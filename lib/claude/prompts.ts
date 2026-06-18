@@ -1,0 +1,275 @@
+import { isPresetRoom, type PresetRoom, type Room } from "@/types";
+
+export const ROOM_CONTEXT: Record<PresetRoom, string> = {
+  data_engineering:
+    "Data Engineering (ETL pipelines, orchestration, data modeling, warehousing, streaming)",
+  data_science:
+    "Data Science (statistics, ML models, A/B testing, experimentation, analytics)",
+  ml_engineering:
+    "ML Engineering (model deployment, MLOps, serving infrastructure, inference optimisation)",
+};
+
+// ── Question generation ───────────────────────────────────────────────────
+
+export function questionGenerationPrompt(
+  topicContext:      string | null,
+  previousQuestions: string[],
+  jobDescription?:   string,
+): string {
+  const roleIntro = topicContext
+    ? `You are a senior interviewer at a top tech company hiring for ${topicContext} roles.`
+    : `You are a senior interviewer. Infer the interview domain, required stack, and seniority level entirely from the job description below.`;
+
+  const avoidBlock =
+    previousQuestions.length > 0
+      ? `\nDo NOT ask about any of these already-asked questions:\n${previousQuestions
+          .map((q) => `- "${q}"`)
+          .join("\n")}`
+      : "";
+
+  const jobBlock = jobDescription
+    ? `\n\nThe candidate is applying for a role matching this job description:\n${jobDescription.slice(0, 1500)}\nTailor your question toward the specific stack, seniority level, and responsibilities mentioned.`
+    : "";
+
+  return `${roleIntro}
+
+Generate ONE technical interview question for a mid-to-senior level candidate.${avoidBlock}${jobBlock}
+
+Requirements:
+- Specific and practical — answerable verbally in 2-3 minutes
+- Tests depth of understanding, not just surface knowledge
+- The best answer must be 3-5 sentences: technically precise, well-structured, and demonstrate real expertise
+
+Respond with ONLY valid JSON, no markdown fences, no commentary:
+{"question": "...", "bestAnswer": "..."}`;
+}
+
+export function introQuestionBestAnswerPrompt(question: string): string {
+  return `You are an interview coach. For the introductory interview question below, write an instructional ideal answer in prose form.
+
+Explain the *structure and approach* of a strong answer — what to cover, in what order, and why. Write it as coaching advice, not as a fill-in-the-blank template. Do not use placeholders like [Job Title], [X years], or [Company Name]. Write 3-5 sentences of concrete, actionable guidance.
+
+Example style: "A strong answer follows a clear arc: where you've been, what you've built, and why this role is the natural next step. Open with your current role and the most relevant part of your background, name one specific accomplishment with a measurable outcome, then land on what you're looking for next and why this role fits. Keep it under 90 seconds — confident, not comprehensive."
+
+Question: "${question}"
+
+Respond with ONLY valid JSON, no markdown fences:
+{"bestAnswer": "..."}`;
+}
+
+// ── Similarity check ──────────────────────────────────────────────────────
+
+export function similarityCheckPrompt(
+  bestAnswer: string,
+  transcript: string
+): string {
+  return `You are evaluating whether a candidate's interview answer matches the approach of a model answer.
+
+Model answer: "${bestAnswer}"
+
+Candidate answer: "${transcript}"
+
+Does the candidate's answer capture at least 90% of the key points and approach from the model answer?
+Respond with JSON only: {"usedBestAnswer": true/false, "alignmentScore": 0-100}`;
+}
+
+// ── Hint generation ───────────────────────────────────────────────────────
+
+export function hintGenerationPrompt(question: string, topicContext: string): string {
+  return `You are a concise interview coach.
+The candidate is being asked: "${question}"
+This is a ${topicContext} interview.
+
+Give a single-sentence hint that nudges them toward the right approach without giving away the answer.
+Do NOT mention the answer. Focus on the thinking framework or key concept they should consider.
+Return JSON only: { "hint": "..." }`;
+}
+
+// ── Feedback generation ───────────────────────────────────────────────────
+
+export function feedbackGenerationPrompt({
+  question,
+  bestAnswer,
+  transcript,
+  viewedHint,
+  viewedBestAnswer,
+  usedBestAnswer,
+}: {
+  question: string;
+  bestAnswer: string;
+  transcript: string;
+  viewedHint: boolean;
+  viewedBestAnswer: boolean;
+  usedBestAnswer: boolean;
+}): string {
+  const scaffoldingLines = [
+    viewedHint ? "They requested a hint before answering." : null,
+    viewedBestAnswer
+      ? "They viewed the ideal answer before answering."
+      : "They did not view the ideal answer before answering.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const viewedLine = scaffoldingLines;
+
+  const instruction = usedBestAnswer
+    ? `Their answer closely follows the suggested approach (>90% alignment).
+Explain why this approach is strong and what makes it the right answer. Acknowledge what they did well.`
+    : `Their answer does NOT closely follow the suggested approach.
+Give direct, constructive feedback: highlight what they got right, what they missed, and what the best answer adds.`;
+
+  return `You are a tough but fair interview coach.
+
+The candidate was asked: "${question}"
+The suggested best answer was: "${bestAnswer}"
+The candidate answered: "${transcript}"
+${viewedLine}
+Claude judged their answer as ${usedBestAnswer ? "matching" : "not matching"} the suggested approach.
+
+${instruction}
+
+Keep feedback to 2-3 sentences. Start with a short verdict phrase (e.g. "Strong answer." or "Partially there.").
+Do not use markdown formatting, asterisks, bold markers, or any special characters.
+Reply with ONLY the feedback text — no JSON, no preamble.`;
+}
+
+// ── Session assessment ────────────────────────────────────────────────────
+
+export function sessionAssessmentPrompt(params: {
+  room:  Room;
+  topic?: string;
+  questionsAndAnswers: Array<{
+    question:       string;
+    transcript:     string;
+    feedback:       string;
+    usedBestAnswer: boolean;
+  }>;
+}): string {
+  const { room, topic, questionsAndAnswers } = params;
+  const topicContext = isPresetRoom(room) ? ROOM_CONTEXT[room] : (topic ?? 'general data and ML engineering');
+
+  const qaList = questionsAndAnswers
+    .map(
+      (qa, i) =>
+        `Q${i + 1}: "${qa.question}"\nAnswer: "${qa.transcript}"\nFeedback: "${qa.feedback}"\nUsed ideal answer: ${qa.usedBestAnswer ? 'yes' : 'no'}`,
+    )
+    .join('\n\n');
+
+  return `You are a senior interview coach reviewing a candidate's mock interview session.
+
+Room: ${topicContext}
+Questions answered: ${questionsAndAnswers.length}
+
+Here are the question/answer pairs with individual feedback:
+${qaList}
+
+Write a 2-3 sentence overall assessment. Be direct and honest.
+Highlight one strength and one area to develop.
+Start with the candidate's biggest takeaway.
+Return JSON only: { "assessment": "..." }`;
+}
+
+// ── Focused learning chat ─────────────────────────────────────────────────
+
+export function focusedLearningSystemPrompt(topic: string): string {
+  return `You are a focused learning tutor. The user is studying: "${topic}".
+
+Your rules:
+1. If the question is clearly related to ${topic}: give a thorough, educational answer. Use concrete examples. Structure with bullet points for complex topics. 3–6 sentences or equivalent.
+2. If the question is NOT related to ${topic}: give a very brief answer in 1 sentence maximum, then add: "That's outside our focus — let's stay on ${topic}. What else would you like to explore?"
+
+A question is off-topic when it concerns a different subject, technology, or domain that has no meaningful connection to ${topic}.
+
+Always respond with ONLY valid JSON, no markdown fences, no commentary:
+{"reply": "...", "isOffTopic": true | false}`;
+}
+
+// ── Milestone curriculum generation ──────────────────────────────────────
+
+export function milestoneGenerationPrompt(topic: string): string {
+  return `You are an expert curriculum designer and learning coach.
+
+The user wants to learn: "${topic}"
+
+Generate a comprehensive, logically ordered list of 8–14 learning milestones that cover this topic from foundational concepts to practical mastery.
+
+Requirements:
+- Progress from fundamentals to advanced/applied topics in a logical order
+- Each milestone must be a discrete, achievable learning unit
+- Titles: short and specific (3–7 words). Examples: "Core Architecture & Components", "Writing Your First DAG", "Task Dependencies & XComs"
+- Summaries: 2–3 sentences explaining what this milestone covers, why it matters, and what the learner will be able to do after completing it
+- The first 1–2 milestones should start in column "learn" (the entry point); all others start in "backlog"
+
+Respond with ONLY valid JSON, no markdown fences, no commentary:
+{
+  "trackTitle": "...",
+  "milestones": [
+    { "title": "...", "summary": "...", "column": "learn" },
+    { "title": "...", "summary": "...", "column": "backlog" }
+  ]
+}`;
+}
+
+// ── Learning goal refinement (5-whys) ────────────────────────────────────
+
+export function refinementQuestionPrompt(
+  topic:   string,
+  answers: Array<{ question: string; answer: string }>,
+): string {
+  const historyBlock =
+    answers.length > 0
+      ? `\n\nPrevious Q&A:\n${answers.map(a => `Q: "${a.question}"\nA: "${a.answer}"`).join("\n")}`
+      : "";
+
+  const questionNumber = answers.length + 1;
+  const isLast         = answers.length >= 4;
+
+  return `You are Hugh, a warm learning coach helping someone clarify their learning goal.
+
+Topic: "${topic}"${historyBlock}
+
+This is question ${questionNumber} of 5. ${isLast ? "This is the final question — wrap up your understanding." : "Dig one level deeper with each question."}
+
+Ask ONE focused follow-up question to understand their real motivation, context, or background. Use the 5-Whys method — alternate between "why", "what", "how", and "tell me more about".
+
+Rules:
+- ONE question only, 20 words max
+- Warm and conversational, not clinical
+- Never repeat a question already asked
+- Set "done" to ${isLast ? "true" : "false"}
+
+Respond with ONLY valid JSON, no markdown fences:
+{"question": "...", "done": ${isLast}}`;
+}
+
+export function refineTopicPrompt(
+  topic:   string,
+  answers: Array<{ question: string; answer: string }>,
+): string {
+  const qa = answers
+    .map(a => `Q: ${a.question}\nA: ${a.answer}`)
+    .join("\n\n");
+
+  return `A user wants to learn "${topic}". Here is what they shared about their motivation and context:
+
+${qa}
+
+Based on this:
+1. Write a refined, specific topic title (5-10 words) that captures what they REALLY want to learn — more precise than the original.
+2. Write three short expert tips (1-2 sentences each) about how to learn this subject effectively. Make them specific to the refined topic, practical, and encouraging.
+
+Respond with ONLY valid JSON, no markdown fences:
+{"refinedTopic": "...", "tips": ["...", "...", "..."]}`;
+}
+
+// ── Shared JSON parse helper ──────────────────────────────────────────────
+
+export function parseClaudeJson<T = Record<string, unknown>>(text: string): T {
+  // Strip markdown code fences if Claude wraps the output
+  const cleaned = text
+    .replace(/^```(?:json)?\s*/im, "")
+    .replace(/\s*```\s*$/im, "")
+    .trim();
+  return JSON.parse(cleaned) as T;
+}

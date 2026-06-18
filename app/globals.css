@@ -1,26 +1,96 @@
 @import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@plugin "tailwind-scrollbar";
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans:  var(--font-inter);
+  --font-serif: var(--font-lora);
+
+  --color-background:  #0F172A;
+  --color-surface:     #1E293B;
+  --color-accent:      #38BDF8;
+  --color-accent-dark: #0EA5E9;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 6px 3px rgba(251, 191, 36, 0.45); }
+  50%       { box-shadow: 0 0 20px 8px rgba(251, 191, 36, 0.80); }
+}
+
+.glow-amber {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 200ms ease-out forwards;
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50%       { opacity: 0.65; transform: scale(1.1); }
+}
+
+.animate-breathe {
+  animation: breathe 7s ease-in-out infinite;
+}
+
+.animate-breathe-delayed {
+  animation: breathe 9s ease-in-out infinite;
+  animation-delay: -4s;
+}
+
+.animate-breathe-slow {
+  animation: breathe 11s ease-in-out infinite;
+  animation-delay: -2s;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #0F172A;
+  color: #F8FAFC;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar — themed to match the dark UI */
+* {
+  scrollbar-width: thin;
+  /* Firefox: thumb track */
+  scrollbar-color: #475569 rgba(255, 255, 255, 0.03);
+}
+
+*::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+*::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #475569;
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #64748b;
 }
