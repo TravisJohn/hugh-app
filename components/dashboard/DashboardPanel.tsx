@@ -77,6 +77,10 @@ export default function DashboardPanel({ initialGoals }: Props) {
     setRefining(false);
   }
 
+  function handleGoalDeleted(id: string) {
+    setGoals(prev => prev.filter(g => g.id !== id));
+  }
+
   return (
     <div className="flex flex-col gap-10 px-10 py-8 max-w-2xl w-full">
 
@@ -88,7 +92,7 @@ export default function DashboardPanel({ initialGoals }: Props) {
         <p className="mt-1 text-sm text-slate-500">
           {refining
             ? "Hugh is learning more about your goal to personalize your path."
-            : "Add a topic to your library and set a commitment date."}
+            : "Data, analytics, and everything in between — add a topic and set a commitment date."}
         </p>
 
         <div className="mt-5">
@@ -107,7 +111,7 @@ export default function DashboardPanel({ initialGoals }: Props) {
                 value={topic}
                 onChange={e => setTopic(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="e.g. Apache Airflow, System Design, dbt…"
+                placeholder="e.g. Apache Airflow, dbt, SQL window functions, ML pipelines…"
                 className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500 transition-colors"
               />
 
@@ -169,7 +173,7 @@ export default function DashboardPanel({ initialGoals }: Props) {
             </span>
           </div>
           <div className="flex flex-col gap-3">
-            {goals.map(g => <GoalCard key={g.id} goal={g} />)}
+            {goals.map(g => <GoalCard key={g.id} goal={g} onDelete={handleGoalDeleted} />)}
           </div>
         </section>
       )}
