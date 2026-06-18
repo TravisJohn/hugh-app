@@ -62,6 +62,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
   const [entries, setEntries]               = useState<MilestoneEntry[]>([]);
   const [loadingEntries, setLoadingEntries] = useState(false);
   const [draft, setDraft]                   = useState("");
+  const [draftTitle, setDraftTitle]         = useState("");
   const [saving, setSaving]                 = useState(false);
   const [expanded, setExpanded]             = useState(false);
 
@@ -82,6 +83,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
       return;
     }
     setDraft("");
+    setDraftTitle("");
     setEntries([]);
     setOpenEntries(new Set());
     setShowOverview(true);
@@ -113,14 +115,15 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
       const res = await fetch(`/api/tracker/milestones/${milestone.id}/entries`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ body: draft.trim() }),
+        body:    JSON.stringify({ body: draft.trim(), title: draftTitle.trim() || undefined }),
       });
       const d = await res.json();
       if (d.entry) {
         const newEntry = d.entry as MilestoneEntry;
         setEntries(prev => [...prev, newEntry]);
-        setOpenEntries(prev => new Set([...prev, newEntry.id])); // auto-expand new entry
+        setOpenEntries(prev => new Set([...prev, newEntry.id]));
         setDraft("");
+        setDraftTitle("");
       }
     } finally {
       setSaving(false);
@@ -278,7 +281,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                                   className={`shrink-0 text-slate-500 transition-transform duration-200 ${isOpen ? "" : "-rotate-90"}`}
                                 />
                                 <span className="flex-1 min-w-0 truncate text-xs font-semibold text-violet-400">
-                                  {entry.title || "Note"}
+                                  {entry.title || entry.body.slice(0, 65) + (entry.body.length > 65 ? "…" : "")}
                                 </span>
                                 <span className="shrink-0 text-xs text-slate-600">
                                   {fmtCompact(entry.created_at)}
@@ -308,6 +311,13 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
             {/* Sticky write-entry area — never scrolls */}
             <div className="shrink-0 border-t border-slate-700 px-6 py-4">
               <div className={expanded ? "max-w-3xl mx-auto" : ""}>
+                <input
+                  type="text"
+                  value={draftTitle}
+                  onChange={e => setDraftTitle(e.target.value)}
+                  placeholder="Entry title (optional)"
+                  className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-sky-500 transition-colors mb-2"
+                />
                 <textarea
                   ref={textareaRef}
                   value={draft}

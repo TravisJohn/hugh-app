@@ -11,19 +11,16 @@ export async function POST(req: NextRequest) {
     topic:        string;
     story:        string;
     takeaway:     string;
+    title?:       string;
     milestoneId?: string;
   };
 
-  const { topic, story, takeaway, milestoneId } = body;
+  const { topic, story, takeaway, title, milestoneId } = body;
   if (!topic || !story || !takeaway) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const dateLabel  = new Date().toLocaleString("en-GB", {
-    day: "numeric", month: "short", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
-  });
-  const entryTitle = `Ask Hugh — ${dateLabel}`;
+  const entryTitle = title?.trim() || topic;
   const entryBody  = `${story}\n\nKey Takeaway: ${takeaway}`;
 
   // ── Case 1: milestone-scoped session → save as a diary entry on that card ──

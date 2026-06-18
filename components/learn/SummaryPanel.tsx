@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 export interface SummaryData {
   story:    string;
   takeaway: string;
+  title?:   string | null;
 }
 
 interface Props {
@@ -35,8 +36,9 @@ export default function SummaryPanel({ topic, data, loading, goalId, milestoneId
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({
           topic,
-          story:    data.story,
-          takeaway: data.takeaway,
+          story:       data.story,
+          takeaway:    data.takeaway,
+          title:       data.title ?? undefined,
           milestoneId,
         }),
       });

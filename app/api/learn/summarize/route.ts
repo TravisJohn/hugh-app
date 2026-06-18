@@ -36,12 +36,15 @@ Write a SHORT narrative (3-4 sentences) describing how this conversation unfolde
 
 Then choose ONE key takeaway that is most relevant and most impactful for the topic "${topic}". This should be the single insight the student should remember above all else.
 
-Return ONLY valid JSON with exactly these two fields:
-{"story": "...", "takeaway": "..."}
+Then generate a SHORT, specific title (4-7 words) that captures the MAIN concept discussed in this specific conversation — not just the general subject, but what was actually explored. Examples: "Partitioning Strategies for Large Fact Tables", "Why Idempotency Matters in Pipelines".
+
+Return ONLY valid JSON with exactly these three fields:
+{"story": "...", "takeaway": "...", "title": "..."}
 
 Rules:
 - "story" must be 3-4 flowing sentences, no bullet points
 - "takeaway" must be a single concise sentence (20 words max)
+- "title" must be 4-7 words, specific to what was discussed
 - Do not use markdown inside the JSON values
 - Return ONLY the JSON object, no fences, no commentary`;
 
@@ -58,9 +61,9 @@ Rules:
     }
 
     const raw    = block.text.trim().replace(/^```(?:json)?|```$/g, "").trim();
-    const parsed = JSON.parse(raw) as { story: string; takeaway: string };
+    const parsed = JSON.parse(raw) as { story: string; takeaway: string; title?: string };
 
-    return NextResponse.json({ story: parsed.story, takeaway: parsed.takeaway });
+    return NextResponse.json({ story: parsed.story, takeaway: parsed.takeaway, title: parsed.title ?? null });
   } catch {
     return NextResponse.json({ error: "Failed to generate summary" }, { status: 500 });
   }
