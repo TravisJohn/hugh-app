@@ -1,15 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X, BookOpen, Plus, Loader2, MessageCircle, ArrowRight, Maximize2, Minimize2 } from "lucide-react";
+import {
+  X, BookOpen, Plus, Loader2, MessageCircle, ArrowRight,
+  Maximize2, Minimize2, ChevronDown,
+} from "lucide-react";
 import Link from "next/link";
 import { type Milestone, type MilestoneEntry, KANBAN_COLUMN_LABELS } from "@/types";
 
 interface Props {
-  milestone:    Milestone | null;
+  milestone:     Milestone | null;
   topicContext?: string;
-  goalId?:      string;
-  onClose:      () => void;
+  goalId?:       string;
+  onClose:       () => void;
 }
 
 const COLUMN_COLOURS: Record<string, string> = {
@@ -19,14 +22,59 @@ const COLUMN_COLOURS: Record<string, string> = {
   done:    "text-green-400 bg-green-900/40",
 };
 
+function fmtCompact(dateStr: string) {
+  return new Date(dateStr).toLocaleDateString("en-GB", {
+    day: "numeric", month: "short",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+interface SectionProps {
+  label:    string;
+  open:     boolean;
+  onToggle: () => void;
+  count?:   number;
+}
+
+function SectionToggle({ label, open, onToggle, count }: SectionProps) {
+  return (
+    <button
+      onClick={onToggle}
+      className="flex w-full items-center gap-2 py-3 text-left"
+    >
+      <ChevronDown
+        size={13}
+        className={`shrink-0 text-slate-500 transition-transform duration-200 ${open ? "" : "-rotate-90"}`}
+      />
+      <span className="flex-1 text-xs font-semibold uppercase tracking-widest text-slate-500">
+        {label}
+      </span>
+      {count !== undefined && (
+        <span className="rounded-full bg-slate-800 px-2 py-0.5 font-mono text-xs text-slate-600">
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
+
 export default function MilestoneDrawer({ milestone, topicContext, goalId, onClose }: Props) {
-  const [entries, setEntries]             = useState<MilestoneEntry[]>([]);
+  const [entries, setEntries]               = useState<MilestoneEntry[]>([]);
   const [loadingEntries, setLoadingEntries] = useState(false);
-  const [draft, setDraft]                 = useState("");
-  const [saving, setSaving]               = useState(false);
-  const [expanded, setExpanded]           = useState(false);
-  const textareaRef                       = useRef<HTMLTextAreaElement>(null);
-  const entriesEndRef                     = useRef<HTMLDivElement>(null);
+  const [draft, setDraft]                   = useState("");
+  const [saving, setSaving]                 = useState(false);
+  const [expanded, setExpanded]             = useState(false);
+
+  // Section visibility — all open by default
+  const [showOverview, setShowOverview] = useState(true);
+  const [showActions, setShowActions]   = useState(true);
+  const [showDiary, setShowDiary]       = useState(true);
+
+  // Which individual entries are expanded
+  const [openEntries, setOpenEntries] = useState<Set<string>>(new Set());
+
+  const textareaRef  = useRef<HTMLTextAreaElement>(null);
+  const entriesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!milestone) {
@@ -35,6 +83,10 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
     }
     setDraft("");
     setEntries([]);
+    setOpenEntries(new Set());
+    setShowOverview(true);
+    setShowActions(true);
+    setShowDiary(true);
     setLoadingEntries(true);
     fetch(`/api/tracker/milestones/${milestone.id}/entries`)
       .then(r => r.json())
@@ -45,6 +97,14 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
   useEffect(() => {
     entriesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [entries]);
+
+  function toggleEntry(id: string) {
+    setOpenEntries(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
 
   async function submitEntry() {
     if (!draft.trim() || !milestone || saving) return;
@@ -57,7 +117,9 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
       });
       const d = await res.json();
       if (d.entry) {
-        setEntries(prev => [...prev, d.entry as MilestoneEntry]);
+        const newEntry = d.entry as MilestoneEntry;
+        setEntries(prev => [...prev, newEntry]);
+        setOpenEntries(prev => new Set([...prev, newEntry.id])); // auto-expand new entry
         setDraft("");
       }
     } finally {
@@ -102,7 +164,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
       >
         {milestone && (
           <>
-            {/* Sticky header */}
+            {/* Sticky header — never scrolls */}
             <div className="shrink-0 flex items-start justify-between gap-4 border-b border-slate-700 px-6 py-5">
               <div className="flex-1 min-w-0">
                 <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold mb-2 ${COLUMN_COLOURS[milestone.kanban_column]}`}>
@@ -129,81 +191,122 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
               </div>
             </div>
 
-            {/* Scrollable body — summary + Ask CTA + all diary entries */}
+            {/* Scrollable body */}
             <div className="flex-1 min-h-0 overflow-y-auto">
               <div className={expanded ? "max-w-3xl mx-auto" : ""}>
 
-                {/* Summary */}
-                <div className="border-b border-slate-700 px-6 py-4">
-                  <p className="text-sm text-slate-300 leading-relaxed">{milestone.summary}</p>
-                </div>
-
-                {/* Ask Hugh CTA */}
-                <div className="border-b border-slate-700 px-6 py-4">
-                  <Link
-                    href={askHref()}
-                    onClick={onClose}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-violet-500/30 bg-violet-500/8 px-4 py-3 transition-all hover:border-violet-500/50 hover:bg-violet-500/12 group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 text-violet-400">
-                        <MessageCircle size={15} />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-violet-300">Ask Hugh about this</p>
-                        <p className="text-xs text-slate-500">Full chat — summarise, deep-dive, examples</p>
-                      </div>
-                    </div>
-                    <ArrowRight size={15} className="shrink-0 text-violet-500 transition-transform group-hover:translate-x-0.5" />
-                  </Link>
-                </div>
-
-                {/* Diary entries */}
-                <div className="px-6 py-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <BookOpen size={14} className="text-slate-500" />
-                    <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-                      Learning diary
-                    </span>
-                  </div>
-
-                  {loadingEntries && (
-                    <div className="flex justify-center py-6">
-                      <Loader2 size={18} className="animate-spin text-slate-500" />
-                    </div>
-                  )}
-                  {!loadingEntries && entries.length === 0 && (
-                    <p className="text-center text-xs text-slate-600 py-6">
-                      No entries yet — add your first thought below.
+                {/* ── Overview ─────────────────────────────────────── */}
+                <div className="border-b border-slate-700/60 px-6">
+                  <SectionToggle
+                    label="Overview"
+                    open={showOverview}
+                    onToggle={() => setShowOverview(v => !v)}
+                  />
+                  {showOverview && (
+                    <p className="pb-4 text-sm text-slate-300 leading-relaxed">
+                      {milestone.summary}
                     </p>
                   )}
+                </div>
 
-                  <div className="space-y-3">
-                    {entries.map(entry => (
-                      <div key={entry.id} className="rounded-lg bg-slate-800/60 px-4 py-3 space-y-1.5">
-                        {entry.title && (
-                          <p className="text-xs font-semibold text-violet-400">{entry.title}</p>
-                        )}
-                        <p className="text-xs text-slate-600">
-                          {new Date(entry.created_at).toLocaleDateString("en-GB", {
-                            day: "numeric", month: "short", year: "numeric",
-                            hour: "2-digit", minute: "2-digit",
-                          })}
+                {/* ── Actions ──────────────────────────────────────── */}
+                <div className="border-b border-slate-700/60 px-6">
+                  <SectionToggle
+                    label="Actions"
+                    open={showActions}
+                    onToggle={() => setShowActions(v => !v)}
+                  />
+                  {showActions && (
+                    <div className="pb-4">
+                      <Link
+                        href={askHref()}
+                        onClick={onClose}
+                        className="flex items-center justify-between gap-3 rounded-xl border border-violet-500/30 bg-violet-500/8 px-4 py-3 transition-all hover:border-violet-500/50 hover:bg-violet-500/12 group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 text-violet-400">
+                            <MessageCircle size={15} />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-violet-300">Ask Hugh about this</p>
+                            <p className="text-xs text-slate-500">Full chat — summarise, deep-dive, examples</p>
+                          </div>
+                        </div>
+                        <ArrowRight size={15} className="shrink-0 text-violet-500 transition-transform group-hover:translate-x-0.5" />
+                      </Link>
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Learning diary ───────────────────────────────── */}
+                <div className="px-6">
+                  <SectionToggle
+                    label="Learning diary"
+                    open={showDiary}
+                    onToggle={() => setShowDiary(v => !v)}
+                    count={entries.length || undefined}
+                  />
+
+                  {showDiary && (
+                    <>
+                      {loadingEntries && (
+                        <div className="flex justify-center py-6">
+                          <Loader2 size={18} className="animate-spin text-slate-500" />
+                        </div>
+                      )}
+                      {!loadingEntries && entries.length === 0 && (
+                        <p className="py-6 text-center text-xs text-slate-600">
+                          No entries yet — add your first thought below.
                         </p>
-                        <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap pt-0.5">
-                          {entry.body}
-                        </p>
+                      )}
+
+                      <div className="space-y-2 pb-4">
+                        {entries.map(entry => {
+                          const isOpen = openEntries.has(entry.id);
+                          return (
+                            <div
+                              key={entry.id}
+                              className="rounded-lg border border-slate-700/50 bg-slate-800/50 overflow-hidden"
+                            >
+                              {/* Entry header — always visible */}
+                              <button
+                                onClick={() => toggleEntry(entry.id)}
+                                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left hover:bg-slate-800 transition-colors"
+                              >
+                                <ChevronDown
+                                  size={13}
+                                  className={`shrink-0 text-slate-500 transition-transform duration-200 ${isOpen ? "" : "-rotate-90"}`}
+                                />
+                                <span className="flex-1 min-w-0 truncate text-xs font-semibold text-violet-400">
+                                  {entry.title || "Note"}
+                                </span>
+                                <span className="shrink-0 text-xs text-slate-600">
+                                  {fmtCompact(entry.created_at)}
+                                </span>
+                              </button>
+
+                              {/* Entry body — visible when expanded */}
+                              {isOpen && (
+                                <div className="border-t border-slate-700/40 px-3 py-3 pl-8">
+                                  <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
+                                    {entry.body}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                        <div ref={entriesEndRef} />
                       </div>
-                    ))}
-                    <div ref={entriesEndRef} />
-                  </div>
+                    </>
+                  )}
                 </div>
 
               </div>
             </div>
 
-            {/* Sticky write-entry area */}
-            <div className={`shrink-0 border-t border-slate-700 px-6 py-4 ${expanded ? "" : ""}`}>
+            {/* Sticky write-entry area — never scrolls */}
+            <div className="shrink-0 border-t border-slate-700 px-6 py-4">
               <div className={expanded ? "max-w-3xl mx-auto" : ""}>
                 <textarea
                   ref={textareaRef}
