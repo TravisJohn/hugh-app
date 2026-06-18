@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  X, BookOpen, Plus, Loader2, MessageCircle, ArrowRight,
-  Maximize2, Minimize2, ChevronDown,
+  X, Plus, Loader2, MessageCircle, ArrowRight,
+  Maximize2, Minimize2, ChevronDown, PenLine, BookOpen,
 } from "lucide-react";
 import Link from "next/link";
 import { type Milestone, type MilestoneEntry, KANBAN_COLUMN_LABELS } from "@/types";
@@ -31,12 +31,13 @@ function fmtCompact(dateStr: string) {
 
 interface SectionProps {
   label:    string;
+  icon?:    React.ReactNode;
   open:     boolean;
   onToggle: () => void;
   count?:   number;
 }
 
-function SectionToggle({ label, open, onToggle, count }: SectionProps) {
+function SectionToggle({ label, icon, open, onToggle, count }: SectionProps) {
   return (
     <button
       onClick={onToggle}
@@ -46,6 +47,7 @@ function SectionToggle({ label, open, onToggle, count }: SectionProps) {
         size={13}
         className={`shrink-0 text-slate-500 transition-transform duration-200 ${open ? "" : "-rotate-90"}`}
       />
+      {icon && <span className="shrink-0 text-slate-500">{icon}</span>}
       <span className="flex-1 text-xs font-semibold uppercase tracking-widest text-slate-500">
         {label}
       </span>
@@ -67,9 +69,10 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
   const [expanded, setExpanded]             = useState(false);
 
   // Section visibility — all open by default
-  const [showOverview, setShowOverview] = useState(true);
-  const [showActions, setShowActions]   = useState(true);
-  const [showDiary, setShowDiary]       = useState(true);
+  const [showOverview, setShowOverview]       = useState(true);
+  const [showActions, setShowActions]         = useState(true);
+  const [showDiary, setShowDiary]             = useState(true);
+  const [showWriteEntry, setShowWriteEntry]   = useState(true);
 
   // Which individual entries are expanded
   const [openEntries, setOpenEntries] = useState<Set<string>>(new Set());
@@ -89,6 +92,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
     setShowOverview(true);
     setShowActions(true);
     setShowDiary(true);
+    setShowWriteEntry(true);
     setLoadingEntries(true);
     fetch(`/api/tracker/milestones/${milestone.id}/entries`)
       .then(r => r.json())
@@ -124,6 +128,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
         setOpenEntries(prev => new Set([...prev, newEntry.id]));
         setDraft("");
         setDraftTitle("");
+        setShowDiary(true); // ensure diary section is visible after save
       }
     } finally {
       setSaving(false);
@@ -161,14 +166,25 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
 
       {/* Drawer */}
       <aside
-        className={`fixed top-0 right-0 z-40 flex h-full flex-col bg-slate-900 border-l border-slate-700 shadow-2xl transition-all duration-300
-          ${expanded ? "w-full" : "w-full max-w-md"}
+        className={`fixed top-0 right-0 z-40 flex h-full flex-col border-l border-slate-700/80 shadow-2xl transition-all duration-300
+          ${expanded ? "w-full bg-[#0A0F1E]" : "w-full max-w-md bg-slate-900"}
           ${open ? "translate-x-0" : "translate-x-full"}`}
       >
+        {/* Breathing orbs — only visible in expanded (full-screen) mode */}
+        {expanded && (
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            <div className="animate-breathe absolute top-0 left-0 h-[600px] w-[600px] -translate-x-1/3 -translate-y-1/3 rounded-full bg-sky-500/20 blur-3xl" />
+            <div className="animate-breathe-delayed absolute bottom-0 right-0 h-[700px] w-[700px] translate-x-1/3 translate-y-1/3 rounded-full bg-violet-500/15 blur-3xl" />
+            <div className="animate-breathe-slow absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[400px] w-[400px] rounded-full bg-sky-400/10 blur-3xl" />
+          </div>
+        )}
+
+        {/* All content in a relative wrapper so it sits above the orbs */}
         {milestone && (
-          <>
-            {/* Sticky header — never scrolls */}
-            <div className="shrink-0 flex items-start justify-between gap-4 border-b border-slate-700 px-6 py-5">
+          <div className="relative z-10 flex flex-1 min-h-0 flex-col">
+
+            {/* Sticky header */}
+            <div className="shrink-0 flex items-start justify-between gap-4 border-b border-slate-700/60 px-6 py-5">
               <div className="flex-1 min-w-0">
                 <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold mb-2 ${COLUMN_COLOURS[milestone.kanban_column]}`}>
                   {KANBAN_COLUMN_LABELS[milestone.kanban_column]}
@@ -194,12 +210,12 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
               </div>
             </div>
 
-            {/* Scrollable body */}
+            {/* Scrollable body — everything between header and write area */}
             <div className="flex-1 min-h-0 overflow-y-auto">
               <div className={expanded ? "max-w-3xl mx-auto" : ""}>
 
-                {/* ── Overview ─────────────────────────────────────── */}
-                <div className="border-b border-slate-700/60 px-6">
+                {/* ── Overview ───────────────────────────────────────── */}
+                <div className="border-b border-slate-700/40 px-6">
                   <SectionToggle
                     label="Overview"
                     open={showOverview}
@@ -212,8 +228,8 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                   )}
                 </div>
 
-                {/* ── Actions ──────────────────────────────────────── */}
-                <div className="border-b border-slate-700/60 px-6">
+                {/* ── Actions ────────────────────────────────────────── */}
+                <div className="border-b border-slate-700/40 px-6">
                   <SectionToggle
                     label="Actions"
                     open={showActions}
@@ -224,7 +240,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                       <Link
                         href={askHref()}
                         onClick={onClose}
-                        className="flex items-center justify-between gap-3 rounded-xl border border-violet-500/30 bg-violet-500/8 px-4 py-3 transition-all hover:border-violet-500/50 hover:bg-violet-500/12 group"
+                        className="glow-violet flex items-center justify-between gap-3 rounded-xl border border-violet-500/30 bg-violet-500/8 px-4 py-3 transition-all hover:border-violet-500/60 hover:bg-violet-500/15 group"
                       >
                         <div className="flex items-center gap-3">
                           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 text-violet-400">
@@ -241,10 +257,11 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                   )}
                 </div>
 
-                {/* ── Learning diary ───────────────────────────────── */}
+                {/* ── Learning diary ─────────────────────────────────── */}
                 <div className="px-6">
                   <SectionToggle
                     label="Learning diary"
+                    icon={<BookOpen size={13} />}
                     open={showDiary}
                     onToggle={() => setShowDiary(v => !v)}
                     count={entries.length || undefined}
@@ -259,36 +276,37 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                       )}
                       {!loadingEntries && entries.length === 0 && (
                         <p className="py-6 text-center text-xs text-slate-600">
-                          No entries yet — add your first thought below.
+                          No entries yet — log your first insight below.
                         </p>
                       )}
 
                       <div className="space-y-2 pb-4">
                         {entries.map(entry => {
                           const isOpen = openEntries.has(entry.id);
+                          const label  = entry.title || entry.body.slice(0, 65) + (entry.body.length > 65 ? "…" : "");
                           return (
                             <div
                               key={entry.id}
                               className="rounded-lg border border-slate-700/50 bg-slate-800/50 overflow-hidden"
                             >
-                              {/* Entry header — always visible */}
+                              {/* Collapsed header — always visible */}
                               <button
                                 onClick={() => toggleEntry(entry.id)}
-                                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left hover:bg-slate-800 transition-colors"
+                                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left hover:bg-slate-800/80 transition-colors"
                               >
                                 <ChevronDown
                                   size={13}
                                   className={`shrink-0 text-slate-500 transition-transform duration-200 ${isOpen ? "" : "-rotate-90"}`}
                                 />
                                 <span className="flex-1 min-w-0 truncate text-xs font-semibold text-violet-400">
-                                  {entry.title || entry.body.slice(0, 65) + (entry.body.length > 65 ? "…" : "")}
+                                  {label}
                                 </span>
                                 <span className="shrink-0 text-xs text-slate-600">
                                   {fmtCompact(entry.created_at)}
                                 </span>
                               </button>
 
-                              {/* Entry body — visible when expanded */}
+                              {/* Body — visible when expanded */}
                               {isOpen && (
                                 <div className="border-t border-slate-700/40 px-3 py-3 pl-8">
                                   <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
@@ -308,39 +326,53 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
               </div>
             </div>
 
-            {/* Sticky write-entry area — never scrolls */}
-            <div className="shrink-0 border-t border-slate-700 px-6 py-4">
+            {/* ── Log what I learned — collapsible, sticky at bottom ── */}
+            <div className="shrink-0 border-t border-slate-700/60">
               <div className={expanded ? "max-w-3xl mx-auto" : ""}>
-                <input
-                  type="text"
-                  value={draftTitle}
-                  onChange={e => setDraftTitle(e.target.value)}
-                  placeholder="Entry title (optional)"
-                  className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-sky-500 transition-colors mb-2"
-                />
-                <textarea
-                  ref={textareaRef}
-                  value={draft}
-                  onChange={e => setDraft(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Write a thought, insight, or note…"
-                  rows={3}
-                  className="w-full resize-none rounded-lg bg-slate-800 border border-slate-700 px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-sky-500 transition-colors"
-                />
-                <div className="mt-2 flex items-center justify-between">
-                  <span className="text-xs text-slate-600">⌘ Enter to save</span>
-                  <button
-                    onClick={submitEntry}
-                    disabled={!draft.trim() || saving}
-                    className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {saving ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-                    Add entry
-                  </button>
+                <div className="px-6">
+                  <SectionToggle
+                    label="Log what I learned"
+                    icon={<PenLine size={13} />}
+                    open={showWriteEntry}
+                    onToggle={() => setShowWriteEntry(v => !v)}
+                  />
                 </div>
+
+                {showWriteEntry && (
+                  <div className="px-6 pb-4">
+                    <input
+                      type="text"
+                      value={draftTitle}
+                      onChange={e => setDraftTitle(e.target.value)}
+                      placeholder="Entry title (optional)"
+                      className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-sky-500 transition-colors mb-2"
+                    />
+                    <textarea
+                      ref={textareaRef}
+                      value={draft}
+                      onChange={e => setDraft(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Write a thought, insight, or note…"
+                      rows={3}
+                      className="w-full resize-none rounded-lg bg-slate-800 border border-slate-700 px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-sky-500 transition-colors"
+                    />
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-xs text-slate-600">⌘ Enter to save</span>
+                      <button
+                        onClick={submitEntry}
+                        disabled={!draft.trim() || saving}
+                        className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {saving ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                        Add entry
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          </>
+
+          </div>
         )}
       </aside>
     </>
