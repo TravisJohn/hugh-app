@@ -127,14 +127,16 @@ export default function MasteryClient({ milestoneId, milestoneTitle, personaId, 
   const audio        = useAudioPlayer({ onEnded: onAudioEnded });
 
   // ── Manage speech recognition lifecycle via phase ────────────────────────
+  // Do NOT call speech.reset() here — it calls recognition.stop() internally,
+  // and calling recognition.start() immediately after causes a race condition
+  // where the engine hasn't fully stopped, so start() silently fails.
+  // The transcript is already cleared by handleDone() between exchanges.
   useEffect(() => {
     if (phase === "listening") {
-      speech.reset();
       speech.start();
     } else if (speech.isRecording) {
       speech.stop();
     }
-    // speech hooks are stable — no dep needed
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
@@ -163,6 +165,7 @@ export default function MasteryClient({ milestoneId, milestoneTitle, personaId, 
     setMessages([]);
     setEvaluation(null);
     setApiError(null);
+    speech.reset();  // clear any transcript leftover from a previous session
     setPhase("generating");
 
     try {
@@ -245,7 +248,7 @@ export default function MasteryClient({ milestoneId, milestoneTitle, personaId, 
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#0F172A] flex flex-col">
+    <div className="h-screen bg-[#0F172A] flex flex-col overflow-hidden">
 
       {/* Background orbs */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
@@ -350,7 +353,7 @@ export default function MasteryClient({ milestoneId, milestoneTitle, personaId, 
 
       {/* ── ACTIVE CONVERSATION ───────────────────────────────────────────── */}
       {!["setup", "result", "validating"].includes(phase) && (
-        <div className="relative z-10 flex flex-1 flex-col">
+        <div className="relative z-10 flex flex-1 flex-col min-h-0">
           {/* Exchange counter */}
           {!["evaluating"].includes(phase) && (
             <div className="shrink-0 flex justify-center py-3">
