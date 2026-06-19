@@ -2,6 +2,7 @@ import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
+import { checkUsageAllowed, logUsage } from "@/lib/usage";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -9,6 +10,14 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { allowed, reason } = await checkUsageAllowed(user.id);
+  if (!allowed) {
+    const msg = reason === "limit_reached"
+      ? "Monthly usage limit reached. Please contact Travis to reset or upgrade."
+      : "Your access has been restricted. Please contact support.";
+    return NextResponse.json({ error: msg }, { status: reason === "limit_reached" ? 429 : 403 });
+  }
 
   const body = await req.json() as {
     topic: string;
@@ -20,7 +29,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing topic or messages" }, { status: 400 });
   }
 
-  // Strip any synthetic welcome message (first assistant turn) before building the transcript
   const realMessages = messages[0]?.role === "assistant" ? messages.slice(1) : messages;
 
   const conversation = realMessages
@@ -59,6 +67,8 @@ Rules:
     if (block.type !== "text") {
       return NextResponse.json({ error: "Unexpected response type" }, { status: 500 });
     }
+
+    void logUsage({ userId: user.id, feature: "learn/summarize", tokensIn: response.usage.input_tokens, tokensOut: response.usage.output_tokens });
 
     const raw    = block.text.trim().replace(/^```(?:json)?|```$/g, "").trim();
     const parsed = JSON.parse(raw) as { story: string; takeaway: string; title?: string };

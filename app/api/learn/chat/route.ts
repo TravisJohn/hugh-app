@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { focusedLearningSystemPrompt, parseClaudeJson } from "@/lib/claude/prompts";
+import { checkUsageAllowed, logUsage } from "@/lib/usage";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -12,8 +13,14 @@ interface ChatMessage {
 
 export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { allowed, reason } = await checkUsageAllowed(userId);
+  if (!allowed) {
+    const msg = reason === "limit_reached"
+      ? "Monthly usage limit reached. Please contact Travis to reset or upgrade."
+      : "Your access has been restricted. Please contact support.";
+    return NextResponse.json({ error: msg }, { status: reason === "limit_reached" ? 429 : 403 });
   }
 
   const body = (await request.json()) as {
@@ -51,6 +58,7 @@ export async function POST(request: NextRequest) {
       reply = raw.trim();
     }
 
+    void logUsage({ userId, feature: "learn/chat", tokensIn: res.usage.input_tokens, tokensOut: res.usage.output_tokens });
     return NextResponse.json({ reply: reply || "I couldn't generate a response. Please try again.", isOffTopic });
   } catch (err) {
     console.error("[learn/chat] Claude error:", err);

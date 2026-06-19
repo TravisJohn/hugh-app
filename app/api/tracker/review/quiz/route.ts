@@ -3,6 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
+import { checkUsageAllowed, logUsage } from "@/lib/usage";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -16,6 +17,14 @@ interface QuizQuestion {
 export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { allowed, reason } = await checkUsageAllowed(userId);
+  if (!allowed) {
+    const msg = reason === "limit_reached"
+      ? "Monthly usage limit reached. Please contact Travis to reset or upgrade."
+      : "Your access has been restricted. Please contact support.";
+    return NextResponse.json({ error: msg }, { status: reason === "limit_reached" ? 429 : 403 });
+  }
 
   const body = (await request.json()) as { milestoneId?: string };
   if (!body.milestoneId) {
@@ -96,6 +105,7 @@ Return ONLY a valid JSON array — no markdown, no commentary:
       throw new Error(`Expected 5 questions, got ${Array.isArray(questions) ? questions.length : "non-array"}`);
     }
 
+    void logUsage({ userId, feature: "review/quiz", tokensIn: response.usage.input_tokens, tokensOut: response.usage.output_tokens });
     return NextResponse.json({ questions });
   } catch (err) {
     console.error("[review/quiz] Generation failed:", err);

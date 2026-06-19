@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import SignOutButton from "@/components/landing/SignOutButton";
 import LandingNotice from "@/components/landing/LandingNotice";
 import DashboardPanel from "@/components/dashboard/DashboardPanel";
@@ -14,8 +15,7 @@ interface Props {
 
 export default async function DashboardPage({ searchParams }: Props) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { user } = await verifyUserAccess(supabase);
 
   const sp          = searchParams ? await searchParams : {};
   const showNotice  = sp.notice === "min5";

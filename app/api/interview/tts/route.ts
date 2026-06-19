@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { ElevenLabsClient } from "elevenlabs";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { getPersonaById } from "@/lib/personas";
+import { checkUsageAllowed, logUsage } from "@/lib/usage";
 
 const elevenlabs = new ElevenLabsClient({
   apiKey: process.env.ELEVENLABS_API_KEY,
@@ -9,8 +10,14 @@ const elevenlabs = new ElevenLabsClient({
 
 export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { allowed, reason } = await checkUsageAllowed(userId);
+  if (!allowed) {
+    const msg = reason === "limit_reached"
+      ? "Monthly usage limit reached."
+      : "Your access has been restricted.";
+    return NextResponse.json({ error: msg }, { status: reason === "limit_reached" ? 429 : 403 });
   }
 
   const body = (await request.json()) as {
@@ -57,6 +64,7 @@ export async function POST(request: NextRequest) {
     }
     const audioBuffer = Buffer.concat(chunks);
 
+    void logUsage({ userId, feature: "tts", ttsChars: text.length });
     return new Response(audioBuffer, {
       headers: {
         "Content-Type":   "audio/mpeg",

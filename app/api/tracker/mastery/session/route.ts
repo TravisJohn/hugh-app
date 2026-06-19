@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
+import { checkUsageAllowed, logUsage } from "@/lib/usage";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -34,8 +35,14 @@ function buildConversationText(messages: Message[]): string {
 
 export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { allowed, reason } = await checkUsageAllowed(userId);
+  if (!allowed) {
+    const msg = reason === "limit_reached"
+      ? "Monthly usage limit reached. Please contact Travis to reset or upgrade."
+      : "Your access has been restricted. Please contact support.";
+    return NextResponse.json({ error: msg }, { status: reason === "limit_reached" ? 429 : 403 });
   }
 
   const body = (await request.json()) as RequestBody;
@@ -164,6 +171,8 @@ Return ONLY valid JSON with no markdown fences:
   });
 
   const raw = (completion.content[0] as { type: string; text: string }).text.trim();
+
+  void logUsage({ userId, feature: "mastery/session", tokensIn: completion.usage.input_tokens, tokensOut: completion.usage.output_tokens });
 
   if (phase === "evaluate") {
     const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
