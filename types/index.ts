@@ -118,14 +118,16 @@ export interface Track {
 }
 
 export interface Milestone {
-  id:               string;
-  track_id:         string;
-  title:            string;
-  summary:          string;
-  kanban_column:    KanbanColumn;
-  position:         number;
-  review_validated: boolean;
-  created_at:       string;
+  id:                string;
+  track_id:          string;
+  title:             string;
+  summary:           string;
+  kanban_column:     KanbanColumn;
+  position:          number;
+  review_validated:  boolean;
+  mastery_validated: boolean;
+  mastery_score:     number | null;
+  created_at:        string;
 }
 
 export interface MilestoneEntry {

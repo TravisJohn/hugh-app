@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   X, Plus, Loader2, MessageCircle, ArrowRight,
   Maximize2, Minimize2, ChevronDown, PenLine, BookOpen,
-  OctagonAlert, CheckCircle2, ClipboardCheck,
+  OctagonAlert, CheckCircle2, ClipboardCheck, Mic,
 } from "lucide-react";
 import Link from "next/link";
 import { type Milestone, type MilestoneEntry, KANBAN_COLUMN_LABELS } from "@/types";
@@ -73,11 +73,12 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
   const [expanded, setExpanded]             = useState(false);
 
   // Section visibility
-  const [showOverview, setShowOverview]       = useState(true);
-  const [showReview, setShowReview]           = useState(true);
-  const [showActions, setShowActions]         = useState(true);
-  const [showDiary, setShowDiary]             = useState(true);
-  const [showWriteEntry, setShowWriteEntry]   = useState(true);
+  const [showOverview,  setShowOverview]    = useState(true);
+  const [showReview,    setShowReview]      = useState(true);
+  const [showMastery,   setShowMastery]     = useState(true);
+  const [showActions,   setShowActions]     = useState(true);
+  const [showDiary,     setShowDiary]       = useState(true);
+  const [showWriteEntry, setShowWriteEntry] = useState(true);
 
   // Which individual entries are expanded
   const [openEntries, setOpenEntries] = useState<Set<string>>(new Set());
@@ -90,17 +91,19 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
       setExpanded(false);
       return;
     }
-    const isReview = milestone.kanban_column === "review";
+    const isReview  = milestone.kanban_column === "review";
+    const isMastery = milestone.kanban_column === "done";
     setDraft("");
     setDraftTitle("");
     setEntries([]);
     setOpenEntries(new Set());
     setShowOverview(true);
     setShowReview(true);
-    // Collapse support sections in review mode so learner focuses on the review
-    setShowActions(!isReview);
-    setShowDiary(!isReview);
-    setShowWriteEntry(!isReview);
+    setShowMastery(true);
+    // Collapse support sections in review/mastery mode so the learner focuses on the task
+    setShowActions(!isReview && !isMastery);
+    setShowDiary(!isReview && !isMastery);
+    setShowWriteEntry(!isReview && !isMastery);
     setLoadingEntries(true);
     fetch(`/api/tracker/milestones/${milestone.id}/entries`)
       .then(r => r.json())
@@ -292,6 +295,67 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                                 <ClipboardCheck size={14} />
                                 Start Review Quiz
                                 <span className="text-xs font-normal text-amber-300/70">({entries.length} {entries.length === 1 ? "entry" : "entries"})</span>
+                              </Link>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ── Mastery (only for done-column cards) ───────────── */}
+                {milestone.kanban_column === "done" && (
+                  <div className="border-b border-slate-700/40 px-6">
+                    <SectionToggle
+                      label="Mastery"
+                      icon={
+                        milestone.mastery_validated
+                          ? <CheckCircle2 size={13} className="text-green-400" />
+                          : <OctagonAlert size={13} className="text-red-400" />
+                      }
+                      open={showMastery}
+                      onToggle={() => setShowMastery(v => !v)}
+                    />
+                    {showMastery && (
+                      <div className="pb-4 space-y-3">
+                        {milestone.mastery_validated ? (
+                          <div className="flex items-center gap-2.5 rounded-xl border border-green-500/30 bg-green-500/8 px-4 py-3">
+                            <CheckCircle2 size={16} className="shrink-0 text-green-400" />
+                            <div>
+                              <p className="text-sm font-semibold text-green-300">Mastered</p>
+                              <p className="text-xs text-slate-500">This card has been verbally professed and confirmed.</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-start gap-2.5 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3">
+                              <OctagonAlert size={15} className="shrink-0 mt-0.5 text-red-400" />
+                              <p className="text-sm text-slate-300 leading-relaxed">
+                                This card is not yet confirmed. Profess your mastery in a short voice conversation to lock it in.
+                              </p>
+                            </div>
+
+                            {loadingEntries ? (
+                              <div className="flex items-center gap-2 text-xs text-slate-500 px-1">
+                                <Loader2 size={12} className="animate-spin" />
+                                Checking learning activity…
+                              </div>
+                            ) : entries.length === 0 ? (
+                              <div className="rounded-xl border border-slate-700/60 bg-slate-800/50 px-4 py-3">
+                                <p className="text-sm text-slate-400 leading-relaxed">
+                                  Add at least one learning diary entry before starting a mastery session.
+                                </p>
+                              </div>
+                            ) : (
+                              <Link
+                                href={`/mastery/${milestone.id}?returnUrl=${encodeURIComponent(pathname)}`}
+                                onClick={onClose}
+                                className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-700/70 border border-green-600/40 px-4 py-2.5 text-sm font-semibold text-green-100 hover:bg-green-700 transition-colors"
+                              >
+                                <Mic size={14} />
+                                Begin Mastery Session
+                                <span className="text-xs font-normal text-green-300/70">({entries.length} {entries.length === 1 ? "entry" : "entries"})</span>
                               </Link>
                             )}
                           </>

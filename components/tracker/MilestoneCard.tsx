@@ -26,8 +26,10 @@ export default function MilestoneCard({ milestone, entryCount, isActive, isPulsi
     data: { kanban_column: milestone.kanban_column },
   });
 
-  const tint          = CARD_TINTS[milestone.kanban_column] ?? CARD_TINTS.backlog;
-  const needsReview   = milestone.kanban_column === "review" && !milestone.review_validated;
+  const tint         = CARD_TINTS[milestone.kanban_column] ?? CARD_TINTS.backlog;
+  const needsReview  = milestone.kanban_column === "review" && !milestone.review_validated;
+  const needsMastery = milestone.kanban_column === "done"   && !milestone.mastery_validated;
+  const showStopSign = needsReview || needsMastery;
 
   // Overlay: the floating card while dragging
   if (isOverlay) {
@@ -35,12 +37,12 @@ export default function MilestoneCard({ milestone, entryCount, isActive, isPulsi
       <div className={`flex flex-col gap-2 rounded-xl border p-4 shadow-2xl shadow-black/60 ring-1 ring-white/10 scale-[1.03] cursor-grabbing select-none
         ${tint.bg} ${tint.border}`}
       >
-        {needsReview && (
+        {showStopSign && (
           <div className="absolute left-2 top-[13px] glow-red pointer-events-none">
             <OctagonAlert size={13} className="text-red-400" />
           </div>
         )}
-        <p className={`text-sm font-semibold text-slate-100 leading-snug pr-6 ${needsReview ? "pl-5" : ""}`}>
+        <p className={`text-sm font-semibold text-slate-100 leading-snug pr-6 ${showStopSign ? "pl-5" : ""}`}>
           {milestone.title}
         </p>
         <p className="line-clamp-2 text-xs text-slate-400 leading-relaxed">
@@ -75,7 +77,7 @@ export default function MilestoneCard({ milestone, entryCount, isActive, isPulsi
         }`}
     >
       {/* Unvalidated review indicator — subtle pulsing red stop sign */}
-      {needsReview && !isDragging && (
+      {showStopSign && !isDragging && (
         <div className="absolute left-2 top-[13px] glow-red pointer-events-none">
           <OctagonAlert size={13} className="text-red-400" />
         </div>
@@ -88,7 +90,7 @@ export default function MilestoneCard({ milestone, entryCount, isActive, isPulsi
         </div>
       )}
 
-      <p className={`text-sm font-semibold text-slate-100 leading-snug pr-6 ${needsReview ? "pl-5" : ""}`}>
+      <p className={`text-sm font-semibold text-slate-100 leading-snug pr-6 ${showStopSign ? "pl-5" : ""}`}>
         {milestone.title}
       </p>
 

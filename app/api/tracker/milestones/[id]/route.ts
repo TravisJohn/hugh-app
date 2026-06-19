@@ -15,9 +15,19 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const body = (await request.json()) as { column?: KanbanColumn; reviewValidated?: boolean };
+  const body = (await request.json()) as {
+    column?:           KanbanColumn;
+    reviewValidated?:  boolean;
+    masteryValidated?: boolean;
+    masteryScore?:     number;
+  };
 
-  const updateData: { kanban_column?: KanbanColumn; review_validated?: boolean } = {};
+  const updateData: {
+    kanban_column?:     KanbanColumn;
+    review_validated?:  boolean;
+    mastery_validated?: boolean;
+    mastery_score?:     number | null;
+  } = {};
 
   if (body.column !== undefined) {
     if (!VALID_COLUMNS.includes(body.column)) {
@@ -28,6 +38,14 @@ export async function PATCH(
 
   if (body.reviewValidated !== undefined) {
     updateData.review_validated = body.reviewValidated;
+  }
+
+  if (body.masteryValidated !== undefined) {
+    updateData.mastery_validated = body.masteryValidated;
+  }
+
+  if (body.masteryScore !== undefined) {
+    updateData.mastery_score = body.masteryScore;
   }
 
   if (Object.keys(updateData).length === 0) {

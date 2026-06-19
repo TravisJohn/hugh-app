@@ -7,12 +7,12 @@ import { type Milestone } from "@/types";
 
 interface Props {
   params:       Promise<{ trackId: string }>;
-  searchParams: Promise<{ validated?: string }>;
+  searchParams: Promise<{ validated?: string; mastered?: string }>;
 }
 
 export default async function TrackPage({ params, searchParams }: Props) {
-  const { trackId }  = await params;
-  const { validated } = await searchParams;
+  const { trackId }           = await params;
+  const { validated, mastered } = await searchParams;
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -59,6 +59,7 @@ export default async function TrackPage({ params, searchParams }: Props) {
           initialMilestones={(milestones ?? []) as Milestone[]}
           topicContext={track.topic_description as string}
           validatedId={validated}
+          masteredId={mastered}
         />
       </div>
     </div>

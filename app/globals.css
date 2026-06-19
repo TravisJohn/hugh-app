@@ -75,6 +75,11 @@
   animation-delay: -2s;
 }
 
+@keyframes waveBar {
+  from { transform: scaleY(0.4); }
+  to   { transform: scaleY(1.0); }
+}
+
 *,
 *::before,
 *::after {

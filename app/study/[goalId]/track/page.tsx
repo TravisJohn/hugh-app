@@ -17,6 +17,7 @@ export default async function StudyTrackPage({ params, searchParams }: Props) {
   const sp          = await searchParams;
   const pulseId     = typeof sp.pulse     === "string" ? sp.pulse     : undefined;
   const validatedId = typeof sp.validated === "string" ? sp.validated : undefined;
+  const masteredId  = typeof sp.mastered  === "string" ? sp.mastered  : undefined;
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -104,7 +105,7 @@ export default async function StudyTrackPage({ params, searchParams }: Props) {
 
           {/* Kanban board */}
           <div className="flex-1 overflow-hidden px-6 py-5">
-            <KanbanBoard initialMilestones={milestones} topicContext={g.topic} goalId={goalId} pulseId={pulseId} validatedId={validatedId} />
+            <KanbanBoard initialMilestones={milestones} topicContext={g.topic} goalId={goalId} pulseId={pulseId} validatedId={validatedId} masteredId={masteredId} />
           </div>
         </>
       ) : (
