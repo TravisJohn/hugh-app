@@ -14,8 +14,18 @@ const lora = Lora({
 });
 
 export const metadata: Metadata = {
-  title: "Hugh — AI Interview Coach",
-  description: "AI-powered mock interview training for data professionals",
+  title: "Hugh — You can learn anything",
+  description: "Hugh is your AI learning companion. Build a structured learning plan, track your progress, and prove your knowledge through voice conversations.",
+  openGraph: {
+    title:       "Hugh — You can learn anything",
+    description: "Your AI learning companion. Build a plan, track progress, and prove mastery through voice.",
+    siteName:    "Hugh",
+  },
+  twitter: {
+    card:        "summary",
+    title:       "Hugh — You can learn anything",
+    description: "Your AI learning companion. Build a plan, track progress, and prove mastery through voice.",
+  },
 };
 
 export default function RootLayout({
