@@ -1,7 +1,10 @@
 import { redirect, notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { TrendingUp, MessageCircle, Mic, ArrowLeft, CalendarDays, Lock } from "lucide-react";
+import {
+  TrendingUp, MessageCircle, Mic, ArrowLeft,
+  CalendarDays, Lock, Headphones, Code2,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import SignOutButton from "@/components/landing/SignOutButton";
 import { type LearningGoal } from "@/types";
@@ -23,14 +26,26 @@ export default async function StudyPage({ params }: Props) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/home");
 
-  const { data: goal } = await supabase
-    .from("learning_goals")
-    .select("*")
-    .eq("id", goalId)
-    .eq("user_id", user.id)
-    .single();
+  // Fetch goal + profile in parallel
+  const [{ data: goal }, { data: profile }] = await Promise.all([
+    supabase.from("learning_goals").select("*").eq("id", goalId).eq("user_id", user.id).single(),
+    supabase.from("profiles").select("plan, is_admin").eq("user_id", user.id).maybeSingle(),
+  ]);
 
   if (!goal) notFound();
+
+  // Check if any milestone in this goal's track is mastery-validated
+  let converseUnlocked = false;
+  const { data: track } = await supabase
+    .from("tracks").select("id").eq("goal_id", goalId).eq("user_id", user.id).maybeSingle();
+  if (track) {
+    const { count } = await supabase
+      .from("milestones")
+      .select("id", { count: "exact", head: true })
+      .eq("track_id", (track as { id: string }).id)
+      .eq("mastery_validated", true);
+    converseUnlocked = (count ?? 0) > 0;
+  }
 
   const g       = goal as LearningGoal;
   const initial = (user.email ?? "").split("@")[0]?.[0]?.toUpperCase() ?? "?";
@@ -70,48 +85,50 @@ export default async function StudyPage({ params }: Props) {
       </header>
 
       {/* ── Content ─────────────────────────────────────────────────── */}
-      <main className="relative flex flex-1 flex-col items-center justify-center gap-8 px-6 overflow-hidden">
+      <main className="relative flex flex-1 flex-col items-center justify-center gap-5 px-6 overflow-hidden">
 
-        {/* Logo */}
-        <div className="relative">
+        {/* Logo — compact */}
+        <div className="relative shrink-0">
           <div className="absolute inset-0 rounded-full bg-sky-400/15 blur-2xl scale-150" />
           <Image
             src="/hugh-logo.png.png"
             alt="Hugh"
-            width={120}
-            height={120}
+            width={80}
+            height={80}
             className="relative object-contain drop-shadow-2xl"
             priority
           />
         </div>
 
         {/* Topic context */}
-        <div className="text-center">
+        <div className="text-center shrink-0">
           <p className="text-xs font-semibold uppercase tracking-widest text-slate-600 mb-1">
             You&apos;re learning
           </p>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-100">{g.topic}</h1>
-          <div className="mt-2 flex items-center justify-center gap-1.5 text-xs text-slate-500">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-100">{g.topic}</h1>
+          <div className="mt-1.5 flex items-center justify-center gap-1.5 text-xs text-slate-500">
             <CalendarDays size={12} />
             <span>Started {fmt(g.start_date)} · Commit until {fmt(g.end_date)}</span>
           </div>
         </div>
 
-        {/* Feature cards — Track (default) → Ask → Converse (locked) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-2xl">
+        {/* ── Feature cards — 2 rows of 3 ──────────────────────────── */}
+        <div className="grid grid-cols-3 gap-3 w-full max-w-2xl shrink-0">
 
-          {/* Track — highlighted by default */}
+          {/* ── ROW 1: Active features ───────────────────────────────── */}
+
+          {/* Track */}
           <Link
             href={`/study/${goalId}/track`}
-            className="group flex flex-col gap-3 rounded-2xl border border-green-500/40 bg-green-900/10 p-6 shadow-lg shadow-green-900/20 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-green-400/60 hover:bg-green-900/20 hover:shadow-xl hover:shadow-green-500/20"
+            className="group flex flex-col gap-2.5 rounded-2xl border border-green-500/40 bg-green-900/10 p-4 shadow-lg shadow-green-900/20 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-green-400/60 hover:bg-green-900/20 hover:shadow-xl hover:shadow-green-500/20"
           >
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-green-500/15 text-green-400 transition-transform duration-300 group-hover:scale-110">
-              <TrendingUp size={22} />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-500/15 text-green-400 transition-transform duration-300 group-hover:scale-110">
+              <TrendingUp size={18} />
             </div>
             <div>
-              <div className="flex items-center gap-2 mb-0.5">
-                <p className="font-semibold text-slate-100">Track</p>
-                <span className="rounded-full bg-green-500/15 px-2 py-0.5 text-xs font-semibold text-green-400">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <p className="font-semibold text-slate-100 text-sm">Track</p>
+                <span className="rounded-full bg-green-500/15 px-1.5 py-0.5 text-xs font-semibold text-green-400">
                   Start here
                 </span>
               </div>
@@ -127,42 +144,110 @@ export default async function StudyPage({ params }: Props) {
           {/* Ask */}
           <Link
             href={`/study/${goalId}/ask`}
-            className="group flex flex-col gap-3 rounded-2xl border border-slate-700/60 bg-slate-800/40 p-6 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-violet-500/50 hover:bg-slate-800/70 hover:shadow-xl hover:shadow-violet-500/10"
+            className="group flex flex-col gap-2.5 rounded-2xl border border-slate-700/60 bg-slate-800/40 p-4 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-violet-500/50 hover:bg-slate-800/70 hover:shadow-xl hover:shadow-violet-500/10"
           >
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-500/10 text-violet-400 transition-transform duration-300 group-hover:scale-110">
-              <MessageCircle size={22} />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/10 text-violet-400 transition-transform duration-300 group-hover:scale-110">
+              <MessageCircle size={18} />
             </div>
             <div>
-              <p className="font-semibold text-slate-100 mb-0.5">Ask</p>
+              <p className="font-semibold text-slate-100 text-sm mb-0.5">Ask</p>
               <p className="text-xs text-slate-500 leading-relaxed">
-                Chat with Hugh — your tutor scoped to this exact topic. Ask anything.
+                Chat with Hugh — explore ideas, ask questions, or get unstuck on anything.
               </p>
             </div>
             <span className="mt-auto text-xs font-semibold text-violet-400 transition-all group-hover:text-violet-300">
-              Start session →
+              Start chat →
             </span>
           </Link>
 
-          {/* Converse — locked */}
-          <div className="relative flex flex-col gap-3 rounded-2xl border border-slate-800/60 bg-slate-900/30 p-6 backdrop-blur-sm cursor-not-allowed select-none">
-            {/* Lock badge */}
-            <div className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-slate-800 px-2 py-1 text-xs text-slate-600">
-              <Lock size={10} />
-              Locked
-            </div>
-
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-800/60 text-slate-700">
-              <Mic size={22} />
-            </div>
-            <div>
-              <p className="font-semibold text-slate-600 mb-0.5">Converse</p>
-              <p className="text-xs text-slate-700 leading-relaxed">
-                Apply what you learn in a situational business conversation with Hugh.
+          {/* Converse — locked until a milestone is mastered */}
+          {converseUnlocked ? (
+            <Link
+              href={`/study/${goalId}/track`}
+              className="group flex flex-col gap-2.5 rounded-2xl border border-sky-500/40 bg-sky-900/10 p-4 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-sky-400/60 hover:bg-sky-900/20 hover:shadow-xl hover:shadow-sky-500/10"
+            >
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-500/15 text-sky-400 transition-transform duration-300 group-hover:scale-110">
+                <Mic size={18} />
+              </div>
+              <div>
+                <p className="font-semibold text-slate-100 text-sm mb-0.5">Converse</p>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Revisit mastered topics through Hugh&apos;s situational voice conversations.
+                </p>
+              </div>
+              <span className="mt-auto text-xs font-semibold text-sky-400 transition-all group-hover:text-sky-300">
+                Practice now →
+              </span>
+            </Link>
+          ) : (
+            <div className="relative flex flex-col gap-2.5 rounded-2xl border border-slate-800/60 bg-slate-900/30 p-4 backdrop-blur-sm cursor-not-allowed select-none">
+              <div className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-600">
+                <Lock size={9} />
+                Locked
+              </div>
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-800/60 text-slate-700">
+                <Mic size={18} />
+              </div>
+              <div>
+                <p className="font-semibold text-slate-600 text-sm mb-0.5">Converse</p>
+                <p className="text-xs text-slate-700 leading-relaxed">
+                  Apply what you learn in a situational business conversation with Hugh.
+                </p>
+              </div>
+              <p className="mt-auto text-xs text-slate-700 leading-relaxed">
+                Master a milestone to unlock Converse.
               </p>
             </div>
-            <p className="mt-auto text-xs text-slate-700 leading-relaxed">
-              Hugh needs more learning data to unlock Converse for this topic.
-            </p>
+          )}
+
+          {/* ── ROW 2: Coming soon ───────────────────────────────────── */}
+
+          {/* Listen */}
+          <div className="relative flex flex-col gap-2.5 rounded-2xl border border-slate-800/40 bg-slate-900/20 p-4 backdrop-blur-sm cursor-not-allowed select-none opacity-60">
+            <div className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-slate-800/80 px-2 py-0.5 text-xs text-slate-600">
+              Soon
+            </div>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-800/60 text-slate-700">
+              <Headphones size={18} />
+            </div>
+            <div>
+              <p className="font-semibold text-slate-600 text-sm mb-0.5">Listen</p>
+              <p className="text-xs text-slate-700 leading-relaxed">
+                Topic audio summaries and expert perspectives, ready when you are.
+              </p>
+            </div>
+          </div>
+
+          {/* Code */}
+          <div className="relative flex flex-col gap-2.5 rounded-2xl border border-slate-800/40 bg-slate-900/20 p-4 backdrop-blur-sm cursor-not-allowed select-none opacity-60">
+            <div className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-slate-800/80 px-2 py-0.5 text-xs text-slate-600">
+              Soon
+            </div>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-800/60 text-slate-700">
+              <Code2 size={18} />
+            </div>
+            <div>
+              <p className="font-semibold text-slate-600 text-sm mb-0.5">Code</p>
+              <p className="text-xs text-slate-700 leading-relaxed">
+                Hands-on exercises and coding challenges scoped to what you&apos;re learning.
+              </p>
+            </div>
+          </div>
+
+          {/* Events */}
+          <div className="relative flex flex-col gap-2.5 rounded-2xl border border-slate-800/40 bg-slate-900/20 p-4 backdrop-blur-sm cursor-not-allowed select-none opacity-60">
+            <div className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-slate-800/80 px-2 py-0.5 text-xs text-slate-600">
+              Soon
+            </div>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-800/60 text-slate-700">
+              <CalendarDays size={18} />
+            </div>
+            <div>
+              <p className="font-semibold text-slate-600 text-sm mb-0.5">Events</p>
+              <p className="text-xs text-slate-700 leading-relaxed">
+                Live workshops and Q&amp;As with practitioners in your field.
+              </p>
+            </div>
           </div>
 
         </div>

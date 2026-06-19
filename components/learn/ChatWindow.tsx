@@ -28,9 +28,13 @@ export default function ChatWindow({ topic, goalId, milestoneId }: Props) {
   const [loading, setLoading]       = useState(false);
   const [isOffTrack, setIsOffTrack] = useState(false);
 
+  // Goal offer: surfaces after the user's 3rd reply
+  const [goalOfferShown,     setGoalOfferShown]     = useState(false);
+  const [goalOfferDismissed, setGoalOfferDismissed] = useState(false);
+
   // Summary panel state
-  const [panelOpen, setPanelOpen]   = useState(false);
-  const [summary, setSummary]       = useState<SummaryData | null>(null);
+  const [panelOpen, setPanelOpen]     = useState(false);
+  const [summary, setSummary]         = useState<SummaryData | null>(null);
   const [summarizing, setSummarizing] = useState(false);
 
   const bottomRef   = useRef<HTMLDivElement>(null);
@@ -39,7 +43,7 @@ export default function ChatWindow({ topic, goalId, milestoneId }: Props) {
   // Scroll to bottom on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+  }, [messages, loading, goalOfferShown]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -61,7 +65,6 @@ export default function ChatWindow({ topic, goalId, milestoneId }: Props) {
 
     try {
       // Strip the synthetic welcome message before sending to the API.
-      // It is plain-text (not JSON) and confuses Claude's format adherence on longer threads.
       const apiMessages = history
         .filter((_, i) => !(i === 0 && history[0].role === "assistant"))
         .map(m => ({ role: m.role, content: m.content }));
@@ -72,11 +75,18 @@ export default function ChatWindow({ topic, goalId, milestoneId }: Props) {
       });
       const data = await res.json() as { reply?: string; isOffTopic?: boolean; error?: string };
 
-      setMessages(prev => [...prev, {
-        role:    "assistant",
+      const updated = [...history, {
+        role:    "assistant" as const,
         content: data.reply ?? "Sorry, something went wrong. Please try again.",
-      }]);
+      }];
+      setMessages(updated);
       setIsOffTrack(data.isOffTopic ?? false);
+
+      // Surface goal offer after the 3rd user message
+      const userCount = updated.filter(m => m.role === "user").length;
+      if (userCount >= 3 && !goalOfferShown) {
+        setGoalOfferShown(true);
+      }
     } catch {
       setMessages(prev => [...prev, {
         role:    "assistant",
@@ -95,7 +105,6 @@ export default function ChatWindow({ topic, goalId, milestoneId }: Props) {
     setSummary(null);
 
     try {
-      // Strip synthetic welcome before sending for summarisation
       const apiMessages = messages
         .filter((_, i) => !(i === 0 && messages[0].role === "assistant"))
         .map(m => ({ role: m.role, content: m.content }));
@@ -121,7 +130,6 @@ export default function ChatWindow({ topic, goalId, milestoneId }: Props) {
     }
   }
 
-  // Needs at least one real exchange (welcome + user msg + reply) to summarise
   const canSummarise = messages.length >= 3;
 
   return (
@@ -161,6 +169,7 @@ export default function ChatWindow({ topic, goalId, milestoneId }: Props) {
           {messages.map((m, i) => (
             <ChatBubble key={i} role={m.role} content={m.content} />
           ))}
+
           {loading && (
             <div className="flex justify-start">
               <div className="mr-2.5 mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-900/60 text-xs font-bold text-violet-400">
@@ -172,6 +181,35 @@ export default function ChatWindow({ topic, goalId, milestoneId }: Props) {
               </div>
             </div>
           )}
+
+          {/* Save-to-tracker offer — surfaces inline after the 3rd exchange */}
+          {goalOfferShown && !goalOfferDismissed && (
+            <div className="flex gap-2.5">
+              <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-900/60 text-xs font-bold text-violet-400">
+                H
+              </div>
+              <div className="rounded-2xl rounded-tl-sm border border-violet-500/30 bg-violet-900/15 px-4 py-3.5 space-y-3 max-w-[85%]">
+                <p className="text-sm text-slate-200 leading-relaxed">
+                  We&apos;ve covered some useful ground. Want me to summarise this chat and save the key insights to a card in your learning tracker?
+                </p>
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    onClick={() => { setGoalOfferDismissed(true); handleSummarise(); }}
+                    className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-semibold text-white hover:bg-violet-500 transition-colors"
+                  >
+                    Yes, save to tracker →
+                  </button>
+                  <button
+                    onClick={() => setGoalOfferDismissed(true)}
+                    className="rounded-xl border border-slate-700 px-4 py-2 text-xs text-slate-500 hover:text-slate-300 hover:border-slate-600 transition-colors"
+                  >
+                    Keep chatting
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div ref={bottomRef} />
         </div>
 
@@ -183,7 +221,7 @@ export default function ChatWindow({ topic, goalId, milestoneId }: Props) {
               value={draft}
               onChange={e => setDraft(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={`Ask anything about ${topic}…`}
+              placeholder="Ask me anything…"
               rows={1}
               className="flex-1 resize-none bg-transparent text-sm text-slate-100 placeholder-slate-600 focus:outline-none"
             />

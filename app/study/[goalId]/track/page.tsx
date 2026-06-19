@@ -23,20 +23,14 @@ export default async function StudyTrackPage({ params, searchParams }: Props) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: goal }, { data: track }] = await Promise.all([
-    supabase
-      .from("learning_goals")
-      .select("*")
-      .eq("id", goalId)
-      .eq("user_id", user.id)
-      .single(),
-    supabase
-      .from("tracks")
-      .select("*")
-      .eq("goal_id", goalId)
-      .eq("user_id", user.id)
-      .maybeSingle(),
+  const [{ data: goal }, { data: track }, { data: profile }] = await Promise.all([
+    supabase.from("learning_goals").select("*").eq("id", goalId).eq("user_id", user.id).single(),
+    supabase.from("tracks").select("*").eq("goal_id", goalId).eq("user_id", user.id).maybeSingle(),
+    supabase.from("profiles").select("plan, is_admin").eq("user_id", user.id).maybeSingle(),
   ]);
+
+  const isPremium = (profile?.plan === "pro") || (profile?.is_admin === true);
+  const isAdmin   = profile?.is_admin === true;
 
   if (!goal) notFound();
 
@@ -105,7 +99,7 @@ export default async function StudyTrackPage({ params, searchParams }: Props) {
 
           {/* Kanban board */}
           <div className="flex-1 overflow-hidden px-6 py-5">
-            <KanbanBoard initialMilestones={milestones} topicContext={g.topic} goalId={goalId} pulseId={pulseId} validatedId={validatedId} masteredId={masteredId} />
+            <KanbanBoard initialMilestones={milestones} topicContext={g.topic} goalId={goalId} pulseId={pulseId} validatedId={validatedId} masteredId={masteredId} isPremium={isPremium} isAdmin={isAdmin} />
           </div>
         </>
       ) : (

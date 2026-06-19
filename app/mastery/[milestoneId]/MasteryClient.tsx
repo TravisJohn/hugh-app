@@ -227,6 +227,13 @@ export default function MasteryClient({ milestoneId, milestoneTitle, personaId, 
     }
   }
 
+  // ── Clean exit: stop audio/speech before navigating ──────────────────────
+  function handleExit() {
+    audio.stop();
+    speech.reset();
+    router.push(boardUrl);
+  }
+
   // ── Confirm mastery (only called when passed) ─────────────────────────────
   async function doValidate() {
     setPhase("validating");
@@ -259,7 +266,7 @@ export default function MasteryClient({ milestoneId, milestoneTitle, personaId, 
       {/* Header */}
       <header className="relative z-10 shrink-0 flex items-center justify-between border-b border-slate-800 px-6 py-4">
         <button
-          onClick={() => router.push(boardUrl)}
+          onClick={handleExit}
           className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300 transition-colors"
         >
           <ArrowLeft size={14} />
@@ -420,48 +427,58 @@ export default function MasteryClient({ milestoneId, milestoneTitle, personaId, 
 
           {/* Bottom mic area */}
           <div className="shrink-0 border-t border-slate-800/60 px-6 py-5">
-            <div className="max-w-2xl mx-auto flex items-center justify-center gap-5">
+            <div className="max-w-2xl mx-auto flex flex-col items-center gap-4">
 
-              {phase === "listening" && (
-                <>
-                  <div className="relative flex items-center justify-center">
-                    <div className="absolute h-12 w-12 rounded-full bg-red-500/20 animate-ping" />
-                    <div className="relative flex h-10 w-10 items-center justify-center rounded-full border border-red-500/50 bg-red-500/20">
-                      <Mic size={18} className="text-red-400" />
+              <div className="flex items-center justify-center gap-5">
+                {phase === "listening" && (
+                  <>
+                    <div className="relative flex items-center justify-center">
+                      <div className="absolute h-12 w-12 rounded-full bg-red-500/20 animate-ping" />
+                      <div className="relative flex h-10 w-10 items-center justify-center rounded-full border border-red-500/50 bg-red-500/20">
+                        <Mic size={18} className="text-red-400" />
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex flex-col gap-1.5 items-start">
-                    <button
-                      onClick={handleDone}
-                      className="flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-sky-500 transition-colors"
-                    >
-                      <MicOff size={15} />
-                      Done talking
-                    </button>
-                    {!speech.isSupported && (
-                      <p className="text-xs text-red-400">Chrome or Edge required for voice input</p>
-                    )}
-                  </div>
-                </>
-              )}
+                    <div className="flex flex-col gap-1.5 items-start">
+                      <button
+                        onClick={handleDone}
+                        className="flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-sky-500 transition-colors"
+                      >
+                        <MicOff size={15} />
+                        Done talking
+                      </button>
+                      {!speech.isSupported && (
+                        <p className="text-xs text-red-400">Chrome or Edge required for voice input</p>
+                      )}
+                    </div>
+                  </>
+                )}
 
-              {phase === "playing" && (
-                <div className="flex items-center gap-3 text-sm text-slate-400">
-                  <div className="flex gap-1 items-end h-5">
-                    {[0, 1, 2, 3].map(i => (
-                      <div
-                        key={i}
-                        className="w-1 rounded-full bg-amber-400/70"
-                        style={{
-                          height: `${40 + i * 15}%`,
-                          animation: `waveBar 0.7s ease-in-out infinite ${i * 0.12}s alternate`,
-                        }}
-                      />
-                    ))}
+                {phase === "playing" && (
+                  <div className="flex items-center gap-3 text-sm text-slate-400">
+                    <div className="flex gap-1 items-end h-5">
+                      {[0, 1, 2, 3].map(i => (
+                        <div
+                          key={i}
+                          className="w-1 rounded-full bg-amber-400/70"
+                          style={{
+                            height: `${40 + i * 15}%`,
+                            animation: `waveBar 0.7s ease-in-out infinite ${i * 0.12}s alternate`,
+                          }}
+                        />
+                      ))}
+                    </div>
+                    Hugh is speaking…
                   </div>
-                  Hugh is speaking…
-                </div>
-              )}
+                )}
+              </div>
+
+              {/* End session — always visible during active conversation */}
+              <button
+                onClick={handleExit}
+                className="text-xs text-slate-700 hover:text-slate-500 transition-colors"
+              >
+                End session &amp; take a break
+              </button>
 
             </div>
           </div>

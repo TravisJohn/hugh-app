@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
 import {
   DndContext,
   DragOverlay,
@@ -11,7 +12,7 @@ import {
   type DragStartEvent,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { Trophy, Medal } from "lucide-react";
+import { Trophy, Medal, Crown } from "lucide-react";
 import { type Milestone, type KanbanColumn, KANBAN_COLUMNS } from "@/types";
 import KanbanColumnComponent from "./KanbanColumn";
 import MilestoneCard from "./MilestoneCard";
@@ -24,9 +25,15 @@ interface Props {
   pulseId?:          string;
   validatedId?:      string;
   masteredId?:       string;
+  isPremium?:        boolean;
+  isAdmin?:          boolean;
 }
 
-export default function KanbanBoard({ initialMilestones, topicContext, goalId, pulseId: initialPulseId, validatedId, masteredId }: Props) {
+export default function KanbanBoard({
+  initialMilestones, topicContext, goalId,
+  pulseId: initialPulseId, validatedId, masteredId,
+  isPremium = false, isAdmin = false,
+}: Props) {
   const router   = useRouter();
   const pathname = usePathname();
 
@@ -35,11 +42,12 @@ export default function KanbanBoard({ initialMilestones, topicContext, goalId, p
   const [draggingMilestone, setDraggingMilestone] = useState<Milestone | null>(null);
   const [entryCounts, setEntryCounts]             = useState<Record<string, number>>({});
   const [pulseId, setPulseId]                     = useState<string | null>(initialPulseId ?? null);
+  const [showPremiumGate, setShowPremiumGate]     = useState(false);
 
   // Celebration state
-  const [toastVisible, setToastVisible]     = useState(false);
-  const [toastTitle,   setToastTitle]       = useState("");
-  const [toastKind,    setToastKind]        = useState<"review" | "mastery">("review");
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastTitle,   setToastTitle]   = useState("");
+  const [toastKind,    setToastKind]    = useState<"review" | "mastery">("review");
 
   // Confetti + toast when returning from a passed quiz (review)
   useEffect(() => {
@@ -102,6 +110,12 @@ export default function KanbanBoard({ initialMilestones, topicContext, goalId, p
     const newColumn   = over.id as KanbanColumn;
     const current     = milestones.find(m => m.id === milestoneId);
     if (!current || current.kanban_column === newColumn) return;
+
+    // Non-premium users can't drag to Mastered
+    if (newColumn === "done" && !isPremium && !isAdmin) {
+      setShowPremiumGate(true);
+      return;
+    }
 
     const updatedFields: Partial<Milestone> = { kanban_column: newColumn };
     if (newColumn === "review") updatedFields.review_validated  = false;
@@ -211,7 +225,49 @@ export default function KanbanBoard({ initialMilestones, topicContext, goalId, p
         onClose={handleDrawerClose}
       />
 
-      {/* Celebration toast */}
+      {/* ── Premium gate modal ─────────────────────────────────────────── */}
+      {showPremiumGate && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowPremiumGate(false)}
+        >
+          <div
+            className="w-full max-w-sm mx-4 rounded-3xl border border-amber-500/30 bg-[#1c1200] p-6 space-y-4 shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/20">
+                <Crown size={18} className="text-amber-400" />
+              </div>
+              <div>
+                <p className="font-semibold text-white">Hugh Pro feature</p>
+                <p className="text-xs text-amber-600/80">Mastery Sessions</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-slate-400 leading-relaxed">
+              Moving a card to <span className="text-amber-300 font-medium">Mastered</span> unlocks a voice-led proficiency session with Hugh — 3 exchanges scored by AI. You need a Pro subscription to access Mastery Sessions.
+            </p>
+
+            <Link
+              href="/upgrade"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-500 py-3 text-sm font-bold text-black hover:bg-amber-400 transition-colors"
+            >
+              <Crown size={14} />
+              See Hugh Pro
+            </Link>
+
+            <button
+              onClick={() => setShowPremiumGate(false)}
+              className="w-full text-center text-xs text-slate-600 hover:text-slate-400 transition-colors py-1"
+            >
+              Maybe later
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Celebration toast ─────────────────────────────────────────── */}
       {toastVisible && (
         <div className="fixed bottom-8 left-1/2 z-50 animate-toast-in">
           {toastKind === "mastery" ? (
@@ -241,6 +297,7 @@ export default function KanbanBoard({ initialMilestones, topicContext, goalId, p
           )}
         </div>
       )}
+
     </div>
   );
 }

@@ -18,20 +18,16 @@ export default async function TrackPage({ params, searchParams }: Props) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/tracker");
 
-  const { data: track } = await supabase
-    .from("tracks")
-    .select("*")
-    .eq("id", trackId)
-    .eq("user_id", user.id)
-    .single();
+  const [{ data: track }, { data: profile }, { data: milestones }] = await Promise.all([
+    supabase.from("tracks").select("*").eq("id", trackId).eq("user_id", user.id).single(),
+    supabase.from("profiles").select("plan, is_admin").eq("user_id", user.id).maybeSingle(),
+    supabase.from("milestones").select("*").eq("track_id", trackId).order("position", { ascending: true }),
+  ]);
 
   if (!track) notFound();
 
-  const { data: milestones } = await supabase
-    .from("milestones")
-    .select("*")
-    .eq("track_id", trackId)
-    .order("position", { ascending: true });
+  const isPremium = (profile?.plan === "pro") || (profile?.is_admin === true);
+  const isAdmin   = profile?.is_admin === true;
 
   return (
     <div className="flex h-screen flex-col bg-[#0F172A] overflow-hidden">
@@ -60,6 +56,8 @@ export default async function TrackPage({ params, searchParams }: Props) {
           topicContext={track.topic_description as string}
           validatedId={validated}
           masteredId={mastered}
+          isPremium={isPremium}
+          isAdmin={isAdmin}
         />
       </div>
     </div>
