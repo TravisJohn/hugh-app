@@ -1,10 +1,33 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Users, Zap, DollarSign, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Users, Zap, DollarSign, AlertTriangle, ExternalLink } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { estimateCost, DEFAULT_MONTHLY_TOKEN_LIMIT } from "@/lib/usage";
 import AdminActions from "./AdminActions";
+
+// ── ElevenLabs subscription fetch ─────────────────────────────────────────
+interface ElevenLabsSubscription {
+  tier:                         string;
+  character_count:              number;
+  character_limit:              number;
+  next_character_count_reset_unix: number;
+  status:                       string;
+}
+
+async function fetchElevenLabsStatus(): Promise<ElevenLabsSubscription | null> {
+  try {
+    const res = await fetch("https://api.elevenlabs.io/v1/user", {
+      headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY! },
+      next:    { revalidate: 300 }, // cache 5 min
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as { subscription: ElevenLabsSubscription };
+    return data.subscription ?? null;
+  } catch {
+    return null;
+  }
+}
 
 function startOfMonth(): string {
   const d = new Date();
@@ -57,12 +80,14 @@ export default async function AdminPage() {
     { data: { users: authUsers } },
     { data: profiles },
     { data: usageLogs },
+    elevenLabs,
   ] = await Promise.all([
     service.auth.admin.listUsers({ perPage: 200 }),
     service.from("profiles").select("*"),
     service.from("usage_logs")
       .select("user_id, tokens_in, tokens_out, tts_chars, created_at")
       .gte("created_at", monthStart),
+    fetchElevenLabsStatus(),
   ]);
 
   // Build lookup maps
@@ -125,6 +150,88 @@ export default async function AdminPage() {
       </header>
 
       <main className="px-8 py-8 space-y-8 max-w-7xl mx-auto">
+
+        {/* ── Provider status ─────────────────────────────────────── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+          {/* ElevenLabs */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-slate-300">ElevenLabs</p>
+              <Link
+                href="https://elevenlabs.io/app/subscription"
+                target="_blank"
+                className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-400 transition-colors"
+              >
+                Dashboard <ExternalLink size={11} />
+              </Link>
+            </div>
+            {elevenLabs ? (
+              <>
+                <div>
+                  <div className="flex items-end justify-between mb-1.5">
+                    <span className="text-xs text-slate-500">Characters used</span>
+                    <span className="text-xs text-slate-400 tabular-nums">
+                      {fmt(elevenLabs.character_count)} / {fmt(elevenLabs.character_limit)}
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        elevenLabs.character_count / elevenLabs.character_limit > 0.8
+                          ? "bg-red-400"
+                          : elevenLabs.character_count / elevenLabs.character_limit > 0.6
+                          ? "bg-amber-400"
+                          : "bg-sky-400"
+                      }`}
+                      style={{ width: `${Math.min(100, (elevenLabs.character_count / elevenLabs.character_limit) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-xs text-slate-600">
+                  <span className="capitalize">{elevenLabs.tier} plan · {elevenLabs.status}</span>
+                  <span>
+                    Resets {new Date(elevenLabs.next_character_count_reset_unix * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <p className="text-xs text-slate-600">Unable to fetch — check API key</p>
+            )}
+          </div>
+
+          {/* Anthropic */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-slate-300">Anthropic</p>
+              <Link
+                href="https://console.anthropic.com/settings/billing"
+                target="_blank"
+                className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-400 transition-colors"
+              >
+                Console <ExternalLink size={11} />
+              </Link>
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500">Tokens in (this month)</span>
+                <span className="text-slate-400 tabular-nums">{fmt(rows.reduce((s, r) => s + r.tokensIn, 0))}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500">Tokens out (this month)</span>
+                <span className="text-slate-400 tabular-nums">{fmt(rows.reduce((s, r) => s + r.tokensOut, 0))}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500">Est. Claude cost</span>
+                <span className="text-slate-300 font-semibold tabular-nums">
+                  ${rows.reduce((s, r) => s + estimateCost(r.tokensIn, r.tokensOut, 0), 0).toFixed(3)}
+                </span>
+              </div>
+            </div>
+            <p className="text-xs text-slate-700">No live usage API — check Console for actual billing.</p>
+          </div>
+
+        </div>
 
         {/* Summary cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
