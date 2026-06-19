@@ -6,11 +6,13 @@ import KanbanBoard from "@/components/tracker/KanbanBoard";
 import { type Milestone } from "@/types";
 
 interface Props {
-  params: Promise<{ trackId: string }>;
+  params:       Promise<{ trackId: string }>;
+  searchParams: Promise<{ validated?: string }>;
 }
 
-export default async function TrackPage({ params }: Props) {
-  const { trackId } = await params;
+export default async function TrackPage({ params, searchParams }: Props) {
+  const { trackId }  = await params;
+  const { validated } = await searchParams;
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -56,6 +58,7 @@ export default async function TrackPage({ params }: Props) {
         <KanbanBoard
           initialMilestones={(milestones ?? []) as Milestone[]}
           topicContext={track.topic_description as string}
+          validatedId={validated}
         />
       </div>
     </div>

@@ -105,7 +105,9 @@ export default function QuizClient({ milestoneId, milestoneTitle, entryCount, re
         body:    JSON.stringify({ reviewValidated: true }),
       });
     } finally {
-      router.push(returnUrl);
+      // Append validated flag so the board can show the celebration
+      const sep  = returnUrl.includes("?") ? "&" : "?";
+      router.push(`${returnUrl}${sep}validated=${milestoneId}`);
     }
   }
 

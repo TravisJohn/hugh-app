@@ -27,11 +27,16 @@ export default async function ReviewQuizPage({ params, searchParams }: Props) {
 
   if (!milestone) notFound();
 
-  // Entry count determines whether quiz is available
+  // Guard: quiz only makes sense for cards in the review column
+  if (milestone.kanban_column !== "review") redirect(returnUrl);
+
+  // Guard: must have at least one diary entry to generate questions
   const { count } = await supabase
     .from("milestone_entries")
     .select("id", { count: "exact", head: true })
     .eq("milestone_id", milestoneId);
+
+  if ((count ?? 0) === 0) redirect(returnUrl);
 
   return (
     <QuizClient

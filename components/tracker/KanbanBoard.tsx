@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import {
   DndContext,
   DragOverlay,
@@ -10,6 +11,7 @@ import {
   type DragStartEvent,
   type DragEndEvent,
 } from "@dnd-kit/core";
+import { Trophy } from "lucide-react";
 import { type Milestone, type KanbanColumn, KANBAN_COLUMNS } from "@/types";
 import KanbanColumnComponent from "./KanbanColumn";
 import MilestoneCard from "./MilestoneCard";
@@ -20,14 +22,45 @@ interface Props {
   topicContext?:     string;
   goalId?:           string;
   pulseId?:          string;
+  validatedId?:      string;
 }
 
-export default function KanbanBoard({ initialMilestones, topicContext, goalId, pulseId: initialPulseId }: Props) {
+export default function KanbanBoard({ initialMilestones, topicContext, goalId, pulseId: initialPulseId, validatedId }: Props) {
+  const router   = useRouter();
+  const pathname = usePathname();
+
   const [milestones, setMilestones]               = useState<Milestone[]>(initialMilestones);
   const [activeMilestone, setActiveMilestone]     = useState<Milestone | null>(null);
   const [draggingMilestone, setDraggingMilestone] = useState<Milestone | null>(null);
   const [entryCounts, setEntryCounts]             = useState<Record<string, number>>({});
   const [pulseId, setPulseId]                     = useState<string | null>(initialPulseId ?? null);
+
+  // Celebration state
+  const [toastVisible, setToastVisible]     = useState(false);
+  const [toastTitle, setToastTitle]         = useState("");
+
+  // Fire confetti + toast when returning from a passed quiz
+  useEffect(() => {
+    if (!validatedId) return;
+
+    const ms = milestones.find(m => m.id === validatedId);
+    setToastTitle(ms?.title ?? "");
+    setToastVisible(true);
+
+    // Dynamic import keeps canvas-confetti out of the initial bundle
+    import("canvas-confetti").then(({ default: confetti }) => {
+      confetti({ particleCount: 110, spread: 70, origin: { y: 0.65 }, colors: ["#10b981", "#3b82f6", "#8b5cf6", "#f59e0b", "#ffffff"] });
+      setTimeout(() => {
+        confetti({ particleCount: 60, spread: 90, origin: { y: 0.55 }, colors: ["#10b981", "#3b82f6", "#8b5cf6", "#f59e0b"] });
+      }, 200);
+    });
+
+    // Clean the ?validated= param from the URL without a navigation event
+    router.replace(pathname, { scroll: false });
+
+    const t = setTimeout(() => setToastVisible(false), 5000);
+    return () => clearTimeout(t);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!pulseId) return;
@@ -53,7 +86,6 @@ export default function KanbanBoard({ initialMilestones, topicContext, goalId, p
     const current     = milestones.find(m => m.id === milestoneId);
     if (!current || current.kanban_column === newColumn) return;
 
-    // Reset review validation whenever a card enters the review column
     const updatedFields: Partial<Milestone> = { kanban_column: newColumn };
     if (newColumn === "review") updatedFields.review_validated = false;
 
@@ -69,7 +101,6 @@ export default function KanbanBoard({ initialMilestones, topicContext, goalId, p
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify(patchBody),
     }).catch(() => {
-      // Roll back optimistic update on failure
       setMilestones(prev =>
         prev.map(m => m.id === milestoneId ? { ...m, ...current } : m)
       );
@@ -107,7 +138,7 @@ export default function KanbanBoard({ initialMilestones, topicContext, goalId, p
 
   return (
     <div className="relative h-full">
-      {/* Subtle background orbs — same texture as the expanded drawer */}
+      {/* Subtle background orbs */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="animate-breathe absolute -top-1/3 right-1/4 h-[600px] w-[600px] rounded-full bg-sky-500/[0.06] blur-3xl" />
         <div className="animate-breathe-delayed absolute -bottom-1/3 left-1/5 h-[700px] w-[700px] rounded-full bg-violet-500/[0.05] blur-3xl" />
@@ -135,13 +166,11 @@ export default function KanbanBoard({ initialMilestones, topicContext, goalId, p
             ))}
           </div>
 
-          {/* Contextual demotion hint — shown only while dragging */}
           <p className={`text-center text-xs text-slate-600 transition-opacity duration-200 ${draggingMilestone ? "opacity-100" : "opacity-0"}`}>
             Drop on any column — cards can move forward or backward
           </p>
         </div>
 
-        {/* DragOverlay renders the dragged card in a portal above everything */}
         <DragOverlay dropAnimation={{ duration: 180, easing: "ease" }}>
           {draggingMilestone && (
             <MilestoneCard
@@ -162,6 +191,23 @@ export default function KanbanBoard({ initialMilestones, topicContext, goalId, p
         goalId={goalId}
         onClose={handleDrawerClose}
       />
+
+      {/* Celebration toast */}
+      {toastVisible && (
+        <div className="fixed bottom-8 left-1/2 z-50 animate-toast-in">
+          <div className="flex items-center gap-3 rounded-2xl border border-green-500/40 bg-[#0a1a12] px-5 py-4 shadow-2xl shadow-black/60 backdrop-blur-sm">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-green-500/20">
+              <Trophy size={18} className="text-green-400" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-green-300">Card Validated!</p>
+              {toastTitle && (
+                <p className="mt-0.5 max-w-[220px] truncate text-xs text-green-500/70">{toastTitle}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
