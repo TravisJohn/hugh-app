@@ -16,18 +16,21 @@ export default async function MasteryPage({ params, searchParams }: Props) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect(`/login?next=/mastery/${milestoneId}`);
 
-  // Ownership + data fetch
+  // Ownership + data fetch — include track_id so the client can build a
+  // reliable fallback URL that always points to the specific board, not /tracker
   const { data: milestone } = await supabase
     .from("milestones")
-    .select("id, title, kanban_column, mastery_validated, tracks!inner(user_id)")
+    .select("id, title, kanban_column, mastery_validated, track_id, tracks!inner(user_id)")
     .eq("id", milestoneId)
     .single();
 
-  if (!milestone) redirect("/tracker");
+  if (!milestone) redirect(returnUrl ?? "/tracker");
+
+  const trackId = (milestone as { track_id: string }).track_id;
 
   // Guard: must be in the Mastered (done) column
   if (milestone.kanban_column !== "done") {
-    redirect(returnUrl ?? "/tracker");
+    redirect(returnUrl ?? `/tracker/${trackId}`);
   }
 
   // Guard: must have at least one diary entry
@@ -37,7 +40,7 @@ export default async function MasteryPage({ params, searchParams }: Props) {
     .eq("milestone_id", milestoneId);
 
   if (!count || count === 0) {
-    redirect(returnUrl ?? "/tracker");
+    redirect(returnUrl ?? `/tracker/${trackId}`);
   }
 
   // Pick a random voice persona for this session's TTS
@@ -48,7 +51,8 @@ export default async function MasteryPage({ params, searchParams }: Props) {
       milestoneId={milestoneId}
       milestoneTitle={milestone.title as string}
       personaId={persona.id}
-      returnUrl={returnUrl ?? "/tracker"}
+      trackId={trackId}
+      returnUrl={returnUrl}
     />
   );
 }

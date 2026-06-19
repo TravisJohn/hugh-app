@@ -92,13 +92,21 @@ interface Props {
   milestoneId:    string;
   milestoneTitle: string;
   personaId:      string;
-  returnUrl:      string;
+  trackId:        string;
+  returnUrl?:     string;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
 
-export default function MasteryClient({ milestoneId, milestoneTitle, personaId, returnUrl }: Props) {
+export default function MasteryClient({ milestoneId, milestoneTitle, personaId, trackId, returnUrl }: Props) {
   const router = useRouter();
+
+  // The specific board is the guaranteed destination. returnUrl adds study-context
+  // if the user came from /study/[goalId]/track, otherwise we fall back to the
+  // standalone board so we never land on the generic /tracker list page.
+  const boardUrl = returnUrl && returnUrl !== "/tracker"
+    ? returnUrl
+    : `/tracker/${trackId}`;
 
   const [phase,      setPhase]      = useState<Phase>("setup");
   const [scenario,   setScenario]   = useState<ScenarioKey>(randomScenario);
@@ -224,8 +232,8 @@ export default function MasteryClient({ milestoneId, milestoneTitle, personaId, 
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ masteryValidated: true, masteryScore: evaluation?.score ?? 0 }),
     });
-    const sep = returnUrl.includes("?") ? "&" : "?";
-    router.push(`${returnUrl}${sep}mastered=${milestoneId}`);
+    const sep = boardUrl.includes("?") ? "&" : "?";
+    router.push(`${boardUrl}${sep}mastered=${milestoneId}`);
   }
 
   // ── Derived values ────────────────────────────────────────────────────────
@@ -248,7 +256,7 @@ export default function MasteryClient({ milestoneId, milestoneTitle, personaId, 
       {/* Header */}
       <header className="relative z-10 shrink-0 flex items-center justify-between border-b border-slate-800 px-6 py-4">
         <button
-          onClick={() => router.push(returnUrl)}
+          onClick={() => router.push(boardUrl)}
           className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300 transition-colors"
         >
           <ArrowLeft size={14} />
