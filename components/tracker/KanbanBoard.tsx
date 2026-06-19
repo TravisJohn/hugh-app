@@ -23,11 +23,11 @@ interface Props {
 }
 
 export default function KanbanBoard({ initialMilestones, topicContext, goalId, pulseId: initialPulseId }: Props) {
-  const [milestones, setMilestones]           = useState<Milestone[]>(initialMilestones);
-  const [activeMilestone, setActiveMilestone] = useState<Milestone | null>(null);
+  const [milestones, setMilestones]               = useState<Milestone[]>(initialMilestones);
+  const [activeMilestone, setActiveMilestone]     = useState<Milestone | null>(null);
   const [draggingMilestone, setDraggingMilestone] = useState<Milestone | null>(null);
-  const [entryCounts, setEntryCounts]         = useState<Record<string, number>>({});
-  const [pulseId, setPulseId]                 = useState<string | null>(initialPulseId ?? null);
+  const [entryCounts, setEntryCounts]             = useState<Record<string, number>>({});
+  const [pulseId, setPulseId]                     = useState<string | null>(initialPulseId ?? null);
 
   useEffect(() => {
     if (!pulseId) return;
@@ -53,17 +53,25 @@ export default function KanbanBoard({ initialMilestones, topicContext, goalId, p
     const current     = milestones.find(m => m.id === milestoneId);
     if (!current || current.kanban_column === newColumn) return;
 
+    // Reset review validation whenever a card enters the review column
+    const updatedFields: Partial<Milestone> = { kanban_column: newColumn };
+    if (newColumn === "review") updatedFields.review_validated = false;
+
     setMilestones(prev =>
-      prev.map(m => m.id === milestoneId ? { ...m, kanban_column: newColumn } : m)
+      prev.map(m => m.id === milestoneId ? { ...m, ...updatedFields } : m)
     );
+
+    const patchBody: { column: KanbanColumn; reviewValidated?: boolean } = { column: newColumn };
+    if (newColumn === "review") patchBody.reviewValidated = false;
 
     fetch(`/api/tracker/milestones/${milestoneId}`, {
       method:  "PATCH",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ column: newColumn }),
+      body:    JSON.stringify(patchBody),
     }).catch(() => {
+      // Roll back optimistic update on failure
       setMilestones(prev =>
-        prev.map(m => m.id === milestoneId ? { ...m, kanban_column: current.kanban_column } : m)
+        prev.map(m => m.id === milestoneId ? { ...m, ...current } : m)
       );
     });
   }
@@ -98,14 +106,20 @@ export default function KanbanBoard({ initialMilestones, topicContext, goalId, p
   );
 
   return (
-    <>
+    <div className="relative h-full">
+      {/* Subtle background orbs — same texture as the expanded drawer */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="animate-breathe absolute -top-1/3 right-1/4 h-[600px] w-[600px] rounded-full bg-sky-500/[0.06] blur-3xl" />
+        <div className="animate-breathe-delayed absolute -bottom-1/3 left-1/5 h-[700px] w-[700px] rounded-full bg-violet-500/[0.05] blur-3xl" />
+      </div>
+
       <DndContext
         sensors={sensors}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="flex flex-col h-full gap-2">
+        <div className="relative z-10 flex flex-col h-full gap-2">
           <div className="flex gap-4 flex-1 min-h-0">
             {KANBAN_COLUMNS.map(col => (
               <KanbanColumnComponent
@@ -148,6 +162,6 @@ export default function KanbanBoard({ initialMilestones, topicContext, goalId, p
         goalId={goalId}
         onClose={handleDrawerClose}
       />
-    </>
+    </div>
   );
 }

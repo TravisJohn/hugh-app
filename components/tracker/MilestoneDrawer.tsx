@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import {
   X, Plus, Loader2, MessageCircle, ArrowRight,
   Maximize2, Minimize2, ChevronDown, PenLine, BookOpen,
+  OctagonAlert, CheckCircle2, ClipboardCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { type Milestone, type MilestoneEntry, KANBAN_COLUMN_LABELS } from "@/types";
@@ -61,6 +63,8 @@ function SectionToggle({ label, icon, open, onToggle, count }: SectionProps) {
 }
 
 export default function MilestoneDrawer({ milestone, topicContext, goalId, onClose }: Props) {
+  const pathname = usePathname();
+
   const [entries, setEntries]               = useState<MilestoneEntry[]>([]);
   const [loadingEntries, setLoadingEntries] = useState(false);
   const [draft, setDraft]                   = useState("");
@@ -68,8 +72,9 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
   const [saving, setSaving]                 = useState(false);
   const [expanded, setExpanded]             = useState(false);
 
-  // Section visibility — all open by default
+  // Section visibility
   const [showOverview, setShowOverview]       = useState(true);
+  const [showReview, setShowReview]           = useState(true);
   const [showActions, setShowActions]         = useState(true);
   const [showDiary, setShowDiary]             = useState(true);
   const [showWriteEntry, setShowWriteEntry]   = useState(true);
@@ -77,7 +82,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
   // Which individual entries are expanded
   const [openEntries, setOpenEntries] = useState<Set<string>>(new Set());
 
-  const textareaRef  = useRef<HTMLTextAreaElement>(null);
+  const textareaRef   = useRef<HTMLTextAreaElement>(null);
   const entriesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -85,14 +90,17 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
       setExpanded(false);
       return;
     }
+    const isReview = milestone.kanban_column === "review";
     setDraft("");
     setDraftTitle("");
     setEntries([]);
     setOpenEntries(new Set());
     setShowOverview(true);
-    setShowActions(true);
-    setShowDiary(true);
-    setShowWriteEntry(true);
+    setShowReview(true);
+    // Collapse support sections in review mode so learner focuses on the review
+    setShowActions(!isReview);
+    setShowDiary(!isReview);
+    setShowWriteEntry(!isReview);
     setLoadingEntries(true);
     fetch(`/api/tracker/milestones/${milestone.id}/entries`)
       .then(r => r.json())
@@ -128,7 +136,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
         setOpenEntries(prev => new Set([...prev, newEntry.id]));
         setDraft("");
         setDraftTitle("");
-        setShowDiary(true); // ensure diary section is visible after save
+        setShowDiary(true);
       }
     } finally {
       setSaving(false);
@@ -154,6 +162,11 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
     return `/learn?topic=${topicParam}`;
   }
 
+  function quizHref(): string {
+    if (!milestone) return "#";
+    return `/review/${milestone.id}?returnUrl=${encodeURIComponent(pathname)}`;
+  }
+
   const open = milestone !== null;
 
   return (
@@ -170,7 +183,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
           ${expanded ? "w-full bg-[#0A0F1E]" : "w-full max-w-md bg-slate-900"}
           ${open ? "translate-x-0" : "translate-x-full"}`}
       >
-        {/* Breathing orbs — only visible in expanded (full-screen) mode */}
+        {/* Breathing orbs — only in expanded mode */}
         {expanded && (
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
             <div className="animate-breathe absolute top-0 left-0 h-[600px] w-[600px] -translate-x-1/3 -translate-y-1/3 rounded-full bg-sky-500/20 blur-3xl" />
@@ -179,7 +192,6 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
           </div>
         )}
 
-        {/* All content in a relative wrapper so it sits above the orbs */}
         {milestone && (
           <div className="relative z-10 flex flex-1 min-h-0 flex-col">
 
@@ -210,7 +222,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
               </div>
             </div>
 
-            {/* Scrollable body — everything between header and write area */}
+            {/* Scrollable body */}
             <div className="flex-1 min-h-0 overflow-y-auto">
               <div className={expanded ? "max-w-3xl mx-auto" : ""}>
 
@@ -227,6 +239,67 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                     </p>
                   )}
                 </div>
+
+                {/* ── Review (only for review-column cards) ──────────── */}
+                {milestone.kanban_column === "review" && (
+                  <div className="border-b border-slate-700/40 px-6">
+                    <SectionToggle
+                      label="Review"
+                      icon={
+                        milestone.review_validated
+                          ? <CheckCircle2 size={13} className="text-green-400" />
+                          : <OctagonAlert size={13} className="text-red-400" />
+                      }
+                      open={showReview}
+                      onToggle={() => setShowReview(v => !v)}
+                    />
+                    {showReview && (
+                      <div className="pb-4 space-y-3">
+                        {milestone.review_validated ? (
+                          <div className="flex items-center gap-2.5 rounded-xl border border-green-500/30 bg-green-500/8 px-4 py-3">
+                            <CheckCircle2 size={16} className="shrink-0 text-green-400" />
+                            <div>
+                              <p className="text-sm font-semibold text-green-300">Validated</p>
+                              <p className="text-xs text-slate-500">This card has passed review.</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-start gap-2.5 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3">
+                              <OctagonAlert size={15} className="shrink-0 mt-0.5 text-red-400" />
+                              <p className="text-sm text-slate-300 leading-relaxed">
+                                This card is not yet validated. Pass a short quiz based on your learning diary to mark it as reviewed.
+                              </p>
+                            </div>
+
+                            {loadingEntries ? (
+                              <div className="flex items-center gap-2 text-xs text-slate-500 px-1">
+                                <Loader2 size={12} className="animate-spin" />
+                                Checking learning activity…
+                              </div>
+                            ) : entries.length === 0 ? (
+                              <div className="rounded-xl border border-slate-700/60 bg-slate-800/50 px-4 py-3">
+                                <p className="text-sm text-slate-400 leading-relaxed">
+                                  Add at least one learning diary entry before starting the review quiz.
+                                </p>
+                              </div>
+                            ) : (
+                              <Link
+                                href={quizHref()}
+                                onClick={onClose}
+                                className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-700/70 border border-amber-600/40 px-4 py-2.5 text-sm font-semibold text-amber-100 hover:bg-amber-700 transition-colors"
+                              >
+                                <ClipboardCheck size={14} />
+                                Start Review Quiz
+                                <span className="text-xs font-normal text-amber-300/70">({entries.length} {entries.length === 1 ? "entry" : "entries"})</span>
+                              </Link>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* ── Actions ────────────────────────────────────────── */}
                 <div className="border-b border-slate-700/40 px-6">
@@ -289,7 +362,6 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                               key={entry.id}
                               className="rounded-lg border border-slate-700/50 bg-slate-800/50 overflow-hidden"
                             >
-                              {/* Collapsed header — always visible */}
                               <button
                                 onClick={() => toggleEntry(entry.id)}
                                 className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left hover:bg-slate-800/80 transition-colors"
@@ -306,7 +378,6 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                                 </span>
                               </button>
 
-                              {/* Body — visible when expanded */}
                               {isOpen && (
                                 <div className="border-t border-slate-700/40 px-3 py-3 pl-8">
                                   <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">

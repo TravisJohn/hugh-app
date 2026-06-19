@@ -7,38 +7,12 @@ import MilestoneCard from "./MilestoneCard";
 const COLUMN_STYLES: Record<KanbanColumnType, {
   dot:    string;
   header: string;
-  ring:   string;
-  zone:   string;   // idle drop zone tint
-  over:   string;   // active drag-over tint
+  ring:   string;   // shown on drag-over only
 }> = {
-  backlog: {
-    dot:    "bg-slate-500",
-    header: "text-slate-400",
-    ring:   "ring-slate-600",
-    zone:   "bg-slate-800/20",
-    over:   "bg-slate-800/60",
-  },
-  learn: {
-    dot:    "bg-sky-500",
-    header: "text-sky-400",
-    ring:   "ring-sky-700",
-    zone:   "bg-sky-950/20",
-    over:   "bg-sky-950/50",
-  },
-  review: {
-    dot:    "bg-amber-500",
-    header: "text-amber-400",
-    ring:   "ring-amber-700",
-    zone:   "bg-amber-950/20",
-    over:   "bg-amber-950/50",
-  },
-  done: {
-    dot:    "bg-green-500",
-    header: "text-green-400",
-    ring:   "ring-green-700",
-    zone:   "bg-green-950/20",
-    over:   "bg-green-950/50",
-  },
+  backlog: { dot: "bg-slate-500", header: "text-slate-400", ring: "ring-slate-600"  },
+  learn:   { dot: "bg-sky-500",   header: "text-sky-400",   ring: "ring-sky-700"    },
+  review:  { dot: "bg-amber-500", header: "text-amber-400", ring: "ring-amber-700"  },
+  done:    { dot: "bg-green-500", header: "text-green-400", ring: "ring-green-700"  },
 };
 
 interface Props {
@@ -71,10 +45,10 @@ export default function KanbanColumn({ column, milestones, entryCounts, activeId
         ref={setNodeRef}
         className={`flex flex-1 flex-col gap-3 rounded-xl p-3 min-h-[200px] overflow-y-auto transition-all duration-150
           ${isOver
-            ? `${styles.over} ring-2 ${styles.ring}`
+            ? `bg-slate-800/50 ring-2 ${styles.ring}`
             : isDragging
-            ? `${styles.zone} ring-1 ${styles.ring} ring-opacity-50`
-            : styles.zone
+            ? "bg-slate-800/20 ring-1 ring-slate-700/50"
+            : "bg-slate-800/20"
           }`}
       >
         {milestones.map(m => (

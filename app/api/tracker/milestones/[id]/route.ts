@@ -15,10 +15,23 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const body = (await request.json()) as { column: KanbanColumn };
+  const body = (await request.json()) as { column?: KanbanColumn; reviewValidated?: boolean };
 
-  if (!VALID_COLUMNS.includes(body.column)) {
-    return NextResponse.json({ error: "Invalid column" }, { status: 400 });
+  const updateData: { kanban_column?: KanbanColumn; review_validated?: boolean } = {};
+
+  if (body.column !== undefined) {
+    if (!VALID_COLUMNS.includes(body.column)) {
+      return NextResponse.json({ error: "Invalid column" }, { status: 400 });
+    }
+    updateData.kanban_column = body.column;
+  }
+
+  if (body.reviewValidated !== undefined) {
+    updateData.review_validated = body.reviewValidated;
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
   }
 
   const supabase = await createClient();
@@ -36,7 +49,7 @@ export async function PATCH(
 
   const { error: updateError } = await supabase
     .from("milestones")
-    .update({ kanban_column: body.column })
+    .update(updateData)
     .eq("id", id);
 
   if (updateError) {
