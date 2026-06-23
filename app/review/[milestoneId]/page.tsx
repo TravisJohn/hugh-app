@@ -21,7 +21,7 @@ export default async function ReviewQuizPage({ params, searchParams }: Props) {
   // Verify ownership and fetch milestone
   const { data: milestone } = await supabase
     .from("milestones")
-    .select("id, title, kanban_column, review_validated, tracks!inner(user_id)")
+    .select("id, title, kanban_column, review_validated, tracks!track_id!inner(user_id)")
     .eq("id", milestoneId)
     .single();
 

@@ -21,7 +21,7 @@ export default async function TrackerPage({ searchParams }: Props) {
   const [tracksResult, goalResult] = await Promise.all([
     supabase
       .from("tracks")
-      .select("*, milestones(id, kanban_column)")
+      .select("*, milestones!track_id(id, kanban_column)")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false }),
 

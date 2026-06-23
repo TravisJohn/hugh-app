@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import KanbanBoard from "@/components/tracker/KanbanBoard";
-import { type Milestone } from "@/types";
+import { type Milestone, type BacklogPriorityMode } from "@/types";
 
 interface Props {
   params:       Promise<{ trackId: string }>;
@@ -54,6 +54,9 @@ export default async function TrackPage({ params, searchParams }: Props) {
         <KanbanBoard
           initialMilestones={(milestones ?? []) as Milestone[]}
           topicContext={track.topic_description as string}
+          trackId={trackId}
+          focusMilestoneId={track.focus_milestone_id as string | null}
+          backlogPriorityMode={track.backlog_priority_mode as BacklogPriorityMode}
           validatedId={validated}
           masteredId={mastered}
           isPremium={isPremium}

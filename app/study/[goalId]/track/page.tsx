@@ -99,7 +99,7 @@ export default async function StudyTrackPage({ params, searchParams }: Props) {
 
           {/* Kanban board */}
           <div className="flex-1 overflow-hidden px-6 py-5">
-            <KanbanBoard initialMilestones={milestones} topicContext={g.topic} goalId={goalId} pulseId={pulseId} validatedId={validatedId} masteredId={masteredId} isPremium={isPremium} isAdmin={isAdmin} />
+            <KanbanBoard initialMilestones={milestones} topicContext={g.topic} goalId={goalId} trackId={t.id} focusMilestoneId={t.focus_milestone_id} backlogPriorityMode={t.backlog_priority_mode} pulseId={pulseId} validatedId={validatedId} masteredId={masteredId} isPremium={isPremium} isAdmin={isAdmin} />
           </div>
         </>
       ) : (

@@ -1,6 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { type SupabaseClient } from "@supabase/supabase-js";
 import { milestoneGenerationPrompt, parseClaudeJson } from "@/lib/claude/prompts";
+import { assignBacklogPriority } from "@/lib/tracker/priority";
+import { logUsage } from "@/lib/usage";
 import { type KanbanColumn } from "@/types";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -52,6 +54,17 @@ export async function generateTrack(
   }));
 
   await supabase.from("milestones").insert(milestoneRows);
+
+  // One-time agentic backlog ranking. Non-blocking: a failure here must not
+  // break track creation — the board simply falls back to no suggested order.
+  try {
+    const usage = await assignBacklogPriority(supabase, track.id as string, topic);
+    if (usage) {
+      void logUsage({ userId, feature: "tracker/priority", tokensIn: usage.inputTokens, tokensOut: usage.outputTokens });
+    }
+  } catch (err) {
+    console.error("[generateTrack] backlog priority ranking failed:", err);
+  }
 
   return track.id as string;
 }

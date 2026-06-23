@@ -362,3 +362,98 @@ Fixes and improvements from live testing:
 | Active Kanban card glow | `isActive` state applies `ring-1 ring-violet-500/30 shadow-[0_0_18px_...]` border; `isPulsing` (post-save) applies brighter `ring-2 ring-violet-400/40` glow |
 
 Zero TypeScript errors confirmed.
+
+---
+
+> **Log gap note:** Phases for the admin system, user approval/usage gate, premium gate, milestone review (quiz) and milestone mastery (voice) shipped between Phase 13 and Phase 14 but were not logged at the time. They live in the code (migrations `011`–`014`, `/admin`, `/review`, `/mastery`, `/upgrade`, `/pending`, `/blocked`).
+
+## Phase 14 — Tracker Refinements (fact-check, edit, focus, coverage) ✅
+
+Five refinements to the learning tracker. Two new concepts unify them: a per-milestone
+**learning-points checklist** ("things to understand") and a per-track **persistent focus**.
+
+### Decisions (agreed with Travis up front)
+- Fact-check runs **automatically** on every entry save/edit; warning lingers until corrected.
+- The understanding-**gap footnote is permanent** — kept even after the entry is corrected.
+- The **focused milestone is remembered per track** (survives reload/navigation) — unifies the glow and the Ask goal.
+- The activity check is **goal-grounded**: the milestone goal is broken into an enumerated checklist, and coverage is judged against it.
+- Ask checklist cadence: recompute **on open + Refresh + Summarise** (not keystroke-live).
+
+### Migrations
+- `015_entry_factcheck.sql` — `milestone_entries`: `fact_status` (`pending`/`correct`/`incorrect`, with CHECK), `correction`, `gap_note`, `corrected`.
+- `016_milestone_focus.sql` — `milestones`: `learning_points JSONB`, `coverage JSONB`; `tracks`: `focus_milestone_id UUID` FK.
+- Patched `014_admin_system.sql` to `DROP POLICY IF EXISTS` before `CREATE POLICY` (idempotent re-runs). **Not re-run** — file-only per Travis.
+
+### Types
+- `Track.focus_milestone_id`; new `LearningPoint`, `MilestoneCoverage`; `Milestone.learning_points`/`coverage`; `FactStatus`; `MilestoneEntry.{fact_status,correction,gap_note,corrected}`.
+
+### Prompts (`lib/claude/prompts.ts`)
+- `factCheckEntryPrompt` — flags only genuine factual/conceptual errors (not reflections); returns `{status, correction, gap}`.
+- `learningPointsPrompt` — 4–6 checkable "things to understand" from a milestone goal (generated lazily per card).
+- `coveragePrompt` — judges which points the diary + chat meaningfully cover.
+
+### API routes
+- `POST /api/tracker/entries/[entryId]/verify` — auto fact-check; on `incorrect` persists correction + permanent gap and leaves the warning; on `correct` clears the warning but keeps the gap. Soft-fails (skips) if usage blocked.
+- `PATCH /api/tracker/entries/[entryId]` — edit body/title (→ resets to `pending` for re-verify) or `action:"accept"` to apply the fix.
+- `GET/POST /api/tracker/milestones/[id]/coverage` — GET ensures the checklist (one-time gen) + returns cached coverage; POST recomputes coverage from diary (+ optional `chatText`) and caches it.
+- `PATCH /api/tracker/tracks/[trackId]` — set `focus_milestone_id`.
+- All Claude calls wrapped with `logUsage` (`tracker/verify|points|coverage`).
+
+### Components
+- **MilestoneDrawer** — entry editing; clickable fact-check warning with **Accept fix** / **Rewrite myself**; permanent "Gap noted" footnote; new **"What to understand"** section with coverage ticks, `X of N covered` readiness, and a Re-check button. New entries auto-verify in the background; status icons (spinner/⚠/✓) per entry.
+- **MilestoneCard / KanbanColumn / KanbanBoard** — new persistent `isFocused` glow sourced from `track.focus_milestone_id`; opening a card sets focus (PATCH track) and it stays glowing until another card is opened. Post-save `pulse` flash retained on top.
+- **ChatWindow** — optional `onTranscriptChange` / `onSummariseStart` callbacks (non-breaking).
+- **AskWorkspace** (new) — wraps ChatWindow + ChecklistRail, shares the transcript via a ref, triggers a rail recompute on Summarise.
+- **ChecklistRail** (new) — persistent right-hand side-rail on Ask: enumerated checklist + live ticks; recomputes on open / Refresh / Summarise.
+- **Ask page** — back arrow now goes to `/study/[goalId]/track`; focused milestone resolved from URL param **or** the track's persistent focus, so the goal stays in view.
+
+**Pending deploy step:** run `015` and `016` in the Supabase SQL editor before this ships.
+
+Zero TypeScript errors confirmed (`npx tsc --noEmit`, exit 0).
+
+### Phase 14.1 — Embed ambiguity fix (live-testing bug)
+The Ask checklist showed "unavailable". Root cause: `016`'s new `tracks.focus_milestone_id → milestones` FK created a **second** relationship between `milestones` and `tracks`, so PostgREST could no longer resolve `tracks!inner(...)` embeds — they errored with *"more than one relationship was found"*. This silently broke five routes (coverage + verify, plus the pre-existing **milestones PATCH**, **mastery session**, and **review quiz** ownership checks). Fixed by disambiguating with the FK-column hint: `tracks!track_id!inner(...)` in all five. `learning_points` was correctly null (lazy-gen) — the lazy-gen just never ran because the ownership query 404'd first. Verified against the live DB via service-role query.
+
+### Phase 14.2 — Embed ambiguity, round 2 (the `.tsx` + reverse-direction misses)
+The 14.1 grep was scoped to `**/*.ts`, so it missed **page** components (`.tsx`) and reverse-direction embeds. Three more spots had the same `016` ambiguity:
+- `app/review/[milestoneId]/page.tsx` and `app/mastery/[milestoneId]/page.tsx` — `tracks!inner(user_id)`; the failing query made `milestone` null → `notFound()`/redirect, surfacing as a **genuine 404 page** when opening a review quiz or mastery session. Fixed with `tracks!track_id!inner(...)`.
+- `app/tracker/page.tsx` — the **reverse** embed `tracks` → `milestones(...)` (the dashboard's milestone counts) was also ambiguous. Fixed with `milestones!track_id(...)`.
+Swept every file extension afterwards; no embeds remain unqualified. Verified the original 404'd milestone ID now resolves. `tsc` exit 0.
+
+---
+
+## Phase 15 — Backlog Priority ✅
+
+A study-order guide for the Backlog column so a novice knows what to tackle next.
+
+### Decisions (clarified with Travis)
+- Priority **is** the build-time curriculum order Hugh already generates (fundamentals → advanced, stored as `position`). **No AI call, no re-ranking** — the ranks are fixed at track creation and never change; they're the learner's guide.
+- Per-track **Auto | Manual** toggle (default Auto). Auto shows the fixed ranks; Manual lets the learner reorder.
+- Manual mechanic: **up/down arrows**, not drag — an agentic call to avoid destabilising the working cross-column DnD right before a push (no `@dnd-kit/sortable`, no board refactor). Drag-sort noted as a clean fast-follow.
+
+### Migration
+- `017_backlog_priority.sql` — `tracks.backlog_priority_mode TEXT NOT NULL DEFAULT 'auto'` + CHECK (`auto`|`manual`). **Must be run before this ships.** Degrades gracefully to `auto` if unapplied (column read as undefined → default).
+
+### Types / API
+- `Track.backlog_priority_mode`; `BacklogPriorityMode` type.
+- `PATCH /api/tracker/tracks/[trackId]` extended to accept `backlogPriorityMode`.
+- `PATCH /api/tracker/tracks/[trackId]/reorder` — persists a manual backlog order by reassigning the *existing set* of `position` values to the new order (keeps cards interleaved correctly vs. other columns; no global renumber).
+
+### Components
+- **MilestoneCard** — sky `#n` rank badge (backlog only); up/down arrows in Manual mode with `stopPropagation` so they don't trigger drag/drawer.
+- **KanbanColumn** — compact Auto|Manual segmented toggle in the Backlog header; passes rank + move handlers to cards.
+- **KanbanBoard** — `priorityMode` state, `toggleMode` (persists), `moveCard` (optimistic position swap + reorder PATCH with revert); `byColumn` now sorts by `position` so reorders render.
+- Both track pages pass `backlogPriorityMode`.
+
+Zero TypeScript errors (`npx tsc --noEmit`, exit 0).
+
+### Phase 15.1 — Agentic backlog priority (replaces deterministic order)
+The Phase 15 rank was just the build-order `position`. Replaced with a **one-time agentic ranking** computed at generation.
+
+- **Migration `018_priority_rank.sql`** — `milestones.priority_rank INTEGER`, `priority_reason TEXT`. **Run before shipping.**
+- `backlogPriorityPrompt` + `lib/tracker/priority.ts` `assignBacklogPriority(supabase, trackId, topic)` — one Claude call reasons through the backlog's dependencies and returns a build order; writes each card's rank + a one-line reason. Deliberately **no `server-only` import** (reusable by the backfill); returns token usage for the caller to log.
+- `generateTrack` calls it once after inserting milestones, logs usage as `tracker/priority`, non-blocking on failure. **No recompute triggers anywhere** — set once, stays fixed as cards move/are added. (Confirmed there was never a `/rank` route to drop.)
+- **UI:** Auto mode orders the backlog by `priority_rank` and shows a sky `#n` badge with the reason as a hover tooltip — pure guidance, doesn't restrict opening. Manual mode hides the badge/order entirely (backlog in the learner's own order) and keeps the up/down arrows for self-sequencing (unchanged). `byColumn` sorts backlog by `priority_rank` in auto, by `position` otherwise; null ranks (pre-existing tracks) fall back to position with no badge.
+- **Existing tracks:** `scripts/backfill-priority.mjs` (run once, after `018`) ranks any track whose backlog isn't yet ranked; idempotent; safe to delete after.
+
+Zero TypeScript errors (`npx tsc --noEmit`, exit 0).

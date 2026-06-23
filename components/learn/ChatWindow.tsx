@@ -12,15 +12,17 @@ interface Message {
 }
 
 interface Props {
-  topic:        string;
-  goalId?:      string;
-  milestoneId?: string;
+  topic:               string;
+  goalId?:             string;
+  milestoneId?:        string;
+  onTranscriptChange?: (text: string) => void;
+  onSummariseStart?:   () => void;
 }
 
 const WELCOME = (topic: string) =>
   `Hi! I'm Hugh, and I'm here to help you learn about **${topic}**. Ask me anything — concepts, examples, how things work, or where to start.`;
 
-export default function ChatWindow({ topic, goalId, milestoneId }: Props) {
+export default function ChatWindow({ topic, goalId, milestoneId, onTranscriptChange, onSummariseStart }: Props) {
   const [messages, setMessages]     = useState<Message[]>([
     { role: "assistant", content: WELCOME(topic) },
   ]);
@@ -44,6 +46,17 @@ export default function ChatWindow({ topic, goalId, milestoneId }: Props) {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading, goalOfferShown]);
+
+  // Surface the running transcript (minus the synthetic welcome) to the parent,
+  // so the checklist side-rail can fold the chat into its coverage assessment.
+  useEffect(() => {
+    if (!onTranscriptChange) return;
+    const text = messages
+      .filter((_, i) => !(i === 0 && messages[0].role === "assistant"))
+      .map(m => `${m.role === "user" ? "Learner" : "Hugh"}: ${m.content}`)
+      .join("\n\n");
+    onTranscriptChange(text);
+  }, [messages, onTranscriptChange]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -100,6 +113,7 @@ export default function ChatWindow({ topic, goalId, milestoneId }: Props) {
 
   async function handleSummarise() {
     if (messages.length < 3 || summarizing) return;
+    onSummariseStart?.();
     setPanelOpen(true);
     setSummarizing(true);
     setSummary(null);

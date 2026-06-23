@@ -1,16 +1,24 @@
 "use client";
 
 import { useDraggable } from "@dnd-kit/core";
-import { GripVertical, BookOpen, OctagonAlert, ChevronRight } from "lucide-react";
-import { type Milestone } from "@/types";
+import { GripVertical, BookOpen, OctagonAlert, ChevronRight, ChevronUp, ChevronDown } from "lucide-react";
+import { type Milestone, type BacklogPriorityMode } from "@/types";
 
 interface Props {
-  milestone:  Milestone;
-  entryCount: number;
-  isActive:   boolean;
-  isPulsing:  boolean;
-  isOverlay?: boolean;
-  onClick:    (milestone: Milestone) => void;
+  milestone:       Milestone;
+  entryCount:      number;
+  isActive:        boolean;
+  isPulsing:       boolean;
+  isFocused:       boolean;
+  isBacklog?:      boolean;             // backlog cards get arrows in manual mode
+  priorityRank?:   number | null;      // Hugh's agentic rank; shown as badge in auto mode
+  priorityReason?: string | null;      // one-line tooltip on the rank badge
+  priorityMode?:   BacklogPriorityMode;
+  canMoveUp?:      boolean;
+  canMoveDown?:    boolean;
+  onMove?:         (dir: "up" | "down") => void;
+  isOverlay?:      boolean;
+  onClick:         (milestone: Milestone) => void;
 }
 
 const CARD_TINTS: Record<string, { bg: string; border: string }> = {
@@ -20,7 +28,11 @@ const CARD_TINTS: Record<string, { bg: string; border: string }> = {
   done:    { bg: "bg-green-950/60",   border: "border-green-900/50" },
 };
 
-export default function MilestoneCard({ milestone, entryCount, isActive, isPulsing, isOverlay, onClick }: Props) {
+export default function MilestoneCard({
+  milestone, entryCount, isActive, isPulsing, isFocused,
+  isBacklog, priorityRank, priorityReason, priorityMode, canMoveUp, canMoveDown, onMove,
+  isOverlay, onClick,
+}: Props) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id:   milestone.id,
     data: { kanban_column: milestone.kanban_column },
@@ -30,6 +42,10 @@ export default function MilestoneCard({ milestone, entryCount, isActive, isPulsi
   const needsReview  = milestone.kanban_column === "review" && !milestone.review_validated;
   const needsMastery = milestone.kanban_column === "done"   && !milestone.mastery_validated;
   const showStopSign = needsReview || needsMastery;
+
+  // Auto mode shows Hugh's guidance badge; Manual mode shows reorder arrows.
+  const showBadge  = priorityMode === "auto"   && priorityRank != null;
+  const showArrows = priorityMode === "manual" && !!isBacklog;
 
   // Overlay: the floating card while dragging
   if (isOverlay) {
@@ -73,6 +89,8 @@ export default function MilestoneCard({ milestone, entryCount, isActive, isPulsi
           ? "cursor-pointer border-violet-500/60 bg-slate-800 shadow-[0_0_18px_rgba(139,92,246,0.25)] ring-1 ring-violet-500/30"
           : isPulsing
           ? "cursor-pointer border-violet-400 bg-slate-800 shadow-[0_0_28px_rgba(139,92,246,0.55)] ring-2 ring-violet-400/40"
+          : isFocused
+          ? "cursor-grab active:cursor-grabbing border-violet-500/50 bg-slate-800/90 shadow-[0_0_16px_rgba(139,92,246,0.22)] ring-1 ring-violet-500/25"
           : `cursor-grab active:cursor-grabbing ${tint.bg} ${tint.border} hover:brightness-110 hover:border-opacity-80`
         }`}
     >
@@ -83,6 +101,16 @@ export default function MilestoneCard({ milestone, entryCount, isActive, isPulsi
         </div>
       )}
 
+      {/* Hugh's suggested study-order badge (auto mode only) */}
+      {showBadge && !isDragging && (
+        <div
+          title={priorityReason ?? undefined}
+          className="absolute left-2 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-sky-500/15 text-[10px] font-bold text-sky-300 cursor-help"
+        >
+          {priorityRank}
+        </div>
+      )}
+
       {/* Grip handle */}
       {!isDragging && (
         <div className="absolute right-2 top-2 text-slate-600 opacity-30 group-hover:opacity-70 transition-opacity pointer-events-none">
@@ -90,7 +118,7 @@ export default function MilestoneCard({ milestone, entryCount, isActive, isPulsi
         </div>
       )}
 
-      <p className={`text-sm font-semibold text-slate-100 leading-snug pr-6 ${showStopSign ? "pl-5" : ""}`}>
+      <p className={`text-sm font-semibold text-slate-100 leading-snug pr-6 ${showBadge ? "pl-7" : showStopSign ? "pl-5" : ""}`}>
         {milestone.title}
       </p>
 
@@ -99,16 +127,39 @@ export default function MilestoneCard({ milestone, entryCount, isActive, isPulsi
       </p>
 
       <div className="flex items-center justify-between mt-1">
-        {entryCount > 0 ? (
-          <div className="flex items-center gap-1.5">
-            <BookOpen size={11} className="text-slate-500" />
-            <span className="text-xs text-slate-500">
-              {entryCount} {entryCount === 1 ? "entry" : "entries"}
-            </span>
-          </div>
-        ) : (
-          <span />
-        )}
+        <div className="flex items-center gap-1.5">
+          {/* Manual reorder arrows (backlog, manual mode only) */}
+          {showArrows && !isDragging && (
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={e => { e.stopPropagation(); onMove?.("up"); }}
+                onPointerDown={e => e.stopPropagation()}
+                disabled={!canMoveUp}
+                title="Move up"
+                className="rounded p-0.5 text-slate-500 hover:text-sky-300 hover:bg-slate-700/60 disabled:opacity-25 disabled:hover:bg-transparent disabled:hover:text-slate-500 transition-colors"
+              >
+                <ChevronUp size={13} />
+              </button>
+              <button
+                onClick={e => { e.stopPropagation(); onMove?.("down"); }}
+                onPointerDown={e => e.stopPropagation()}
+                disabled={!canMoveDown}
+                title="Move down"
+                className="rounded p-0.5 text-slate-500 hover:text-sky-300 hover:bg-slate-700/60 disabled:opacity-25 disabled:hover:bg-transparent disabled:hover:text-slate-500 transition-colors"
+              >
+                <ChevronDown size={13} />
+              </button>
+            </div>
+          )}
+          {entryCount > 0 && (
+            <div className="flex items-center gap-1.5">
+              <BookOpen size={11} className="text-slate-500" />
+              <span className="text-xs text-slate-500">
+                {entryCount} {entryCount === 1 ? "entry" : "entries"}
+              </span>
+            </div>
+          )}
+        </div>
         <span className="flex items-center gap-0.5 text-xs text-slate-400 cursor-pointer hover:text-slate-100 transition-colors select-none">
           See details
           <ChevronRight size={11} />

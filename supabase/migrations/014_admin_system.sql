@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS usage_logs (
 ALTER TABLE usage_logs ENABLE ROW LEVEL SECURITY;
 
 -- Users can read their own logs; service-role key writes (bypasses RLS)
+DROP POLICY IF EXISTS "usage_logs_select_own" ON usage_logs;
 CREATE POLICY "usage_logs_select_own"
   ON usage_logs FOR SELECT
   USING (auth.uid() = user_id);

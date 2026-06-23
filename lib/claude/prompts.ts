@@ -213,6 +213,103 @@ Respond with ONLY valid JSON, no markdown fences, no commentary:
 }`;
 }
 
+// ── Learning points (the "things to understand" checklist) ───────────────
+
+export function learningPointsPrompt(
+  topic:            string,
+  milestoneTitle:   string,
+  milestoneSummary: string,
+): string {
+  return `You are an expert curriculum designer.
+
+The learner is studying "${topic}". This specific milestone is:
+Title: "${milestoneTitle}"
+Summary: "${milestoneSummary}"
+
+Break this milestone's goal into a short, enumerated checklist of the key ideas the learner must understand to have genuinely accomplished it. These are the concrete "things to understand" — the concepts, mechanisms, or skills that together mean the goal is met.
+
+Rules:
+- 4 to 6 points, ordered from foundational to applied
+- Each point: one specific idea, 4–12 words, no trailing punctuation
+- Concrete and checkable (e.g. "How watermarking handles late-arriving events"), not vague ("Understand streaming")
+
+Respond with ONLY valid JSON, no markdown fences:
+{"points": ["...", "...", "..."]}`;
+}
+
+// ── Coverage check (which points the learner's activity has touched) ──────
+
+export function coveragePrompt(
+  milestoneTitle: string,
+  points:         Array<{ id: string; text: string }>,
+  activityText:   string,
+): string {
+  const pointList = points.map(p => `${p.id}: ${p.text}`).join("\n");
+
+  return `You are assessing how thoroughly a learner has engaged with a milestone's key ideas.
+
+Milestone: "${milestoneTitle}"
+
+The "things to understand" checklist:
+${pointList}
+
+Here is the learner's activity — their diary entries and chat with the coach:
+"""
+${activityText.slice(0, 6000)}
+"""
+
+For each checklist point, decide whether the activity meaningfully discusses, explains, or applies that idea (not just mentions the words in passing). Return the ids of the points that ARE covered.
+
+Respond with ONLY valid JSON, no markdown fences:
+{"coveredIds": ["p1", "p3"]}`;
+}
+
+// ── Diary entry fact-check ────────────────────────────────────────────────
+
+export function factCheckEntryPrompt(
+  topic:          string,
+  milestoneTitle: string,
+  entryBody:      string,
+): string {
+  return `You are Hugh, a precise but supportive learning coach. A learner wrote a diary note while studying "${topic}" (milestone: "${milestoneTitle}"). Check it for factual or conceptual errors.
+
+Learner's note:
+"""
+${entryBody.slice(0, 2000)}
+"""
+
+Judge ONLY clear factual or conceptual mistakes about the subject. Personal reflections, opinions, questions, learning goals, or notes that are correct-but-incomplete are NOT errors — mark those "correct".
+
+If there is a genuine error:
+- status: "incorrect"
+- correction: a rewritten version of their note that fixes the error while keeping their voice and intent. Keep it roughly the same length.
+- gap: one short sentence naming the specific misunderstanding (e.g. "You treated a CTE as if it were materialised like a temp table — it isn't by default."). This is shown to the learner as a permanent note of where their understanding was off.
+
+If there is no error: status "correct", and set correction and gap to null.
+
+Respond with ONLY valid JSON, no markdown fences:
+{"status": "correct" | "incorrect", "correction": "..." | null, "gap": "..." | null}`;
+}
+
+// ── Backlog priority (agentic build order, one-time at generation) ────────
+
+export function backlogPriorityPrompt(
+  topic: string,
+  items: Array<{ n: number; title: string; summary: string }>,
+): string {
+  return `You are an expert curriculum architect. A learner wants to learn: "${topic}".
+
+Below are the backlog learning milestones for this goal. Reason about their conceptual dependencies and pedagogy, then put them in the best build order — what genuinely must be understood before what, so each milestone builds on the ones before it. Use real judgment about prerequisites, not a fixed formula.
+
+Milestones:
+${items.map(it => `${it.n}. ${it.title} — ${it.summary}`).join("\n")}
+
+Return ALL of them in recommended study order (first = study first). For each, give a one-line reason (max ~15 words) for its placement relative to the others.
+
+Respond with ONLY valid JSON, no markdown fences:
+{"ordered": [{"n": <milestone number>, "reason": "..."}]}`;
+}
+
 // ── Learning goal refinement (5-whys) ────────────────────────────────────
 
 export function refinementQuestionPrompt(

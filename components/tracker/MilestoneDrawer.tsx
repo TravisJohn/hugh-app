@@ -6,9 +6,13 @@ import {
   X, Plus, Loader2, MessageCircle, ArrowRight,
   Maximize2, Minimize2, ChevronDown, PenLine, BookOpen,
   OctagonAlert, CheckCircle2, ClipboardCheck, Mic,
+  ListChecks, Check, Circle, Pencil, RotateCw, AlertTriangle, Paperclip,
 } from "lucide-react";
 import Link from "next/link";
-import { type Milestone, type MilestoneEntry, KANBAN_COLUMN_LABELS } from "@/types";
+import {
+  type Milestone, type MilestoneEntry, type LearningPoint,
+  KANBAN_COLUMN_LABELS,
+} from "@/types";
 
 interface Props {
   milestone:     Milestone | null;
@@ -72,8 +76,21 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
   const [saving, setSaving]                 = useState(false);
   const [expanded, setExpanded]             = useState(false);
 
+  // Fact-check / editing state
+  const [verifyingIds, setVerifyingIds] = useState<Set<string>>(new Set());
+  const [editingId, setEditingId]       = useState<string | null>(null);
+  const [editBody, setEditBody]         = useState("");
+  const [editTitle, setEditTitle]       = useState("");
+
+  // "What to understand" checklist + coverage
+  const [points, setPoints]                   = useState<LearningPoint[]>([]);
+  const [coveredIds, setCoveredIds]           = useState<string[]>([]);
+  const [loadingCoverage, setLoadingCoverage] = useState(false);
+  const [rechecking, setRechecking]           = useState(false);
+
   // Section visibility
   const [showOverview,  setShowOverview]    = useState(true);
+  const [showPoints,    setShowPoints]      = useState(true);
   const [showReview,    setShowReview]      = useState(true);
   const [showMastery,   setShowMastery]     = useState(true);
   const [showActions,   setShowActions]     = useState(true);
@@ -97,18 +114,35 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
     setDraftTitle("");
     setEntries([]);
     setOpenEntries(new Set());
+    setEditingId(null);
+    setVerifyingIds(new Set());
+    setPoints([]);
+    setCoveredIds([]);
     setShowOverview(true);
+    setShowPoints(true);
     setShowReview(true);
     setShowMastery(true);
     // Collapse support sections in review/mastery mode so the learner focuses on the task
     setShowActions(!isReview && !isMastery);
     setShowDiary(!isReview && !isMastery);
     setShowWriteEntry(!isReview && !isMastery);
+
     setLoadingEntries(true);
     fetch(`/api/tracker/milestones/${milestone.id}/entries`)
       .then(r => r.json())
       .then(d => setEntries(d.entries ?? []))
       .finally(() => setLoadingEntries(false));
+
+    // Load the checklist + cached coverage (generates the checklist once if absent)
+    setLoadingCoverage(true);
+    fetch(`/api/tracker/milestones/${milestone.id}/coverage`)
+      .then(r => r.json())
+      .then(d => {
+        setPoints(d.learningPoints ?? []);
+        setCoveredIds(d.coverage?.coveredIds ?? []);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingCoverage(false));
   }, [milestone?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -121,6 +155,28 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
+  }
+
+  function replaceEntry(updated: MilestoneEntry) {
+    setEntries(prev => prev.map(e => e.id === updated.id ? updated : e));
+  }
+
+  // Background fact-check for a saved/edited entry
+  async function verifyEntry(entryId: string) {
+    setVerifyingIds(prev => new Set(prev).add(entryId));
+    try {
+      const res = await fetch(`/api/tracker/entries/${entryId}/verify`, { method: "POST" });
+      const d   = await res.json();
+      if (d.entry) replaceEntry(d.entry as MilestoneEntry);
+    } catch {
+      /* leave as pending — non-blocking */
+    } finally {
+      setVerifyingIds(prev => {
+        const next = new Set(prev);
+        next.delete(entryId);
+        return next;
+      });
+    }
   }
 
   async function submitEntry() {
@@ -140,9 +196,59 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
         setDraft("");
         setDraftTitle("");
         setShowDiary(true);
+        void verifyEntry(newEntry.id); // auto fact-check in the background
       }
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function acceptFix(entryId: string) {
+    const res = await fetch(`/api/tracker/entries/${entryId}`, {
+      method:  "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ action: "accept" }),
+    });
+    const d = await res.json();
+    if (d.entry) replaceEntry(d.entry as MilestoneEntry);
+  }
+
+  function startEdit(entry: MilestoneEntry) {
+    setEditingId(entry.id);
+    setEditBody(entry.body);
+    setEditTitle(entry.title ?? "");
+    setOpenEntries(prev => new Set(prev).add(entry.id));
+  }
+
+  async function saveEdit(entryId: string) {
+    if (!editBody.trim()) return;
+    const res = await fetch(`/api/tracker/entries/${entryId}`, {
+      method:  "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ body: editBody.trim(), title: editTitle.trim() || undefined }),
+    });
+    const d = await res.json();
+    if (d.entry) {
+      replaceEntry(d.entry as MilestoneEntry);
+      setEditingId(null);
+      void verifyEntry(entryId); // re-check the rewritten entry
+    }
+  }
+
+  async function recheckCoverage() {
+    if (!milestone || rechecking) return;
+    setRechecking(true);
+    try {
+      const res = await fetch(`/api/tracker/milestones/${milestone.id}/coverage`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({}),
+      });
+      const d = await res.json();
+      if (d.learningPoints) setPoints(d.learningPoints);
+      if (d.coverage)       setCoveredIds(d.coverage.coveredIds ?? []);
+    } finally {
+      setRechecking(false);
     }
   }
 
@@ -170,7 +276,8 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
     return `/review/${milestone.id}?returnUrl=${encodeURIComponent(pathname)}`;
   }
 
-  const open = milestone !== null;
+  const open       = milestone !== null;
+  const allCovered = points.length > 0 && coveredIds.length === points.length;
 
   return (
     <>
@@ -240,6 +347,66 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                     <p className="pb-4 text-sm text-slate-300 leading-relaxed">
                       {milestone.summary}
                     </p>
+                  )}
+                </div>
+
+                {/* ── What to understand (goal checklist + coverage) ──── */}
+                <div className="border-b border-slate-700/40 px-6">
+                  <SectionToggle
+                    label="What to understand"
+                    icon={<ListChecks size={13} />}
+                    open={showPoints}
+                    onToggle={() => setShowPoints(v => !v)}
+                    count={points.length || undefined}
+                  />
+                  {showPoints && (
+                    <div className="pb-4">
+                      {loadingCoverage && points.length === 0 ? (
+                        <div className="flex items-center gap-2 py-2 text-xs text-slate-500">
+                          <Loader2 size={12} className="animate-spin" />
+                          Building your checklist…
+                        </div>
+                      ) : points.length === 0 ? (
+                        <p className="py-2 text-xs text-slate-600">
+                          Checklist unavailable right now.
+                        </p>
+                      ) : (
+                        <>
+                          <ol className="space-y-2">
+                            {points.map(p => {
+                              const done = coveredIds.includes(p.id);
+                              return (
+                                <li key={p.id} className="flex items-start gap-2.5">
+                                  {done
+                                    ? <Check  size={15} className="mt-0.5 shrink-0 text-green-400" />
+                                    : <Circle size={15} className="mt-0.5 shrink-0 text-slate-600" />}
+                                  <span className={`text-sm leading-snug ${done ? "text-slate-300" : "text-slate-400"}`}>
+                                    {p.text}
+                                  </span>
+                                </li>
+                              );
+                            })}
+                          </ol>
+                          <div className="mt-3 flex items-center justify-between">
+                            <span className={`text-xs font-medium ${allCovered ? "text-green-400" : "text-slate-500"}`}>
+                              {allCovered
+                                ? "All ideas covered — ready to validate"
+                                : `${coveredIds.length} of ${points.length} covered`}
+                            </span>
+                            <button
+                              onClick={recheckCoverage}
+                              disabled={rechecking}
+                              className="flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 disabled:opacity-50 transition-colors"
+                            >
+                              {rechecking
+                                ? <Loader2 size={11} className="animate-spin" />
+                                : <RotateCw size={11} />}
+                              Re-check
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   )}
                 </div>
 
@@ -419,12 +586,15 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
 
                       <div className="space-y-2 pb-4">
                         {entries.map(entry => {
-                          const isOpen = openEntries.has(entry.id);
-                          const label  = entry.title || entry.body.slice(0, 65) + (entry.body.length > 65 ? "…" : "");
+                          const isOpen      = openEntries.has(entry.id);
+                          const isEditing   = editingId === entry.id;
+                          const isVerifying = verifyingIds.has(entry.id);
+                          const showWarning = entry.fact_status === "incorrect" && !entry.corrected;
+                          const label       = entry.title || entry.body.slice(0, 65) + (entry.body.length > 65 ? "…" : "");
                           return (
                             <div
                               key={entry.id}
-                              className="rounded-lg border border-slate-700/50 bg-slate-800/50 overflow-hidden"
+                              className={`rounded-lg border overflow-hidden ${showWarning ? "border-amber-500/40 bg-amber-950/10" : "border-slate-700/50 bg-slate-800/50"}`}
                             >
                               <button
                                 onClick={() => toggleEntry(entry.id)}
@@ -437,16 +607,112 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                                 <span className="flex-1 min-w-0 truncate text-xs font-semibold text-violet-400">
                                   {label}
                                 </span>
+                                {isVerifying ? (
+                                  <Loader2 size={12} className="shrink-0 animate-spin text-slate-500" />
+                                ) : showWarning ? (
+                                  <AlertTriangle size={12} className="shrink-0 text-amber-400" />
+                                ) : entry.fact_status === "correct" ? (
+                                  <Check size={12} className="shrink-0 text-green-500/70" />
+                                ) : null}
                                 <span className="shrink-0 text-xs text-slate-600">
                                   {fmtCompact(entry.created_at)}
                                 </span>
                               </button>
 
                               {isOpen && (
-                                <div className="border-t border-slate-700/40 px-3 py-3 pl-8">
-                                  <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
-                                    {entry.body}
-                                  </p>
+                                <div className="border-t border-slate-700/40 px-3 py-3 pl-8 space-y-3">
+                                  {isEditing ? (
+                                    <div className="space-y-2">
+                                      <input
+                                        type="text"
+                                        value={editTitle}
+                                        onChange={e => setEditTitle(e.target.value)}
+                                        placeholder="Title (optional)"
+                                        className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-sky-500"
+                                      />
+                                      <textarea
+                                        value={editBody}
+                                        onChange={e => setEditBody(e.target.value)}
+                                        rows={4}
+                                        className="w-full resize-none rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-sky-500"
+                                      />
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          onClick={() => saveEdit(entry.id)}
+                                          disabled={!editBody.trim()}
+                                          className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-500 disabled:opacity-40 transition-colors"
+                                        >
+                                          Save &amp; re-check
+                                        </button>
+                                        <button
+                                          onClick={() => setEditingId(null)}
+                                          className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
+                                      {entry.body}
+                                    </p>
+                                  )}
+
+                                  {/* Fact-check warning — clickable correction */}
+                                  {showWarning && !isEditing && (
+                                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-2.5">
+                                      <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400">
+                                        <AlertTriangle size={13} />
+                                        Hugh thinks this needs a fix
+                                      </div>
+                                      {entry.correction && (
+                                        <div>
+                                          <p className="mb-1 text-xs uppercase tracking-wider text-slate-600">Suggested correction</p>
+                                          <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
+                                            {entry.correction}
+                                          </p>
+                                        </div>
+                                      )}
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          onClick={() => acceptFix(entry.id)}
+                                          className="flex items-center gap-1 rounded-lg bg-amber-600/80 px-3 py-1.5 text-xs font-semibold text-amber-50 hover:bg-amber-600 transition-colors"
+                                        >
+                                          <Check size={12} />
+                                          Accept fix
+                                        </button>
+                                        <button
+                                          onClick={() => startEdit(entry)}
+                                          className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                                        >
+                                          <Pencil size={11} />
+                                          Rewrite myself
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Permanent gap footnote — stays after correction */}
+                                  {entry.gap_note && (
+                                    <div className="flex items-start gap-1.5 border-t border-slate-700/40 pt-2.5 text-xs leading-relaxed text-slate-500">
+                                      <Paperclip size={11} className="mt-0.5 shrink-0 text-slate-600" />
+                                      <span>
+                                        <span className="font-semibold text-slate-400">Gap noted:</span>{" "}
+                                        {entry.gap_note}
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {/* Plain edit affordance when there's no warning */}
+                                  {!isEditing && !showWarning && (
+                                    <button
+                                      onClick={() => startEdit(entry)}
+                                      className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-400 transition-colors"
+                                    >
+                                      <Pencil size={10} />
+                                      Edit
+                                    </button>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -492,7 +758,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                       className="w-full resize-none rounded-lg bg-slate-800 border border-slate-700 px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-sky-500 transition-colors"
                     />
                     <div className="mt-2 flex items-center justify-between">
-                      <span className="text-xs text-slate-600">⌘ Enter to save</span>
+                      <span className="text-xs text-slate-600">Hugh fact-checks each entry · ⌘ Enter to save</span>
                       <button
                         onClick={submitEntry}
                         disabled={!draft.trim() || saving}

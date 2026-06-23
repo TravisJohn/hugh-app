@@ -13,7 +13,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { Trophy, Medal, Crown } from "lucide-react";
-import { type Milestone, type KanbanColumn, KANBAN_COLUMNS } from "@/types";
+import { type Milestone, type KanbanColumn, type BacklogPriorityMode, KANBAN_COLUMNS } from "@/types";
 import KanbanColumnComponent from "./KanbanColumn";
 import MilestoneCard from "./MilestoneCard";
 import MilestoneDrawer from "./MilestoneDrawer";
@@ -22,6 +22,9 @@ interface Props {
   initialMilestones: Milestone[];
   topicContext?:     string;
   goalId?:           string;
+  trackId?:          string;
+  focusMilestoneId?: string | null;
+  backlogPriorityMode?: BacklogPriorityMode;
   pulseId?:          string;
   validatedId?:      string;
   masteredId?:       string;
@@ -30,7 +33,8 @@ interface Props {
 }
 
 export default function KanbanBoard({
-  initialMilestones, topicContext, goalId,
+  initialMilestones, topicContext, goalId, trackId, focusMilestoneId,
+  backlogPriorityMode = "auto",
   pulseId: initialPulseId, validatedId, masteredId,
   isPremium = false, isAdmin = false,
 }: Props) {
@@ -42,6 +46,8 @@ export default function KanbanBoard({
   const [draggingMilestone, setDraggingMilestone] = useState<Milestone | null>(null);
   const [entryCounts, setEntryCounts]             = useState<Record<string, number>>({});
   const [pulseId, setPulseId]                     = useState<string | null>(initialPulseId ?? null);
+  const [focusId, setFocusId]                     = useState<string | null>(focusMilestoneId ?? null);
+  const [priorityMode, setPriorityMode]           = useState<BacklogPriorityMode>(backlogPriorityMode);
   const [showPremiumGate, setShowPremiumGate]     = useState(false);
 
   // Celebration state
@@ -146,7 +152,73 @@ export default function KanbanBoard({
 
   const handleCardClick = useCallback((milestone: Milestone) => {
     setActiveMilestone(milestone);
-  }, []);
+    // Opening a card makes it the persistent focus — glows until another is picked.
+    setFocusId(prev => {
+      if (prev === milestone.id) return prev;
+      if (trackId) {
+        fetch(`/api/tracker/tracks/${trackId}`, {
+          method:  "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ focusMilestoneId: milestone.id }),
+        }).catch(() => {});
+      }
+      return milestone.id;
+    });
+  }, [trackId]);
+
+  function toggleMode(mode: BacklogPriorityMode) {
+    setPriorityMode(prev => {
+      if (prev === mode) return prev;
+      if (trackId) {
+        fetch(`/api/tracker/tracks/${trackId}`, {
+          method:  "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ backlogPriorityMode: mode }),
+        }).catch(() => {});
+      }
+      return mode;
+    });
+  }
+
+  // Manual reorder: swap a backlog card with its neighbour and persist.
+  function moveCard(milestoneId: string, dir: "up" | "down") {
+    const backlog = milestones
+      .filter(m => m.kanban_column === "backlog")
+      .sort((a, b) => a.position - b.position);
+
+    const idx    = backlog.findIndex(m => m.id === milestoneId);
+    const target = dir === "up" ? idx - 1 : idx + 1;
+    if (idx < 0 || target < 0 || target >= backlog.length) return;
+
+    const a = backlog[idx];
+    const b = backlog[target];
+
+    // Optimistic: swap their position values
+    setMilestones(prev => prev.map(m =>
+      m.id === a.id ? { ...m, position: b.position }
+      : m.id === b.id ? { ...m, position: a.position }
+      : m
+    ));
+
+    const newOrder = [...backlog];
+    [newOrder[idx], newOrder[target]] = [newOrder[target], newOrder[idx]];
+    const orderedIds = newOrder.map(m => m.id);
+
+    if (trackId) {
+      fetch(`/api/tracker/tracks/${trackId}/reorder`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ orderedIds }),
+      }).catch(() => {
+        // Revert on failure
+        setMilestones(prev => prev.map(m =>
+          m.id === a.id ? { ...m, position: a.position }
+          : m.id === b.id ? { ...m, position: b.position }
+          : m
+        ));
+      });
+    }
+  }
 
   function handleDrawerClose() {
     if (activeMilestone) {
@@ -163,7 +235,14 @@ export default function KanbanBoard({
 
   const byColumn = KANBAN_COLUMNS.reduce<Record<KanbanColumn, Milestone[]>>(
     (acc, col) => {
-      acc[col] = milestones.filter(m => m.kanban_column === col);
+      const cards = milestones.filter(m => m.kanban_column === col);
+      // Auto mode orders the backlog by Hugh's agentic rank (nulls last, then position).
+      // Everything else (manual backlog + all other columns) orders by position.
+      acc[col] = col === "backlog" && priorityMode === "auto"
+        ? cards.sort((a, b) =>
+            (a.priority_rank ?? Number.MAX_SAFE_INTEGER) - (b.priority_rank ?? Number.MAX_SAFE_INTEGER)
+            || a.position - b.position)
+        : cards.sort((a, b) => a.position - b.position);
       return acc;
     },
     { backlog: [], learn: [], review: [], done: [] }
@@ -193,7 +272,11 @@ export default function KanbanBoard({
                 entryCounts={entryCounts}
                 activeId={activeMilestone?.id ?? null}
                 pulseId={pulseId}
+                focusId={focusId}
                 isDragging={!!draggingMilestone}
+                priorityMode={priorityMode}
+                onToggleMode={toggleMode}
+                onMoveCard={moveCard}
                 onCardClick={handleCardClick}
               />
             ))}
@@ -211,6 +294,7 @@ export default function KanbanBoard({
               entryCount={entryCounts[draggingMilestone.id] ?? 0}
               isActive={false}
               isPulsing={false}
+              isFocused={false}
               isOverlay
               onClick={() => {}}
             />

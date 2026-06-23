@@ -57,7 +57,7 @@ export async function PATCH(
   // Confirm the milestone belongs to this user via its track
   const { data: milestone, error: fetchError } = await supabase
     .from("milestones")
-    .select("id, tracks!inner(user_id)")
+    .select("id, tracks!track_id!inner(user_id)")
     .eq("id", id)
     .single();
 

@@ -1,7 +1,10 @@
 "use client";
 
 import { useDroppable } from "@dnd-kit/core";
-import { type KanbanColumn as KanbanColumnType, type Milestone, KANBAN_COLUMN_LABELS } from "@/types";
+import {
+  type KanbanColumn as KanbanColumnType, type Milestone,
+  type BacklogPriorityMode, KANBAN_COLUMN_LABELS,
+} from "@/types";
 import MilestoneCard from "./MilestoneCard";
 
 const COLUMN_STYLES: Record<KanbanColumnType, {
@@ -16,28 +19,65 @@ const COLUMN_STYLES: Record<KanbanColumnType, {
 };
 
 interface Props {
-  column:      KanbanColumnType;
-  milestones:  Milestone[];
-  entryCounts: Record<string, number>;
-  activeId:    string | null;
-  pulseId:     string | null;
-  isDragging:  boolean;
-  onCardClick: (milestone: Milestone) => void;
+  column:        KanbanColumnType;
+  milestones:    Milestone[];
+  entryCounts:   Record<string, number>;
+  activeId:      string | null;
+  pulseId:       string | null;
+  focusId:       string | null;
+  isDragging:    boolean;
+  priorityMode:  BacklogPriorityMode;
+  onToggleMode:  (mode: BacklogPriorityMode) => void;
+  onMoveCard:    (milestoneId: string, dir: "up" | "down") => void;
+  onCardClick:   (milestone: Milestone) => void;
 }
 
-export default function KanbanColumn({ column, milestones, entryCounts, activeId, pulseId, isDragging, onCardClick }: Props) {
+export default function KanbanColumn({
+  column, milestones, entryCounts, activeId, pulseId, focusId, isDragging,
+  priorityMode, onToggleMode, onMoveCard, onCardClick,
+}: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: column });
-  const styles = COLUMN_STYLES[column];
+  const styles    = COLUMN_STYLES[column];
+  const isBacklog = column === "backlog";
 
   return (
     <div className="flex flex-1 flex-col min-w-0 h-full">
       {/* Column header */}
       <div className="mb-3 flex items-center gap-2 px-1">
         <span className={`h-2 w-2 rounded-full ${styles.dot}`} />
-        <span className={`text-xs font-bold uppercase tracking-widest ${styles.header}`}>
+        <span className={`min-w-0 truncate text-xs font-bold uppercase tracking-widest ${styles.header}`}>
           {KANBAN_COLUMN_LABELS[column]}
         </span>
-        <span className="ml-auto text-xs text-slate-600 font-mono">{milestones.length}</span>
+        {isBacklog ? (
+          <div className="ml-auto flex shrink-0 items-center gap-1.5">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+              Priority
+            </span>
+            <div className="flex items-center rounded-lg border border-slate-700 bg-slate-800/60 p-0.5 text-[10px] font-semibold">
+              <button
+                onClick={() => onToggleMode("auto")}
+                title="Auto: Hugh orders the backlog by suggested priority"
+                className={`rounded-md px-1.5 py-0.5 capitalize transition-colors ${
+                  priorityMode === "auto" ? "bg-sky-500/20 text-sky-300" : "text-slate-500 hover:text-slate-300"
+                }`}
+              >
+                auto
+              </button>
+              <button
+                onClick={() => onToggleMode("manual")}
+                title="Manual: you control the order with the arrows"
+                className={`rounded-md px-1.5 py-0.5 capitalize transition-colors ${
+                  priorityMode === "manual" ? "bg-sky-500/20 text-sky-300" : "text-slate-500 hover:text-slate-300"
+                }`}
+              >
+                manual
+              </button>
+            </div>
+            <span className="text-xs text-slate-600 font-mono">{milestones.length}</span>
+          </div>
+        ) : (
+          <span className="ml-auto text-xs text-slate-600 font-mono">{milestones.length}</span>
+        )}
       </div>
 
       {/* Drop zone */}
@@ -51,13 +91,21 @@ export default function KanbanColumn({ column, milestones, entryCounts, activeId
             : "bg-slate-800/20"
           }`}
       >
-        {milestones.map(m => (
+        {milestones.map((m, idx) => (
           <MilestoneCard
             key={m.id}
             milestone={m}
             entryCount={entryCounts[m.id] ?? 0}
             isActive={m.id === activeId}
             isPulsing={m.id === pulseId}
+            isFocused={m.id === focusId}
+            isBacklog={isBacklog}
+            priorityRank={m.priority_rank}
+            priorityReason={m.priority_reason}
+            priorityMode={priorityMode}
+            canMoveUp={idx > 0}
+            canMoveDown={idx < milestones.length - 1}
+            onMove={dir => onMoveCard(m.id, dir)}
             onClick={onCardClick}
           />
         ))}

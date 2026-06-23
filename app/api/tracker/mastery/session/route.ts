@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
   // Verify ownership
   const { data: milestone } = await supabase
     .from("milestones")
-    .select("id, title, tracks!inner(user_id)")
+    .select("id, title, tracks!track_id!inner(user_id)")
     .eq("id", milestoneId)
     .single();
 

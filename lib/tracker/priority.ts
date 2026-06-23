@@ -1,0 +1,70 @@
+import Anthropic from "@anthropic-ai/sdk";
+import { type SupabaseClient } from "@supabase/supabase-js";
+import { backlogPriorityPrompt, parseClaudeJson } from "@/lib/claude/prompts";
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+export interface PriorityUsage {
+  inputTokens:  number;
+  outputTokens: number;
+}
+
+/**
+ * One-time agentic ranking of a track's backlog milestones. Claude reasons
+ * through dependencies and returns a logical build order; we write each card's
+ * `priority_rank` (1-based) and a one-line `priority_reason`.
+ *
+ * Deliberately has NO server-only imports so it can run from a backfill script
+ * as well as from generateTrack. Caller is responsible for logging usage.
+ * Returns null when there are no backlog milestones.
+ */
+export async function assignBacklogPriority(
+  supabase: SupabaseClient,
+  trackId:  string,
+  topic:    string,
+): Promise<PriorityUsage | null> {
+  const { data: rows } = await supabase
+    .from("milestones")
+    .select("id, title, summary")
+    .eq("track_id", trackId)
+    .eq("kanban_column", "backlog")
+    .order("position", { ascending: true });
+
+  const milestones = (rows ?? []) as Array<{ id: string; title: string; summary: string }>;
+  if (milestones.length === 0) return null;
+
+  const items = milestones.map((m, i) => ({ n: i + 1, title: m.title, summary: m.summary }));
+
+  const res = await anthropic.messages.create({
+    model:      "claude-sonnet-4-6",
+    max_tokens: 1200,
+    messages:   [{ role: "user", content: backlogPriorityPrompt(topic, items) }],
+  });
+
+  const raw    = res.content[0]?.type === "text" ? res.content[0].text : "{}";
+  const parsed = parseClaudeJson<{ ordered: Array<{ n: number; reason: string }> }>(raw);
+
+  // Build rank assignments from Claude's order; guard ranges + de-dupe.
+  const seen = new Set<number>();
+  const assignments: Array<{ id: string; rank: number; reason: string | null }> = [];
+  let rank = 1;
+  for (const entry of parsed.ordered ?? []) {
+    const idx = entry.n - 1;
+    if (idx < 0 || idx >= milestones.length || seen.has(entry.n)) continue;
+    seen.add(entry.n);
+    assignments.push({ id: milestones[idx].id, rank: rank++, reason: entry.reason?.trim() || null });
+  }
+  // Append any milestones Claude omitted, preserving their original order.
+  milestones.forEach((m, i) => {
+    if (!seen.has(i + 1)) assignments.push({ id: m.id, rank: rank++, reason: null });
+  });
+
+  await Promise.all(assignments.map(a =>
+    supabase
+      .from("milestones")
+      .update({ priority_rank: a.rank, priority_reason: a.reason })
+      .eq("id", a.id)
+  ));
+
+  return { inputTokens: res.usage.input_tokens, outputTokens: res.usage.output_tokens };
+}

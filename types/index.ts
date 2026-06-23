@@ -107,14 +107,30 @@ export const KANBAN_COLUMN_LABELS: Record<KanbanColumn, string> = {
   done:    'Mastered',
 };
 
+export type BacklogPriorityMode = 'auto' | 'manual';
+
 export interface Track {
-  id:                string;
-  user_id:           string;
-  goal_id:           string | null;
-  title:             string;
-  topic_description: string;
-  status:            'active' | 'paused' | 'completed';
-  created_at:        string;
+  id:                    string;
+  user_id:               string;
+  goal_id:               string | null;
+  title:                 string;
+  topic_description:     string;
+  status:                'active' | 'paused' | 'completed';
+  focus_milestone_id:    string | null;
+  backlog_priority_mode: BacklogPriorityMode;
+  created_at:            string;
+}
+
+// A single "thing to understand" derived from a milestone's goal.
+export interface LearningPoint {
+  id:   string;
+  text: string;
+}
+
+// Cached coverage assessment — which learning points the learner's activity covers.
+export interface MilestoneCoverage {
+  coveredIds: string[];
+  updatedAt:  string;
 }
 
 export interface Milestone {
@@ -127,8 +143,14 @@ export interface Milestone {
   review_validated:  boolean;
   mastery_validated: boolean;
   mastery_score:     number | null;
+  learning_points:   LearningPoint[] | null;
+  coverage:          MilestoneCoverage | null;
+  priority_rank:     number | null;
+  priority_reason:   string | null;
   created_at:        string;
 }
+
+export type FactStatus = 'pending' | 'correct' | 'incorrect';
 
 export interface MilestoneEntry {
   id:           string;
@@ -136,6 +158,10 @@ export interface MilestoneEntry {
   user_id:      string;
   title:        string | null;
   body:         string;
+  fact_status:  FactStatus;
+  correction:   string | null;
+  gap_note:     string | null;
+  corrected:    boolean;
   created_at:   string;
 }
 

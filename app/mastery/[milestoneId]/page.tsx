@@ -20,7 +20,7 @@ export default async function MasteryPage({ params, searchParams }: Props) {
   // reliable fallback URL that always points to the specific board, not /tracker
   const { data: milestone } = await supabase
     .from("milestones")
-    .select("id, title, kanban_column, mastery_validated, track_id, tracks!inner(user_id)")
+    .select("id, title, kanban_column, mastery_validated, track_id, tracks!track_id!inner(user_id)")
     .eq("id", milestoneId)
     .single();
 
