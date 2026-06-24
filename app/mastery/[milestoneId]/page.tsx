@@ -53,6 +53,7 @@ export default async function MasteryPage({ params, searchParams }: Props) {
       personaId={persona.id}
       trackId={trackId}
       returnUrl={returnUrl}
+      alreadyMastered={milestone.mastery_validated as boolean}
     />
   );
 }

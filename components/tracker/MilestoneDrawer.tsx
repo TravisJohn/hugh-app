@@ -7,12 +7,30 @@ import {
   Maximize2, Minimize2, ChevronDown, PenLine, BookOpen,
   OctagonAlert, CheckCircle2, ClipboardCheck, Mic,
   ListChecks, Check, Circle, Pencil, RotateCw, AlertTriangle, Paperclip,
+  Download, FileText, Sparkles,
 } from "lucide-react";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import type { Components } from "react-markdown";
 import {
   type Milestone, type MilestoneEntry, type LearningPoint,
   KANBAN_COLUMN_LABELS,
 } from "@/types";
+
+// Compact markdown styling for the in-drawer summary document.
+const summaryMarkdownComponents: Components = {
+  h1: ({ children }) => <h1 className="mb-2 text-base font-bold text-slate-100">{children}</h1>,
+  h2: ({ children }) => <h2 className="mt-3 mb-1.5 text-xs font-bold uppercase tracking-widest text-green-400/80">{children}</h2>,
+  h3: ({ children }) => <h3 className="mt-2 mb-1 text-sm font-semibold text-slate-200">{children}</h3>,
+  p:  ({ children }) => <p className="mb-2 text-sm leading-relaxed text-slate-300">{children}</p>,
+  ul: ({ children }) => <ul className="mb-2 ml-4 list-disc space-y-1">{children}</ul>,
+  ol: ({ children }) => <ol className="mb-2 ml-4 list-decimal space-y-1">{children}</ol>,
+  li: ({ children }) => <li className="text-sm leading-snug text-slate-300">{children}</li>,
+  strong: ({ children }) => <strong className="font-semibold text-slate-100">{children}</strong>,
+  em: ({ children }) => <em className="italic text-slate-400">{children}</em>,
+  hr: () => <hr className="my-3 border-slate-700/60" />,
+};
 
 interface Props {
   milestone:     Milestone | null;
@@ -88,6 +106,11 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
   const [loadingCoverage, setLoadingCoverage] = useState(false);
   const [rechecking, setRechecking]           = useState(false);
 
+  // Mastery "what you learned" summary document
+  const [summaryDoc, setSummaryDoc]   = useState<string | null>(null);
+  const [summaryAt, setSummaryAt]     = useState<string | null>(null);
+  const [genSummary, setGenSummary]   = useState(false);
+
   // Section visibility
   const [showOverview,  setShowOverview]    = useState(true);
   const [showPoints,    setShowPoints]      = useState(true);
@@ -118,6 +141,9 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
     setVerifyingIds(new Set());
     setPoints([]);
     setCoveredIds([]);
+    setSummaryDoc(milestone.summary_doc ?? null);
+    setSummaryAt(milestone.summary_doc_at ?? null);
+    setGenSummary(false);
     setShowOverview(true);
     setShowPoints(true);
     setShowReview(true);
@@ -250,6 +276,35 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
     } finally {
       setRechecking(false);
     }
+  }
+
+  async function generateSummary() {
+    if (!milestone || genSummary) return;
+    setGenSummary(true);
+    try {
+      const res = await fetch(`/api/tracker/milestones/${milestone.id}/summary`, { method: "POST" });
+      const d   = await res.json();
+      if (d.summaryDoc) {
+        setSummaryDoc(d.summaryDoc as string);
+        setSummaryAt((d.generatedAt as string) ?? new Date().toISOString());
+      }
+    } finally {
+      setGenSummary(false);
+    }
+  }
+
+  function downloadSummary() {
+    if (!summaryDoc || !milestone) return;
+    const slug = milestone.title.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase();
+    const blob = new Blob([summaryDoc], { type: "text/markdown;charset=utf-8" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `${slug || "milestone"}-summary.md`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -487,13 +542,85 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                     {showMastery && (
                       <div className="pb-4 space-y-3">
                         {milestone.mastery_validated ? (
-                          <div className="flex items-center gap-2.5 rounded-xl border border-green-500/30 bg-green-500/8 px-4 py-3">
-                            <CheckCircle2 size={16} className="shrink-0 text-green-400" />
-                            <div>
-                              <p className="text-sm font-semibold text-green-300">Mastered</p>
-                              <p className="text-xs text-slate-500">This card has been verbally professed and confirmed.</p>
+                          <>
+                            <div className="flex items-center gap-2.5 rounded-xl border border-green-500/30 bg-green-500/8 px-4 py-3">
+                              <CheckCircle2 size={16} className="shrink-0 text-green-400" />
+                              <div>
+                                <p className="text-sm font-semibold text-green-300">Mastered</p>
+                                <p className="text-xs text-slate-500">This card has been verbally professed and confirmed.</p>
+                              </div>
                             </div>
-                          </div>
+
+                            {/* Practice again — re-run the session without leaving the Mastered column */}
+                            <Link
+                              href={`/mastery/${milestone.id}?returnUrl=${encodeURIComponent(pathname)}`}
+                              onClick={onClose}
+                              className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:border-slate-600 hover:bg-slate-800 transition-colors"
+                            >
+                              <Mic size={14} />
+                              Practice again
+                              <span className="text-xs font-normal text-slate-500">stays mastered</span>
+                            </Link>
+
+                            {/* ── Learning summary document ─────────────────── */}
+                            <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 space-y-3">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                                  <FileText size={13} />
+                                  Learning summary
+                                </div>
+                                {summaryDoc && !genSummary && (
+                                  <div className="flex items-center gap-3">
+                                    <button
+                                      onClick={generateSummary}
+                                      className="flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 transition-colors"
+                                    >
+                                      <RotateCw size={11} />
+                                      Regenerate
+                                    </button>
+                                    <button
+                                      onClick={downloadSummary}
+                                      className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                                    >
+                                      <Download size={11} />
+                                      Download
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+
+                              {genSummary ? (
+                                <div className="flex items-center gap-2 py-2 text-xs text-slate-500">
+                                  <Loader2 size={12} className="animate-spin" />
+                                  Hugh is writing your summary…
+                                </div>
+                              ) : summaryDoc ? (
+                                <>
+                                  <div className="rounded-lg border border-slate-700/50 bg-slate-900/40 px-4 py-3">
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={summaryMarkdownComponents}>
+                                      {summaryDoc}
+                                    </ReactMarkdown>
+                                  </div>
+                                  {summaryAt && (
+                                    <p className="text-xs text-slate-600">Generated {fmtCompact(summaryAt)}</p>
+                                  )}
+                                </>
+                              ) : (
+                                <>
+                                  <p className="text-sm text-slate-400 leading-relaxed">
+                                    Generate a document summarising what you learned here — drawn from your diary, the checklist, and your mastery session.
+                                  </p>
+                                  <button
+                                    onClick={generateSummary}
+                                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-green-600/40 bg-green-700/50 px-4 py-2.5 text-sm font-semibold text-green-100 hover:bg-green-700 transition-colors"
+                                  >
+                                    <Sparkles size={14} />
+                                    Generate summary
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </>
                         ) : (
                           <>
                             <div className="flex items-start gap-2.5 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3">

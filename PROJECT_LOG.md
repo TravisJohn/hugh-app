@@ -535,3 +535,36 @@ react-hooks "synchronous setState in effect" rule.
 Context: Vercel Hobby + Fluid Compute allows up to 300s (verified against docs
 2026-06-19), so `after()` track-gen is viable on Hobby; `maxDuration=120`.
 Fluid Compute + env vars confirmed enabled by Travis. [[after-hobby-limitation]]
+
+### Phase 17 — Mastery redo (practice) + learning summary document
+Two-part refinement on the Mastery feature.
+
+**Redo for practice (no bucket move):**
+- A "Practice again" button on a Mastered card re-runs the voice session in place
+  (the `/mastery/[id]` route already requires the `done` column, so nothing moves).
+- `MasteryClient` gains an `alreadyMastered` mode: the result screen always frames
+  as "Still mastered", offers "Save score & finish" + "Practice again", and the
+  setup copy reflects a practice run. Score rule = **latest**: a practice finish
+  PATCHes `mastery_score` (+ feedback) to the most recent run even if lower, and
+  **never** sends `mastery_validated:false` — mastery is never revoked.
+
+**Learning summary document (AI narrative, in-app + downloadable):**
+- `migration 020_milestone_summary.sql` — `milestones.mastery_feedback`,
+  `summary_doc`, `summary_doc_at`. **Must be applied before this ships.**
+- `masterySummaryPrompt` (markdown out) builds a "what you learned" doc from the
+  milestone, the checklist + coverage, the diary entries (incl. gap notes), and
+  the latest mastery score/feedback.
+- `POST /api/tracker/milestones/[id]/summary` — ownership + must-be-`done` →
+  generate → store `summary_doc`/`summary_doc_at` → return. Logs `tracker/summary`.
+- Auto-generated on first mastery (`MasteryClient.confirmMastery` also persists
+  `mastery_feedback` then fires the summary POST, non-fatal). Practice runs do NOT
+  auto-regenerate (on-demand only).
+- `MilestoneDrawer` (mastered cards): renders the doc via `react-markdown` +
+  `remark-gfm`, with **Regenerate** and **Download** (`.md` Blob) actions, or a
+  "Generate summary" button when none exists yet. Reads the doc off the milestone
+  (`select("*")`), keeps local state for regeneration.
+
+Verified: `tsc --noEmit` clean, `next build` compiles. (Pre-existing eslint
+warnings in untouched lines unchanged.) Live test pending Travis after applying
+migration 020 — redo keeps mastery + updates score; summary auto-generates,
+renders, downloads, regenerates. PDF export deferred to v2 (markdown only).

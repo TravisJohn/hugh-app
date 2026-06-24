@@ -310,6 +310,60 @@ Respond with ONLY valid JSON, no markdown fences:
 {"ordered": [{"n": <milestone number>, "reason": "..."}]}`;
 }
 
+// ── Mastery summary document (markdown "what you learned") ────────────────
+
+export function masterySummaryPrompt(params: {
+  topic:            string;
+  milestoneTitle:   string;
+  milestoneSummary: string;
+  points:           Array<{ text: string; covered: boolean }>;
+  diaryEntries:     Array<{ title: string | null; body: string; gap: string | null }>;
+  masteryScore:     number | null;
+  masteryFeedback:  string | null;
+}): string {
+  const { topic, milestoneTitle, milestoneSummary, points, diaryEntries, masteryScore, masteryFeedback } = params;
+
+  const pointsBlock = points.length > 0
+    ? points.map(p => `- [${p.covered ? "covered" : "partial"}] ${p.text}`).join("\n")
+    : "(no checklist available)";
+
+  const diaryBlock = diaryEntries.length > 0
+    ? diaryEntries
+        .map((e, i) => `[Note ${i + 1}]${e.title ? ` ${e.title}` : ""}\n${e.body}${e.gap ? `\n(Gap previously noted: ${e.gap})` : ""}`)
+        .join("\n\n")
+    : "(no diary entries)";
+
+  const masteryBlock = masteryScore != null
+    ? `Mastery score: ${masteryScore}/10.${masteryFeedback ? ` Hugh's verdict: ${masteryFeedback}` : ""}`
+    : "(mastery not yet scored)";
+
+  return `You are Hugh, a supportive learning coach. Write a concise, well-structured "what you learned" summary document for a learner who has just mastered a milestone. It should read like a keepsake they can revisit — celebratory but substantive, grounded ONLY in the material below (do not invent facts they didn't engage with).
+
+Subject area: "${topic}"
+Milestone: "${milestoneTitle}"
+What the milestone covers: ${milestoneSummary}
+
+Key ideas checklist (coverage from their activity):
+${pointsBlock}
+
+The learner's own diary notes for this milestone:
+"""
+${diaryBlock}
+"""
+
+${masteryBlock}
+
+Write the document in GitHub-flavoured Markdown with this structure:
+- A top-level heading: the milestone title.
+- A short 1-2 sentence intro framing what they set out to learn.
+- "## What you now understand" — 3-6 bullet points synthesising the key ideas they genuinely engaged with (draw from their notes and the covered checklist items). Be specific.
+- "## In your own words" — 1-2 short paragraphs weaving their diary insights into a coherent narrative.
+- If any gaps were noted, a "## Watch-outs" section listing them briefly as things to keep sharp.
+- "## Mastery" — one sentence noting they professed this verbally${masteryScore != null ? " and their score" : ""}.
+
+Keep it under ~350 words. Warm, clear, second person ("you"). Respond with ONLY the markdown document — no code fences, no preamble.`;
+}
+
 // ── Learning goal refinement (5-whys) ────────────────────────────────────
 
 export function refinementQuestionPrompt(

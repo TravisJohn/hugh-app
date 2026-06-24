@@ -151,6 +151,9 @@ export interface Milestone {
   coverage:          MilestoneCoverage | null;
   priority_rank:     number | null;
   priority_reason:   string | null;
+  mastery_feedback:  string | null;
+  summary_doc:       string | null;
+  summary_doc_at:    string | null;
   created_at:        string;
 }
 

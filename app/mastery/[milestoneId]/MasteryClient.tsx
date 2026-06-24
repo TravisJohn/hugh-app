@@ -89,16 +89,17 @@ const COLOR_CLASSES: Record<ColorKey, { bg: string; border: string; text: string
 // ── Props ──────────────────────────────────────────────────────────────────
 
 interface Props {
-  milestoneId:    string;
-  milestoneTitle: string;
-  personaId:      string;
-  trackId:        string;
-  returnUrl?:     string;
+  milestoneId:     string;
+  milestoneTitle:  string;
+  personaId:       string;
+  trackId:         string;
+  returnUrl?:      string;
+  alreadyMastered: boolean;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
 
-export default function MasteryClient({ milestoneId, milestoneTitle, personaId, trackId, returnUrl }: Props) {
+export default function MasteryClient({ milestoneId, milestoneTitle, personaId, trackId, returnUrl, alreadyMastered }: Props) {
   const router = useRouter();
 
   // The specific board is the guaranteed destination. returnUrl adds study-context
@@ -234,16 +235,43 @@ export default function MasteryClient({ milestoneId, milestoneTitle, personaId, 
     router.push(boardUrl);
   }
 
-  // ── Confirm mastery (only called when passed) ─────────────────────────────
-  async function doValidate() {
+  function navigateBackMastered() {
+    const sep = boardUrl.includes("?") ? "&" : "?";
+    router.push(`${boardUrl}${sep}mastered=${milestoneId}`);
+  }
+
+  // ── First-time mastery: validate, persist score + feedback, generate doc ──
+  async function confirmMastery() {
     setPhase("validating");
     await fetch(`/api/tracker/milestones/${milestoneId}`, {
       method:  "PATCH",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ masteryValidated: true, masteryScore: evaluation?.score ?? 0 }),
+      body:    JSON.stringify({
+        masteryValidated: true,
+        masteryScore:     evaluation?.score ?? 0,
+        masteryFeedback:  evaluation?.feedback ?? "",
+      }),
     });
-    const sep = boardUrl.includes("?") ? "&" : "?";
-    router.push(`${boardUrl}${sep}mastered=${milestoneId}`);
+    // Auto-generate the "what you learned" summary document. Non-fatal: it can
+    // always be regenerated from the milestone drawer if this call fails.
+    await fetch(`/api/tracker/milestones/${milestoneId}/summary`, { method: "POST" }).catch(() => {});
+    navigateBackMastered();
+  }
+
+  // ── Practice run on an already-mastered card ──────────────────────────────
+  // Records the latest score + feedback (even if lower) and never revokes
+  // mastery. Does NOT regenerate the summary doc — that stays on-demand.
+  async function finishPractice() {
+    setPhase("validating");
+    await fetch(`/api/tracker/milestones/${milestoneId}`, {
+      method:  "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({
+        masteryScore:    evaluation?.score ?? 0,
+        masteryFeedback: evaluation?.feedback ?? "",
+      }),
+    });
+    navigateBackMastered();
   }
 
   // ── Derived values ────────────────────────────────────────────────────────
@@ -252,6 +280,9 @@ export default function MasteryClient({ milestoneId, milestoneTitle, personaId, 
   const cfg             = SCENARIOS[scenario];
   const colors          = COLOR_CLASSES[cfg.color as ColorKey];
   const isBusy          = ["generating", "thinking", "evaluating", "validating"].includes(phase);
+  // On an already-mastered card every practice run is "positive" — mastery is
+  // locked, so we never show a fail/almost framing.
+  const positive        = alreadyMastered || !!evaluation?.passed;
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -328,10 +359,14 @@ export default function MasteryClient({ milestoneId, milestoneTitle, personaId, 
                 {cfg.label}
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-slate-100">Profess Your Mastery</h1>
+                <h1 className="text-2xl font-bold text-slate-100">
+                  {alreadyMastered ? "Practice Your Mastery" : "Profess Your Mastery"}
+                </h1>
                 <p className="mt-3 text-sm text-slate-400 leading-relaxed max-w-sm mx-auto">
-                  {cfg.tagline} Hugh leads a 3-exchange voice conversation.
-                  Score <span className="text-slate-200 font-semibold">7 or higher</span> to confirm mastery.
+                  {cfg.tagline} Hugh leads a 3-exchange voice conversation.{" "}
+                  {alreadyMastered
+                    ? "This is a practice run — your mastery is already locked in, so explore freely."
+                    : <>Score <span className="text-slate-200 font-semibold">7 or higher</span> to confirm mastery.</>}
                 </p>
               </div>
               <div className={`rounded-2xl border px-5 py-4 text-sm text-slate-400 leading-relaxed text-left ${colors.bg} ${colors.border}`}>
@@ -492,16 +527,20 @@ export default function MasteryClient({ milestoneId, milestoneTitle, personaId, 
 
             {/* Score card */}
             <div className={`rounded-3xl border p-6 text-center ${
-              evaluation?.passed
+              positive
                 ? "border-green-500/30 bg-green-500/5"
                 : "border-amber-500/30 bg-amber-500/5"
             }`}>
-              <div className={`text-5xl font-black mb-1 ${evaluation?.passed ? "text-green-300" : "text-amber-300"}`}>
+              <div className={`text-5xl font-black mb-1 ${positive ? "text-green-300" : "text-amber-300"}`}>
                 {evaluation?.score ?? "—"}
                 <span className="text-2xl font-normal text-slate-500">/10</span>
               </div>
-              <p className={`text-sm font-semibold ${evaluation?.passed ? "text-green-400" : "text-amber-400"}`}>
-                {evaluation?.passed ? "Mastery confirmed" : "Almost — one more try will get you there"}
+              <p className={`text-sm font-semibold ${positive ? "text-green-400" : "text-amber-400"}`}>
+                {alreadyMastered
+                  ? "Still mastered — practice logged"
+                  : evaluation?.passed
+                  ? "Mastery confirmed"
+                  : "Almost — one more try will get you there"}
               </p>
             </div>
 
@@ -527,9 +566,26 @@ export default function MasteryClient({ milestoneId, milestoneTitle, personaId, 
             </div>
 
             {/* CTA */}
-            {evaluation?.passed ? (
+            {alreadyMastered ? (
+              <div className="space-y-2">
+                <button
+                  onClick={finishPractice}
+                  className="w-full flex items-center justify-center gap-2 rounded-2xl bg-green-600 py-3.5 text-sm font-bold text-white hover:bg-green-500 transition-colors"
+                >
+                  <Trophy size={16} />
+                  Save score &amp; finish
+                </button>
+                <button
+                  onClick={() => { setPickMode(true); setPhase("setup"); setMessages([]); setEvaluation(null); }}
+                  className="w-full flex items-center justify-center gap-2 rounded-2xl border border-slate-700 py-3 text-sm text-slate-400 hover:text-slate-200 hover:border-slate-600 transition-colors"
+                >
+                  <RotateCcw size={14} />
+                  Practice again
+                </button>
+              </div>
+            ) : evaluation?.passed ? (
               <button
-                onClick={doValidate}
+                onClick={confirmMastery}
                 className="w-full flex items-center justify-center gap-2 rounded-2xl bg-green-600 py-3.5 text-sm font-bold text-white hover:bg-green-500 transition-colors"
               >
                 <Trophy size={16} />

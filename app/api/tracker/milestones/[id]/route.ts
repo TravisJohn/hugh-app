@@ -20,6 +20,7 @@ export async function PATCH(
     reviewValidated?:  boolean;
     masteryValidated?: boolean;
     masteryScore?:     number;
+    masteryFeedback?:  string;
   };
 
   const updateData: {
@@ -27,6 +28,7 @@ export async function PATCH(
     review_validated?:  boolean;
     mastery_validated?: boolean;
     mastery_score?:     number | null;
+    mastery_feedback?:  string | null;
   } = {};
 
   if (body.column !== undefined) {
@@ -46,6 +48,10 @@ export async function PATCH(
 
   if (body.masteryScore !== undefined) {
     updateData.mastery_score = body.masteryScore;
+  }
+
+  if (body.masteryFeedback !== undefined) {
+    updateData.mastery_feedback = body.masteryFeedback;
   }
 
   if (Object.keys(updateData).length === 0) {
