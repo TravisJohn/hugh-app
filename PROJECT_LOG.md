@@ -520,3 +520,18 @@ the failed state instead of hanging — which also covers the Vercel Hobby case
 where the background build is killed and the row stays `pending` forever
 ([[after-hobby-limitation]]). All transitions funnel through the single-`settle`
 guard; `cleanup` clears poll + timeout + channel.
+
+### Phase 16 — STEP 1 hardening: stalled-goal safety
+Closes the one residual dead-end before the Hobby test deploy. If a background
+build is killed past `maxDuration` (or the tab closes before the client
+watchdog), the goal row stays `pending` forever and a reload showed an endless
+"Building…" spinner. `GoalCard` now treats a goal `pending` for more than
+`STALL_MS` (5 min — safely beyond the 120s server cap) as **stalled**: red
+warning, "Track build stalled — remove and re-add", disabled Start. Read-only
+(no DB writes), so it also covers the closed-tab case. Computed client-side via a
+`setTimeout` (delay clamped to 0) to avoid an SSR/CSR hydration mismatch and the
+react-hooks "synchronous setState in effect" rule.
+
+Context: Vercel Hobby + Fluid Compute allows up to 300s (verified against docs
+2026-06-19), so `after()` track-gen is viable on Hobby; `maxDuration=120`.
+Fluid Compute + env vars confirmed enabled by Travis. [[after-hobby-limitation]]

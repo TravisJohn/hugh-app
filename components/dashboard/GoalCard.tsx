@@ -1,9 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Sparkles, Trash2, Loader2, AlertTriangle } from "lucide-react";
 import { type LearningGoal } from "@/types";
+
+// A goal still 'pending' past this age means its background build never
+// finished (function killed / tab closed before the watchdog wrote a status).
+// The server caps track-gen at maxDuration=120s, so anything pending this long
+// is definitively stalled, not slow. Surfaced as a recoverable dead-end rather
+// than an endless "Building…" spinner.
+const STALL_MS = 5 * 60 * 1000;
 
 function fmt(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-GB", {
@@ -19,6 +26,19 @@ interface Props {
 export default function GoalCard({ goal, onDelete }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting]     = useState(false);
+  // Computed client-side after mount to avoid an SSR/CSR hydration mismatch
+  // (Date.now() differs between render passes).
+  const [stalled, setStalled]       = useState(false);
+
+  useEffect(() => {
+    if (goal.track_status !== "pending") return;
+    const age = Date.now() - new Date(goal.created_at).getTime();
+    // Fires immediately if already past the threshold (delay clamped to 0), or
+    // live when the user is watching a goal cross it. setState stays in the
+    // callback, never synchronous in the effect body.
+    const t = setTimeout(() => setStalled(true), Math.max(0, STALL_MS - age));
+    return () => clearTimeout(t);
+  }, [goal.track_status, goal.created_at]);
 
   async function handleDeleteClick() {
     if (!confirming) {
@@ -30,7 +50,8 @@ export default function GoalCard({ goal, onDelete }: Props) {
     onDelete?.(goal.id);
   }
 
-  const status = goal.track_status;
+  const status: "pending" | "ready" | "failed" | "stalled" =
+    stalled ? "stalled" : goal.track_status;
 
   return (
     <div className="flex items-center gap-4 rounded-2xl border border-slate-700 bg-slate-800/60 px-5 py-4 transition-colors hover:border-slate-600 hover:bg-slate-800">
@@ -38,7 +59,7 @@ export default function GoalCard({ goal, onDelete }: Props) {
       <div className="shrink-0">
         {status === "pending" ? (
           <Loader2 size={20} className="text-amber-400 animate-spin" />
-        ) : status === "failed" ? (
+        ) : status === "failed" || status === "stalled" ? (
           <AlertTriangle size={20} className="text-red-400" />
         ) : (
           <Sparkles size={20} className="text-amber-400 animate-pulse" />
@@ -50,6 +71,10 @@ export default function GoalCard({ goal, onDelete }: Props) {
         <p className="font-semibold text-slate-100 leading-snug">{goal.topic}</p>
         {status === "pending" ? (
           <p className="mt-0.5 text-xs text-amber-400/80">Building your track…</p>
+        ) : status === "stalled" ? (
+          <p className="mt-0.5 text-xs text-red-400/90">
+            Track build stalled — remove and re-add to try again.
+          </p>
         ) : status === "failed" ? (
           <p className="mt-0.5 text-xs text-red-400/90">
             Track build failed — remove and re-add to try again.
@@ -101,7 +126,13 @@ export default function GoalCard({ goal, onDelete }: Props) {
         ) : (
           <span
             className="cursor-not-allowed rounded-xl bg-slate-700 px-4 py-2 text-sm font-bold text-slate-500"
-            title={status === "pending" ? "Track is still being built" : "Track build failed"}
+            title={
+              status === "pending"
+                ? "Track is still being built"
+                : status === "stalled"
+                ? "Track build stalled — remove and re-add"
+                : "Track build failed"
+            }
           >
             Start →
           </span>
