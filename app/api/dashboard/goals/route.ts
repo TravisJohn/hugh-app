@@ -9,9 +9,11 @@ import { generateTrack } from "@/lib/tracker/generate";
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // Track generation runs post-response via `after()` and chains two Claude
-// calls (milestones + backlog priority), so the invocation must be allowed to
-// outlive the response. Hobby plans cap this at 10s regardless of the value.
-export const maxDuration = 60;
+// calls (milestones + backlog priority), so the invocation must outlive the
+// response. With Fluid Compute (default-on) Hobby allows up to 300s; 120s gives
+// comfortable headroom over the ~30-90s build while staying under the client's
+// 180s watchdog in RefinementFlow so a slow build can't trigger a false failure.
+export const maxDuration = 120;
 
 export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
