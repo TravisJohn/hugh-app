@@ -1,57 +1,52 @@
 "use client";
 
-import {
-  forwardRef, useImperativeHandle, useCallback, useEffect, useState,
-} from "react";
-import { ListChecks, Check, Circle, Loader2, RotateCw } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ListChecks, Check, Circle, Loader2 } from "lucide-react";
 import { type LearningPoint } from "@/types";
-
-export interface ChecklistRailHandle {
-  recompute: () => void;
-}
 
 interface Props {
   milestoneId:    string;
   milestoneTitle: string;
-  /** Reads the latest chat transcript at call time (avoids stale closures). */
-  getTranscript:  () => string;
 }
 
 /**
  * Persistent side-rail for the Ask page. Shows the focused milestone's
- * enumerated "things to understand" and ticks each one as the learner's
- * diary + chat covers it. Recomputes on open, on Refresh, and on Summarise
- * (driven by the parent via the imperative `recompute` handle).
+ * enumerated "things to understand". Coverage is a self-assessment: the learner
+ * ticks each idea once they're confident they understand it, and the checks
+ * persist on the milestone. (No AI judges coverage — that's the learner's call.)
  */
-const ChecklistRail = forwardRef<ChecklistRailHandle, Props>(function ChecklistRail(
-  { milestoneId, milestoneTitle, getTranscript }, ref
-) {
+export default function ChecklistRail({ milestoneId, milestoneTitle }: Props) {
   const [points, setPoints]         = useState<LearningPoint[]>([]);
   const [coveredIds, setCoveredIds] = useState<string[]>([]);
   const [loading, setLoading]       = useState(true);
 
-  const compute = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/tracker/milestones/${milestoneId}/coverage`, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ chatText: getTranscript() }),
-      });
-      const d = await res.json();
-      if (d.learningPoints) setPoints(d.learningPoints);
-      if (d.coverage)       setCoveredIds(d.coverage.coveredIds ?? []);
-    } catch {
-      /* keep last known state */
-    } finally {
-      setLoading(false);
-    }
-  }, [milestoneId, getTranscript]);
+  // Load the checklist + saved check-offs on open. `loading` starts true and
+  // milestoneId is fixed for this component's life, so no in-effect reset needed.
+  useEffect(() => {
+    let active = true;
+    fetch(`/api/tracker/milestones/${milestoneId}/coverage`)
+      .then(r => r.json())
+      .then(d => {
+        if (!active) return;
+        setPoints(d.learningPoints ?? []);
+        setCoveredIds(d.coverage?.coveredIds ?? []);
+      })
+      .catch(() => {})
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [milestoneId]);
 
-  // Recompute on open (and whenever the focused milestone changes)
-  useEffect(() => { void compute(); }, [compute]);
-
-  useImperativeHandle(ref, () => ({ recompute: () => void compute() }), [compute]);
+  function toggle(id: string) {
+    const next = coveredIds.includes(id)
+      ? coveredIds.filter(x => x !== id)
+      : [...coveredIds, id];
+    setCoveredIds(next); // optimistic
+    void fetch(`/api/tracker/milestones/${milestoneId}/coverage`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ coveredIds: next }),
+    }).catch(() => {});
+  }
 
   const allCovered = points.length > 0 && coveredIds.length === points.length;
 
@@ -82,13 +77,18 @@ const ChecklistRail = forwardRef<ChecklistRailHandle, Props>(function ChecklistR
             {points.map(p => {
               const done = coveredIds.includes(p.id);
               return (
-                <li key={p.id} className="flex items-start gap-2.5">
-                  {done
-                    ? <Check  size={15} className="mt-0.5 shrink-0 text-green-400" />
-                    : <Circle size={15} className="mt-0.5 shrink-0 text-slate-600" />}
-                  <span className={`text-sm leading-snug ${done ? "text-slate-300" : "text-slate-400"}`}>
-                    {p.text}
-                  </span>
+                <li key={p.id}>
+                  <button
+                    onClick={() => toggle(p.id)}
+                    className="group flex w-full items-start gap-2.5 text-left"
+                  >
+                    {done
+                      ? <Check  size={15} className="mt-0.5 shrink-0 text-green-400" />
+                      : <Circle size={15} className="mt-0.5 shrink-0 text-slate-600 group-hover:text-slate-400 transition-colors" />}
+                    <span className={`text-sm leading-snug transition-colors ${done ? "text-slate-300" : "text-slate-400 group-hover:text-slate-200"}`}>
+                      {p.text}
+                    </span>
+                  </button>
                 </li>
               );
             })}
@@ -96,29 +96,17 @@ const ChecklistRail = forwardRef<ChecklistRailHandle, Props>(function ChecklistR
         )}
       </div>
 
-      {/* Footer — progress + manual refresh */}
+      {/* Footer — progress + guidance */}
       {points.length > 0 && (
         <div className="shrink-0 border-t border-slate-800 px-5 py-3">
-          <div className="flex items-center justify-between">
-            <span className={`text-xs font-medium ${allCovered ? "text-green-400" : "text-slate-500"}`}>
-              {allCovered ? "All ideas covered" : `${coveredIds.length} of ${points.length} covered`}
-            </span>
-            <button
-              onClick={() => void compute()}
-              disabled={loading}
-              className="flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 disabled:opacity-50 transition-colors"
-            >
-              {loading ? <Loader2 size={11} className="animate-spin" /> : <RotateCw size={11} />}
-              Refresh
-            </button>
-          </div>
+          <span className={`text-xs font-medium ${allCovered ? "text-green-400" : "text-slate-500"}`}>
+            {allCovered ? "All ideas checked off" : `${coveredIds.length} of ${points.length} checked`}
+          </span>
           <p className="mt-1.5 text-xs text-slate-600 leading-relaxed">
-            Ask Hugh about the open items to tick them off.
+            Tick each idea once you&apos;re confident you understand it — this is your own honest progress check.
           </p>
         </div>
       )}
     </aside>
   );
-});
-
-export default ChecklistRail;
+}

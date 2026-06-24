@@ -104,7 +104,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
   const [points, setPoints]                   = useState<LearningPoint[]>([]);
   const [coveredIds, setCoveredIds]           = useState<string[]>([]);
   const [loadingCoverage, setLoadingCoverage] = useState(false);
-  const [rechecking, setRechecking]           = useState(false);
+  const [nudgeDismissed, setNudgeDismissed]   = useState(false);
 
   // Mastery "what you learned" summary document
   const [summaryDoc, setSummaryDoc]   = useState<string | null>(null);
@@ -142,6 +142,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
     setVerifyingIds(new Set());
     setPoints([]);
     setCoveredIds([]);
+    setNudgeDismissed(false);
     setSummaryDoc(milestone.summary_doc ?? null);
     setSummaryAt(milestone.summary_doc_at ?? null);
     setGenSummary(false);
@@ -278,21 +279,18 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
     }
   }
 
-  async function recheckCoverage() {
-    if (!milestone || rechecking) return;
-    setRechecking(true);
-    try {
-      const res = await fetch(`/api/tracker/milestones/${milestone.id}/coverage`, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({}),
-      });
-      const d = await res.json();
-      if (d.learningPoints) setPoints(d.learningPoints);
-      if (d.coverage)       setCoveredIds(d.coverage.coveredIds ?? []);
-    } finally {
-      setRechecking(false);
-    }
+  // Manual self-assessment: the learner ticks each idea once they understand it.
+  function togglePoint(id: string) {
+    if (!milestone) return;
+    const next = coveredIds.includes(id)
+      ? coveredIds.filter(x => x !== id)
+      : [...coveredIds, id];
+    setCoveredIds(next); // optimistic
+    void fetch(`/api/tracker/milestones/${milestone.id}/coverage`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ coveredIds: next }),
+    }).catch(() => {});
   }
 
   async function generateSummary() {
@@ -348,8 +346,28 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
     return `/review/${milestone.id}?returnUrl=${encodeURIComponent(pathname)}`;
   }
 
-  const open       = milestone !== null;
-  const allCovered = points.length > 0 && coveredIds.length === points.length;
+  const open           = milestone !== null;
+  const allCovered     = points.length > 0 && coveredIds.length === points.length;
+  const uncheckedCount = points.length - coveredIds.length;
+  const showNudge      = points.length > 0 && !allCovered && !nudgeDismissed;
+
+  // Gentle, dismissible reminder shown before starting Review / Mastery when the
+  // learner hasn't ticked off all of their "What to understand" items. Never blocks.
+  const checklistNudge = showNudge ? (
+    <div className="flex items-start gap-2 rounded-xl border border-amber-500/25 bg-amber-500/5 px-3.5 py-2.5">
+      <ListChecks size={14} className="mt-0.5 shrink-0 text-amber-400" />
+      <p className="flex-1 text-xs leading-relaxed text-amber-200/90">
+        You still have {uncheckedCount} idea{uncheckedCount === 1 ? "" : "s"} unticked in &ldquo;What to understand.&rdquo; You can carry on, but it&apos;s worth confirming you genuinely have them first.
+      </p>
+      <button
+        onClick={() => setNudgeDismissed(true)}
+        className="shrink-0 text-amber-500/60 hover:text-amber-300 transition-colors"
+        title="Dismiss"
+      >
+        <X size={13} />
+      </button>
+    </div>
+  ) : null;
 
   return (
     <>
@@ -444,37 +462,35 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                         </p>
                       ) : (
                         <>
-                          <ol className="space-y-2">
+                          <ol className="space-y-1">
                             {points.map(p => {
                               const done = coveredIds.includes(p.id);
                               return (
-                                <li key={p.id} className="flex items-start gap-2.5">
-                                  {done
-                                    ? <Check  size={15} className="mt-0.5 shrink-0 text-green-400" />
-                                    : <Circle size={15} className="mt-0.5 shrink-0 text-slate-600" />}
-                                  <span className={`text-sm leading-snug ${done ? "text-slate-300" : "text-slate-400"}`}>
-                                    {p.text}
-                                  </span>
+                                <li key={p.id}>
+                                  <button
+                                    onClick={() => togglePoint(p.id)}
+                                    className="group flex w-full items-start gap-2.5 rounded-lg py-1 text-left hover:bg-slate-800/40 transition-colors"
+                                  >
+                                    {done
+                                      ? <Check  size={15} className="mt-0.5 shrink-0 text-green-400" />
+                                      : <Circle size={15} className="mt-0.5 shrink-0 text-slate-600 group-hover:text-slate-400 transition-colors" />}
+                                    <span className={`text-sm leading-snug transition-colors ${done ? "text-slate-300" : "text-slate-400 group-hover:text-slate-200"}`}>
+                                      {p.text}
+                                    </span>
+                                  </button>
                                 </li>
                               );
                             })}
                           </ol>
-                          <div className="mt-3 flex items-center justify-between">
+                          <div className="mt-3">
                             <span className={`text-xs font-medium ${allCovered ? "text-green-400" : "text-slate-500"}`}>
                               {allCovered
-                                ? "All ideas covered — ready to validate"
-                                : `${coveredIds.length} of ${points.length} covered`}
+                                ? "All ideas checked off — nicely done"
+                                : `${coveredIds.length} of ${points.length} checked`}
                             </span>
-                            <button
-                              onClick={recheckCoverage}
-                              disabled={rechecking}
-                              className="flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 disabled:opacity-50 transition-colors"
-                            >
-                              {rechecking
-                                ? <Loader2 size={11} className="animate-spin" />
-                                : <RotateCw size={11} />}
-                              Re-check
-                            </button>
+                            <p className="mt-1.5 text-xs text-slate-600 leading-relaxed">
+                              Tick each idea once you&apos;re confident you understand it — this is your own honest progress check.
+                            </p>
                           </div>
                         </>
                       )}
@@ -513,6 +529,8 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                                 This card is not yet validated. Pass a short quiz based on your learning diary to mark it as reviewed.
                               </p>
                             </div>
+
+                            {checklistNudge}
 
                             {loadingEntries ? (
                               <div className="flex items-center gap-2 text-xs text-slate-500 px-1">
@@ -657,6 +675,8 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                                 This card is not yet confirmed. Profess your mastery in a short voice conversation to lock it in.
                               </p>
                             </div>
+
+                            {checklistNudge}
 
                             {loadingEntries ? (
                               <div className="flex items-center gap-2 text-xs text-slate-500 px-1">

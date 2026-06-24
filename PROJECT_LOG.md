@@ -576,3 +576,26 @@ summary the first time a mastered card is opened without one — showing the exi
 "Hugh is writing your summary…" state — via an effect keyed on the milestone id that
 reads the milestone prop and defers the call with `setTimeout(0)` (keeps it out of
 the effect body). Manual Regenerate/Download unchanged.
+
+### Phase 18 — "What to understand" becomes a manual self-check
+The AI coverage assessment was unreliable (it credited points that *Hugh* explained
+in chat, not what the learner engaged with — even after the prompt fix it conflated
+teaching with understanding). Coverage is now a manual self-assessment the learner
+controls. AI still *generates* the checklist items (`learningPointsPrompt`); only
+the determination of what's covered changed.
+
+- `POST /api/tracker/milestones/[id]/coverage` — no longer calls Claude. Accepts
+  `{ coveredIds }`, validates against the milestone's checklist, and persists into
+  the existing `coverage.coveredIds` (no migration; existing marks kept). GET
+  unchanged (still generates the checklist items once if missing).
+- `coveragePrompt` removed from `lib/claude/prompts.ts` (dead).
+- `ChecklistRail` (Ask side-rail) — each item is now a toggle that persists
+  optimistically; removed the AI Refresh + chat-transcript wiring. Footer guides:
+  "Tick each idea once you're confident you understand it."
+- `AskWorkspace` — dropped the transcript ref + summarise-recompute plumbing.
+- `MilestoneDrawer` — checklist items toggle on click; "Re-check" replaced with the
+  same guidance; a dismissible amber **nudge** appears before starting Review /
+  Mastery when items are still unticked ("you still have N unticked… you can carry
+  on"). Never blocks (per decision: guidance + gentle nudge; existing marks kept).
+
+tsc + next build clean. No migration. (Pre-existing eslint warnings unchanged.)

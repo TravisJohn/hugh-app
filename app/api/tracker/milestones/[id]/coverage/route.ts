@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
-import { learningPointsPrompt, coveragePrompt, parseClaudeJson } from "@/lib/claude/prompts";
+import { learningPointsPrompt, parseClaudeJson } from "@/lib/claude/prompts";
 import { checkUsageAllowed, logUsage } from "@/lib/usage";
 import { type LearningPoint } from "@/types";
 
@@ -78,7 +78,10 @@ export async function GET(
   return NextResponse.json({ learningPoints: points, coverage: ms.coverage });
 }
 
-// ── POST: recompute coverage from diary entries (+ optional chat text) ──────
+// ── POST: persist the learner's manual check-offs ───────────────────────────
+// Coverage is a self-assessment the learner controls — they tick each idea once
+// they're confident they understand it. We just validate the ids against the
+// milestone's checklist and store them. No AI judgement is involved.
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -86,57 +89,23 @@ export async function POST(
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { allowed } = await checkUsageAllowed(userId);
-  if (!allowed) return NextResponse.json({ skipped: true });
-
   const { id } = await params;
-  const { chatText } = (await request.json().catch(() => ({}))) as { chatText?: string };
+  const { coveredIds } = (await request.json().catch(() => ({}))) as { coveredIds?: string[] };
+  if (!Array.isArray(coveredIds)) {
+    return NextResponse.json({ error: "coveredIds must be an array" }, { status: 400 });
+  }
+
   const supabase = await createClient();
 
   const ms = await loadOwnedMilestone(supabase, id, userId);
   if (!ms) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const points = await ensureLearningPoints(supabase, ms, userId);
-  if (points.length === 0) {
-    return NextResponse.json({ learningPoints: [], coverage: { coveredIds: [], updatedAt: new Date().toISOString() } });
-  }
+  // Only accept ids that belong to this milestone's checklist.
+  const validIds = new Set((ms.learning_points ?? []).map(p => p.id));
+  const filtered = coveredIds.filter(cid => validIds.has(cid));
+  const coverage = { coveredIds: filtered, updatedAt: new Date().toISOString() };
 
-  // Gather activity: diary entries + this Ask session's chat
-  const { data: entries } = await supabase
-    .from("milestone_entries")
-    .select("title, body")
-    .eq("milestone_id", id)
-    .eq("user_id", userId)
-    .order("created_at", { ascending: true });
+  await supabase.from("milestones").update({ coverage }).eq("id", id);
 
-  const diaryText = (entries ?? [])
-    .map(e => `${e.title ? e.title + ": " : ""}${e.body}`)
-    .join("\n\n");
-  const activityText = [diaryText, chatText?.trim()].filter(Boolean).join("\n\n");
-
-  if (!activityText) {
-    const coverage = { coveredIds: [] as string[], updatedAt: new Date().toISOString() };
-    await supabase.from("milestones").update({ coverage }).eq("id", id);
-    return NextResponse.json({ learningPoints: points, coverage });
-  }
-
-  try {
-    const res = await anthropic.messages.create({
-      model:      "claude-sonnet-4-6",
-      max_tokens: 300,
-      messages:   [{ role: "user", content: coveragePrompt(ms.title, points, activityText) }],
-    });
-    const raw    = res.content[0]?.type === "text" ? res.content[0].text : "{}";
-    const parsed = parseClaudeJson<{ coveredIds: string[] }>(raw);
-    const validIds = new Set(points.map(p => p.id));
-    const coveredIds = (parsed.coveredIds ?? []).filter(cid => validIds.has(cid));
-    const coverage = { coveredIds, updatedAt: new Date().toISOString() };
-
-    await supabase.from("milestones").update({ coverage }).eq("id", id);
-    void logUsage({ userId, feature: "tracker/coverage", tokensIn: res.usage.input_tokens, tokensOut: res.usage.output_tokens });
-    return NextResponse.json({ learningPoints: points, coverage });
-  } catch (err) {
-    console.error("[tracker/coverage] error:", err);
-    return NextResponse.json({ error: "Failed to assess coverage" }, { status: 502 });
-  }
+  return NextResponse.json({ learningPoints: ms.learning_points ?? [], coverage });
 }

@@ -237,37 +237,6 @@ Respond with ONLY valid JSON, no markdown fences:
 {"points": ["...", "...", "..."]}`;
 }
 
-// ── Coverage check (which points the learner's activity has touched) ──────
-
-export function coveragePrompt(
-  milestoneTitle: string,
-  points:         Array<{ id: string; text: string }>,
-  activityText:   string,
-): string {
-  const pointList = points.map(p => `${p.id}: ${p.text}`).join("\n");
-
-  return `You are assessing which of a milestone's key ideas the LEARNER has genuinely engaged with.
-
-Milestone: "${milestoneTitle}"
-
-The "things to understand" checklist:
-${pointList}
-
-Below is the learner's activity. It is made up of their own diary entries plus a chat transcript whose lines are labelled "Learner:" (the learner) and "Hugh:" (their AI coach):
-"""
-${activityText.slice(0, 6000)}
-"""
-
-For each checklist point, decide whether the LEARNER has demonstrated understanding of it — meaning the learner explained it in their own words, applied it, or asked a substantive question that shows real engagement, OR captured it in one of their diary entries.
-
-CRUCIAL RULE: Do NOT mark a point covered just because "Hugh" (the coach) explained, mentioned, or taught it. The coach teaching something is not evidence the learner has grasped it — only the learner's own words count. If a point was only ever explained by Hugh and the learner did not engage with it themselves, leave it UNCOVERED. When in doubt, leave it uncovered.
-
-Return the ids of only the points the learner has genuinely covered.
-
-Respond with ONLY valid JSON, no markdown fences:
-{"coveredIds": ["p1", "p3"]}`;
-}
-
 // ── Diary entry fact-check ────────────────────────────────────────────────
 
 export function factCheckEntryPrompt(
