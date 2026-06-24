@@ -240,7 +240,9 @@ export default function MasteryClient({ milestoneId, milestoneTitle, personaId, 
     router.push(`${boardUrl}${sep}mastered=${milestoneId}`);
   }
 
-  // ── First-time mastery: validate, persist score + feedback, generate doc ──
+  // ── First-time mastery: validate + persist score/feedback, then navigate ──
+  // The summary document is generated lazily by the milestone drawer (it shows
+  // a "writing…" state) so confirming mastery stays fast and never blocks on it.
   async function confirmMastery() {
     setPhase("validating");
     await fetch(`/api/tracker/milestones/${milestoneId}`, {
@@ -252,9 +254,6 @@ export default function MasteryClient({ milestoneId, milestoneTitle, personaId, 
         masteryFeedback:  evaluation?.feedback ?? "",
       }),
     });
-    // Auto-generate the "what you learned" summary document. Non-fatal: it can
-    // always be regenerated from the milestone drawer if this call fails.
-    await fetch(`/api/tracker/milestones/${milestoneId}/summary`, { method: "POST" }).catch(() => {});
     navigateBackMastered();
   }
 

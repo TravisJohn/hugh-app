@@ -175,6 +175,21 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
     entriesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [entries]);
 
+  // Auto-generate the learning summary the first time a mastered card is opened
+  // without one yet — so it appears (with a "writing…" state) right after the
+  // learner confirms mastery, without blocking the mastery flow itself.
+  // Reads the milestone prop (not state) so it never races the reset effect;
+  // the setTimeout defers setState out of the effect body.
+  useEffect(() => {
+    if (!milestone) return;
+    if (milestone.kanban_column !== "done") return;
+    if (!milestone.mastery_validated) return;
+    if (milestone.summary_doc) return;
+    const t = setTimeout(() => { void generateSummary(); }, 0);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [milestone?.id]);
+
   function toggleEntry(id: string) {
     setOpenEntries(prev => {
       const next = new Set(prev);

@@ -568,3 +568,11 @@ Verified: `tsc --noEmit` clean, `next build` compiles. (Pre-existing eslint
 warnings in untouched lines unchanged.) Live test pending Travis after applying
 migration 020 — redo keeps mastery + updates score; summary auto-generates,
 renders, downloads, regenerates. PDF export deferred to v2 (markdown only).
+
+### Phase 17.1 — Summary generation moved to background (drawer-driven)
+Per UX feedback: confirming mastery no longer waits on the summary. `confirmMastery`
+now only validates + navigates (fast). The `MilestoneDrawer` auto-generates the
+summary the first time a mastered card is opened without one — showing the existing
+"Hugh is writing your summary…" state — via an effect keyed on the milestone id that
+reads the milestone prop and defers the call with `setTimeout(0)` (keeps it out of
+the effect body). Manual Regenerate/Download unchanged.
