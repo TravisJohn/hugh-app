@@ -457,3 +457,27 @@ The Phase 15 rank was just the build-order `position`. Replaced with a **one-tim
 - **Existing tracks:** `scripts/backfill-priority.mjs` (run once, after `018`) ranks any track whose backlog isn't yet ranked; idempotent; safe to delete after.
 
 Zero TypeScript errors (`npx tsc --noEmit`, exit 0).
+
+### Phase 16 — STEP 1: Decouple track generation from POST /api/dashboard/goals
+Goal creation no longer blocks on track generation. The goals route inserts the
+`learning_goals` row as `track_status='pending'` and returns immediately;
+`generateTrack` (milestones + backlog priority) runs after the response.
+
+- **Migration `019_goal_track_status.sql`** — `learning_goals.track_status TEXT NOT NULL DEFAULT 'ready'` + CHECK (`pending`|`ready`|`failed`); `REPLICA IDENTITY FULL`; adds the table to the `supabase_realtime` publication (guarded, idempotent). Existing rows default `ready`. **Must be run before this ships.**
+- `app/api/dashboard/goals/route.ts` — returns as soon as `refineTopicPrompt` resolves + the goal row is inserted. `generateTrack` moved into `after()` (next/server) using a **service-role** client (cookie-bound request client isn't guaranteed valid post-response); its try/catch flips the row to `ready`/`failed`. `export const maxDuration = 60`.
+- `RefinementFlow.tsx` — removed the fixed STAGES / 2.4s ticker. Waiting phase now subscribes to Supabase Realtime on the goal row (`postgres_changes` UPDATE, filtered by id), with a post-`SUBSCRIBED` status fetch as a race guard and a single-`settle` ref. New **failed** phase ("we couldn't build your track — goal is saved") instead of silently landing on an empty track.
+- `GoalCard.tsx` — renders `pending` (spinner + "Building your track…", Start disabled) and `failed` (red badge, Start disabled) so a reload mid-build / a failed goal is never a silent dead end.
+- `types/index.ts` — `TrackStatus`; `LearningGoal.track_status`.
+- `globals.css` — `progress-slide` indeterminate shimmer (replaces the fake staged progress).
+
+Static verification green: `npx tsc --noEmit`, `eslint`, `next build` all clean.
+Live verification (create → fast response → populate → forced-failure shows `failed`) deferred to Travis — requires migration 019 applied + a real auth session.
+
+> ⚠️ **DEPLOY-TARGET RISK (Hobby plan):** `after()` runs inside the same serverless
+> invocation and is bound by the function timeout. Hobby caps at **10s regardless of
+> `maxDuration`**, and `generateTrack` chains two Claude calls (milestones ~2k tokens +
+> backlog priority) that routinely exceed 10s. On Hobby, `after()` will be killed
+> mid-build → goals stuck `pending` or wrongly marked `failed`. **The `after()` approach
+> is a stopgap; track-gen needs a real background job (Supabase Edge Function trigger /
+> DB-trigger queue) before this is reliable in production.** The status column + Realtime
+> + failed-state UI built here are reusable by that job unchanged.

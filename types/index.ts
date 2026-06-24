@@ -86,13 +86,17 @@ export interface Answer {
 export type ClientPersona = Omit<Persona, 'voiceId'>;
 
 // ── Learning goals (dashboard) ────────────────────────────────────────────
+// Status of the Kanban track that is generated for a goal in the background.
+export type TrackStatus = 'pending' | 'ready' | 'failed';
+
 export interface LearningGoal {
-  id:         string;
-  user_id:    string;
-  topic:      string;
-  start_date: string;
-  end_date:   string;
-  created_at: string;
+  id:           string;
+  user_id:      string;
+  topic:        string;
+  start_date:   string;
+  end_date:     string;
+  track_status: TrackStatus;
+  created_at:   string;
 }
 
 // ── Progress Tracker ──────────────────────────────────────────────────────

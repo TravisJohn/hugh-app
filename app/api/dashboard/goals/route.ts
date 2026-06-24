@@ -1,11 +1,17 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse, after } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { refineTopicPrompt, parseClaudeJson } from "@/lib/claude/prompts";
 import { generateTrack } from "@/lib/tracker/generate";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// Track generation runs post-response via `after()` and chains two Claude
+// calls (milestones + backlog priority), so the invocation must be allowed to
+// outlive the response. Hobby plans cap this at 10s regardless of the value.
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
@@ -50,10 +56,11 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Step 2: create the learning goal
+  // Step 2: create the learning goal with track_status = 'pending'.
+  // The response returns here — the track is built afterwards in `after()`.
   const { data: goal, error: goalError } = await supabase
     .from("learning_goals")
-    .insert({ user_id: userId, topic: finalTopic, end_date })
+    .insert({ user_id: userId, topic: finalTopic, end_date, track_status: "pending" })
     .select("*")
     .single();
 
@@ -62,13 +69,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Failed to save goal" }, { status: 500 });
   }
 
-  // Step 3: generate the linked track + milestones (non-blocking on failure)
-  try {
-    await generateTrack(supabase, userId, finalTopic, goal.id as string);
-  } catch (err) {
-    console.error("[dashboard/goals] track generation error:", err);
-    // Goal is still returned — track can be created manually from TrackerDashboard
-  }
+  const goalId = goal.id as string;
+
+  // Step 3: generate the track AFTER the response is sent. The frontend watches
+  // learning_goals.track_status over Realtime to know when this completes.
+  // A service-role client is used because the cookie-bound request client is
+  // not guaranteed to be usable once the response lifecycle has ended.
+  after(async () => {
+    const service = createServiceClient();
+    try {
+      await generateTrack(service, userId, finalTopic, goalId);
+      await service
+        .from("learning_goals")
+        .update({ track_status: "ready" })
+        .eq("id", goalId);
+    } catch (err) {
+      console.error("[dashboard/goals] background track generation failed:", err);
+      await service
+        .from("learning_goals")
+        .update({ track_status: "failed" })
+        .eq("id", goalId);
+    }
+  });
 
   return NextResponse.json({ goal, tips });
 }

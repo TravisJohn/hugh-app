@@ -29,6 +29,15 @@
   animation: fadeIn 200ms ease-out forwards;
 }
 
+@keyframes progress-slide {
+  0%   { transform: translateX(-120%); }
+  100% { transform: translateX(420%); }
+}
+
+.animate-progress-slide {
+  animation: progress-slide 1.4s ease-in-out infinite;
+}
+
 @keyframes glow-pulse-violet {
   0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
   50%       { box-shadow: 0 0 14px 4px rgba(139, 92, 246, 0.18); }

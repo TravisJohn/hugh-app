@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Loader2, SkipForward, ArrowRight, Brain, ChevronLeft } from "lucide-react";
-import { type LearningGoal } from "@/types";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Loader2, SkipForward, ArrowRight, Brain, ChevronLeft, AlertTriangle } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { type LearningGoal, type TrackStatus } from "@/types";
 
 interface QA {
   question: string;
@@ -16,13 +17,6 @@ interface Props {
   onCancel:      () => void;
 }
 
-const STAGES = [
-  "Analyzing your learning goals…",
-  "Crafting your personalized path…",
-  "Preparing expert insights…",
-  "Finishing up…",
-] as const;
-
 const FALLBACK_TIPS = [
   "The best learners tie new concepts to real problems they're already solving.",
   "Teaching what you learn — even to yourself — can accelerate retention by up to 50%.",
@@ -31,6 +25,8 @@ const FALLBACK_TIPS = [
 
 const MAX_QUESTIONS = 5;
 
+type Phase = "asking" | "waiting" | "failed";
+
 export default function RefinementFlow({ topic, endDate, onGoalCreated, onCancel }: Props) {
   const [question, setQuestion]     = useState<string | null>(null);
   const [answers, setAnswers]       = useState<QA[]>([]);
@@ -38,27 +34,21 @@ export default function RefinementFlow({ topic, endDate, onGoalCreated, onCancel
   const [fetching, setFetching]     = useState(false);
   const [fetchError, setFetchError] = useState(false);
 
-  const [phase, setPhase]         = useState<"asking" | "waiting">("asking");
-  const [stageIdx, setStageIdx]   = useState(0);
+  const [phase, setPhase]         = useState<Phase>("asking");
   const [tips, setTips]           = useState<string[]>(FALLBACK_TIPS);
   const [tipIdx, setTipIdx]       = useState(0);
-  const [goalReady, setGoalReady] = useState<LearningGoal | null>(null);
+  const [pendingGoal, setPendingGoal] = useState<LearningGoal | null>(null);
   const [apiError, setApiError]   = useState(false);
+
+  // Guards a single terminal transition (ready/failed) — Realtime + the
+  // race-guard fetch can both fire, but the goal must only settle once.
+  const settledRef = useRef(false);
 
   // Load first question on mount
   useEffect(() => {
     fetchNextQuestion([]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Stage ticker during waiting
-  useEffect(() => {
-    if (phase !== "waiting") return;
-    const id = setInterval(() => {
-      setStageIdx(i => Math.min(i + 1, STAGES.length - 1));
-    }, 2400);
-    return () => clearInterval(id);
-  }, [phase]);
 
   // Tip rotator during waiting
   useEffect(() => {
@@ -69,13 +59,49 @@ export default function RefinementFlow({ topic, endDate, onGoalCreated, onCancel
     return () => clearInterval(id);
   }, [phase, tips.length]);
 
-  // Complete when both stage finished + API returned
+  // ── Realtime: watch the goal's track_status while the track builds ────────
   useEffect(() => {
-    if (goalReady && stageIdx >= STAGES.length - 1) {
-      const t = setTimeout(() => onGoalCreated(goalReady), 500);
-      return () => clearTimeout(t);
-    }
-  }, [goalReady, stageIdx, onGoalCreated]);
+    if (phase !== "waiting" || !pendingGoal) return;
+
+    const goalId   = pendingGoal.id;
+    const supabase = createClient();
+
+    const settle = (status: TrackStatus | undefined) => {
+      if (settledRef.current) return;
+      if (status === "ready") {
+        settledRef.current = true;
+        onGoalCreated({ ...pendingGoal, track_status: "ready" });
+      } else if (status === "failed") {
+        settledRef.current = true;
+        setPhase("failed");
+      }
+    };
+
+    const channel = supabase
+      .channel(`goal-${goalId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "learning_goals", filter: `id=eq.${goalId}` },
+        payload => settle((payload.new as { track_status?: TrackStatus }).track_status),
+      )
+      .subscribe(status => {
+        // Race guard: the track may have finished before the subscription was
+        // established. Read the current status once we're connected.
+        if (status === "SUBSCRIBED") {
+          void supabase
+            .from("learning_goals")
+            .select("track_status")
+            .eq("id", goalId)
+            .single()
+            .then(({ data }) => settle(data?.track_status as TrackStatus | undefined));
+        }
+      });
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, pendingGoal]);
 
   async function fetchNextQuestion(currentAnswers: QA[]) {
     setFetching(true);
@@ -101,9 +127,10 @@ export default function RefinementFlow({ topic, endDate, onGoalCreated, onCancel
   }
 
   const enterWaiting = useCallback(async (finalAnswers: QA[]) => {
+    settledRef.current = false;
     setPhase("waiting");
-    setStageIdx(0);
     setApiError(false);
+    setPendingGoal(null);
 
     try {
       const res  = await fetch("/api/dashboard/goals", {
@@ -120,7 +147,9 @@ export default function RefinementFlow({ topic, endDate, onGoalCreated, onCancel
       }
 
       if (data.tips && data.tips.length > 0) setTips(data.tips);
-      setGoalReady(data.goal);
+      // Goal exists with track_status 'pending'; the Realtime effect now waits
+      // for the background track build to flip it to 'ready' or 'failed'.
+      setPendingGoal(data.goal);
     } catch {
       setApiError(true);
       setPhase("asking");
@@ -151,11 +180,40 @@ export default function RefinementFlow({ topic, endDate, onGoalCreated, onCancel
     if (e.key === "Enter") submitAnswer();
   }
 
+  // ── Failed phase ──────────────────────────────────────────────────────────
+  if (phase === "failed") {
+    return (
+      <div className="flex flex-col gap-5">
+        <div className="flex flex-col items-center gap-4 py-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/15">
+            <AlertTriangle size={22} className="text-red-400" />
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-semibold text-slate-100">
+              We couldn&apos;t build your track
+            </p>
+            <p className="mt-1 text-xs text-slate-500 leading-relaxed">
+              Your goal is saved to your library — open it to retry generating the track.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => pendingGoal && onGoalCreated({ ...pendingGoal, track_status: "failed" })}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 py-2.5 text-sm font-bold text-slate-900 hover:bg-amber-400 transition-colors"
+        >
+          Go to my library
+          <ArrowRight size={14} />
+        </button>
+      </div>
+    );
+  }
+
   // ── Waiting phase ─────────────────────────────────────────────────────────
   if (phase === "waiting") {
     return (
       <div className="flex flex-col gap-5">
-        {/* Stage animation */}
+        {/* Building animation */}
         <div className="flex flex-col items-center gap-4 py-4">
           <div className="relative flex h-16 w-16 items-center justify-center">
             <div className="absolute inset-0 animate-ping rounded-full bg-amber-500/20" />
@@ -166,20 +224,13 @@ export default function RefinementFlow({ topic, endDate, onGoalCreated, onCancel
           </div>
 
           <div className="text-center">
-            <p className="text-sm font-semibold text-slate-100">{STAGES[stageIdx]}</p>
+            <p className="text-sm font-semibold text-slate-100">Building your learning track…</p>
             <p className="mt-0.5 text-xs text-slate-500">This usually takes 1–2 minutes</p>
           </div>
 
-          {/* Stage progress dots */}
-          <div className="flex gap-1.5">
-            {STAGES.map((_, i) => (
-              <div
-                key={i}
-                className={`h-1 rounded-full transition-all duration-700 ${
-                  i <= stageIdx ? "w-6 bg-amber-500" : "w-3 bg-slate-700"
-                }`}
-              />
-            ))}
+          {/* Indeterminate progress shimmer */}
+          <div className="h-1 w-32 overflow-hidden rounded-full bg-slate-700">
+            <div className="h-full w-1/3 animate-progress-slide rounded-full bg-amber-500" />
           </div>
         </div>
 
@@ -250,6 +301,11 @@ export default function RefinementFlow({ topic, endDate, onGoalCreated, onCancel
       {/* Error notice */}
       {apiError && (
         <p className="text-xs text-red-400">Something went wrong — please try again.</p>
+      )}
+      {fetchError && (
+        <p className="text-xs text-amber-400/80">
+          Hugh had trouble reaching the coach — here&apos;s a question to keep going.
+        </p>
       )}
 
       {/* Answer input */}
