@@ -481,3 +481,25 @@ Live verification (create → fast response → populate → forced-failure show
 > is a stopgap; track-gen needs a real background job (Supabase Edge Function trigger /
 > DB-trigger queue) before this is reliable in production.** The status column + Realtime
 > + failed-state UI built here are reusable by that job unchanged.
+
+### Phase 16 — STEP 2: Harden refine-phase error handling
+The refinement asking phase could hang permanently: a 502 from `/api/dashboard/refine`
+does **not** throw client-side, so the old `try/catch` never fired — `res.json()`
+returned `{error}`, `data.done` was falsy, and `setQuestion(null)` left the UI stuck on a
+disabled "Hugh is thinking…" state forever.
+
+- `app/api/dashboard/refine/route.ts` — the Claude call + JSON parse now retry **once**
+  before returning 502 (covers transient API/parse failures).
+- `RefinementFlow.tsx` — new `tryRefine()` helper retries the request once and treats
+  `!res.ok` **and** malformed payloads (neither `question` nor `done`) as failures, not
+  just thrown network errors. On exhausted failure the flow **cannot stall**:
+  - mid-refinement (≥1 answer): advance straight to the Waiting/build phase rather than
+    looping on a broken endpoint;
+  - first question (0 answers): show a generic prompt so the learner can still engage —
+    answering it advances toward the MAX_QUESTIONS cap, which terminates into Waiting.
+
+Verified live (dev server, auth-bypass): happy path → 200 + question; no auth → 401;
+forced Claude failure (invalid ANTHROPIC_API_KEY) → **clean 502 in ~1.1s, no hang**.
+Client "reaches Waiting rather than hanging" path verified by code/types + the confirmed
+clean 502 (full browser-driven run needs a real auth session, same constraint as STEP 1).
+`tsc`, `eslint`, `next build` all clean.

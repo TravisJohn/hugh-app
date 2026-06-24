@@ -103,26 +103,57 @@ export default function RefinementFlow({ topic, endDate, onGoalCreated, onCancel
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, pendingGoal]);
 
+  // Attempt the /refine call, retrying once. Returns the parsed payload, or
+  // null if it failed/was malformed after the retry. Note: a 502 from the route
+  // does NOT throw, so we must treat !res.ok and missing fields as failures too
+  // — otherwise the asking phase hangs on a disabled "thinking…" state forever.
+  async function tryRefine(
+    currentAnswers: QA[],
+  ): Promise<{ question?: string; done?: boolean } | null> {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await fetch("/api/dashboard/refine", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ topic, answers: currentAnswers }),
+        });
+        if (!res.ok) continue;
+        const data = await res.json() as { question?: string; done?: boolean };
+        if (data && (data.question || data.done)) return data;
+        // Malformed (neither question nor done) — retry.
+      } catch {
+        // Network error — retry.
+      }
+    }
+    return null;
+  }
+
   async function fetchNextQuestion(currentAnswers: QA[]) {
     setFetching(true);
     setFetchError(false);
-    try {
-      const res  = await fetch("/api/dashboard/refine", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ topic, answers: currentAnswers }),
-      });
-      const data = await res.json() as { question?: string; done?: boolean; error?: string };
-      if (data.done) {
-        enterWaiting(currentAnswers);
-      } else {
-        setQuestion(data.question ?? null);
-      }
-    } catch {
-      setFetchError(true);
+
+    const data = await tryRefine(currentAnswers);
+    setFetching(false);
+
+    if (data?.done) {
+      enterWaiting(currentAnswers);
+      return;
+    }
+    if (data?.question) {
+      setQuestion(data.question);
+      return;
+    }
+
+    // Failed after retry. Never leave the user on a disabled "thinking…" state.
+    setFetchError(true);
+    if (currentAnswers.length > 0) {
+      // We already have enough context to refine — don't loop on a broken
+      // endpoint; advance straight to the build (Waiting) phase.
+      enterWaiting(currentAnswers);
+    } else {
+      // The very first question failed: offer a generic prompt so the learner
+      // can still contribute. Answering it advances answers → MAX terminates.
       setQuestion("What specifically are you hoping to achieve by learning this?");
-    } finally {
-      setFetching(false);
     }
   }
 
