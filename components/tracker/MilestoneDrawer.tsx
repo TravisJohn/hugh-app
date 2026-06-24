@@ -110,6 +110,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
   const [summaryDoc, setSummaryDoc]   = useState<string | null>(null);
   const [summaryAt, setSummaryAt]     = useState<string | null>(null);
   const [genSummary, setGenSummary]   = useState(false);
+  const [showSummary, setShowSummary] = useState(true);
 
   // Section visibility
   const [showOverview,  setShowOverview]    = useState(true);
@@ -144,6 +145,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
     setSummaryDoc(milestone.summary_doc ?? null);
     setSummaryAt(milestone.summary_doc_at ?? null);
     setGenSummary(false);
+    setShowSummary(true);
     setShowOverview(true);
     setShowPoints(true);
     setShowReview(true);
@@ -580,11 +582,20 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                             {/* ── Learning summary document ─────────────────── */}
                             <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4 space-y-3">
                               <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-slate-500">
-                                  <FileText size={13} />
-                                  Learning summary
-                                </div>
-                                {summaryDoc && !genSummary && (
+                                <button
+                                  onClick={() => setShowSummary(v => !v)}
+                                  className="flex flex-1 items-center gap-2 text-left"
+                                >
+                                  <ChevronDown
+                                    size={13}
+                                    className={`shrink-0 text-slate-500 transition-transform duration-200 ${showSummary ? "" : "-rotate-90"}`}
+                                  />
+                                  <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                                    <FileText size={13} />
+                                    Learning summary
+                                  </span>
+                                </button>
+                                {summaryDoc && !genSummary && showSummary && (
                                   <div className="flex items-center gap-3">
                                     <button
                                       onClick={generateSummary}
@@ -604,35 +615,37 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                                 )}
                               </div>
 
-                              {genSummary ? (
-                                <div className="flex items-center gap-2 py-2 text-xs text-slate-500">
-                                  <Loader2 size={12} className="animate-spin" />
-                                  Hugh is writing your summary…
-                                </div>
-                              ) : summaryDoc ? (
-                                <>
-                                  <div className="rounded-lg border border-slate-700/50 bg-slate-900/40 px-4 py-3">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={summaryMarkdownComponents}>
-                                      {summaryDoc}
-                                    </ReactMarkdown>
+                              {showSummary && (
+                                genSummary ? (
+                                  <div className="flex items-center gap-2 py-2 text-xs text-slate-500">
+                                    <Loader2 size={12} className="animate-spin" />
+                                    Hugh is writing your summary…
                                   </div>
-                                  {summaryAt && (
-                                    <p className="text-xs text-slate-600">Generated {fmtCompact(summaryAt)}</p>
-                                  )}
-                                </>
-                              ) : (
-                                <>
-                                  <p className="text-sm text-slate-400 leading-relaxed">
-                                    Generate a document summarising what you learned here — drawn from your diary, the checklist, and your mastery session.
-                                  </p>
-                                  <button
-                                    onClick={generateSummary}
-                                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-green-600/40 bg-green-700/50 px-4 py-2.5 text-sm font-semibold text-green-100 hover:bg-green-700 transition-colors"
-                                  >
-                                    <Sparkles size={14} />
-                                    Generate summary
-                                  </button>
-                                </>
+                                ) : summaryDoc ? (
+                                  <>
+                                    <div className="rounded-lg border border-slate-700/50 bg-slate-900/40 px-4 py-3">
+                                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={summaryMarkdownComponents}>
+                                        {summaryDoc}
+                                      </ReactMarkdown>
+                                    </div>
+                                    {summaryAt && (
+                                      <p className="text-xs text-slate-600">Generated {fmtCompact(summaryAt)}</p>
+                                    )}
+                                  </>
+                                ) : (
+                                  <>
+                                    <p className="text-sm text-slate-400 leading-relaxed">
+                                      Generate a document summarising what you learned here — drawn from your diary, the checklist, and your mastery session.
+                                    </p>
+                                    <button
+                                      onClick={generateSummary}
+                                      className="flex w-full items-center justify-center gap-2 rounded-xl border border-green-600/40 bg-green-700/50 px-4 py-2.5 text-sm font-semibold text-green-100 hover:bg-green-700 transition-colors"
+                                    >
+                                      <Sparkles size={14} />
+                                      Generate summary
+                                    </button>
+                                  </>
+                                )
                               )}
                             </div>
                           </>
