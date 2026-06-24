@@ -503,3 +503,20 @@ forced Claude failure (invalid ANTHROPIC_API_KEY) → **clean 502 in ~1.1s, no h
 Client "reaches Waiting rather than hanging" path verified by code/types + the confirmed
 clean 502 (full browser-driven run needs a real auth session, same constraint as STEP 1).
 `tsc`, `eslint`, `next build` all clean.
+
+### Phase 16 — STEP 1 fix: "Building…" hang (found in live test)
+Travis's localhost test: after submitting the refinement, the UI stuck on
+"Building your learning track…". DB check showed the goal reached
+`track_status='ready'` — so `after()`/`generateTrack` worked; the bug was purely
+frontend: **Supabase Realtime never delivered the UPDATE** (the classic silent
+drop on RLS-protected tables when the socket isn't authed), and the single
+race-guard fetch had run instantly while still `pending`.
+
+Fix in `RefinementFlow.tsx`: Realtime is now only the fast path. Added (a) a 3s
+**poll** of `track_status` via the authed browser client — the reliable path that
+doesn't depend on Realtime; (b) `realtime.setAuth(session.access_token)` so the
+socket can actually receive RLS changes; (c) a **180s hard timeout** that surfaces
+the failed state instead of hanging — which also covers the Vercel Hobby case
+where the background build is killed and the row stays `pending` forever
+([[after-hobby-limitation]]). All transitions funnel through the single-`settle`
+guard; `cleanup` clears poll + timeout + channel.
