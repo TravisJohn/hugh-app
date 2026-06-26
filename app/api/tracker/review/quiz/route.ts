@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
   }
 
   const entriesText = entries
-    .map((e, i) => `Entry ${i + 1}${e.title ? ` — ${e.title}` : ""}:\n${e.body}`)
+    .map((e, i) => `Entry ${i + 1}${e.title ? ` — ${e.title}` : ""}:\n${(e.body ?? "").slice(0, 2000)}`)
     .join("\n\n---\n\n");
 
   const prompt = `You are generating a review quiz to test a learner's understanding of what they have studied.

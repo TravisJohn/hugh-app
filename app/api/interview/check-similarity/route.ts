@@ -27,7 +27,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const res = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      // Pure classification (alignment judgment) — Haiku handles this well at 1/5 the cost.
+      model: "claude-haiku-4-5",
       max_tokens: 128,
       messages: [
         {

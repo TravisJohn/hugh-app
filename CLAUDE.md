@@ -8,10 +8,25 @@ Hugh is an AI-powered mock interview training web app. Users select a domain roo
 |---|---|
 | Frontend + Backend | Next.js 14 (App Router), deployed on Vercel |
 | Database + Auth | Supabase (PostgreSQL + Supabase Auth) |
-| LLM | Anthropic Claude API (`claude-sonnet-4-6`) |
+| LLM | Anthropic Claude API (model per route — see Model Selection below) |
 | TTS | ElevenLabs API |
 | STT | Web Speech API (browser-native, Chrome/Edge only) |
 | Styling | Tailwind CSS |
+
+## Model Selection
+Pick the model per route by the job, not a blanket default — input tokens are the
+bulk of Claude spend, so cheap routes should use the cheap model:
+
+- **`claude-sonnet-4-6`** ($3/$15 per MTok) — reasoning-heavy generation where
+  quality matters: track generation, backlog priority, quiz generation, diary
+  fact-check, learn/chat tutoring, learn/summarize, mastery **evaluate** (scoring),
+  interview feedback.
+- **`claude-haiku-4-5`** ($1/$5 per MTok — 5× cheaper input) — classification and
+  short, low-stakes generation: similarity checks, hints, 5-whys refinement
+  questions, mastery **open**/**respond** (in-character conversational lines).
+
+When in doubt, default to Sonnet. Only move a route to Haiku after confirming the
+output quality holds.
 
 ## Environment Variables
 All secrets live in `.env.local` (never committed). See `.env.example` for the full list.

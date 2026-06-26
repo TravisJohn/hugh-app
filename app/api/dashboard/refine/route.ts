@@ -27,7 +27,8 @@ export async function POST(request: NextRequest) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const msg = await anthropic.messages.create({
-        model:      "claude-sonnet-4-6",
+        // 5-whys refinement question (short conversational gen) — Haiku is sufficient.
+        model:      "claude-haiku-4-5",
         max_tokens: 200,
         messages:   [{ role: "user", content: prompt }],
       });

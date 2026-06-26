@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
   }
 
   const entriesText = entries
-    .map((e, i) => `[Entry ${i + 1}]${e.title ? ` ${e.title}` : ""}\n${e.body}`)
+    .map((e, i) => `[Entry ${i + 1}]${e.title ? ` ${e.title}` : ""}\n${(e.body ?? "").slice(0, 2000)}`)
     .join("\n\n");
 
   const persona    = SCENARIO_PERSONAS[scenario];
@@ -165,7 +165,9 @@ Return ONLY valid JSON with no markdown fences:
   }
 
   const completion = await anthropic.messages.create({
-    model:      "claude-sonnet-4-6",
+    // Scoring (evaluate) needs Sonnet's judgment; the in-character open/respond
+    // lines are short conversational gen — Haiku handles those at 1/5 the cost.
+    model:      phase === "evaluate" ? "claude-sonnet-4-6" : "claude-haiku-4-5",
     max_tokens: phase === "evaluate" ? 512 : 256,
     messages:   [{ role: "user", content: prompt }],
   });

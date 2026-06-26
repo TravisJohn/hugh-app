@@ -51,7 +51,8 @@ export async function POST(request: NextRequest) {
   let hint: string;
   try {
     const res = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      // Single-sentence hint (short, low-stakes gen) — Haiku is sufficient and cheaper.
+      model: "claude-haiku-4-5",
       max_tokens: 128,
       messages: [
         {
