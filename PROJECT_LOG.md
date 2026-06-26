@@ -599,3 +599,31 @@ the determination of what's covered changed.
   on"). Never blocks (per decision: guidance + gentle nudge; existing marks kept).
 
 tsc + next build clean. No migration. (Pre-existing eslint warnings unchanged.)
+
+### Phase 19 — Token-cost optimization (Claude spend) ✅
+Input tokens are ~83% of Claude spend, so all work is input-side.
+
+**learn/chat prompt caching:** ephemeral cache breakpoint so the system prompt +
+conversation prefix is reused across turns (cache reads ~0.1x). `tokensIn` now
+counts `input_tokens + cache_creation_input_tokens`; cache reads excluded so a
+warm cache eases the learner's quota. learn/chat was ~45% of spend.
+
+**Monthly usage gauge:** `getUsageSummary()` + `<HeaderUsage />` temperature bar
+(sky→amber→red) next to the username on all 7 page headers. Reuses the same
+profiles columns + usage_logs window as `checkUsageAllowed` — no migration.
+
+**Model selection (CLAUDE.md mandate relaxed):** Sonnet for reasoning-heavy,
+Haiku for classification/short-gen. Moved to `claude-haiku-4-5` (5x cheaper
+input): check-similarity, generate-hint, dashboard/refine (5-whys), mastery
+open/respond. Mastery evaluate (scoring), quiz gen, fact-check, learn/summarize,
+track gen, and interview feedback stay on Sonnet.
+
+**Cap diary input:** mastery/session + review/quiz slice each entry body at 2000
+chars (mirrors factCheck), bounding worst-case input tokens.
+
+**Merge interview submit:** `submitAnswerPrompt` folds the alignment judgment into
+generate-feedback — one Sonnet call returns {usedBestAnswer, alignmentScore,
+feedback}, halving calls + duplicated context. useInterview drops
+apiCheckSimilarity; usedBestAnswer persisted server-side. State machine unchanged.
+
+tsc --noEmit clean; next build compiles (exit 0). No migration.
