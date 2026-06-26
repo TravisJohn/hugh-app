@@ -4,6 +4,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import SignOutButton from "@/components/landing/SignOutButton";
+import HeaderUsage from "@/components/usage/HeaderUsage";
 import LandingNotice from "@/components/landing/LandingNotice";
 import DashboardPanel from "@/components/dashboard/DashboardPanel";
 import { type LearningGoal } from "@/types";
@@ -72,6 +73,7 @@ export default async function DashboardPage({ searchParams }: Props) {
             <p className="text-xs text-slate-600">{dateLabel}</p>
           </div>
           <div className="flex items-center gap-4 text-sm">
+              <HeaderUsage />
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-sm font-semibold text-slate-200">
               {initial}
             </div>

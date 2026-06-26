@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, LayoutDashboard } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import SignOutButton from "@/components/landing/SignOutButton";
+import HeaderUsage from "@/components/usage/HeaderUsage";
 import KanbanBoard from "@/components/tracker/KanbanBoard";
 import StudyTabs from "@/components/study/StudyTabs";
 import { type LearningGoal, type Track, type Milestone } from "@/types";
@@ -67,6 +68,7 @@ export default async function StudyTrackPage({ params, searchParams }: Props) {
         </div>
 
         <div className="flex items-center gap-4 text-sm">
+          <HeaderUsage />
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-sm font-semibold text-slate-200">
             {initial}
           </div>

@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import TrackerDashboard from "@/components/tracker/TrackerDashboard";
 import SignOutButton from "@/components/landing/SignOutButton";
+import HeaderUsage from "@/components/usage/HeaderUsage";
 import { type TrackWithStats, type LearningGoal } from "@/types";
 
 interface Props {
@@ -68,6 +69,7 @@ export default async function TrackerPage({ searchParams }: Props) {
         </div>
 
         <div className="flex items-center gap-4 text-sm">
+          <HeaderUsage />
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-sm font-semibold text-slate-200">
             {initial}
           </div>

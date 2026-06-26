@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, Milestone as MilestoneIcon, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import SignOutButton from "@/components/landing/SignOutButton";
+import HeaderUsage from "@/components/usage/HeaderUsage";
 import AskWorkspace from "@/components/learn/AskWorkspace";
 import StudyTabs from "@/components/study/StudyTabs";
 import { type LearningGoal } from "@/types";
@@ -85,6 +86,7 @@ export default async function StudyAskPage({ params, searchParams }: Props) {
         </div>
 
         <div className="flex items-center gap-4 text-sm">
+          <HeaderUsage />
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-800 text-sm font-semibold text-slate-300">
             {initial}
           </div>

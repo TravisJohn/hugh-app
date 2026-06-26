@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import SessionSetupForm from "@/components/landing/SessionSetupForm";
 import SignOutButton from "@/components/landing/SignOutButton";
+import HeaderUsage from "@/components/usage/HeaderUsage";
 import LandingNotice from "@/components/landing/LandingNotice";
 
 interface Props {
@@ -49,6 +50,7 @@ export default async function InterviewPage({ searchParams }: Props) {
           </nav>
         </div>
         <div className="flex items-center gap-4 text-sm">
+          <HeaderUsage />
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-sm font-semibold text-slate-200">
             {initial}
           </div>
