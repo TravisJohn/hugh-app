@@ -546,7 +546,6 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                             ) : (
                               <Link
                                 href={quizHref()}
-                                onClick={onClose}
                                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-700/70 border border-amber-600/40 px-4 py-2.5 text-sm font-semibold text-amber-100 hover:bg-amber-700 transition-colors"
                               >
                                 <ClipboardCheck size={14} />
@@ -589,7 +588,6 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                             {/* Practice again — re-run the session without leaving the Mastered column */}
                             <Link
                               href={`/mastery/${milestone.id}?returnUrl=${encodeURIComponent(pathname)}`}
-                              onClick={onClose}
                               className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:border-slate-600 hover:bg-slate-800 transition-colors"
                             >
                               <Mic size={14} />
@@ -692,7 +690,6 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                             ) : (
                               <Link
                                 href={`/mastery/${milestone.id}?returnUrl=${encodeURIComponent(pathname)}`}
-                                onClick={onClose}
                                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-700/70 border border-green-600/40 px-4 py-2.5 text-sm font-semibold text-green-100 hover:bg-green-700 transition-colors"
                               >
                                 <Mic size={14} />
@@ -718,7 +715,6 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                     <div className="pb-4">
                       <Link
                         href={askHref()}
-                        onClick={onClose}
                         className="glow-violet flex items-center justify-between gap-3 rounded-xl border border-violet-500/30 bg-violet-500/8 px-4 py-3 transition-all hover:border-violet-500/60 hover:bg-violet-500/15 group"
                       >
                         <div className="flex items-center gap-3">
