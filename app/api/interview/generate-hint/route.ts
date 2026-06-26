@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
-import { ROOM_CONTEXT, hintGenerationPrompt, parseClaudeJson } from "@/lib/claude/prompts";
+import { ROOM_CONTEXT, hintGenerationPrompt, parseClaudeJson, stripEmphasis } from "@/lib/claude/prompts";
 import { isPresetRoom, type Room } from "@/types";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
 
     const text = res.content[0].type === "text" ? res.content[0].text : "";
     const parsed = parseClaudeJson<{ hint: string }>(text);
-    hint = parsed.hint;
+    hint = stripEmphasis(parsed.hint);
   } catch (err) {
     console.error("[generate-hint] Claude error:", err);
     return NextResponse.json(

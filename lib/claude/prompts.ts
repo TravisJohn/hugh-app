@@ -448,3 +448,10 @@ export function parseClaudeJson<T = Record<string, unknown>>(text: string): T {
     .trim();
   return JSON.parse(cleaned) as T;
 }
+
+// Strip paired markdown emphasis (*italic* / **bold**) from text that is read
+// aloud or rendered as plain text, where stray markers show literally. A lone
+// unpaired "*" (e.g. "SELECT *") is left intact.
+export function stripEmphasis(s: string): string {
+  return s.replace(/\*\*([^*]+)\*\*/g, "$1").replace(/\*([^*]+)\*/g, "$1");
+}

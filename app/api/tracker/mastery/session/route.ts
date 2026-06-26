@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { checkUsageAllowed, logUsage } from "@/lib/usage";
+import { stripEmphasis } from "@/lib/claude/prompts";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -33,12 +34,6 @@ function buildConversationText(messages: Message[]): string {
     .join("\n");
 }
 
-// Hugh's lines are read aloud and rendered as plain text, so stray markdown
-// emphasis (*italic* / **bold**) shows literally. Strip paired emphasis markers
-// only — a lone unpaired "*" (e.g. "SELECT *") is left intact.
-function stripEmphasis(s: string): string {
-  return s.replace(/\*\*([^*]+)\*\*/g, "$1").replace(/\*([^*]+)\*/g, "$1");
-}
 
 export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
