@@ -33,6 +33,13 @@ function buildConversationText(messages: Message[]): string {
     .join("\n");
 }
 
+// Hugh's lines are read aloud and rendered as plain text, so stray markdown
+// emphasis (*italic* / **bold**) shows literally. Strip paired emphasis markers
+// only — a lone unpaired "*" (e.g. "SELECT *") is left intact.
+function stripEmphasis(s: string): string {
+  return s.replace(/\*\*([^*]+)\*\*/g, "$1").replace(/\*([^*]+)\*/g, "$1");
+}
+
 export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -104,7 +111,8 @@ Generate ONE natural opening line that:
 3. Is 1-2 sentences, conversational, authentic to your role as ${persona}
 4. Does NOT start with "As a..." or similar role announcements
 
-Return ONLY the spoken line. No quotes, no stage directions, no labels.`;
+Return ONLY the spoken line. No quotes, no stage directions, no labels.
+This line is read aloud — use plain text only, no markdown, asterisks, or emphasis markers.`;
 
   } else if (phase === "respond") {
     const conversationText = buildConversationText(messages);
@@ -130,7 +138,8 @@ Generate ONE natural follow-up line that:
 3. Is 1-2 sentences, stays in character as ${persona}
 4. Keeps the conversation moving forward naturally
 
-Return ONLY the spoken line. No quotes, no stage directions.`;
+Return ONLY the spoken line. No quotes, no stage directions.
+This line is read aloud — use plain text only, no markdown, asterisks, or emphasis markers.`;
 
   } else if (phase === "evaluate") {
     const conversationText = buildConversationText(messages);
@@ -180,12 +189,12 @@ Return ONLY valid JSON with no markdown fences:
     const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
     try {
       const result = JSON.parse(cleaned) as { score: number; feedback: string; passed: boolean };
-      return NextResponse.json(result);
+      return NextResponse.json({ ...result, feedback: stripEmphasis(result.feedback) });
     } catch {
       console.error("[mastery/session] Failed to parse evaluate JSON:", cleaned);
       return NextResponse.json({ error: "Failed to parse evaluation" }, { status: 500 });
     }
   }
 
-  return NextResponse.json({ text: raw });
+  return NextResponse.json({ text: stripEmphasis(raw) });
 }
