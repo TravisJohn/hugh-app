@@ -65,19 +65,9 @@ async function apiFetchQuestion(params: {
   return res.json() as Promise<{ question: string; bestAnswer: string; questionId?: string }>;
 }
 
-async function apiCheckSimilarity(
-  bestAnswer: string,
-  transcript: string,
-): Promise<{ usedBestAnswer: boolean; alignmentScore: number }> {
-  const res = await fetch('/api/interview/check-similarity', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ bestAnswer, transcript }),
-  });
-  if (!res.ok) throw new Error(`check-similarity failed: ${res.status}`);
-  return res.json() as Promise<{ usedBestAnswer: boolean; alignmentScore: number }>;
-}
-
+// Single submit call: the route judges alignment AND writes feedback together
+// (formerly two calls — check-similarity then generate-feedback — that duplicated
+// the question/bestAnswer/transcript context).
 async function apiGenerateFeedback(params: {
   questionId?:      string;
   question:         string;
@@ -85,15 +75,14 @@ async function apiGenerateFeedback(params: {
   transcript:       string;
   viewedHint:       boolean;
   viewedBestAnswer: boolean;
-  usedBestAnswer:   boolean;
-}): Promise<{ feedback: string }> {
+}): Promise<{ feedback: string; usedBestAnswer: boolean; alignmentScore: number }> {
   const res = await fetch('/api/interview/generate-feedback', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(params),
   });
   if (!res.ok) throw new Error(`generate-feedback failed: ${res.status}`);
-  return res.json() as Promise<{ feedback: string }>;
+  return res.json() as Promise<{ feedback: string; usedBestAnswer: boolean; alignmentScore: number }>;
 }
 
 async function apiFetchHint(params: {
@@ -294,9 +283,8 @@ export function useInterview() {
     setState(InterviewState.SUBMITTING);
 
     try {
-      const { usedBestAnswer } = await apiCheckSimilarity(bestAnswer, editedTranscript);
-
-      // Always generate + persist feedback (passive mode stores it silently)
+      // One call now both judges alignment and writes feedback (passive mode
+      // stores it silently). usedBestAnswer is persisted server-side.
       const { feedback: feedbackText } = await apiGenerateFeedback({
         questionId:       currentQuestion.id || undefined,
         question:         currentQuestion.question_text,
@@ -304,7 +292,6 @@ export function useInterview() {
         transcript:       editedTranscript,
         viewedHint,
         viewedBestAnswer,
-        usedBestAnswer,
       });
 
       if (coachingModeRef.current === 'passive') {

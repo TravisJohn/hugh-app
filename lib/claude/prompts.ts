@@ -134,6 +134,54 @@ Do not use markdown formatting, asterisks, bold markers, or any special characte
 Reply with ONLY the feedback text — no JSON, no preamble.`;
 }
 
+// ── Submit answer (merged similarity judgment + feedback) ────────────────
+// One call replaces the former check-similarity → generate-feedback pair: both
+// sent the same question/bestAnswer/transcript, so combining halves the calls
+// and the duplicated input context. Returns the alignment verdict AND the
+// coaching feedback in a single JSON object.
+export function submitAnswerPrompt({
+  question,
+  bestAnswer,
+  transcript,
+  viewedHint,
+  viewedBestAnswer,
+}: {
+  question: string;
+  bestAnswer: string;
+  transcript: string;
+  viewedHint: boolean;
+  viewedBestAnswer: boolean;
+}): string {
+  const scaffoldingLines = [
+    viewedHint ? "They requested a hint before answering." : null,
+    viewedBestAnswer
+      ? "They viewed the ideal answer before answering."
+      : "They did not view the ideal answer before answering.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return `You are a tough but fair interview coach.
+
+The candidate was asked: "${question}"
+The suggested best answer was: "${bestAnswer}"
+The candidate answered: "${transcript}"
+${scaffoldingLines}
+
+Do two things:
+1. Judge how well the candidate's answer captures the key points and approach of
+   the suggested best answer. Score alignment 0-100; an answer that captures at
+   least 90% of the key points counts as having used the best approach.
+2. Write 2-3 sentences of feedback consistent with that judgment. If alignment is
+   high (>=90), explain why this approach is strong and acknowledge what they did
+   well. Otherwise highlight what they got right, what they missed, and what the
+   best answer adds. Start with a short verdict phrase (e.g. "Strong answer." or
+   "Partially there."). Do not use markdown, asterisks, or special characters.
+
+Return ONLY valid JSON, no markdown fences:
+{"usedBestAnswer": <true if alignmentScore >= 90>, "alignmentScore": <0-100>, "feedback": "<2-3 sentences>"}`;
+}
+
 // ── Session assessment ────────────────────────────────────────────────────
 
 export function sessionAssessmentPrompt(params: {

@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
-import { feedbackGenerationPrompt } from "@/lib/claude/prompts";
+import { submitAnswerPrompt, parseClaudeJson } from "@/lib/claude/prompts";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -19,7 +19,6 @@ export async function POST(request: NextRequest) {
     transcript: string;
     viewedHint: boolean;
     viewedBestAnswer: boolean;
-    usedBestAnswer: boolean;
   };
 
   const {
@@ -29,7 +28,6 @@ export async function POST(request: NextRequest) {
     transcript,
     viewedHint,
     viewedBestAnswer,
-    usedBestAnswer,
   } = body;
 
   if (!question || !bestAnswer || !transcript) {
@@ -43,31 +41,39 @@ export async function POST(request: NextRequest) {
   const hintWasViewed = viewedHint ?? false;
 
   let feedback: string;
+  let usedBestAnswer: boolean;
+  let alignmentScore: number;
 
   try {
+    // Merged judgment + feedback in one Sonnet call (formerly check-similarity
+    // then generate-feedback, which duplicated question/bestAnswer/transcript).
     const res = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 512,
       messages: [
         {
           role: "user",
-          content: feedbackGenerationPrompt({
+          content: submitAnswerPrompt({
             question,
             bestAnswer,
             transcript,
             viewedHint: hintWasViewed,
             viewedBestAnswer,
-            usedBestAnswer,
           }),
         },
       ],
     });
 
-    const raw =
-      res.content[0].type === "text"
-        ? res.content[0].text.trim()
-        : "No feedback generated.";
-    feedback = raw.replace(/\*\*/g, '');
+    const raw = res.content[0].type === "text" ? res.content[0].text : "{}";
+    const parsed = parseClaudeJson<{
+      usedBestAnswer: boolean;
+      alignmentScore: number;
+      feedback: string;
+    }>(raw);
+
+    alignmentScore = Math.max(0, Math.min(100, parsed.alignmentScore ?? 0));
+    usedBestAnswer = alignmentScore >= 90;
+    feedback = (parsed.feedback ?? "No feedback generated.").replace(/\*\*/g, "");
   } catch (err) {
     console.error("[generate-feedback] Claude error:", err);
     return NextResponse.json(
@@ -92,5 +98,5 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ feedback });
+  return NextResponse.json({ feedback, usedBestAnswer, alignmentScore });
 }
