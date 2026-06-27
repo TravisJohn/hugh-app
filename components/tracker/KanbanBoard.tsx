@@ -220,6 +220,12 @@ export default function KanbanBoard({
     }
   }
 
+  // Keep the board's milestone copy in sync when the drawer changes a card's
+  // self-assessment statuses, so the card's top-right chips update instantly.
+  const handleCoverageChange = useCallback((milestoneId: string, coverage: Milestone["coverage"]) => {
+    setMilestones(prev => prev.map(m => m.id === milestoneId ? { ...m, coverage } : m));
+  }, []);
+
   function handleDrawerClose() {
     if (activeMilestone) {
       fetch(`/api/tracker/milestones/${activeMilestone.id}/entries`)
@@ -307,6 +313,7 @@ export default function KanbanBoard({
         topicContext={topicContext}
         goalId={goalId}
         onClose={handleDrawerClose}
+        onCoverageChange={handleCoverageChange}
       />
 
       {/* ── Premium gate modal ─────────────────────────────────────────── */}

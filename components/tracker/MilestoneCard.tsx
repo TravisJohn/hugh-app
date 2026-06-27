@@ -1,8 +1,9 @@
 "use client";
 
 import { useDraggable } from "@dnd-kit/core";
-import { GripVertical, BookOpen, OctagonAlert, ChevronRight, ChevronUp, ChevronDown } from "lucide-react";
+import { GripVertical, BookOpen, OctagonAlert, ChevronRight, ChevronUp, ChevronDown, Check, Bookmark, HelpCircle } from "lucide-react";
 import { type Milestone, type BacklogPriorityMode } from "@/types";
+import { normalizeCoverage, countByStatus } from "@/utils/coverage";
 
 interface Props {
   milestone:       Milestone;
@@ -47,6 +48,35 @@ export default function MilestoneCard({
   const showBadge  = priorityMode === "auto"   && priorityRank != null;
   const showArrows = priorityMode === "manual" && !!isBacklog;
 
+  // Self-assessment summary surfaced top-right — even in review/done columns the
+  // learner can see at a glance which cards carry bookmarks or stuck points.
+  // Untouched cards (no statuses set) show nothing.
+  const coverage   = normalizeCoverage(milestone.coverage);
+  const understood = coverage ? countByStatus(coverage.statuses, "understood") : 0;
+  const bookmarked = coverage ? countByStatus(coverage.statuses, "bookmarked") : 0;
+  const stuck      = coverage ? countByStatus(coverage.statuses, "stuck") : 0;
+  const hasChips   = understood > 0 || bookmarked > 0 || stuck > 0;
+
+  const statusChips = hasChips ? (
+    <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
+      {understood > 0 && (
+        <span className="flex items-center gap-0.5 text-green-400" title={`${understood} understood`}>
+          <Check size={11} /><span className="text-xs font-medium">{understood}</span>
+        </span>
+      )}
+      {bookmarked > 0 && (
+        <span className="flex items-center gap-0.5 text-amber-400" title={`${bookmarked} bookmarked to revisit`}>
+          <Bookmark size={11} /><span className="text-xs font-medium">{bookmarked}</span>
+        </span>
+      )}
+      {stuck > 0 && (
+        <span className="flex items-center gap-0.5 text-red-400" title={`${stuck} still unclear`}>
+          <HelpCircle size={11} /><span className="text-xs font-medium">{stuck}</span>
+        </span>
+      )}
+    </div>
+  ) : null;
+
   // Overlay: the floating card while dragging
   if (isOverlay) {
     return (
@@ -58,9 +88,12 @@ export default function MilestoneCard({
             <OctagonAlert size={13} className="text-red-400" />
           </div>
         )}
-        <p className={`text-sm font-semibold text-slate-100 leading-snug pr-6 ${showStopSign ? "pl-5" : ""}`}>
-          {milestone.title}
-        </p>
+        <div className="flex items-start justify-between gap-2">
+          <p className={`text-sm font-semibold text-slate-100 leading-snug ${showStopSign ? "pl-5" : ""} ${!hasChips ? "pr-6" : ""}`}>
+            {milestone.title}
+          </p>
+          {statusChips}
+        </div>
         <p className="line-clamp-2 text-xs text-slate-400 leading-relaxed">
           {milestone.summary}
         </p>
@@ -111,16 +144,19 @@ export default function MilestoneCard({
         </div>
       )}
 
-      {/* Grip handle */}
-      {!isDragging && (
+      {/* Grip handle — yields the corner to the status summary when present */}
+      {!isDragging && !hasChips && (
         <div className="absolute right-2 top-2 text-slate-600 opacity-30 group-hover:opacity-70 transition-opacity pointer-events-none">
           <GripVertical size={14} />
         </div>
       )}
 
-      <p className={`text-sm font-semibold text-slate-100 leading-snug pr-6 ${showBadge ? "pl-7" : showStopSign ? "pl-5" : ""}`}>
-        {milestone.title}
-      </p>
+      <div className="flex items-start justify-between gap-2">
+        <p className={`text-sm font-semibold text-slate-100 leading-snug ${showBadge ? "pl-7" : showStopSign ? "pl-5" : ""} ${!hasChips ? "pr-6" : ""}`}>
+          {milestone.title}
+        </p>
+        {statusChips}
+      </div>
 
       <p className="line-clamp-2 text-xs text-slate-400 leading-relaxed">
         {milestone.summary}

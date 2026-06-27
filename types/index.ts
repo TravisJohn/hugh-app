@@ -131,10 +131,14 @@ export interface LearningPoint {
   text: string;
 }
 
-// Cached coverage assessment — which learning points the learner's activity covers.
+// Self-assessment status for a single learning point. Absent from the map =
+// unstarted. Purely the learner's own awareness flag — never gates mastery.
+export type PointStatus = 'understood' | 'bookmarked' | 'stuck';
+
+// Per-milestone self-assessment: each learning point id mapped to its status.
 export interface MilestoneCoverage {
-  coveredIds: string[];
-  updatedAt:  string;
+  statuses:  Record<string, PointStatus>;
+  updatedAt: string;
 }
 
 export interface Milestone {

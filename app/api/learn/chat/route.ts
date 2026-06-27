@@ -24,11 +24,12 @@ export async function POST(request: NextRequest) {
   }
 
   const body = (await request.json()) as {
-    topic:    string;
-    messages: ChatMessage[];
+    topic:      string;
+    messages:   ChatMessage[];
+    focusMode?: boolean;
   };
 
-  const { topic, messages } = body;
+  const { topic, messages, focusMode } = body;
 
   if (!topic?.trim() || !Array.isArray(messages) || messages.length === 0) {
     return NextResponse.json({ error: "topic and messages are required" }, { status: 400 });
@@ -43,12 +44,17 @@ export async function POST(request: NextRequest) {
       max_tokens: 1024,
       system:     focusedLearningSystemPrompt(topic.trim()),
       messages:   capped,
-      // Prompt caching: auto-place a 5-min breakpoint on the last message, so the
+      // Prompt caching: auto-place a breakpoint on the last message, so the
       // system prompt + prior conversation prefix is reused across turns of the
       // same chat. Cache reads cost ~0.1x; this is the bulk of learn/chat spend.
       // (Effective once the prefix exceeds Sonnet's ~2048-token cache minimum —
       // i.e. after the first couple of turns; shorter prefixes silently skip.)
-      cache_control: { type: "ephemeral" },
+      //
+      // During a Pomodoro focus block we switch to the 1-hour TTL: deliberate,
+      // spaced study leaves gaps >5 min between questions, which would expire the
+      // default cache and force a re-write each turn. The 1h write costs 2x (vs
+      // 1.25x) but is recovered the moment one such re-write is avoided.
+      cache_control: focusMode ? { type: "ephemeral", ttl: "1h" } : { type: "ephemeral" },
     });
 
     const raw = res.content[0].type === "text" ? res.content[0].text : "{}";

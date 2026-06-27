@@ -4,7 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { learningPointsPrompt, parseClaudeJson } from "@/lib/claude/prompts";
 import { checkUsageAllowed, logUsage } from "@/lib/usage";
-import { type LearningPoint } from "@/types";
+import { normalizeCoverage } from "@/utils/coverage";
+import { type LearningPoint, type PointStatus } from "@/types";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -13,7 +14,7 @@ interface MilestoneRow {
   title:           string;
   summary:         string;
   learning_points: LearningPoint[] | null;
-  coverage:        { coveredIds: string[]; updatedAt: string } | null;
+  coverage:        unknown; // legacy or current shape — normalized on read
   tracks:          { user_id: string; topic_description: string } | null;
 }
 
@@ -75,13 +76,16 @@ export async function GET(
   // If usage is blocked, still return whatever points already exist (no new call).
   const points = allowed ? await ensureLearningPoints(supabase, ms, userId) : (ms.learning_points ?? []);
 
-  return NextResponse.json({ learningPoints: points, coverage: ms.coverage });
+  return NextResponse.json({ learningPoints: points, coverage: normalizeCoverage(ms.coverage) });
 }
 
-// ── POST: persist the learner's manual check-offs ───────────────────────────
-// Coverage is a self-assessment the learner controls — they tick each idea once
-// they're confident they understand it. We just validate the ids against the
-// milestone's checklist and store them. No AI judgement is involved.
+const VALID_STATUSES = new Set<PointStatus>(["understood", "bookmarked", "stuck"]);
+
+// ── POST: persist the learner's self-assessment ─────────────────────────────
+// Coverage is a self-assessment the learner controls — they flag each idea as
+// understood / bookmarked-for-later / still-stuck. We validate the ids against
+// the milestone's checklist and the status values, then store them. No AI
+// judgement is involved, and this never gates mastery.
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -90,9 +94,9 @@ export async function POST(
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const { coveredIds } = (await request.json().catch(() => ({}))) as { coveredIds?: string[] };
-  if (!Array.isArray(coveredIds)) {
-    return NextResponse.json({ error: "coveredIds must be an array" }, { status: 400 });
+  const { statuses } = (await request.json().catch(() => ({}))) as { statuses?: Record<string, string> };
+  if (!statuses || typeof statuses !== "object" || Array.isArray(statuses)) {
+    return NextResponse.json({ error: "statuses must be an object" }, { status: 400 });
   }
 
   const supabase = await createClient();
@@ -100,12 +104,34 @@ export async function POST(
   const ms = await loadOwnedMilestone(supabase, id, userId);
   if (!ms) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Only accept ids that belong to this milestone's checklist.
+  // Only accept ids that belong to this milestone's checklist and valid statuses.
   const validIds = new Set((ms.learning_points ?? []).map(p => p.id));
-  const filtered = coveredIds.filter(cid => validIds.has(cid));
-  const coverage = { coveredIds: filtered, updatedAt: new Date().toISOString() };
+  const clean: Record<string, PointStatus> = {};
+  for (const [pid, val] of Object.entries(statuses)) {
+    if (validIds.has(pid) && VALID_STATUSES.has(val as PointStatus)) clean[pid] = val as PointStatus;
+  }
+  const coverage = { statuses: clean, updatedAt: new Date().toISOString() };
 
+  // Persist the current snapshot (what the board/drawer/card read).
   await supabase.from("milestones").update({ coverage }).eq("id", id);
+
+  // Append-only history: log every actual transition for future coaching. The
+  // snapshot above is the source of truth for the UI; this is best-effort and
+  // never blocks the learner's save. (See migration 021_point_status_events.)
+  const prev = normalizeCoverage(ms.coverage)?.statuses ?? {};
+  const changedIds = new Set([...Object.keys(prev), ...Object.keys(clean)]);
+  const events = [...changedIds]
+    .filter(pid => (prev[pid] ?? null) !== (clean[pid] ?? null))
+    .map(pid => ({
+      user_id:      userId,
+      milestone_id: id,
+      point_id:     pid,
+      from_status:  prev[pid] ?? null,
+      to_status:    clean[pid] ?? null,
+    }));
+  if (events.length > 0) {
+    await supabase.from("point_status_events").insert(events);
+  }
 
   return NextResponse.json({ learningPoints: ms.learning_points ?? [], coverage });
 }

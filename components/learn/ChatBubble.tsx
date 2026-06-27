@@ -1,12 +1,52 @@
 "use client";
 
+import { useState, isValidElement, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
+import { Copy, Check } from "lucide-react";
 
 interface Props {
   role:    "user" | "assistant";
   content: string;
+}
+
+// Flatten a rendered markdown node back to its plain text (for copy-to-clipboard).
+function nodeText(node: ReactNode): string {
+  if (node == null || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(nodeText).join("");
+  if (isValidElement(node)) return nodeText((node.props as { children?: ReactNode }).children);
+  return "";
+}
+
+// Code block with a copy button — used for Hugh's deep-dive prompts (and any snippet).
+function CodeBlock({ children }: { children?: ReactNode }) {
+  const [copied, setCopied] = useState(false);
+
+  function copy() {
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(nodeText(children).replace(/\n$/, "")).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }).catch(() => {});
+  }
+
+  return (
+    <div className="relative mb-2">
+      <pre className="max-w-full overflow-x-auto whitespace-pre-wrap break-words rounded-lg bg-slate-900 p-3 pr-10 font-mono text-xs text-slate-300">
+        {children}
+      </pre>
+      <button
+        type="button"
+        onClick={copy}
+        title={copied ? "Copied" : "Copy"}
+        className="absolute right-2 top-2 rounded-md border border-slate-700 bg-slate-800/80 p-1.5 text-slate-400 opacity-70 transition-all hover:text-white hover:opacity-100"
+      >
+        {copied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+      </button>
+    </div>
+  );
 }
 
 const markdownComponents: Components = {
@@ -27,11 +67,7 @@ const markdownComponents: Components = {
       <code className="rounded bg-slate-700 px-1 py-0.5 font-mono text-xs text-sky-300">{children}</code>
     );
   },
-  pre: ({ children }) => (
-    <pre className="mb-2 overflow-x-auto rounded-lg bg-slate-900 p-3 font-mono text-xs text-slate-300">
-      {children}
-    </pre>
-  ),
+  pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
   table: ({ children }) => (
     <div className="my-3 overflow-x-auto rounded-lg border border-slate-600">
       <table className="w-full border-collapse text-sm">{children}</table>
@@ -63,7 +99,7 @@ export default function ChatBubble({ role, content }: Props) {
         </div>
       )}
       <div
-        className={`rounded-2xl px-4 py-3 text-sm leading-relaxed
+        className={`min-w-0 break-words rounded-2xl px-4 py-3 text-sm leading-relaxed
           ${isUser
             ? "max-w-[78%] rounded-tr-sm bg-sky-600 text-white whitespace-pre-wrap"
             : "w-full max-w-[92%] rounded-tl-sm bg-slate-800 text-slate-200 border border-slate-700"

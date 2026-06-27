@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { masterySummaryPrompt } from "@/lib/claude/prompts";
 import { checkUsageAllowed, logUsage } from "@/lib/usage";
+import { normalizeCoverage } from "@/utils/coverage";
 import { type LearningPoint } from "@/types";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -14,7 +15,7 @@ interface MilestoneRow {
   summary:           string;
   kanban_column:     string;
   learning_points:   LearningPoint[] | null;
-  coverage:          { coveredIds: string[] } | null;
+  coverage:          unknown; // legacy or current shape — normalized on read
   mastery_score:     number | null;
   mastery_feedback:  string | null;
   tracks:            { user_id: string; topic_description: string } | null;
@@ -67,8 +68,10 @@ export async function POST(
     return NextResponse.json({ error: "Add a diary entry before generating a summary" }, { status: 422 });
   }
 
-  const coveredIds = new Set(ms.coverage?.coveredIds ?? []);
-  const points = (ms.learning_points ?? []).map(p => ({ text: p.text, covered: coveredIds.has(p.id) }));
+  // "Covered" for the summary means the learner marked it understood; bookmarked
+  // and still-stuck points are treated as not yet covered so the summary can flag them.
+  const statuses = normalizeCoverage(ms.coverage)?.statuses ?? {};
+  const points = (ms.learning_points ?? []).map(p => ({ text: p.text, covered: statuses[p.id] === "understood" }));
   const diaryEntries = entries.map(e => ({
     title: (e.title as string | null) ?? null,
     body:  e.body as string,

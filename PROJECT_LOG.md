@@ -627,3 +627,114 @@ feedback}, halving calls + duplicated context. useInterview drops
 apiCheckSimilarity; usedBestAnswer persisted server-side. State machine unchanged.
 
 tsc --noEmit clean; next build compiles (exit 0). No migration.
+
+### Phase 20 — "What to understand" gains three states ✅
+The self-check went from binary (understood / not) to three statuses so the learner
+can flag awareness, not just completion: **understood** (green check), **bookmarked
+for later** (amber bookmark), **still stuck** (red help). Purely an awareness aid —
+it never gates mastery. The win is visibility: bookmarked/stuck counts now show on
+the kanban card itself, so even in Review/Done columns the learner sees what to
+circle back on.
+
+- **Data model:** `MilestoneCoverage` changed from `{ coveredIds: string[] }` to
+  `{ statuses: Record<string, PointStatus> }` where `PointStatus =
+  'understood'|'bookmarked'|'stuck'` (absent = unstarted). No migration — the JSONB
+  `coverage` field is normalized at read time via `normalizeCoverage()` in
+  `utils/coverage.ts`, which maps any legacy `coveredIds[]` to `understood`.
+- **Coverage route:** GET returns normalized coverage; POST accepts `{ statuses }`,
+  validating ids against the checklist and values against the three statuses.
+- **Shared UI:** `components/learn/PointStatusControl.tsx` — three mutually-exclusive
+  icon toggles (click active to clear), with `STATUS_META` as the single source of
+  icon/colour. Reused by `ChecklistRail` and `MilestoneDrawer`.
+- **MilestoneCard:** top-right status summary — green-check / amber-bookmark /
+  red-stuck icon+count chips, each shown only when its count >0 (untouched cards
+  show nothing). Normalizes the raw milestone.coverage — no extra fetch. Purely
+  visual; the grip handle yields the corner when chips are present.
+- **Summary route:** "covered" for the mastery summary now means `understood`;
+  bookmarked/stuck count as not-yet-covered so the summary can flag them.
+- Mastery flow + nudge untouched (nudge keys on understood count, never blocks).
+
+**Capture layer for future coaching (migration 021):** the snapshot in
+`coverage` is current-state only — overwritten on every save, so history is lost.
+Added an append-only `point_status_events` table to record every status change as
+a transition (`from_status` → `to_status`, NULL = unstarted; only actual changes
+logged), with RLS owner policy + indexes on (user_id, created_at) and
+(milestone_id, point_id). The coverage POST route now diffs prev vs. new statuses
+and inserts the transitions after writing the snapshot — best-effort, never blocks
+the save. *What* we do with this data (trends, recurring confusion, time-to-
+understanding, nudges) is deliberately deferred; the point is to start capturing
+now since history can't be backfilled.
+
+tsc --noEmit clean. **Migration 021 must be applied to Supabase.**
+
+### Phase 21 — Pomodoro focus timer on the Ask page ✅
+A 🍅 focus timer for the Ask page (scoped there only — Review has its own limit,
+Converse has a finish line). Doubles as a caching optimization: during a focus
+block the chat route switches its prompt cache to the 1-hour TTL.
+
+- **`hooks/usePomodoro.ts`** — wall-clock timer (epoch `endsAt`, not interval
+  counting) persisted to `localStorage` so it survives reloads/tab throttling;
+  recomputes on `visibilitychange`. Phases: idle → focus → optional 5-min break.
+  Pause/resume/stop; fires a transient `completed` signal at zero. Exposes
+  `focusActive` (the cache-TTL flag) plus pure helpers `remainingOf` / `formatMmSs`.
+- **`components/learn/PomodoroControl.tsx`** — tomato toggle + duration picker
+  (15/25/50, 25 default); running countdown with pause/stop; on completion a
+  Web-Audio chime + a dismissible toast offering a 5-min break (or "focus again"
+  after a break). Never blocks asking.
+- **`ChatWindow`** mounts the hook, renders the control in the toolbar (now
+  `justify-between`, opposite Summarise), and sends `focusMode: pomo.focusActive`.
+- **`/api/learn/chat`** sets `cache_control.ttl: "1h"` when `focusMode`, else the
+  default 5-min. No beta header needed. Rationale: spaced study leaves >5-min gaps
+  that would expire the 5-min cache; 1h write is 2x vs 1.25x but recovered after one
+  avoided re-write. Measurable via existing `tokensIn` (incl. cache creation) logs.
+- Free (not premium). No DB changes.
+
+tsc --noEmit clean; timer helpers sanity-checked via node. No test runner in the
+project (only `lint`); pure timer math kept in exported helpers for checkability.
+
+### Phase 22 — Concise, takeaway-led Ask answers + deep-dive coaching ✅
+Reshaped `focusedLearningSystemPrompt` (learn/chat). Justified on UX/differentiation,
+not cost — output is the minority of spend (~17%) and more follow-up turns partly
+offset the saving; the real win is readability and a distinct voice.
+
+- **Concise + takeaway:** answers now lead with the single core idea in plain,
+  jargon-light language, at most one example, and end with a `**Takeaway:** …`
+  line tying it to why it matters for the topic. (Was: "thorough… 3–6 sentences.")
+- **Deep-dive coaching:** instead of dumping exhaustive technical detail, Hugh
+  answers narrow follow-ups directly but, for broad "teach me everything" depth,
+  hands a copy-pasteable prompt (fenced code block) for the learner's own AI
+  chatbot — framed as a power-move, not a brush-off. This also moves the expensive
+  deep-generation off Hugh entirely (token-favourable) and teaches prompting.
+- **Bring-it-back loop:** that handed prompt ends by asking the external chatbot
+  for a concise, paste-ready summary (3–5 bullets + takeaway), and Hugh tells the
+  learner to paste it into the card's diary. No new infra — the card diary
+  (`milestone_entries`, text) already exists; there is no file-attachment system
+  (the drawer's Paperclip icon is just a "Gap noted" label). True file uploads
+  would need Supabase Storage + migration + UI — deferred.
+- No UI change — `ChatBubble` already renders the bold takeaway + code block. Prompt
+  text only; cache-safe (system prompt stays static within a session).
+- **Copy button:** `ChatBubble` code blocks now render via a `CodeBlock` component
+  with a top-right copy icon (flattens the node to text via `nodeText`, trims the
+  trailing newline) — one-click hand-off of the deep-dive prompt.
+- **Layout hardening:** longer coached responses exposed missing `min-w-0` on the
+  flex chain — a wide code block expanded the chat column past the viewport, and
+  the Ask page root is `overflow-hidden`, so it clipped with no scrollbar. Added
+  `min-w-0` to the ChatWindow root + assistant bubble (with `break-words`) and
+  `max-w-full` to the code `<pre>`, so wide content scrolls *inside* the block
+  instead of blowing out the page. Also condensed the handed deep-dive prompt to a
+  few focused lines (≈2–4 sentences).
+
+tsc --noEmit clean. Next agenda (deferred): Markdown-capable diary + a real
+external-chatbot session import/save-to-card flow (see memory).
+
+### Phase 22.1 — Deep-dive prompt line formatting ✅
+The handed deep-dive prompt was rendering as one run-on line and spilling
+horizontally out of the code block. Two fixes: (1) `focusedLearningSystemPrompt`
+now instructs Hugh to format the handed prompt across separate lines (one
+instruction per line, blank line between parts, summary instruction on its own
+final line); (2) `ChatBubble` code blocks gained `whitespace-pre-wrap break-words`
+so long lines wrap inside the box instead of scrolling off-screen. tsc clean.
+
+Future refinement (deferred): the deep-dive hand-off only triggers when the
+learner asks to go deeper — non-intuitive. Surface it as an explicit **"Go Deep"**
+affordance on the Ask card. Logged in memory.

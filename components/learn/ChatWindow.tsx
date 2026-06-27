@@ -5,6 +5,8 @@ import { Send, Loader2, Sparkles } from "lucide-react";
 import ChatBubble from "./ChatBubble";
 import OffTrackNotice from "./OffTrackNotice";
 import SummaryPanel, { type SummaryData } from "./SummaryPanel";
+import PomodoroControl from "./PomodoroControl";
+import { usePomodoro } from "@/hooks/usePomodoro";
 
 interface Message {
   role:    "user" | "assistant";
@@ -38,6 +40,10 @@ export default function ChatWindow({ topic, goalId, milestoneId, onTranscriptCha
   const [panelOpen, setPanelOpen]     = useState(false);
   const [summary, setSummary]         = useState<SummaryData | null>(null);
   const [summarizing, setSummarizing] = useState(false);
+
+  // Optional Pomodoro focus timer. While a focus block is active, the chat route
+  // is asked to use the 1-hour prompt-cache TTL (spaced study keeps the prefix warm).
+  const pomo = usePomodoro();
 
   const bottomRef   = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -84,7 +90,7 @@ export default function ChatWindow({ topic, goalId, milestoneId, onTranscriptCha
       const res  = await fetch("/api/learn/chat", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ topic, messages: apiMessages }),
+        body:    JSON.stringify({ topic, messages: apiMessages, focusMode: pomo.focusActive }),
       });
       const data = await res.json() as { reply?: string; isOffTopic?: boolean; error?: string };
 
@@ -147,13 +153,14 @@ export default function ChatWindow({ topic, goalId, milestoneId, onTranscriptCha
   const canSummarise = messages.length >= 3;
 
   return (
-    <div className="flex flex-1 min-h-0">
+    <div className="flex flex-1 min-h-0 min-w-0">
 
       {/* ── Chat column ─────────────────────────────────────────────── */}
       <div className="flex flex-1 flex-col min-w-0 min-h-0">
 
         {/* Toolbar */}
-        <div className="shrink-0 flex items-center justify-end border-b border-slate-800/50 px-4 py-2">
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-800/50 px-4 py-2">
+          <PomodoroControl pomo={pomo} />
           <button
             onClick={handleSummarise}
             disabled={!canSummarise || summarizing}

@@ -6,7 +6,7 @@ import {
   X, Plus, Loader2, MessageCircle, ArrowRight,
   Maximize2, Minimize2, ChevronDown, PenLine, BookOpen,
   OctagonAlert, CheckCircle2, ClipboardCheck, Mic,
-  ListChecks, Check, Circle, Pencil, RotateCw, AlertTriangle, Paperclip,
+  ListChecks, Check, Pencil, RotateCw, AlertTriangle, Paperclip,
   Download, FileText, Sparkles,
 } from "lucide-react";
 import Link from "next/link";
@@ -14,9 +14,11 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
 import {
-  type Milestone, type MilestoneEntry, type LearningPoint,
-  KANBAN_COLUMN_LABELS,
+  type Milestone, type MilestoneEntry, type LearningPoint, type PointStatus,
+  type MilestoneCoverage, KANBAN_COLUMN_LABELS,
 } from "@/types";
+import { normalizeCoverage, countByStatus } from "@/utils/coverage";
+import PointStatusControl from "@/components/learn/PointStatusControl";
 
 // Compact markdown styling for the in-drawer summary document.
 const summaryMarkdownComponents: Components = {
@@ -33,10 +35,13 @@ const summaryMarkdownComponents: Components = {
 };
 
 interface Props {
-  milestone:     Milestone | null;
-  topicContext?: string;
-  goalId?:       string;
-  onClose:       () => void;
+  milestone:        Milestone | null;
+  topicContext?:    string;
+  goalId?:          string;
+  onClose:          () => void;
+  // Lets the parent board keep its milestone copy (and thus the card chips) in
+  // sync as the learner changes self-assessment statuses, without a reload.
+  onCoverageChange?: (milestoneId: string, coverage: MilestoneCoverage) => void;
 }
 
 const COLUMN_COLOURS: Record<string, string> = {
@@ -84,7 +89,7 @@ function SectionToggle({ label, icon, open, onToggle, count }: SectionProps) {
   );
 }
 
-export default function MilestoneDrawer({ milestone, topicContext, goalId, onClose }: Props) {
+export default function MilestoneDrawer({ milestone, topicContext, goalId, onClose, onCoverageChange }: Props) {
   const pathname = usePathname();
 
   const [entries, setEntries]               = useState<MilestoneEntry[]>([]);
@@ -102,7 +107,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
 
   // "What to understand" checklist + coverage
   const [points, setPoints]                   = useState<LearningPoint[]>([]);
-  const [coveredIds, setCoveredIds]           = useState<string[]>([]);
+  const [statuses, setStatuses]               = useState<Record<string, PointStatus>>({});
   const [loadingCoverage, setLoadingCoverage] = useState(false);
   const [nudgeDismissed, setNudgeDismissed]   = useState(false);
 
@@ -141,7 +146,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
     setEditingId(null);
     setVerifyingIds(new Set());
     setPoints([]);
-    setCoveredIds([]);
+    setStatuses({});
     setNudgeDismissed(false);
     setSummaryDoc(milestone.summary_doc ?? null);
     setSummaryAt(milestone.summary_doc_at ?? null);
@@ -168,7 +173,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
       .then(r => r.json())
       .then(d => {
         setPoints(d.learningPoints ?? []);
-        setCoveredIds(d.coverage?.coveredIds ?? []);
+        setStatuses(normalizeCoverage(d.coverage)?.statuses ?? {});
       })
       .catch(() => {})
       .finally(() => setLoadingCoverage(false));
@@ -279,17 +284,19 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
     }
   }
 
-  // Manual self-assessment: the learner ticks each idea once they understand it.
-  function togglePoint(id: string) {
+  // Self-assessment: the learner flags each idea as understood / bookmarked /
+  // stuck. Clearing a status removes the id from the map.
+  function setPointStatus(id: string, next: PointStatus | undefined) {
     if (!milestone) return;
-    const next = coveredIds.includes(id)
-      ? coveredIds.filter(x => x !== id)
-      : [...coveredIds, id];
-    setCoveredIds(next); // optimistic
+    const updated = { ...statuses };
+    if (next) updated[id] = next; else delete updated[id];
+    setStatuses(updated); // optimistic
+    // Bubble the change up so the board's card chips update without a reload.
+    onCoverageChange?.(milestone.id, { statuses: updated, updatedAt: new Date().toISOString() });
     void fetch(`/api/tracker/milestones/${milestone.id}/coverage`, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ coveredIds: next }),
+      body:    JSON.stringify({ statuses: updated }),
     }).catch(() => {});
   }
 
@@ -346,10 +353,13 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
     return `/review/${milestone.id}?returnUrl=${encodeURIComponent(pathname)}`;
   }
 
-  const open           = milestone !== null;
-  const allCovered     = points.length > 0 && coveredIds.length === points.length;
-  const uncheckedCount = points.length - coveredIds.length;
-  const showNudge      = points.length > 0 && !allCovered && !nudgeDismissed;
+  const open            = milestone !== null;
+  const understoodCount = countByStatus(statuses, "understood");
+  const bookmarkedCount = countByStatus(statuses, "bookmarked");
+  const stuckCount      = countByStatus(statuses, "stuck");
+  const allCovered      = points.length > 0 && understoodCount === points.length;
+  const uncheckedCount  = points.length - understoodCount;
+  const showNudge       = points.length > 0 && !allCovered && !nudgeDismissed;
 
   // Gentle, dismissible reminder shown before starting Review / Mastery when the
   // learner hasn't ticked off all of their "What to understand" items. Never blocks.
@@ -463,33 +473,31 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                       ) : (
                         <>
                           <ol className="space-y-1">
-                            {points.map(p => {
-                              const done = coveredIds.includes(p.id);
-                              return (
-                                <li key={p.id}>
-                                  <button
-                                    onClick={() => togglePoint(p.id)}
-                                    className="group flex w-full items-start gap-2.5 rounded-lg py-1 text-left hover:bg-slate-800/40 transition-colors"
-                                  >
-                                    {done
-                                      ? <Check  size={15} className="mt-0.5 shrink-0 text-green-400" />
-                                      : <Circle size={15} className="mt-0.5 shrink-0 text-slate-600 group-hover:text-slate-400 transition-colors" />}
-                                    <span className={`text-sm leading-snug transition-colors ${done ? "text-slate-300" : "text-slate-400 group-hover:text-slate-200"}`}>
-                                      {p.text}
-                                    </span>
-                                  </button>
-                                </li>
-                              );
-                            })}
+                            {points.map(p => (
+                              <li
+                                key={p.id}
+                                className="flex items-start justify-between gap-2.5 rounded-lg py-1 pl-2 pr-1"
+                              >
+                                <span className="flex-1 text-sm leading-snug text-slate-300">
+                                  {p.text}
+                                </span>
+                                <PointStatusControl
+                                  current={statuses[p.id]}
+                                  onChange={next => setPointStatus(p.id, next)}
+                                />
+                              </li>
+                            ))}
                           </ol>
                           <div className="mt-3">
                             <span className={`text-xs font-medium ${allCovered ? "text-green-400" : "text-slate-500"}`}>
                               {allCovered
-                                ? "All ideas checked off — nicely done"
-                                : `${coveredIds.length} of ${points.length} checked`}
+                                ? "All ideas marked understood — nicely done"
+                                : `${understoodCount} of ${points.length} understood`}
+                              {bookmarkedCount > 0 && <span className="text-amber-400"> · {bookmarkedCount} bookmarked</span>}
+                              {stuckCount > 0 && <span className="text-red-400"> · {stuckCount} to revisit</span>}
                             </span>
                             <p className="mt-1.5 text-xs text-slate-600 leading-relaxed">
-                              Tick each idea once you&apos;re confident you understand it — this is your own honest progress check.
+                              Flag each idea as understood, bookmarked for later, or still unclear — your own honest progress check.
                             </p>
                           </div>
                         </>
