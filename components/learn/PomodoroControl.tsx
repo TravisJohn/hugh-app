@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Pause, Play, Square, X } from "lucide-react";
+import { useState } from "react";
+import { Pause, Play, Square } from "lucide-react";
 import { formatMmSs, type PomodoroApi } from "@/hooks/usePomodoro";
 
 interface Props {
@@ -10,56 +10,15 @@ interface Props {
 
 const FOCUS_OPTIONS = [15, 25, 50];
 
-// Gentle two-tone chime via Web Audio — no asset needed. Best-effort: browsers
-// block audio until the user has interacted, which they always have here (they
-// clicked to start the timer), so it plays on completion.
-function playChime() {
-  try {
-    const w = window as unknown as {
-      AudioContext?: typeof AudioContext;
-      webkitAudioContext?: typeof AudioContext;
-    };
-    const Ctx = w.AudioContext ?? w.webkitAudioContext;
-    if (!Ctx) return;
-    const ctx = new Ctx();
-    const now = ctx.currentTime;
-    [880, 1318.5].forEach((freq, i) => {
-      const osc  = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.value = freq;
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      const t = now + i * 0.18;
-      gain.gain.setValueAtTime(0.0001, t);
-      gain.gain.linearRampToValueAtTime(0.16, t + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.38);
-      osc.start(t);
-      osc.stop(t + 0.42);
-    });
-    setTimeout(() => void ctx.close(), 1200);
-  } catch { /* audio not available — toast still shows */ }
-}
-
 /**
- * Focus-timer widget for the Ask toolbar. Idle: a tomato that opens a duration
- * picker. Running: a live countdown with pause/stop. On completion: a chime and
- * a dismissible toast that offers a 5-minute break (or, after a break, another
- * focus block). Never blocks the learner.
+ * Focus-timer control for the Ask toolbar. Idle: a tomato that opens a duration
+ * picker to start a session. Running: a live countdown with pause/stop. The
+ * completion chime and break toast are handled globally by the PomodoroDock, so
+ * they fire (and the timer stays visible) on any page — not just here.
  */
 export default function PomodoroControl({ pomo }: Props) {
-  const { phase, remainingMs, paused, completed } = pomo;
+  const { phase, remainingMs, paused } = pomo;
   const [pickerOpen, setPickerOpen] = useState(false);
-
-  // Chime once per completion. Ref-guard so a re-render with the same `completed`
-  // value (or React's dev double-invoke) doesn't double-play.
-  const chimedFor = useRef<"focus" | "break" | null>(null);
-  useEffect(() => {
-    if (!completed) { chimedFor.current = null; return; }
-    if (chimedFor.current === completed) return;
-    chimedFor.current = completed;
-    playChime();
-  }, [completed]);
 
   return (
     <div className="relative flex items-center">
@@ -115,45 +74,6 @@ export default function PomodoroControl({ pomo }: Props) {
             ))}
           </div>
         </>
-      )}
-
-      {/* Completion toast */}
-      {completed && (
-        <div className="fixed bottom-8 left-1/2 z-50 -translate-x-1/2 animate-toast-in">
-          <div className="flex items-center gap-3 rounded-2xl border border-rose-500/40 bg-[#1a0f12] px-5 py-4 shadow-2xl shadow-black/60 backdrop-blur-sm">
-            <span aria-hidden className="text-lg leading-none">{completed === "focus" ? "🍅" : "☕"}</span>
-            <div>
-              <p className="text-sm font-semibold text-rose-200">
-                {completed === "focus" ? "Focus block done" : "Break's over"}
-              </p>
-              <p className="mt-0.5 text-xs text-slate-400">
-                {completed === "focus" ? "Nice work — take a breather?" : "Ready for another focus block?"}
-              </p>
-            </div>
-            {completed === "focus" ? (
-              <button
-                onClick={pomo.startBreak}
-                className="ml-1 shrink-0 rounded-xl bg-sky-600 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-500 transition-colors"
-              >
-                5-min break
-              </button>
-            ) : (
-              <button
-                onClick={() => pomo.start(25)}
-                className="ml-1 shrink-0 rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-500 transition-colors"
-              >
-                Focus again
-              </button>
-            )}
-            <button
-              onClick={pomo.acknowledge}
-              title="Dismiss"
-              className="shrink-0 text-slate-500 hover:text-slate-300 transition-colors"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        </div>
       )}
     </div>
   );

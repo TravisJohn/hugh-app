@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Lora } from "next/font/google";
 import "./globals.css";
+import PomodoroProvider from "@/components/learn/PomodoroProvider";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -36,7 +37,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${lora.variable} h-full`}>
       <body className="h-full bg-[#0F172A] font-sans text-slate-100 antialiased">
-        {children}
+        <PomodoroProvider>
+          {children}
+        </PomodoroProvider>
       </body>
     </html>
   );

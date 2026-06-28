@@ -778,3 +778,36 @@ to the checklist.
 tsc --noEmit clean; eslint clean (0/0); next build compiles (exit 0). Live test
 pending Travis after applying migration 022 — tag a summary/entry to a point, see
 the count + filter, re-tag, clear.
+
+### Phase 24 — Post-deploy refinements ✅
+
+**Visible fact-check / re-check status (MilestoneDrawer).** The background
+fact-check on diary save/edit only showed a tiny 12px spinner, easy to miss (and a
+freshly-saved entry auto-opens). Now four coordinated signals using existing
+`globals.css` animations — no new deps:
+- an indeterminate `progress-slide` shimmer bar across the top of the verifying
+  card + a sky border/tint;
+- a legible "CHECKING" pill in the collapsed row (was a bare spinner);
+- an expanded "✨ Hugh is fact-checking this entry" banner with bouncing dots, so
+  the open view shows what's happening;
+- the ✓/⚠ result (and correction panel) `fadeIn`s when the check completes.
+Covers both paths: `submitEntry`→verify (new) and `saveEdit`→verify (re-check).
+
+**App-wide Pomodoro (was Ask-page only).** The timer state already persisted
+(wall-clock + localStorage) but only *rendered* in ChatWindow, so a running
+session was invisible elsewhere. Lifted to a single app-level instance:
+- `components/learn/PomodoroProvider.tsx` — runs the one `usePomodoro()` in the
+  root layout, exposes `usePomodoroContext()` (single source of truth; no duplicate
+  intervals or competing localStorage writers). ChatWindow now reads the context.
+- `components/learn/PomodoroDock.tsx` — global floating countdown (bottom-right,
+  z-50) shown wherever a session is active; owns the completion chime + break toast
+  (moved out of PomodoroControl, so they fire on any page).
+- `PomodoroControl` slimmed to the start-picker + inline countdown for the Ask
+  toolbar. `app/layout.tsx` wraps children in the provider.
+- Visibility: **silent** (no dock/toast/chime) on `/review/*`, `/mastery/*`,
+  `/converse/*` (Converse route is future). On the Ask pages the floating countdown
+  is hidden (inline control covers it) but chime/toast still fire. Dock appears only
+  while a session runs; starting stays on the Ask page. (Decisions confirmed with
+  Travis: hide on Mastery too; idle = hidden.)
+
+tsc --noEmit clean; eslint clean (0/0); next build compiles (exit 0). No migration.

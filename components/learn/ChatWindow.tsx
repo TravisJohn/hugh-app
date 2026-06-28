@@ -6,7 +6,7 @@ import ChatBubble from "./ChatBubble";
 import OffTrackNotice from "./OffTrackNotice";
 import SummaryPanel, { type SummaryData } from "./SummaryPanel";
 import PomodoroControl from "./PomodoroControl";
-import { usePomodoro } from "@/hooks/usePomodoro";
+import { usePomodoroContext } from "./PomodoroProvider";
 
 interface Message {
   role:    "user" | "assistant";
@@ -41,9 +41,11 @@ export default function ChatWindow({ topic, goalId, milestoneId, onTranscriptCha
   const [summary, setSummary]         = useState<SummaryData | null>(null);
   const [summarizing, setSummarizing] = useState(false);
 
-  // Optional Pomodoro focus timer. While a focus block is active, the chat route
-  // is asked to use the 1-hour prompt-cache TTL (spaced study keeps the prefix warm).
-  const pomo = usePomodoro();
+  // Shared app-wide Pomodoro focus timer. While a focus block is active, the chat
+  // route is asked to use the 1-hour prompt-cache TTL (spaced study keeps the
+  // prefix warm). Reading the context (not a fresh hook) keeps this in sync with
+  // the global dock shown on other pages.
+  const pomo = usePomodoroContext();
 
   const bottomRef   = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
