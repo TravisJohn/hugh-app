@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
+import { isValidPointTag } from "@/lib/tracker/points";
 
 export async function GET(
   request: NextRequest,
@@ -38,7 +39,7 @@ export async function POST(
   }
 
   const { id } = await params;
-  const body = (await request.json()) as { body: string; title?: string };
+  const body = (await request.json()) as { body: string; title?: string; pointId?: string | null };
 
   const text  = body.body?.trim();
   const title = body.title?.trim() ?? null;
@@ -48,9 +49,12 @@ export async function POST(
 
   const supabase = await createClient();
 
+  // A tag pointing at a non-existent learning point is dropped, not rejected.
+  const tag = (await isValidPointTag(supabase, id, body.pointId)) ? body.pointId ?? null : null;
+
   const { data, error } = await supabase
     .from("milestone_entries")
-    .insert({ milestone_id: id, user_id: userId, body: text, title })
+    .insert({ milestone_id: id, user_id: userId, body: text, title, point_id: tag })
     .select("*")
     .single();
 

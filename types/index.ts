@@ -173,6 +173,9 @@ export interface MilestoneEntry {
   correction:   string | null;
   gap_note:     string | null;
   corrected:    boolean;
+  // Optional tag to one of the milestone's learning points (a LearningPoint.id
+  // from learning_points JSONB). null = untagged / general entry.
+  point_id:     string | null;
   created_at:   string;
 }
 

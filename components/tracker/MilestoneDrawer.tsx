@@ -7,7 +7,7 @@ import {
   Maximize2, Minimize2, ChevronDown, PenLine, BookOpen,
   OctagonAlert, CheckCircle2, ClipboardCheck, Mic,
   ListChecks, Check, Pencil, RotateCw, AlertTriangle, Paperclip,
-  Download, FileText, Sparkles,
+  Download, FileText, Sparkles, Tag,
 } from "lucide-react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
@@ -19,6 +19,7 @@ import {
 } from "@/types";
 import { normalizeCoverage, countByStatus } from "@/utils/coverage";
 import PointStatusControl from "@/components/learn/PointStatusControl";
+import PointTagSelect from "@/components/learn/PointTagSelect";
 
 // Compact markdown styling for the in-drawer summary document.
 const summaryMarkdownComponents: Components = {
@@ -96,8 +97,12 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
   const [loadingEntries, setLoadingEntries] = useState(false);
   const [draft, setDraft]                   = useState("");
   const [draftTitle, setDraftTitle]         = useState("");
+  const [draftPointId, setDraftPointId]     = useState<string | null>(null);
   const [saving, setSaving]                 = useState(false);
   const [expanded, setExpanded]             = useState(false);
+
+  // When set, the diary shows only entries tagged to this learning point.
+  const [filterPointId, setFilterPointId]   = useState<string | null>(null);
 
   // Fact-check / editing state
   const [verifyingIds, setVerifyingIds] = useState<Set<string>>(new Set());
@@ -132,6 +137,9 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
   const textareaRef   = useRef<HTMLTextAreaElement>(null);
   const entriesEndRef = useRef<HTMLDivElement>(null);
 
+  // Reset all per-milestone state when the open card changes — an intentional
+  // sync-on-id pattern, so the setState-in-effect rule is suppressed here.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!milestone) {
       setExpanded(false);
@@ -141,6 +149,8 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
     const isMastery = milestone.kanban_column === "done";
     setDraft("");
     setDraftTitle("");
+    setDraftPointId(null);
+    setFilterPointId(null);
     setEntries([]);
     setOpenEntries(new Set());
     setEditingId(null);
@@ -178,6 +188,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
       .catch(() => {})
       .finally(() => setLoadingCoverage(false));
   }, [milestone?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     entriesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -201,7 +212,8 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
   function toggleEntry(id: string) {
     setOpenEntries(prev => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
@@ -235,7 +247,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
       const res = await fetch(`/api/tracker/milestones/${milestone.id}/entries`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ body: draft.trim(), title: draftTitle.trim() || undefined }),
+        body:    JSON.stringify({ body: draft.trim(), title: draftTitle.trim() || undefined, pointId: draftPointId }),
       });
       const d = await res.json();
       if (d.entry) {
@@ -244,6 +256,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
         setOpenEntries(prev => new Set([...prev, newEntry.id]));
         setDraft("");
         setDraftTitle("");
+        setDraftPointId(null);
         setShowDiary(true);
         void verifyEntry(newEntry.id); // auto fact-check in the background
       }
@@ -282,6 +295,18 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
       setEditingId(null);
       void verifyEntry(entryId); // re-check the rewritten entry
     }
+  }
+
+  // Re-tag an existing entry to a learning point (or clear the tag). No content
+  // change, so no re-verify — the server updates point_id only.
+  async function retagEntry(entryId: string, pointId: string | null) {
+    const res = await fetch(`/api/tracker/entries/${entryId}`, {
+      method:  "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ pointId }),
+    });
+    const d = await res.json();
+    if (d.entry) replaceEntry(d.entry as MilestoneEntry);
   }
 
   // Self-assessment: the learner flags each idea as understood / bookmarked /
@@ -351,6 +376,23 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
   function quizHref(): string {
     if (!milestone) return "#";
     return `/review/${milestone.id}?returnUrl=${encodeURIComponent(pathname)}`;
+  }
+
+  // Learning-point tag lookups for the diary: id → text, per-point entry counts,
+  // and the entries visible under the active filter.
+  const pointsById = new Map(points.map(p => [p.id, p.text]));
+  const entryCountByPoint = entries.reduce<Record<string, number>>((acc, e) => {
+    if (e.point_id) acc[e.point_id] = (acc[e.point_id] ?? 0) + 1;
+    return acc;
+  }, {});
+  const activeFilterText = filterPointId ? pointsById.get(filterPointId) ?? null : null;
+  const visibleEntries   = filterPointId
+    ? entries.filter(e => e.point_id === filterPointId)
+    : entries;
+
+  function focusPointInDiary(pointId: string) {
+    setFilterPointId(prev => (prev === pointId ? null : pointId));
+    setShowDiary(true);
   }
 
   const open            = milestone !== null;
@@ -481,6 +523,19 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                                 <span className="flex-1 text-sm leading-snug text-slate-300">
                                   {p.text}
                                 </span>
+                                {entryCountByPoint[p.id] > 0 && (
+                                  <button
+                                    onClick={() => focusPointInDiary(p.id)}
+                                    title="Show tagged diary entries"
+                                    className={`mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${
+                                      filterPointId === p.id
+                                        ? "bg-violet-500/25 text-violet-200"
+                                        : "bg-slate-800 text-slate-500 hover:text-violet-300"
+                                    }`}
+                                  >
+                                    {entryCountByPoint[p.id]} {entryCountByPoint[p.id] === 1 ? "note" : "notes"}
+                                  </button>
+                                )}
                                 <PointStatusControl
                                   current={statuses[p.id]}
                                   onChange={next => setPointStatus(p.id, next)}
@@ -763,8 +818,30 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                         </p>
                       )}
 
+                      {/* Active learning-point filter */}
+                      {filterPointId && (
+                        <div className="mb-2 flex items-center gap-2 rounded-lg border border-violet-500/25 bg-violet-500/8 px-3 py-2">
+                          <Tag size={12} className="shrink-0 text-violet-400" />
+                          <span className="flex-1 truncate text-xs text-violet-200">
+                            {activeFilterText ?? "Tagged entries"}
+                          </span>
+                          <button
+                            onClick={() => setFilterPointId(null)}
+                            className="shrink-0 text-violet-400/70 transition-colors hover:text-violet-200"
+                            title="Clear filter"
+                          >
+                            <X size={13} />
+                          </button>
+                        </div>
+                      )}
+                      {!loadingEntries && entries.length > 0 && visibleEntries.length === 0 && (
+                        <p className="py-6 text-center text-xs text-slate-600">
+                          No entries tagged to this learning point yet.
+                        </p>
+                      )}
+
                       <div className="space-y-2 pb-4">
-                        {entries.map(entry => {
+                        {visibleEntries.map(entry => {
                           const isOpen      = openEntries.has(entry.id);
                           const isEditing   = editingId === entry.id;
                           const isVerifying = verifyingIds.has(entry.id);
@@ -793,6 +870,9 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                                 ) : entry.fact_status === "correct" ? (
                                   <Check size={12} className="shrink-0 text-green-500/70" />
                                 ) : null}
+                                {entry.point_id && (
+                                  <Tag size={11} className="shrink-0 text-violet-400/70" />
+                                )}
                                 <span className="shrink-0 text-xs text-slate-600">
                                   {fmtCompact(entry.created_at)}
                                 </span>
@@ -882,6 +962,19 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                                     </div>
                                   )}
 
+                                  {/* Re-tag to a learning point */}
+                                  {points.length > 0 && !isEditing && (
+                                    <div className="flex items-center gap-2 border-t border-slate-700/40 pt-2.5">
+                                      <span className="shrink-0 text-xs text-slate-600">Learning point</span>
+                                      <PointTagSelect
+                                        points={points}
+                                        value={entry.point_id}
+                                        onChange={id => retagEntry(entry.id, id)}
+                                        className="flex-1"
+                                      />
+                                    </div>
+                                  )}
+
                                   {/* Plain edit affordance when there's no warning */}
                                   {!isEditing && !showWarning && (
                                     <button
@@ -936,6 +1029,11 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                       rows={3}
                       className="w-full resize-none rounded-lg bg-slate-800 border border-slate-700 px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-sky-500 transition-colors"
                     />
+                    {points.length > 0 && (
+                      <div className="mt-2">
+                        <PointTagSelect points={points} value={draftPointId} onChange={setDraftPointId} />
+                      </div>
+                    )}
                     <div className="mt-2 flex items-center justify-between">
                       <span className="text-xs text-slate-600">Hugh fact-checks each entry · ⌘ Enter to save</span>
                       <button

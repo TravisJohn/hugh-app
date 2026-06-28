@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X, BookMarked, CheckCircle2, Loader2, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { type LearningPoint } from "@/types";
+import PointTagSelect from "./PointTagSelect";
 
 export interface SummaryData {
   story:    string;
@@ -25,6 +27,21 @@ export default function SummaryPanel({ topic, data, loading, goalId, milestoneId
   const [saved, setSaved]         = useState(false);
   const [saveError, setSaveError] = useState("");
 
+  // The milestone's "What to understand" points, so the learner can tag this
+  // summary to one of them. Only relevant for a milestone-scoped session.
+  const [points, setPoints]   = useState<LearningPoint[]>([]);
+  const [pointId, setPointId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!milestoneId) return;
+    let active = true;
+    fetch(`/api/tracker/milestones/${milestoneId}/coverage`)
+      .then(r => r.json())
+      .then(d => { if (active) setPoints(d.learningPoints ?? []); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [milestoneId]);
+
   async function handleSave() {
     if (!data || saving || saved) return;
     setSaving(true);
@@ -40,6 +57,7 @@ export default function SummaryPanel({ topic, data, loading, goalId, milestoneId
           takeaway:    data.takeaway,
           title:       data.title ?? undefined,
           milestoneId,
+          pointId,
         }),
       });
 
@@ -116,6 +134,12 @@ export default function SummaryPanel({ topic, data, loading, goalId, milestoneId
         <div className="shrink-0 border-t border-slate-800 px-5 py-4 space-y-2">
           {saveError && (
             <p className="text-xs text-red-400">{saveError}</p>
+          )}
+          {!saved && points.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-xs text-slate-500">Tag to a learning point (optional)</p>
+              <PointTagSelect points={points} value={pointId} onChange={setPointId} />
+            </div>
           )}
           <button
             onClick={handleSave}

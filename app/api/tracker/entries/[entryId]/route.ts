@@ -1,14 +1,17 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
+import { isValidPointTag } from "@/lib/tracker/points";
 
 /**
- * Edit a diary entry, or accept Hugh's suggested correction.
+ * Edit a diary entry, accept Hugh's suggested correction, or re-tag it to a
+ * learning point.
  *
  * Body shapes:
- *  - { action: "accept" }            → apply `correction` to the body, clear the warning
- *  - { body?: string, title?: string } → edit the entry; resets fact_status to
+ *  - { action: "accept" }              → apply `correction` to the body, clear the warning
+ *  - { body, title?, pointId? }        → edit the entry; resets fact_status to
  *    'pending' so the client can re-verify. The permanent gap_note is preserved.
+ *  - { pointId: string | null }        → re-tag only (no content change)
  *
  * Returns the updated entry.
  */
@@ -21,9 +24,10 @@ export async function PATCH(
 
   const { entryId } = await params;
   const body = (await request.json()) as {
-    action?: "accept";
-    body?:   string;
-    title?:  string;
+    action?:  "accept";
+    body?:    string;
+    title?:   string;
+    pointId?: string | null;
   };
 
   const supabase = await createClient();
@@ -36,6 +40,12 @@ export async function PATCH(
     .single();
 
   if (!existing) return NextResponse.json({ error: "Entry not found" }, { status: 404 });
+
+  // Resolve an optional re-tag once (a tag pointing at a missing point is dropped).
+  const hasPointKey = Object.prototype.hasOwnProperty.call(body, "pointId");
+  const pointTag = hasPointKey
+    ? ((await isValidPointTag(supabase, existing.milestone_id, body.pointId)) ? body.pointId ?? null : null)
+    : undefined;
 
   let update: Record<string, unknown>;
 
@@ -50,12 +60,9 @@ export async function PATCH(
       fact_status: "correct",
       corrected:   true,
     };
-  } else {
-    const newBody  = body.body?.trim();
+  } else if (body.body?.trim()) {
+    const newBody  = body.body.trim();
     const newTitle = body.title?.trim();
-    if (!newBody) {
-      return NextResponse.json({ error: "Entry body is required" }, { status: 400 });
-    }
     // Edited content → re-check needed. Preserve gap_note (permanent).
     update = {
       body:        newBody,
@@ -64,6 +71,12 @@ export async function PATCH(
       fact_status: "pending",
       corrected:   false,
     };
+    if (hasPointKey) update.point_id = pointTag;
+  } else if (hasPointKey) {
+    // Re-tag only — no content change, so no re-verify.
+    update = { point_id: pointTag };
+  } else {
+    return NextResponse.json({ error: "Entry body is required" }, { status: 400 });
   }
 
   const { data: updated, error } = await supabase

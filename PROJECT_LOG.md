@@ -738,3 +738,43 @@ so long lines wrap inside the box instead of scrolling off-screen. tsc clean.
 Future refinement (deferred): the deep-dive hand-off only triggers when the
 learner asks to go deeper — non-intuitive. Surface it as an explicit **"Go Deep"**
 affordance on the Ask card. Logged in memory.
+
+### Phase 23 — Lint cleanup + learning-point tagging ✅
+
+**Lint cleanup (0 errors / 0 warnings, from 20 / 9).** Next 16's `eslint-config-next`
+ships the newer react-compiler-era `react-hooks` rules at error severity, which
+flagged legitimate existing patterns. Fixed without weakening any rule globally
+(kept them live for new code):
+- Real fixes: hoisted `<Btn>` out of `AdminActions` render (`static-components` ×6);
+  removed unused `redirect` import + a dead `profile` fetch (study page); escaped an
+  apostrophe; `declare var`→`declare const` in `speech.d.ts` (×5); rewrote a
+  ternary-statement; removed 2 stale `eslint-disable` directives in `useInterview`.
+- `usePomodoro` refactor: replaced the `forceTick` counter with a `now` state so
+  render is pure (kills `purity`) and folded completion-detection into the tick
+  callback (kills both `set-state-in-effect` + a deps warning).
+- Justified scoped disables only for intentional effect patterns (reset-on-id,
+  mount-once celebration, timer-zero reveal, SSR-safe hydration).
+- Untracked pitch decks (`presentation/`, `presentation-story/`,
+  `HUGH_PRESENTATION.md`) added to `.gitignore`.
+
+**Learning-point tagging.** Diary entries and saved Ask summaries can now be tagged
+to one of the milestone's "What to understand" learning points, linking the diary
+to the checklist.
+- **Migration `022_entry_point_tag.sql`** — `milestone_entries.point_id TEXT`
+  (nullable; soft ref to a `learning_points` JSONB id, not a hard FK) + index on
+  `(milestone_id, point_id)`. **Must be applied before this ships.**
+- `MilestoneEntry.point_id` added to types. `lib/tracker/points.ts`
+  `isValidPointTag()` validates a tag against the milestone's points (null = OK);
+  an invalid tag is dropped, not rejected.
+- Routes: `save-summary` POST, `entries` POST, and `entries` PATCH (new re-tag
+  path `{ pointId }`, plus optional `pointId` on edit) all accept + validate the tag.
+- `components/learn/PointTagSelect.tsx` — reusable compact picker (renders nothing
+  when the milestone has no checklist). Wired into **SummaryPanel** (Ask save) and
+  the **MilestoneDrawer** write box.
+- MilestoneDrawer diary: a `Tag` indicator on tagged rows, an inline re-tag select
+  per entry, a per-point **note count** in "What to understand" that **click-to-filters**
+  the diary to that point (with a clearable filter chip).
+
+tsc --noEmit clean; eslint clean (0/0); next build compiles (exit 0). Live test
+pending Travis after applying migration 022 — tag a summary/entry to a point, see
+the count + filter, re-tag, clear.
