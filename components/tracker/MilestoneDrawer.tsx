@@ -850,8 +850,20 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                           return (
                             <div
                               key={entry.id}
-                              className={`rounded-lg border overflow-hidden ${showWarning ? "border-amber-500/40 bg-amber-950/10" : "border-slate-700/50 bg-slate-800/50"}`}
+                              className={`relative rounded-lg border overflow-hidden transition-colors ${
+                                isVerifying
+                                  ? "border-sky-500/40 bg-sky-950/10"
+                                  : showWarning
+                                  ? "border-amber-500/40 bg-amber-950/10"
+                                  : "border-slate-700/50 bg-slate-800/50"
+                              }`}
                             >
+                              {/* Indeterminate shimmer while Hugh fact-checks */}
+                              {isVerifying && (
+                                <div className="absolute inset-x-0 top-0 h-0.5 overflow-hidden bg-sky-500/10">
+                                  <div className="h-full w-1/3 bg-sky-400/80 animate-progress-slide" />
+                                </div>
+                              )}
                               <button
                                 onClick={() => toggleEntry(entry.id)}
                                 className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left hover:bg-slate-800/80 transition-colors"
@@ -864,11 +876,14 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                                   {label}
                                 </span>
                                 {isVerifying ? (
-                                  <Loader2 size={12} className="shrink-0 animate-spin text-slate-500" />
+                                  <span className="flex shrink-0 items-center gap-1 rounded-full bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-300">
+                                    <Loader2 size={10} className="animate-spin" />
+                                    Checking
+                                  </span>
                                 ) : showWarning ? (
-                                  <AlertTriangle size={12} className="shrink-0 text-amber-400" />
+                                  <AlertTriangle size={12} className="shrink-0 text-amber-400 animate-fadeIn" />
                                 ) : entry.fact_status === "correct" ? (
-                                  <Check size={12} className="shrink-0 text-green-500/70" />
+                                  <Check size={12} className="shrink-0 text-green-500/70 animate-fadeIn" />
                                 ) : null}
                                 {entry.point_id && (
                                   <Tag size={11} className="shrink-0 text-violet-400/70" />
@@ -917,9 +932,22 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                                     </p>
                                   )}
 
+                                  {/* Live fact-check status — keeps the learner on the page */}
+                                  {isVerifying && !isEditing && (
+                                    <div className="flex items-center gap-2 rounded-lg border border-sky-500/25 bg-sky-500/8 px-3 py-2 animate-fadeIn">
+                                      <Sparkles size={13} className="shrink-0 text-sky-400 animate-pulse" />
+                                      <span className="text-xs font-medium text-sky-200">Hugh is fact-checking this entry</span>
+                                      <span className="ml-0.5 flex items-center gap-0.5">
+                                        <span className="h-1 w-1 rounded-full bg-sky-400 animate-bounce" style={{ animationDelay: "-0.3s" }} />
+                                        <span className="h-1 w-1 rounded-full bg-sky-400 animate-bounce" style={{ animationDelay: "-0.15s" }} />
+                                        <span className="h-1 w-1 rounded-full bg-sky-400 animate-bounce" />
+                                      </span>
+                                    </div>
+                                  )}
+
                                   {/* Fact-check warning — clickable correction */}
                                   {showWarning && !isEditing && (
-                                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-2.5">
+                                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 space-y-2.5 animate-fadeIn">
                                       <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400">
                                         <AlertTriangle size={13} />
                                         Hugh thinks this needs a fix
