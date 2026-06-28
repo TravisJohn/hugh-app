@@ -36,6 +36,11 @@ yarn-error.log*
 # database backups (contain real data — never commit)
 /backups
 
+# standalone pitch decks / slides — kept locally, not part of the app
+/presentation/
+/presentation-story/
+/HUGH_PRESENTATION.md
+
 # vercel
 .vercel
 

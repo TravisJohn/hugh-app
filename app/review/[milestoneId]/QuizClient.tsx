@@ -54,10 +54,12 @@ export default function QuizClient({ milestoneId, milestoneTitle, entryCount, re
 
   useEffect(() => () => clearTimer(), [clearTimer]);
 
-  // When timer hits 0, auto-reveal with no answer selected
+  // When timer hits 0, auto-reveal with no answer selected. Reacting to the
+  // ticking timer state is the intent here, so allow setState in this effect.
   useEffect(() => {
     if (timeLeft === 0 && phase === "quiz" && !revealed) {
       clearTimer();
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRevealed(true);
     }
   }, [timeLeft, phase, revealed, clearTimer]);

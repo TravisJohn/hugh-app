@@ -54,12 +54,17 @@ export function formatMmSs(ms: number): string {
 export function usePomodoro(): PomodoroApi {
   const [session, setSession]     = useState<PomodoroSession | null>(null);
   const [completed, setCompleted] = useState<"focus" | "break" | null>(null);
-  const [, forceTick]             = useState(0);
+  // `now` drives the countdown re-render. Keeping the clock in state (updated by
+  // the tick below) means the render itself stays pure — no Date.now() at render.
+  const [now, setNow]             = useState(() => Date.now());
 
-  // Hydrate any in-flight session on mount.
+  // Hydrate any in-flight session on mount. Done in an effect (not a lazy
+  // useState initializer) so the first render matches the server's (which has no
+  // localStorage) and avoids a hydration mismatch.
   useEffect(() => {
     const raw = typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEY) : null;
     if (!raw) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     try { setSession(JSON.parse(raw) as PomodoroSession); } catch { /* ignore corrupt state */ }
   }, []);
 
@@ -70,22 +75,23 @@ export function usePomodoro(): PomodoroApi {
   }, [session]);
 
   // Tick while running; recompute on tab refocus so a throttled interval can't
-  // leave a stale display.
+  // leave a stale display. The tick also fires completion the moment a running
+  // phase hits zero — done in this async callback (not an effect body) so it
+  // never causes a synchronous cascade.
   useEffect(() => {
     if (!session || session.pausedRemaining != null) return;
-    const id = setInterval(() => forceTick(t => t + 1), TICK_MS);
-    const onVisible = () => forceTick(t => t + 1);
-    document.addEventListener("visibilitychange", onVisible);
-    return () => { clearInterval(id); document.removeEventListener("visibilitychange", onVisible); };
+    const tick = () => {
+      const t = Date.now();
+      setNow(t);
+      if (session.endsAt - t <= 0) {
+        setCompleted(session.phase);
+        setSession(null);
+      }
+    };
+    const id = setInterval(tick, TICK_MS);
+    document.addEventListener("visibilitychange", tick);
+    return () => { clearInterval(id); document.removeEventListener("visibilitychange", tick); };
   }, [session]);
-
-  // Fire completion the moment a running phase hits zero.
-  useEffect(() => {
-    if (!session || session.pausedRemaining != null) return;
-    if (session.endsAt - Date.now() > 0) return;
-    setCompleted(session.phase);
-    setSession(null);
-  });
 
   const start = useCallback((minutes: number) => {
     setCompleted(null);
@@ -114,7 +120,7 @@ export function usePomodoro(): PomodoroApi {
 
   return {
     phase:       session?.phase ?? "idle",
-    remainingMs: remainingOf(session, Date.now()),
+    remainingMs: remainingOf(session, now),
     paused:      session?.pausedRemaining != null,
     focusActive: session?.phase === "focus",
     completed,

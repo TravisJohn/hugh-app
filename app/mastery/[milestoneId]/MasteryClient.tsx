@@ -546,7 +546,7 @@ export default function MasteryClient({ milestoneId, milestoneTitle, personaId, 
             {/* Feedback */}
             {evaluation?.feedback && (
               <div className="rounded-2xl border border-slate-700/60 bg-slate-800/40 px-5 py-4">
-                <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-2">Hugh's Feedback</p>
+                <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-2">Hugh&apos;s Feedback</p>
                 <p className="text-sm text-slate-300 leading-relaxed">{evaluation.feedback}</p>
               </div>
             )}

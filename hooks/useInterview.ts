@@ -225,7 +225,6 @@ export function useInterview() {
       setError('Failed to start session. Please try again.');
       setState(InterviewState.IDLE);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [play, setState]);
 
   const requestHint = useCallback(async (): Promise<void> => {
@@ -382,7 +381,6 @@ export function useInterview() {
       console.error('[useInterview] nextQuestion:', err);
       setError('Failed to load the next question. Please try again.');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     sessionId, room, currentPersona, currentQuestion,
     previousQuestions, questionIndex, play, setState,

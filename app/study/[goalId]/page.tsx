@@ -27,11 +27,8 @@ export default async function StudyPage({ params }: Props) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/home");
 
-  // Fetch goal + profile in parallel
-  const [{ data: goal }, { data: profile }] = await Promise.all([
-    supabase.from("learning_goals").select("*").eq("id", goalId).eq("user_id", user.id).single(),
-    supabase.from("profiles").select("plan, is_admin").eq("user_id", user.id).maybeSingle(),
-  ]);
+  const { data: goal } = await supabase
+    .from("learning_goals").select("*").eq("id", goalId).eq("user_id", user.id).single();
 
   if (!goal) notFound();
 

@@ -55,6 +55,9 @@ export default function KanbanBoard({
   const [toastTitle,   setToastTitle]   = useState("");
   const [toastKind,    setToastKind]    = useState<"review" | "mastery">("review");
 
+  // These two effects fire a one-time celebration based on a navigation result;
+  // the setState calls are the whole point, so suppress the setState-in-effect rule.
+  /* eslint-disable react-hooks/set-state-in-effect */
   // Confetti + toast when returning from a passed quiz (review)
   useEffect(() => {
     if (!validatedId) return;
@@ -92,6 +95,7 @@ export default function KanbanBoard({
     const t = setTimeout(() => setToastVisible(false), 6000);
     return () => clearTimeout(t);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (!pulseId) return;

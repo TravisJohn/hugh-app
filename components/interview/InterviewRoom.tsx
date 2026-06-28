@@ -74,17 +74,20 @@ export default function InterviewRoom({ sessionId, room, persona, coachingMode, 
     reRecord,
   } = useInterview();
 
-  // Strict Mode guard — prevent double-start in development
+  // Strict Mode guard — prevent double-start in development. Runs once; the
+  // session params are read at mount and intentionally not re-run dependencies.
   const startedRef = useRef(false);
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
     void startSession(sessionId, room, persona, coachingMode, topic, jobDescription, skipIntro, voiceEnabled);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startSession, sessionId, room, persona]);
 
   // Mirror the editable transcript so ActionZone can call submitAnswer(reviewText)
   const [reviewText, setReviewText] = useState('');
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (state === InterviewState.REVIEWING) setReviewText(transcript);
   }, [state, transcript]);
 

@@ -51,7 +51,7 @@ interface SpeechRecognition extends EventTarget {
   ): void;
 }
 
-declare var SpeechRecognition: {
+declare const SpeechRecognition: {
   prototype: SpeechRecognition;
   new(): SpeechRecognition;
 };
@@ -61,7 +61,7 @@ interface SpeechRecognitionEvent extends Event {
   readonly results:     SpeechRecognitionResultList;
 }
 
-declare var SpeechRecognitionEvent: {
+declare const SpeechRecognitionEvent: {
   prototype: SpeechRecognitionEvent;
   new(type: string, eventInitDict: SpeechRecognitionEventInit): SpeechRecognitionEvent;
 };
@@ -76,7 +76,7 @@ interface SpeechRecognitionErrorEvent extends Event {
   readonly message: string;
 }
 
-declare var SpeechRecognitionErrorEvent: {
+declare const SpeechRecognitionErrorEvent: {
   prototype: SpeechRecognitionErrorEvent;
   new(type: string, eventInitDict: SpeechRecognitionErrorEventInit): SpeechRecognitionErrorEvent;
 };
@@ -101,7 +101,7 @@ interface SpeechGrammar {
   weight: number;
 }
 
-declare var SpeechGrammar: {
+declare const SpeechGrammar: {
   prototype: SpeechGrammar;
   new(): SpeechGrammar;
 };
@@ -114,7 +114,7 @@ interface SpeechGrammarList {
   [index: number]: SpeechGrammar;
 }
 
-declare var SpeechGrammarList: {
+declare const SpeechGrammarList: {
   prototype: SpeechGrammarList;
   new(): SpeechGrammarList;
 };
