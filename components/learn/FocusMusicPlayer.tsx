@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { isSilentRoute } from "@/lib/pomodoro/routes";
 import { usePomodoroContext, useFocusMusicContext } from "./PomodoroProvider";
@@ -13,8 +13,9 @@ const FADE_MS       = 700;
  * client-side navigation (it lives in the provider, not a page), so playback is
  * continuous as the learner moves around. Music plays only while the timer widget
  * is visible — i.e. a session is active AND the route isn't a silent one — so the
- * off-switch is always next to the sound. A random track is chosen each time
- * playback (re)starts, and the volume fades in/out on every transition.
+ * off-switch is always next to the sound. Tracks are shuffled — a random track
+ * plays, and when it ends a different random track follows (non-looping). The
+ * volume fades in/out on every transition.
  */
 export default function FocusMusicPlayer() {
   const { enabled, tracks } = useFocusMusicContext();
@@ -28,15 +29,28 @@ export default function FocusMusicPlayer() {
 
   const wantMusic = enabled && phase !== "idle" && !isSilentRoute(pathname) && tracks.length > 0;
 
-  // Pick a fresh random track each time music transitions into playing (toggled
-  // on, a new session begins, or returning from a silent route). Stable while playing.
+  // Pick a random track, avoiding an immediate repeat of the current one.
+  const pickRandom = useCallback((exclude: string | null): string | null => {
+    if (tracks.length === 0) return null;
+    if (tracks.length === 1) return tracks[0];
+    let next = exclude;
+    while (next === exclude) next = tracks[Math.floor(Math.random() * tracks.length)];
+    return next;
+  }, [tracks]);
+
+  // Start a fresh shuffle each time music transitions into playing (toggled on, a
+  // new session begins, or returning from a silent route).
   useEffect(() => {
     if (wantMusic && !wasPlayingRef.current) {
-      const pick = tracks[Math.floor(Math.random() * tracks.length)];
-      setSrc(pick ?? null);
+      setSrc(prev => pickRandom(prev));
     }
     wasPlayingRef.current = wantMusic;
-  }, [wantMusic, tracks]);
+  }, [wantMusic, pickRandom]);
+
+  // When a track finishes, advance to another random one (shuffle, non-looping).
+  const handleEnded = useCallback(() => {
+    setSrc(prev => pickRandom(prev));
+  }, [pickRandom]);
 
   const shouldPlay = wantMusic && !!src;
 
@@ -73,5 +87,5 @@ export default function FocusMusicPlayer() {
     };
   }, [shouldPlay, src]);
 
-  return <audio ref={audioRef} src={src ?? undefined} loop preload="none" />;
+  return <audio ref={audioRef} src={src ?? undefined} onEnded={handleEnded} preload="none" />;
 }

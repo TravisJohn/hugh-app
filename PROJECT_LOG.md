@@ -822,8 +822,9 @@ Optional background music for focus sessions, attached to the Pomodoro widget.
   persisted; mounted once in PomodoroProvider (shared via `useFocusMusicContext`).
 - `components/learn/FocusMusicPlayer.tsx` — always-mounted, invisible looping
   `<audio>` in the provider (survives navigation → continuous playback). Plays only
-  while the timer widget is visible (session active AND not a silent route); picks a
-  **random** track each time playback (re)starts; fades volume in/out (~700ms);
+  while the timer widget is visible (session active AND not a silent route);
+  **shuffles** — a random track plays and, when it ends, a different random track
+  follows (non-looping, no back-to-back repeats); fades volume in/out (~700ms);
   autoplay-block safe (catches blocked play after a gesture-less reload).
 - `components/learn/PomodoroMusicControl.tsx` — simple 🎵 on/off toggle, rendered in
   both the floating dock and the Ask-toolbar control. Off by default.
