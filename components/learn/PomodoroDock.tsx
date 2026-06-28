@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { GripVertical, Pause, Play, Square, X } from "lucide-react";
 import { formatMmSs } from "@/hooks/usePomodoro";
+import { isSilentRoute, isAskRoute } from "@/lib/pomodoro/routes";
 import { usePomodoroContext } from "./PomodoroProvider";
+import PomodoroMusicControl from "./PomodoroMusicControl";
 
 // Persisted drag position for the floating countdown (null = default corner).
 const POS_KEY = "hugh:pomodoro:pos";
@@ -18,21 +20,6 @@ function readPos(): Pos | null {
 }
 function writePos(p: Pos | null) {
   try { if (p) localStorage.setItem(POS_KEY, JSON.stringify(p)); } catch { /* ignore */ }
-}
-
-// Routes where the timer disappears entirely (focused assessments + the
-// coming-soon Converse). No dock, no toast, no chime — a clean, undistracted screen.
-function isSilentRoute(path: string): boolean {
-  return /^\/review\//.test(path)
-    || /^\/mastery\//.test(path)
-    || /^\/converse(\/|$)/.test(path);
-}
-
-// Pages that carry their own inline timer control (the Ask chat toolbar). The
-// floating countdown is hidden there to avoid showing two of the same timer, but
-// the completion chime + toast still come from here.
-function isAskRoute(path: string): boolean {
-  return path === "/learn" || /^\/study\/[^/]+\/ask$/.test(path);
 }
 
 // Gentle two-tone chime via Web Audio — no asset needed. Best-effort; browsers
@@ -152,6 +139,7 @@ export default function PomodoroDock() {
             }`}>
               {formatMmSs(remainingMs)}
             </span>
+            <PomodoroMusicControl />
             <button
               onClick={paused ? pomo.resume : pomo.pause}
               title={paused ? "Resume" : "Pause"}

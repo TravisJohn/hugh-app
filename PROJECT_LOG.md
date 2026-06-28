@@ -811,3 +811,28 @@ session was invisible elsewhere. Lifted to a single app-level instance:
   Travis: hide on Mastery too; idle = hidden.)
 
 tsc --noEmit clean; eslint clean (0/0); next build compiles (exit 0). No migration.
+
+### Phase 25 — Pomodoro focus music ✅
+
+Optional background music for focus sessions, attached to the Pomodoro widget.
+- `lib/pomodoro/tracks.ts` — AUTO-GENERATED list of track URLs (string[]), produced
+  by `scripts/gen-focus-tracks.mjs` from the files in `public/audio/focus/`. Re-run
+  the script after adding/removing tracks. Empty list → music control hidden.
+- `hooks/useFocusMusic.ts` — on/off preference only (no track picker), localStorage
+  persisted; mounted once in PomodoroProvider (shared via `useFocusMusicContext`).
+- `components/learn/FocusMusicPlayer.tsx` — always-mounted, invisible looping
+  `<audio>` in the provider (survives navigation → continuous playback). Plays only
+  while the timer widget is visible (session active AND not a silent route); picks a
+  **random** track each time playback (re)starts; fades volume in/out (~700ms);
+  autoplay-block safe (catches blocked play after a gesture-less reload).
+- `components/learn/PomodoroMusicControl.tsx` — simple 🎵 on/off toggle, rendered in
+  both the floating dock and the Ask-toolbar control. Off by default.
+- Behaviour (confirmed with Travis): random track (38 tracks generated); off by
+  default; plays only while the widget is visible so the off-switch is always next
+  to the sound; fade in/out.
+
+Note: 38 tracks (~161 MB) committed under `public/audio/focus/` — accepted repo
+bloat for the MVP; easy to migrate to Supabase Storage / a CDN later (only the
+generated URL list references them; the player is source-agnostic).
+
+tsc --noEmit clean; eslint clean (0/0); next build compiles (exit 0). No migration.

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Pause, Play, Square } from "lucide-react";
 import { formatMmSs, type PomodoroApi } from "@/hooks/usePomodoro";
+import PomodoroMusicControl from "./PomodoroMusicControl";
 
 interface Props {
   pomo: PomodoroApi;
@@ -39,6 +40,7 @@ export default function PomodoroControl({ pomo }: Props) {
           <span className={`min-w-[3.1rem] text-center font-mono text-xs font-semibold tabular-nums ${phase === "focus" ? "text-rose-200" : "text-sky-200"}`}>
             {formatMmSs(remainingMs)}
           </span>
+          <PomodoroMusicControl />
           <button
             onClick={paused ? pomo.resume : pomo.pause}
             title={paused ? "Resume" : "Pause"}
