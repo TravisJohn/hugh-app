@@ -1233,12 +1233,20 @@
   // ADMIN (embedded Hugh /admin)
   // ===========================================================================
   let adminUrl = 'http://localhost:3000/admin';
+  // The fallback is only a placeholder for a blank/blocked frame — hide it the
+  // moment the iframe successfully loads so it can't bleed through the embed.
+  (function wireAdminFallback() {
+    const frame = document.getElementById('adminFrame');
+    const fallback = document.getElementById('adminFallback');
+    frame.addEventListener('load', () => { if (frame.src) fallback.style.display = 'none'; });
+  })();
   function ensureAdminFrame() {
     const frame = document.getElementById('adminFrame');
     if (!frame.src) frame.src = adminUrl;
   }
   document.getElementById('adminReload').onclick = () => {
     const frame = document.getElementById('adminFrame');
+    document.getElementById('adminFallback').style.display = ''; // show until reload completes
     frame.src = adminUrl; // force reload
   };
 
