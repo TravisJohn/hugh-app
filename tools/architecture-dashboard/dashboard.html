@@ -371,8 +371,13 @@
 <script>
 (() => {
   'use strict';
-  const POLL_MS = 5000;
-  const DATA_URL = 'architecture-data.json';
+  // Hosted mode = embedded in the Next.js app at /admin/architecture (?hosted=1).
+  // Data + chat then come from admin-gated app routes; file/source features that
+  // need the local Node server are disabled.
+  const HOSTED = new URLSearchParams(location.search).has('hosted');
+  const POLL_MS = HOSTED ? 30000 : 5000; // hosted data is a per-deploy snapshot
+  const DATA_URL = HOSTED ? '/api/architecture/data' : 'architecture-data.json';
+  const ASSISTANT_URL = HOSTED ? '/api/architecture/chat' : '/api/assistant';
 
   let prev = null;          // last rendered dataset
   let view = 'grid';        // 'grid' | 'graph'
@@ -1092,6 +1097,13 @@
 
   async function showCode(path) {
     const panel = document.getElementById('codePanel');
+    if (HOSTED) {
+      // No /api/source on the deployed app (serverless can't read repo source).
+      panel.classList.remove('hidden');
+      panel.innerHTML = `<div class="cp-head"><span class="cp-path">${escapeHtml(path)}</span><span class="cp-meta">source view is available in the local tool — <code>npm run dashboard</code></span><button class="cp-close" title="close">×</button></div>`;
+      panel.querySelector('.cp-close').onclick = () => panel.classList.add('hidden');
+      return;
+    }
     const c = compByPath().get(path);
     const meta = c ? `LOC ${c.loc} · hotspot ${c.hotspotScore} · complexity ${c.complexity} (in ${c.fanIn}/out ${c.fanOut}) · churn ${c.churn}` : '';
     panel.classList.remove('hidden');
@@ -1331,7 +1343,7 @@
     document.getElementById('asstSend').disabled = true;
     const thinking = asstAdd(null, '<span class="dot"></span><span class="dot"></span><span class="dot"></span>', 'a-typing');
     try {
-      const res = await fetch('/api/assistant', {
+      const res = await fetch(ASSISTANT_URL, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: asst.messages }),
       });
@@ -1357,6 +1369,16 @@
 
   // bootstrap config (admin url + assistant status)
   async function loadConfig() {
+    if (HOSTED) {
+      // Gated app version: assistant is always available (server-side key),
+      // admin tab points at the app's own /admin.
+      adminUrl = '/admin';
+      asst.configured = true;
+      document.getElementById('adminUrlLabel').textContent = '/admin';
+      document.getElementById('adminOpen').href = '/admin';
+      document.getElementById('asstModel').textContent = 'claude-sonnet-4-6';
+      return;
+    }
     try {
       const cfg = await (await fetch('/api/config')).json();
       adminUrl = cfg.adminUrl || adminUrl;

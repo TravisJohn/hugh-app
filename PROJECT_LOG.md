@@ -1021,3 +1021,47 @@ Decided against an `/admin`-style **app route**: the dashboard is a local dev to
 the way `/admin` is — keeping it standalone preserves the original
 "touches no app code" design goal. Verified the launcher serves the page, data,
 and mascot (all 200) with the watcher live.
+
+### Phase 28 — Hosted, admin-gated architecture page in the app ✅
+
+Made the dashboard reachable as **`/admin/architecture`** inside the Hugh app
+(mobile-friendly, no `npm run serve`), behind the **existing admin login** — one
+place for admin + architecture. The standalone local tool is unchanged; this is
+its hosted, snapshot sibling.
+
+**Auth.** Extracted the admin check into `lib/auth/requireAdmin.ts` (DRY):
+`requireAdminPage()` (redirect → /login if signed out, → /home if not admin) and
+`requireAdminApi()` (returns 401/403 as `NextResponse`). Refactored
+`app/admin/page.tsx` onto it and added an "Architecture" header link.
+
+**Routes (all gated).**
+- `app/admin/architecture/page.tsx` — `requireAdminPage()`, then iframes the UI
+  in `?hosted=1` mode.
+- `app/api/architecture/data/route.ts` — `requireAdminApi()` → build-time scan JSON.
+- `app/api/architecture/chat/route.ts` — `requireAdminApi()` → **OpenAI SDK**
+  (`gpt-4o`, `OPENAI_API_KEY`) grounded ONLY in the scan snapshot (components,
+  hotspots, dependency counts, recent changes). No filesystem/git/source access →
+  can't leak source or secrets; key stays server-side. (Matches the local tool's
+  provider. Deploy note: add `OPENAI_API_KEY` to Vercel env — it isn't there yet.)
+
+**Build pipeline.** `tools/.../scripts/build-hosted.js` (from the app's
+`predev`/`prebuild`) scans → `lib/architecture/data.generated.json` (imported by
+the routes, bundled at build) and copies `dashboard.html` + `ghost.png` →
+`public/admin-architecture/` (single source of truth stays the tool's
+dashboard.html). `architecture-scan.js` gained `--out` / `runScan(outPath)`. Both
+generated paths git-ignored.
+
+**Hosted mode** (`?hosted=1` in dashboard.html): data ← `/api/architecture/data`,
+chat ← `/api/architecture/chat`, admin tab → `/admin`, source-code view disabled
+(no serverless FS), slower poll. Local mode unchanged.
+
+**Security verified at runtime** (next dev): unauthenticated
+`/api/architecture/data` and `/chat` → **401**, `/admin/architecture` →
+**307 → /login**, the generated JSON → **404** (not public); only the data-less UI
+shell is reachable. `tsc --noEmit` and ESLint clean. (Authenticated happy-path —
+an actual Claude reply — not runtime-tested; needs a logged-in admin session, but
+mirrors the production learn/chat route.)
+
+**Trade-off:** hosted data is a **per-deploy snapshot** (scan at build; Vercel has
+no live git/FS at request time). The local tool stays fully live; the code-viewer
+stays local-only by design.

@@ -41,6 +41,10 @@ yarn-error.log*
 /presentation-story/
 /HUGH_PRESENTATION.md
 
+# architecture dashboard — generated at build (predev/prebuild)
+/lib/architecture/data.generated.json
+/public/admin-architecture/
+
 # vercel
 .vercel
 

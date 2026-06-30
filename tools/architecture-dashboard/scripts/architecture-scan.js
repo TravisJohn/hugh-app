@@ -217,7 +217,7 @@ function makeNormalizer(values) {
 
 // --- Main scan ---------------------------------------------------------------
 
-function runScan() {
+function runScan(outPath = OUTPUT_FILE) {
   const absFiles = collectSourceFiles();
   const fileSet = new Set(absFiles);
 
@@ -286,16 +286,19 @@ function runScan() {
     recentChanges,
   };
 
-  fs.writeFileSync(OUTPUT_FILE, JSON.stringify(data, null, 2));
+  fs.mkdirSync(path.dirname(outPath), { recursive: true });
+  fs.writeFileSync(outPath, JSON.stringify(data, null, 2));
   return data;
 }
 
 module.exports = { runScan, OUTPUT_FILE, PROJECT_ROOT, SOURCE_ROOTS };
 
-// Run directly => one-shot scan with a short summary.
+// Run directly => one-shot scan with a short summary. Optional: --out <path>.
 if (require.main === module) {
   const start = Date.now();
-  const data = runScan();
+  const outArg = process.argv.indexOf('--out');
+  const outPath = outArg !== -1 ? path.resolve(process.argv[outArg + 1]) : OUTPUT_FILE;
+  const data = runScan(outPath);
   const top = data.components[0];
   console.log(
     `[scan] ${data.components.length} files, ${data.edges.length} edges in ${
@@ -303,5 +306,5 @@ if (require.main === module) {
     }ms`
   );
   if (top) console.log(`[scan] top hotspot: ${top.path} (score ${top.hotspotScore})`);
-  console.log(`[scan] wrote ${path.relative(process.cwd(), OUTPUT_FILE)}`);
+  console.log(`[scan] wrote ${path.relative(process.cwd(), outPath)}`);
 }

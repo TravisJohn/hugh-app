@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node tools/architecture-dashboard/scripts/build-hosted.js",
     "dev": "next dev",
+    "prebuild": "node tools/architecture-dashboard/scripts/build-hosted.js",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -22,6 +24,7 @@
     "elevenlabs": "^1.59.0",
     "lucide-react": "^1.18.0",
     "next": "16.2.9",
+    "openai": "^6.45.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-markdown": "^10.1.0",

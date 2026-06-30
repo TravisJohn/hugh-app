@@ -132,6 +132,17 @@ browsers block `fetch()` on `file://` pages.)
 > This is a **local dev tool** — it scans the filesystem and git at runtime, so
 > it runs on your machine, not as a deployed app route.
 
+### Hosted version (in the app)
+
+There's also an admin-gated, mobile-friendly copy at **`/admin/architecture`** in
+the Hugh app — handy when you're not on your dev machine. It shows the same
+Grid/Graph/Flow visuals plus the assistant, but as a **per-deploy snapshot** (the
+scan runs at build via the app's `predev`/`prebuild` → `scripts/build-hosted.js`).
+The assistant there is a gated server route (`/api/architecture/chat`, OpenAI
+`gpt-4o` via `OPENAI_API_KEY`); the click-to-view-source feature is local-only. Everything is behind your admin
+login — no keys or source are exposed. This local tool stays fully live and is the
+richer experience.
+
 ### Individual commands (if you prefer)
 
 ```bash

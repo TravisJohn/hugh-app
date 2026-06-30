@@ -1,7 +1,6 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Users, Zap, DollarSign, AlertTriangle, ExternalLink } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { requireAdminPage } from "@/lib/auth/requireAdmin";
 import { createServiceClient } from "@/lib/supabase/service";
 import { estimateCost, DEFAULT_MONTHLY_TOKEN_LIMIT } from "@/lib/usage";
 import AdminActions from "./AdminActions";
@@ -60,17 +59,7 @@ function fmt(n: number) {
 }
 
 export default async function AdminPage() {
-  // Verify admin
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const { data: selfProfile } = await supabase
-    .from("profiles")
-    .select("is_admin")
-    .eq("user_id", user.id)
-    .single();
-  if (!selfProfile?.is_admin) redirect("/home");
+  await requireAdminPage();
 
   // Fetch all data via service role
   const service    = createServiceClient();
@@ -145,6 +134,10 @@ export default async function AdminPage() {
           </Link>
           <span className="text-slate-700">|</span>
           <span className="font-serif text-lg font-semibold">Hugh Admin</span>
+          <span className="text-slate-700">|</span>
+          <Link href="/admin/architecture" className="text-sm text-slate-500 hover:text-slate-300 transition-colors">
+            Architecture
+          </Link>
         </div>
         <span className="text-xs text-slate-600">{new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" })}</span>
       </header>
