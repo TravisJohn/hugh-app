@@ -1,0 +1,15 @@
+{
+  "name": "hugh-architecture-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local architecture-health dashboard for Hugh. Static scan + live watch mode. Standalone — does not touch app code.",
+  "type": "commonjs",
+  "scripts": {
+    "scan": "node scripts/architecture-scan.js",
+    "watch": "node scripts/watch.js",
+    "serve": "node scripts/serve.js"
+  },
+  "dependencies": {
+    "chokidar": "^4.0.3"
+  }
+}

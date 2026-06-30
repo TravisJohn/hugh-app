@@ -837,3 +837,178 @@ bloat for the MVP; easy to migrate to Supabase Storage / a CDN later (only the
 generated URL list references them; the player is source-agnostic).
 
 tsc --noEmit clean; eslint clean (0/0); next build compiles (exit 0). No migration.
+
+### Phase 26 — Hugh Code: isolated Python playground (concept test) ✅
+
+A standalone "coding feels like play" experiment, deliberately decoupled from
+Track / Ask / Converse. An escalating ladder of Python micro-tasks under a
+per-rung timer, with Hugh ghost-typing the reference solution alongside as a
+pacer/teacher (not an opponent). Entirely client-side — no DB, no API routes, no
+Claude/ElevenLabs, no API keys.
+
+**Design (decided with Travis):**
+- **Hugh = ghost/pacer**, not a competitor — he types his solution alongside for
+  the learner to watch/learn from; copying is allowed (muscle memory). The real
+  adversary is the clock.
+- **Timer expiry = game over → restart the ladder from rung 1** (arcade stakes).
+- **Correctness = hidden Python assertions** run after the learner's code in the
+  same namespace (accepts any valid solution, not one phrasing).
+- **Editor = CodeMirror 6** (`@uiw/react-codemirror` + `@codemirror/lang-python`
+  + `@codemirror/theme-one-dark`).
+- On game over, Hugh's **full** solution is revealed as a learning moment.
+
+**Execution: Pyodide (WASM) in a Web Worker.**
+- `lib/code/pyodide.worker.ts` — loads Pyodide from the jsDelivr CDN
+  (`v0.26.4`, lazy, ~7 MB, only on this route so it never bloats the rest of the
+  app). Fresh namespace (`toPy({})`) per attempt so variables never leak between
+  rungs; captures stdout; returns `{passed, stdout, error}` (last traceback line).
+  Typed against `globalThis` (not the webworker lib) to avoid duplicate-global
+  conflicts with the project's `dom` lib setting.
+- `lib/code/pyodideClient.ts` — `PyodideRunner` class: main-thread wrapper,
+  correlates runs by id, and enforces a **6s hard exec timeout** — a runaway
+  `while True:` can't freeze the UI; the worker is terminated and respawned and
+  the run returns an "infinite loop" error. Browser-only guard.
+
+**Content:** `lib/code/tasks.ts` — 15-rung `CodeTask[]` ladder (declare → assign →
+sum → string → f-string → bool → if/else → list → index → loop-sum → function →
+branch-function → dict → comprehension → fizz). Each rung: `prompt`, `starterCode`,
+`hughSolution`, `assertions`, optional `timerSeconds` (10s default, widening to
+12–20s on harder rungs).
+
+**State machine** (`hooks/useCodeLadder.ts`):
+`LOADING_RUNTIME → READY → RACING → CHECKING → PASS → (auto-advance) | GAME_OVER → restart | WON`.
+Clock pauses during CHECKING (exec time isn't held against the run); 100ms
+deadline-based countdown; ref mirrors for stale-closure-proof interval/async submit
+(project convention). `hooks/useHughTyping.ts` drives the char-by-char ghost typing,
+active only while RACING, resets per rung.
+
+**Types:** `types/code.ts` — `CodeTask`, `LadderState`, `RunResult` (kept separate
+from `types/index.ts` to keep the experiment decoupled).
+
+**UI** (`components/code/`, all within `h-screen` no-scroll): `CodePlayground`
+(orchestrator), `CmEditor` (shared CodeMirror wrapper), `TaskPrompt`,
+`CountdownTimer` (SVG ring, reddens in the final third), `LadderProgress` (dots),
+`RunConsole`, `ResultOverlay` (game-over / won). `app/code/page.tsx` — no auth gate
+(self-contained concept test; gate later if it graduates). ⌘/Ctrl+Enter to run.
+
+**Verification:** `tsc --noEmit` clean. Playwright smoke test (dev :3001) drove the
+full loop end-to-end: Pyodide booted in the worker, Hugh ghost-typed `x = 5`, the
+learner's `x = 5` passed the hidden assertions and advanced rung 1 → 2, zero
+console/page errors. Screenshots confirm layout fits the viewport with no scroll.
+
+Deps added: `@uiw/react-codemirror`, `@codemirror/lang-python`,
+`@codemirror/theme-one-dark`. No migration.
+
+### Phase 27 — Architecture-health dashboard (dev tooling) ✅
+
+A local, standalone tool to visualize the structural health of the codebase.
+Lives entirely in `tools/architecture-dashboard/` and **never touches app code** —
+it only reads source files and git history. Not shipped to users; a maintenance
+aid for spotting refactor targets.
+
+**Phase 1 — static scan + report.** `scripts/architecture-scan.js` walks Hugh's
+real source roots (`app/ components/ hooks/ lib/ types/ utils/` — there is no
+`src/`, so the spec's "walk src/" was adapted) and builds an internal import
+dependency graph. Import resolution understands relative paths and the `@/*`
+alias from `tsconfig.json`; bare specifiers (node_modules) are treated as
+external and excluded from the graph. Per file it computes: `loc` (non-blank
+lines), `fanIn`/`fanOut`, `complexity = fanIn + fanOut`, `churn` (commits in the
+last 30 days, from `git log`), and `hotspotScore = normalize(churn) ×
+normalize(complexity)` scaled 0–100 — high only when a file is *both* heavily
+coupled *and* frequently changed. Writes `architecture-data.json`
+(`{components, edges, recentChanges, …}`). First run: 134 files, 263 edges; top
+hotspot `types/index.ts` (47).
+
+`dashboard.html` (plain HTML/CSS/JS, no build step) reads that JSON and renders a
+component grid (tiles **sized by LOC**, **colored green/amber/red by
+hotspotScore**, hover for full metrics), a sorted top-hotspots list, and a
+recent-changes feed from git.
+
+**Phase 2 — live mode.** `scripts/watch.js` (chokidar, the only external dep)
+re-runs the scan on any source save (debounced 300ms) and rewrites the JSON. The
+dashboard polls every 5s and **diffs old vs new** — only changed tiles update
+(and flash); the hotspots list and changes feed replace in place. No full reload.
+
+Also added `scripts/serve.js`, a zero-dependency static server (Node `http`),
+because browsers block `fetch()` on `file://` pages; includes an encoded-path-
+traversal guard. `npm run scan | watch | serve`.
+
+**Verification:** scan runs clean (134 files); server returns 200 for the
+dashboard and JSON, 403 on encoded traversal; watcher boots and does its initial
+scan. The 14 files with `lastModified: null` are the as-yet-uncommitted `code/`
+additions — correctly handled (no git history).
+
+**Phase 27.1 — more views.** Added a **Grid / Graph view switcher** (no scan or
+dependency change — all client-side rendering off the same `architecture-data.json`):
+- Grid gained a **size-by toggle**: *Code size (LOC)* (area ∝ lines) vs *Usage
+  (fan-in)* (area ∝ how many files import it). Clarifies that the original grid
+  sized by code size, not usage.
+- New **Graph (DAG) view**: an interactive force-directed dependency graph
+  (nodes = files sized by LOC / colored by hotspot / bordered by source root;
+  directed arrows = imports). Hover traces deps — outgoing edges blue, incoming
+  orange, rest dim; drag-to-pin, click-to-unpin, drag-bg pan, scroll zoom,
+  per-source-root filters, and a Re-layout button. Hand-written canvas force
+  sim — no graph library, chokidar remains the only dependency.
+- Verified headless (Playwright): both views render, sizing toggle resizes 134
+  tiles, graph paints nodes+edges on an 852×528 canvas, 6 root filters,
+  hover/reheat/filter all exercised, zero console errors. Screenshots confirm
+  layout.
+
+**Phase 27.2 — Flow (Lifecycle) view + teaching angle.** Added a third tab: a
+UML-style **sequence diagram of the "fire off Hugh" loop** (the interview cycle)
+across six actors — Browser → Page/UI → Hook → API route → Claude/ElevenLabs →
+Supabase. 12 curated steps (faithful to the real code: `useInterview` →
+`fetch('/api/interview/*')` → auth → `anthropic.messages.create` →
+Supabase persist → back), each with the real file path and a **transferable
+takeaway** (trust boundary, single source of truth, right-size the model,
+explicit state machine, unidirectional data flow, …) — the view doubles as a
+learning tool for applying Hugh's patterns in software-dev roles. Prev/Next,
+click-a-step, and an animated **Play sequence**. Stat chips (pages / API routes /
+hooks / components / lib modules) counted live from the scan. SVG sequence
+diagram is generated in-page; runtime order is curated (a static import graph
+can't infer temporal order) but file refs + stats are live from
+`architecture-data.json`. No scan/dependency change. Verified headless
+(Playwright): 12 steps render, click/Next/Play all work, lane labels fit, zero
+console errors.
+
+**Phase 27.3 — Admin console + assistant + Grid/Graph interactions.** The
+dashboard grew from a static report into a small local admin app (still one
+external dep, chokidar; the server + assistant use Node built-ins + global fetch).
+
+- **`serve.js` is now a server** with `/api/config`, `/api/source` (read-only repo
+  source, traversal-guarded), and `/api/assistant`. New **`assistant.js`** runs an
+  **OpenAI** function-calling loop (model via `OPENAI_MODEL`, default gpt-4o; key
+  `OPENAI_API_KEY` in `.env.local`, server-side only). Tools: read_file,
+  list_files, git_log, architecture_summary, npm_latest, web_fetch — so the
+  floating **💬 admin assistant** answers from the real repo, recent git, and live
+  library release notes (the requested "recent developments"). Chosen provider is
+  OpenAI per request, even though the app uses Anthropic.
+- **Admin tab** embeds the real Hugh `/admin` via iframe (`HUGH_ADMIN_URL`,
+  default localhost:3000/admin) — one place for architecture + ops. Open-in-tab +
+  reload + fallback note included.
+- **Grid single-click** → source code panel below the grid (via /api/source).
+  **Grid double-click** → dependency map: importers → file → imports, left→right,
+  on a continuous green→yellow→red complexity scale; hub files cap each column at
+  12 with a "+N more" placeholder (verified on lib/supabase/server.ts, 47
+  importers → readable). **Graph single-click** → sticky pinned highlight (fixes
+  highlight vanishing on mouse-off). **Graph double-click** → focus mode (node +
+  neighbours only).
+- `.env.example` documents the three dev-only dashboard vars. Verified headless
+  (Playwright): all interactions work, traversal blocked (403), assistant returns
+  a graceful setup message with no key, zero console errors. Bookmarked
+  AI-assistant idea is now shipped (admin-focused). Later verified **live**
+  against a real OPENAI_API_KEY (gpt-4o): the assistant read
+  app/api/interview/generate-question/route.ts and answered accurately. Added
+  App-Router path guidance to the system prompt + near-match suggestions in
+  read_file so the model recovers from a wrong-path guess instead of giving up.
+
+**Phase 27.4 — assistant UX polish (Hugh ghost).** The floating chat is now
+**draggable by its header** (clamped to the viewport) and the 💬 FAB follows the
+panel as one unit. Rebranded around the **Hugh ghost mascot** (`public/ghost.png`):
+ghost FAB with bob + cyan glow animation, ghost avatar in the header, a faded
+ghost watermark in the empty chat, animated typing dots, and a cyan
+(ghost-colored) accent for the FAB/user bubbles/send button to tie it to the
+theme. `serve.js` gained a guarded read-only `/public/` route to serve the
+mascot (image MIME types added). Verified headless: image serves (200), path
+traversal blocked, drag + FAB-follow work, typing indicator + watermark toggle
+on send, live query rendered correctly. Cyan added to the palette as `--ghost`.
