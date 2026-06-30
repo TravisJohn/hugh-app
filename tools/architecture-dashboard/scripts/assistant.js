@@ -71,6 +71,22 @@ function safeResolve(rel) {
   return abs;
 }
 
+/**
+ * Block files that may hold secrets/credentials so the assistant can never read
+ * them into the model context (and out to OpenAI / a prompt-injection). The
+ * .env files hold the OpenAI, Supabase service-role, Anthropic and ElevenLabs
+ * keys — full system access — so this matters even for a local tool.
+ */
+function isSensitive(rel) {
+  const p = rel.replace(/\\/g, '/').toLowerCase();
+  const base = p.split('/').pop();
+  if (base.startsWith('.env')) return true;
+  if (/\.(pem|key|p12|pfx|crt|cer)$/.test(base)) return true;
+  if (['.npmrc', '.netrc', 'id_rsa', 'id_ed25519', 'credentials', '.pgpass'].includes(base)) return true;
+  if (p.split('/').includes('.git')) return true;
+  return false;
+}
+
 function git(args) {
   try {
     return execFileSync('git', args, { cwd: PROJECT_ROOT, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
@@ -113,6 +129,7 @@ function suggestPaths(rel) {
 
 const TOOLS_IMPL = {
   read_file({ path: rel }) {
+    if (isSensitive(rel)) return `Refused: "${rel}" may contain secrets/credentials and is blocked from the assistant.`;
     const abs = safeResolve(rel);
     if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) {
       const hints = suggestPaths(rel);

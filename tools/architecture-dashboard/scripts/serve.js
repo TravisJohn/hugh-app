@@ -57,10 +57,18 @@ function readBody(req) {
 }
 
 // --- GET /api/source?path=repo/relative/file -------------------------------
+function isSensitive(rel) {
+  const base = rel.replace(/\\/g, '/').toLowerCase().split('/').pop();
+  return base.startsWith('.env') || /\.(pem|key|p12|pfx|crt|cer)$/.test(base) ||
+    ['.npmrc', '.netrc', 'id_rsa', 'id_ed25519', 'credentials', '.pgpass'].includes(base) ||
+    rel.replace(/\\/g, '/').toLowerCase().split('/').includes('.git');
+}
+
 function serveSource(res, query) {
   const rel = query.get('path') || '';
   const abs = path.resolve(PROJECT_ROOT, rel);
   if (!abs.startsWith(PROJECT_ROOT)) return sendJson(res, 403, { error: 'forbidden' });
+  if (isSensitive(rel)) return sendJson(res, 403, { error: 'blocked (possible secrets)' });
   if (!SOURCE_EXTS.has(path.extname(abs))) return sendJson(res, 400, { error: 'unsupported file type' });
   fs.readFile(abs, 'utf8', (err, body) => {
     if (err) return sendJson(res, 404, { error: 'not found' });
