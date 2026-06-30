@@ -5,6 +5,7 @@
   "description": "Local architecture-health dashboard for Hugh. Static scan + live watch mode. Standalone — does not touch app code.",
   "type": "commonjs",
   "scripts": {
+    "dashboard": "node scripts/dashboard.js",
     "scan": "node scripts/architecture-scan.js",
     "watch": "node scripts/watch.js",
     "serve": "node scripts/serve.js"

@@ -118,21 +118,26 @@ cd tools/architecture-dashboard
 npm install            # installs chokidar (the only external dependency)
 ```
 
-## Phase 1 — static scan + report
+## Run it (one command)
 
 ```bash
-npm run scan           # writes architecture-data.json
-npm run serve          # serves the dashboard at http://localhost:4317
+npm run dashboard      # scan + live watch + server, then opens your browser
 ```
 
-Open <http://localhost:4317>. (A static server is required because browsers block
-`fetch()` on `file://` pages.)
+That's the everyday entry point — it scans once so data is ready, starts the
+live watcher (re-scans on every save) and the server, and opens
+<http://localhost:4317>. Ctrl+C stops everything. (A server is required because
+browsers block `fetch()` on `file://` pages.)
 
-## Phase 2 — live mode
+> This is a **local dev tool** — it scans the filesystem and git at runtime, so
+> it runs on your machine, not as a deployed app route.
+
+### Individual commands (if you prefer)
 
 ```bash
-npm run watch          # re-scans on every source save (debounced)
-npm run serve          # in a second terminal
+npm run scan           # one-off scan -> architecture-data.json
+npm run serve          # just the server (http://localhost:4317)
+npm run watch          # just the watcher (re-scans on save)
 ```
 
 The dashboard polls `architecture-data.json` every 5 seconds and re-renders only
@@ -142,11 +147,13 @@ recent-changes feed update in place without a full reload.
 ## Files
 
 ```
+scripts/dashboard.js           # one-command launcher (scan + watch + serve + open)
 scripts/architecture-scan.js   # the scanner (also exports runScan())
 scripts/watch.js               # chokidar watcher -> re-runs the scan
 scripts/serve.js               # local server: static files + /api/{config,source,assistant}
 scripts/assistant.js           # OpenAI tool-calling brain for the admin assistant
 dashboard.html                 # the UI (plain HTML/CSS/JS, no build step)
+ghost.png                      # Hugh mascot (used by the assistant UI)
 architecture-data.json         # generated output (git-ignored)
 ```
 

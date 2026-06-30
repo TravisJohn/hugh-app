@@ -1012,3 +1012,12 @@ theme. `serve.js` gained a guarded read-only `/public/` route to serve the
 mascot (image MIME types added). Verified headless: image serves (200), path
 traversal blocked, drag + FAB-follow work, typing indicator + watermark toggle
 on send, live query rendered correctly. Cyan added to the palette as `--ghost`.
+
+**Phase 27.5 — one-command launch.** Added `npm run dashboard`
+(`scripts/dashboard.js`): initial scan → live chokidar watcher → server → opens
+the browser, all in one process (Ctrl+C stops it). It's the everyday entry point.
+Decided against an `/admin`-style **app route**: the dashboard is a local dev tool
+(reads the filesystem + git at runtime), so it can't be a deployed Vercel route
+the way `/admin` is — keeping it standalone preserves the original
+"touches no app code" design goal. Verified the launcher serves the page, data,
+and mascot (all 200) with the watcher live.
