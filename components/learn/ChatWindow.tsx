@@ -1,12 +1,16 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Loader2, Sparkles } from "lucide-react";
+import { Send, Loader2, Sparkles, Code2 } from "lucide-react";
 import ChatBubble from "./ChatBubble";
 import OffTrackNotice from "./OffTrackNotice";
 import SummaryPanel, { type SummaryData } from "./SummaryPanel";
 import PomodoroControl from "./PomodoroControl";
 import { usePomodoroContext } from "./PomodoroProvider";
+import CodeComposer from "@/components/askcode/CodeComposer";
+import { isCodeModeRequest } from "@/lib/askcode/detect";
+import { fenceCode, mergeCodeExample } from "@/lib/askcode/format";
+import type { ChatResponse } from "@/types/askcode";
 
 interface Message {
   role:    "user" | "assistant";
@@ -31,6 +35,15 @@ export default function ChatWindow({ topic, goalId, milestoneId, onTranscriptCha
   const [draft, setDraft]           = useState("");
   const [loading, setLoading]       = useState(false);
   const [isOffTrack, setIsOffTrack] = useState(false);
+
+  // ── Code mode ──────────────────────────────────────────────────────
+  // `offer` holds the language of Hugh's latest snippet while it's waiting to be
+  // mirrored (drives the "Mirror this snippet" button — offer-first, never an
+  // automatic flip). `codeMode` swaps the composer for the CodeMirror editor.
+  const [offer, setOffer]         = useState<string | null>(null);
+  const [codeMode, setCodeMode]   = useState(false);
+  const [codeLang, setCodeLang]   = useState("python");
+  const [codeDraft, setCodeDraft] = useState("");
 
   // Goal offer: surfaces after the user's 3rd reply
   const [goalOfferShown,     setGoalOfferShown]     = useState(false);
@@ -74,14 +87,14 @@ export default function ChatWindow({ topic, goalId, milestoneId, onTranscriptCha
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }, [draft]);
 
-  async function send() {
-    const text = draft.trim();
-    if (!text || loading) return;
+  // Shared send path for both plain-text turns and mirrored-code turns. The code
+  // turn is just an ordinary user message whose content happens to be a fenced
+  // block — it lives in the thread like any other turn, nothing special persists.
+  async function postMessage(userContent: string, codeModeRequested: boolean) {
+    if (loading) return;
 
-    const userMessage: Message = { role: "user", content: text };
-    const history = [...messages, userMessage];
+    const history = [...messages, { role: "user" as const, content: userContent }];
     setMessages(history);
-    setDraft("");
     setLoading(true);
 
     try {
@@ -92,16 +105,24 @@ export default function ChatWindow({ topic, goalId, milestoneId, onTranscriptCha
       const res  = await fetch("/api/learn/chat", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ topic, messages: apiMessages, focusMode: pomo.focusActive }),
+        body:    JSON.stringify({ topic, messages: apiMessages, focusMode: pomo.focusActive, codeModeRequested }),
       });
-      const data = await res.json() as { reply?: string; isOffTopic?: boolean; error?: string };
+      const data = await res.json() as Partial<ChatResponse> & { error?: string };
 
-      const updated = [...history, {
-        role:    "assistant" as const,
-        content: data.reply ?? "Sorry, something went wrong. Please try again.",
-      }];
+      // Fold any code example into the stored message so it renders (via the
+      // bubble's markdown) and stays in history for Hugh to compare against.
+      const replyText = mergeCodeExample(
+        data.reply ?? "Sorry, something went wrong. Please try again.",
+        data.codeExample ?? null,
+      );
+      const updated = [...history, { role: "assistant" as const, content: replyText }];
       setMessages(updated);
       setIsOffTrack(data.isOffTopic ?? false);
+
+      // Snippet attached → offer the mirror step (offer-first, not auto-switch).
+      if (data.codeExample) {
+        setOffer(data.codeExample.language || "python");
+      }
 
       // Surface goal offer after the 3rd user message
       const userCount = updated.filter(m => m.role === "user").length;
@@ -115,8 +136,30 @@ export default function ChatWindow({ topic, goalId, milestoneId, onTranscriptCha
       }]);
     } finally {
       setLoading(false);
-      textareaRef.current?.focus();
     }
+  }
+
+  function sendText() {
+    const text = draft.trim();
+    if (!text || loading) return;
+    setDraft("");
+    // The keyword only gates the request; Hugh decides if code actually helps.
+    void postMessage(text, isCodeModeRequest(text)).then(() => textareaRef.current?.focus());
+  }
+
+  function sendCode() {
+    const code = codeDraft.trim();
+    if (!code || loading) return;
+    const content = fenceCode(codeLang, code);
+    setCodeMode(false);
+    setCodeDraft("");
+    setOffer(null);
+    void postMessage(content, false);
+  }
+
+  function enterCodeMode() {
+    setCodeLang(offer ?? "python");
+    setCodeMode(true);
   }
 
   async function handleSummarise() {
@@ -148,7 +191,7 @@ export default function ChatWindow({ topic, goalId, milestoneId, onTranscriptCha
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      send();
+      sendText();
     }
   }
 
@@ -236,30 +279,54 @@ export default function ChatWindow({ topic, goalId, milestoneId, onTranscriptCha
           <div ref={bottomRef} />
         </div>
 
-        {/* Input bar */}
-        <div className="shrink-0 border-t border-slate-800 px-4 py-4">
-          <div className="flex items-end gap-3 rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 focus-within:border-violet-500 transition-colors">
-            <textarea
-              ref={textareaRef}
-              value={draft}
-              onChange={e => setDraft(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask me anything…"
-              rows={1}
-              className="flex-1 resize-none bg-transparent text-sm text-slate-100 placeholder-slate-600 focus:outline-none"
-            />
-            <button
-              onClick={send}
-              disabled={!draft.trim() || loading}
-              className="shrink-0 flex h-8 w-8 items-center justify-center rounded-lg bg-violet-600 text-white hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              <Send size={14} />
-            </button>
+        {/* Composer — CodeMirror editor in code mode, otherwise the text input */}
+        {codeMode ? (
+          <CodeComposer
+            language={codeLang}
+            value={codeDraft}
+            disabled={loading}
+            onChange={setCodeDraft}
+            onSend={sendCode}
+            onExit={() => setCodeMode(false)}
+          />
+        ) : (
+          <div className="shrink-0 border-t border-slate-800 px-4 py-4">
+
+            {/* Mirror-this offer — appears after Hugh shares a snippet (offer-first) */}
+            {offer && (
+              <button
+                type="button"
+                onClick={enterCodeMode}
+                className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl border border-violet-500/40 bg-violet-500/10 px-4 py-2.5 text-xs font-semibold text-violet-300 hover:bg-violet-500/15 transition-colors"
+              >
+                <Code2 size={14} />
+                Mirror this snippet — retype it with your own comments
+              </button>
+            )}
+
+            <div className="flex items-end gap-3 rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 focus-within:border-violet-500 transition-colors">
+              <textarea
+                ref={textareaRef}
+                value={draft}
+                onChange={e => setDraft(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Ask me anything… (type “code mode” to practise code)"
+                rows={1}
+                className="flex-1 resize-none bg-transparent text-sm text-slate-100 placeholder-slate-600 focus:outline-none"
+              />
+              <button
+                onClick={sendText}
+                disabled={!draft.trim() || loading}
+                className="shrink-0 flex h-8 w-8 items-center justify-center rounded-lg bg-violet-600 text-white hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <Send size={14} />
+              </button>
+            </div>
+            <p className="mt-1.5 text-center text-xs text-slate-700">
+              Enter to send · Shift+Enter for new line
+            </p>
           </div>
-          <p className="mt-1.5 text-center text-xs text-slate-700">
-            Enter to send · Shift+Enter for new line
-          </p>
-        </div>
+        )}
       </div>
 
       {/* ── Summary side panel ──────────────────────────────────────── */}

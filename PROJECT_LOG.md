@@ -1065,3 +1065,97 @@ mirrors the production learn/chat route.)
 **Trade-off:** hosted data is a **per-deploy snapshot** (scan at build; Vercel has
 no live git/FS at request time). The local tool stays fully live; the code-viewer
 stays local-only by design.
+
+## Phase 22 — Code Mode (Ask page composer mode) — BUILT (unit-tested; browser run-through pending)
+
+**What.** A "mirror coding" practice loop inside the Ask page. Hugh presents a
+small reference snippet focused on the current card's core idea; the learner
+retypes it *with their own line-by-line comments* and sends it as a normal chat
+message. Hugh's next reply validates their understanding.
+
+**Distinct from the existing `code/` feature** (the Python-only Pyodide "ladder"
+playground). To avoid collision this lives under a new `askcode/` namespace.
+
+**Key design decisions (agreed before build):**
+- **Composer mode, not a panel.** Code mode swaps the chat input from a textarea
+  to a lightweight CodeMirror editor (tab support, per-language highlighting,
+  non-blocking — no linting). On send, the code is wrapped in a fenced block and
+  posted as an ordinary user message — it becomes part of the thread, nothing to
+  persist or discard.
+- **Hugh decides worthiness, not the keyword.** Typing "code mode" only *gates*
+  the request (`codeModeRequested` flag on `/api/learn/chat`). The existing chat
+  model call decides whether the topic is code-worthy: if yes → returns a snippet
+  + mirror action point; if not → conversational decline, **never fabricates** an
+  irrelevant snippet. No separate code-example route, no separate instant check.
+- **Hugh can also surface snippets proactively** in any ordinary turn.
+- **Single brain.** `/api/learn/chat` response gains
+  `codeExample: null | { language, code }`. ChatWindow merges `code` into the
+  assistant message as a fenced block (renders via the existing CodeBlock + stays
+  in history so Hugh can compare the learner's mirror), and uses `language` to
+  offer code mode.
+- **Offer-first flip.** When a reply carries a snippet, a "Mirror this snippet"
+  button appears; clicking it switches the composer to the editor (not auto).
+- **Multi-language.** Hugh picks (Python, SQL, …). Adds `@codemirror/lang-sql`;
+  unsupported languages fall back to a plain (no-highlight) editor.
+- **Tests.** Introduced Vitest (repo previously had none), scoped to the pure
+  helpers (`detect`/`format`/`language`).
+- **Caching untouched** — `codeModeRequested` is a request boolean; `codeExample`
+  is response-only; the cached system-prompt prefix is unchanged. Still Sonnet.
+
+**Build order:** types → pure helpers (+tests) → prompt rules + route → CodeComposer
+→ wire ChatWindow + ChatBubble → run-through.
+
+**Files delivered.**
+- NEW `types/askcode.ts` — `CodeExample`, `ChatResponse`, `SUPPORTED_LANGUAGES`.
+- NEW `lib/askcode/detect.ts` — `isCodeModeRequest` (keyword gate) `+ detect.test.ts`.
+- NEW `lib/askcode/format.ts` — `fenceCode` / `mergeCodeExample` / `hasFencedCode`
+  `+ format.test.ts`.
+- NEW `lib/askcode/language.ts` — `languageExtension` / `isHighlighted`
+  (python, sql; plain fallback) `+ language.test.ts`.
+- NEW `components/askcode/CodeComposer.tsx` — CodeMirror composer (Tab indent,
+  ⌘/Ctrl+Enter send via wrapper handler, Exit, bounded 13rem height).
+- EDIT `lib/claude/prompts.ts` — code-mode rules + `codeExample` in the JSON schema.
+- EDIT `app/api/learn/chat/route.ts` — accepts `codeModeRequested` (appended to the
+  final user turn only, keeping the cache prefix stable), parses + returns a
+  validated `codeExample` (ignores empty/partial objects).
+- EDIT `components/learn/ChatWindow.tsx` — `postMessage` shared path, code-mode
+  state, offer button, `sendText`/`sendCode`.
+- EDIT `components/learn/ChatBubble.tsx` — user turn renders as markdown when it
+  contains a fenced block.
+- EDIT `package.json` — `test`/`test:watch` scripts; deps `vitest`,
+  `@codemirror/lang-sql`.
+
+**Verification.** `tsc --noEmit` clean; ESLint clean on all touched files; 18/18
+Vitest unit tests pass. NOT yet run in the browser — the live Hugh round-trip
+(keyword → snippet, non-code decline, proactive snippet, mirror send) needs a
+logged-in session against the Anthropic API.
+
+### Phase 22.1 — refinements after first browser test
+- **Bug: raw JSON leaked into the chat.** When a reply contained unescaped inner
+  quotes/newlines, `JSON.parse` threw and the route fell back to dumping the whole
+  `{"reply": ...}` object as the message. Added `lib/askcode/parse.ts`
+  (`parseChatResponse`) — strict parse first, then a salvage path that recovers
+  `reply` / `isOffTopic` / `codeExample` by field, tolerating stray quotes, so raw
+  JSON can never reach the learner. Pinned with the actual failing payload in
+  `parse.test.ts` (+9 tests → 27 total). Route now uses it instead of
+  `parseClaudeJson`; prompt also reminds Hugh to escape `\"` and `\n`.
+- **Resizable editor.** CodeComposer's editor is now `resize-y` (default 13rem,
+  min 6rem, max 60vh) so the learner can drag it taller for longer snippets;
+  footer hint updated.
+- **Considered + declined: in-editor "Run" (Pyodide).** Reusing `PyodideRunner`
+  to run Python and show output before submit was assessed as easy (Python-only,
+  no API cost, no new deps) but **deliberately not built** — Code Mode stays
+  write-only as originally scoped. Don't re-propose without a new ask.
+
+### Phase 22.2 — regression fix: "I couldn't generate a response" on valid Qs
+The tolerant parser (22.1) dropped the old plain-text fallback. When the model
+answered with **prose instead of JSON** (it sometimes does), `parseChatResponse`
+found no `"reply"` field and returned `""` → the route showed its generic
+"I couldn't generate a response" message for every such turn. Fix in
+`lib/askcode/parse.ts`: (1) the strict path now only accepts a real
+`{reply: string, ...}` object (a bare JSON string/array falls through);
+(2) after salvage, if there's **no `"reply":` field at all**, echo the cleaned
+text as the reply — restoring the long-standing prose fallback — while still
+refusing to echo a malformed-but-JSON object (no brace re-leak). Added 3 tests
+(prose fallback, fence-stripped prose, no-brace-leak) → 29 total. Route also logs
+`stop_reason` + raw head if a reply is ever still empty.

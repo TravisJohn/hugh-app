@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
 import { Copy, Check } from "lucide-react";
+import { hasFencedCode } from "@/lib/askcode/format";
 
 interface Props {
   role:    "user" | "assistant";
@@ -91,6 +92,11 @@ const markdownComponents: Components = {
 export default function ChatBubble({ role, content }: Props) {
   const isUser = role === "user";
 
+  // User turns are plain text by default, but a mirrored-code turn arrives as a
+  // fenced block — render those through markdown so the snippet shows styled
+  // (and indentation/comments read cleanly) instead of as literal back-ticks.
+  const userAsMarkdown = isUser && hasFencedCode(content);
+
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       {!isUser && (
@@ -101,11 +107,11 @@ export default function ChatBubble({ role, content }: Props) {
       <div
         className={`min-w-0 break-words rounded-2xl px-4 py-3 text-sm leading-relaxed
           ${isUser
-            ? "max-w-[78%] rounded-tr-sm bg-sky-600 text-white whitespace-pre-wrap"
+            ? `rounded-tr-sm bg-sky-600 text-white ${userAsMarkdown ? "max-w-[92%]" : "max-w-[78%] whitespace-pre-wrap"}`
             : "w-full max-w-[92%] rounded-tl-sm bg-slate-800 text-slate-200 border border-slate-700"
           }`}
       >
-        {isUser ? (
+        {isUser && !userAsMarkdown ? (
           content
         ) : (
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>

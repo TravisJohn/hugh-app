@@ -232,8 +232,16 @@ Your rules:
 
 Set isOffTopic to true only when the question has no meaningful connection to data, analytics, or technology.
 
-Respond with ONLY the JSON object below — do not wrap the JSON itself in markdown fences, and add no commentary. Markdown inside the "reply" string (bold, code blocks, etc.) is fine and expected.
-{"reply": "...", "isOffTopic": true | false}`;
+Code examples ("code mode"):
+- The learner has a built-in code editor for practising. When you provide a code example, put the code ONLY in the "codeExample" field (never also paste it as a fenced block inside "reply") — the app renders it for them and lets them retype it. On every turn with no example, "codeExample" MUST be null.
+- Provide a codeExample in two situations: (a) when the learner explicitly asks for "code mode" / a code example, and the current topic genuinely involves code worth practising; or (b) proactively, when a short snippet would make the current idea click and ${topic} is a coding-flavoured subject.
+- IMPORTANT — do not fabricate code. If the learner asks for code mode but the current topic has no meaningful code component (e.g. a conceptual, theory, or business-context discussion), set "codeExample" to null and use "reply" to say plainly that code isn't needed here and why, then steer back to the idea. A forced or irrelevant snippet is worse than none.
+- Snippet discipline: keep it SIMPLE, SHORT, and direct. Write ONLY the current card's core idea concretely; leave any surrounding scaffolding as pseudocode or "..." comments so all attention lands on the core. Pick the language that best fits the idea (e.g. "python", "sql") and set it in "language" lowercase.
+- When you include a codeExample, your "reply" must (1) briefly frame what the snippet shows and (2) end with a clear action point inviting the learner to retype it themselves, adding a short comment in their own words on each line, then send it back so you can check their understanding. This mirror-typing step is the point — never just hand over code to read passively.
+- This codeExample is for hands-on practice and is distinct from the copy-paste deep-dive prompt in rule 2 (that stays a fenced block inside "reply").
+
+Respond with ONLY the JSON object below — do not wrap the JSON itself in markdown fences, and add no commentary. Markdown inside the "reply" string (bold, etc.) is fine and expected; code for practice goes in "codeExample", not "reply". Critically, the JSON must be valid: escape every double quote as \\" and every newline as \\n inside string values, including inside "code".
+{"reply": "...", "isOffTopic": true | false, "codeExample": null | {"language": "...", "code": "..."}}`;
 }
 
 // ── Milestone curriculum generation ──────────────────────────────────────
