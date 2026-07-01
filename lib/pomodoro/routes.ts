@@ -1,9 +1,11 @@
 // Shared route rules for the Pomodoro widget + focus music.
 
-// Routes where the timer (and music) disappear entirely: focused assessments and
-// the coming-soon Converse. The Converse route doesn't exist yet — future-proofed.
+// Routes where the timer (and music) disappear entirely: focused assessments, the
+// admin/tools area (not a study context), and the coming-soon Converse. The
+// Converse route doesn't exist yet — future-proofed.
 export function isSilentRoute(path: string): boolean {
-  return /^\/review\//.test(path)
+  return /^\/admin(\/|$)/.test(path)
+    || /^\/review\//.test(path)
     || /^\/mastery\//.test(path)
     || /^\/converse(\/|$)/.test(path);
 }
