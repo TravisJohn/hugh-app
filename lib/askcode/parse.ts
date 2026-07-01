@@ -53,6 +53,7 @@ export function parseChatResponse(raw: string): ChatResponse {
         reply:       o.reply,
         isOffTopic:  o.isOffTopic === true,
         codeExample: toCodeExample(o.codeExample),
+        covered:     o.covered === true,
       };
     }
     // Parsed, but not the {reply,...} object we expect — fall through.
@@ -75,6 +76,9 @@ export function parseChatResponse(raw: string): ChatResponse {
   const off = cleaned.match(/"isOffTopic"\s*:\s*(true|false)/);
   const isOffTopic = off ? off[1] === "true" : false;
 
+  const cov = cleaned.match(/"covered"\s*:\s*(true|false)/);
+  const covered = cov ? cov[1] === "true" : false;
+
   let codeExample: CodeExample | null = null;
   if (!/"codeExample"\s*:\s*null/.test(cleaned)) {
     const codeM = cleaned.match(/"code"\s*:\s*"([\s\S]*?)"\s*\}/);
@@ -94,5 +98,5 @@ export function parseChatResponse(raw: string): ChatResponse {
     reply = cleaned.trim();
   }
 
-  return { reply, isOffTopic, codeExample };
+  return { reply, isOffTopic, codeExample, covered };
 }

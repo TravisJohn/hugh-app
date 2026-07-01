@@ -4,12 +4,22 @@ import { parseChatResponse } from "./parse";
 describe("parseChatResponse — strict path", () => {
   it("parses well-formed JSON", () => {
     const raw = JSON.stringify({ reply: "Hello", isOffTopic: false, codeExample: null });
-    expect(parseChatResponse(raw)).toEqual({ reply: "Hello", isOffTopic: false, codeExample: null });
+    expect(parseChatResponse(raw)).toEqual({ reply: "Hello", isOffTopic: false, codeExample: null, covered: false });
   });
 
   it("strips markdown fences around the JSON", () => {
     const raw = "```json\n" + JSON.stringify({ reply: "Hi", isOffTopic: true, codeExample: null }) + "\n```";
-    expect(parseChatResponse(raw)).toEqual({ reply: "Hi", isOffTopic: true, codeExample: null });
+    expect(parseChatResponse(raw)).toEqual({ reply: "Hi", isOffTopic: true, codeExample: null, covered: false });
+  });
+
+  it("reads the covered flag when Hugh sets it", () => {
+    const raw = JSON.stringify({ reply: "Nice work", isOffTopic: false, codeExample: null, covered: true });
+    expect(parseChatResponse(raw).covered).toBe(true);
+  });
+
+  it("defaults covered to false when absent", () => {
+    const raw = JSON.stringify({ reply: "Hi", isOffTopic: false, codeExample: null });
+    expect(parseChatResponse(raw).covered).toBe(false);
   });
 
   it("keeps a well-formed code example", () => {
@@ -50,6 +60,11 @@ describe("parseChatResponse — salvage path (the leak bug)", () => {
     const out = parseChatResponse(broken);
     expect(out.isOffTopic).toBe(false);
     expect(out.codeExample).toBeNull();
+  });
+
+  it("recovers covered=true from a reply with unescaped quotes", () => {
+    const raw = '{"reply": "You nailed the "join" concept.", "isOffTopic": false, "codeExample": null, "covered": true}';
+    expect(parseChatResponse(raw).covered).toBe(true);
   });
 
   it("salvages a code example whose code has unescaped quotes", () => {

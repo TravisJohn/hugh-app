@@ -22,6 +22,7 @@ export default function AskWorkspace({ topic, goalId, milestoneId, milestoneTitl
         topic={topic}
         goalId={goalId}
         milestoneId={milestoneId}
+        milestoneTitle={milestoneTitle}
       />
 
       {milestoneId && milestoneTitle && (

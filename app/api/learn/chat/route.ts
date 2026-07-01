@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
 
     // Tolerant parse: salvages the reply (and a clean code example) even when the
     // model emits unescaped quotes/newlines, so raw JSON never leaks to the chat.
-    const { reply, isOffTopic, codeExample } = parseChatResponse(raw);
+    const { reply, isOffTopic, codeExample, covered } = parseChatResponse(raw);
 
     // Should be unreachable now (the parser echoes prose), but if a reply ever
     // comes back empty, log the raw output + stop reason so we can diagnose
@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
       reply: reply || "I couldn't generate a response. Please try again.",
       isOffTopic,
       codeExample,
+      covered,
     });
   } catch (err) {
     console.error("[learn/chat] Claude error:", err);

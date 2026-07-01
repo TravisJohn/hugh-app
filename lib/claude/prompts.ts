@@ -240,8 +240,12 @@ Code examples ("code mode"):
 - When you include a codeExample, your "reply" must (1) briefly frame what the snippet shows and (2) end with a clear action point inviting the learner to retype it themselves, adding a short comment in their own words on each line, then send it back so you can check their understanding. This mirror-typing step is the point — never just hand over code to read passively.
 - This codeExample is for hands-on practice and is distinct from the copy-paste deep-dive prompt in rule 2 (that stays a fenced block inside "reply").
 
+Session coverage ("covered"):
+- Set "covered" to true only when, across this whole conversation, the learner has genuinely grasped the core ideas of ${topic} and reached a natural stopping point — where continuing would drift beyond this card's scope or into a different topic. It signals that now is a good moment for them to capture what they've learned and pause; it is NOT a test score and does not gate or unlock anything.
+- Be conservative — default false. One good answer is not coverage: only set it true once the learner has worked through the key ideas of ${topic} (or has clearly signalled they're satisfied and ready to move on). Never mention "covered", coverage, or this judgement anywhere in your "reply" text.
+
 Respond with ONLY the JSON object below — do not wrap the JSON itself in markdown fences, and add no commentary. Markdown inside the "reply" string (bold, etc.) is fine and expected; code for practice goes in "codeExample", not "reply". Critically, the JSON must be valid: escape every double quote as \\" and every newline as \\n inside string values, including inside "code".
-{"reply": "...", "isOffTopic": true | false, "codeExample": null | {"language": "...", "code": "..."}}`;
+{"reply": "...", "isOffTopic": true | false, "codeExample": null | {"language": "...", "code": "..."}, "covered": true | false}`;
 }
 
 // ── Milestone curriculum generation ──────────────────────────────────────

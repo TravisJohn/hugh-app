@@ -34,9 +34,14 @@ export interface CodeExample {
  * The shape `/api/learn/chat` returns. `codeExample` is `null` on every ordinary
  * turn and is only populated when Hugh decides to surface a snippet (whether the
  * learner asked via "code mode" or Hugh offered it proactively).
+ *
+ * `covered` is Hugh's own judgement that the learner has grasped the current
+ * card's core ideas and reached a natural stopping point — the client uses it as
+ * one trigger for the "save & wrap up" nudge. Conservative: false on most turns.
  */
 export interface ChatResponse {
   reply:        string;
   isOffTopic:   boolean;
   codeExample:  CodeExample | null;
+  covered:      boolean;
 }

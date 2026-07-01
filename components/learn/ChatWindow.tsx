@@ -21,14 +21,23 @@ interface Props {
   topic:               string;
   goalId?:             string;
   milestoneId?:        string;
+  milestoneTitle?:     string;
   onTranscriptChange?: (text: string) => void;
   onSummariseStart?:   () => void;
 }
 
+// Wrap-up nudge tuning. The nudge appears when Hugh judges the card covered, or
+// after a run of off-topic turns (drift), or as a soft backstop on a long
+// session — then stays quiet for a cooldown if the learner keeps chatting.
+type OfferReason = "covered" | "drift" | "length";
+const DRIFT_STREAK   = 2;   // consecutive off-topic turns before the drift nudge
+const LENGTH_CAP     = 10;  // user messages before the soft "long session" backstop
+const OFFER_COOLDOWN = 4;   // user messages to stay quiet after a "keep chatting"
+
 const WELCOME = (topic: string) =>
   `Hi! I'm Hugh, and I'm here to help you learn about **${topic}**. Ask me anything — concepts, examples, how things work, or where to start.`;
 
-export default function ChatWindow({ topic, goalId, milestoneId, onTranscriptChange, onSummariseStart }: Props) {
+export default function ChatWindow({ topic, goalId, milestoneId, milestoneTitle, onTranscriptChange, onSummariseStart }: Props) {
   const [messages, setMessages]     = useState<Message[]>([
     { role: "assistant", content: WELCOME(topic) },
   ]);
@@ -48,9 +57,13 @@ export default function ChatWindow({ topic, goalId, milestoneId, onTranscriptCha
   // offered a snippet to retype). Drives the editor's placeholder + language toggle.
   const [codeAuthoring, setCodeAuthoring] = useState(false);
 
-  // Goal offer: surfaces after the user's 3rd reply
-  const [goalOfferShown,     setGoalOfferShown]     = useState(false);
-  const [goalOfferDismissed, setGoalOfferDismissed] = useState(false);
+  // Wrap-up nudge: replaces the old fixed "after 3 messages" offer. `offerReason`
+  // holds why it's currently showing (null = hidden); once the learner saves we
+  // stop offering; a "keep chatting" dismissal sets a cooldown so it isn't naggy.
+  const [offerReason,       setOfferReason]       = useState<OfferReason | null>(null);
+  const [offerSaved,        setOfferSaved]        = useState(false);
+  const [offTopicStreak,    setOffTopicStreak]    = useState(0);
+  const [offerCooldownUntil, setOfferCooldownUntil] = useState(0);
 
   // Summary panel state
   const [panelOpen, setPanelOpen]     = useState(false);
@@ -69,7 +82,7 @@ export default function ChatWindow({ topic, goalId, milestoneId, onTranscriptCha
   // Scroll to bottom on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading, goalOfferShown]);
+  }, [messages, loading, offerReason]);
 
   // Surface the running transcript (minus the synthetic welcome) to the parent,
   // so the checklist side-rail can fold the chat into its coverage assessment.
@@ -120,17 +133,30 @@ export default function ChatWindow({ topic, goalId, milestoneId, onTranscriptCha
       );
       const updated = [...history, { role: "assistant" as const, content: replyText }];
       setMessages(updated);
-      setIsOffTrack(data.isOffTopic ?? false);
+
+      const offTopic = data.isOffTopic ?? false;
+      setIsOffTrack(offTopic);
 
       // Snippet attached → offer the mirror step (offer-first, not auto-switch).
       if (data.codeExample) {
         setOffer(data.codeExample.language || "python");
       }
 
-      // Surface goal offer after the 3rd user message
+      // Track consecutive off-topic turns so drift can trigger the wrap-up nudge.
+      const streak = offTopic ? offTopicStreak + 1 : 0;
+      setOffTopicStreak(streak);
+
+      // Decide whether to surface the wrap-up nudge, and why. Priority: Hugh's
+      // "covered" judgement (resolution) > repeated drift > long-session backstop.
+      // Suppressed once saved, while already showing, or during the cooldown.
       const userCount = updated.filter(m => m.role === "user").length;
-      if (userCount >= 3 && !goalOfferShown) {
-        setGoalOfferShown(true);
+      if (!offerSaved && !offerReason && userCount >= offerCooldownUntil) {
+        const reason: OfferReason | null =
+          data.covered            ? "covered"
+          : streak >= DRIFT_STREAK  ? "drift"
+          : userCount >= LENGTH_CAP ? "length"
+          : null;
+        if (reason) setOfferReason(reason);
       }
     } catch {
       setMessages(prev => [...prev, {
@@ -220,6 +246,19 @@ export default function ChatWindow({ topic, goalId, milestoneId, onTranscriptCha
     }
   }
 
+  // Wrap-up nudge actions. Saving summarises + captures to a card and retires the
+  // nudge for the session; dismissing hides it and stays quiet for a cooldown.
+  function acceptOffer() {
+    setOfferSaved(true);
+    setOfferReason(null);
+    handleSummarise();
+  }
+  function dismissOffer() {
+    const userCount = messages.filter(m => m.role === "user").length;
+    setOfferReason(null);
+    setOfferCooldownUntil(userCount + OFFER_COOLDOWN);
+  }
+
   const canSummarise = messages.length >= 3;
 
   return (
@@ -273,33 +312,49 @@ export default function ChatWindow({ topic, goalId, milestoneId, onTranscriptCha
             </div>
           )}
 
-          {/* Save-to-tracker offer — surfaces inline after the 3rd exchange */}
-          {goalOfferShown && !goalOfferDismissed && (
-            <div className="flex gap-2.5">
-              <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-900/60 text-xs font-bold text-violet-400">
-                H
-              </div>
-              <div className="rounded-2xl rounded-tl-sm border border-violet-500/30 bg-violet-900/15 px-4 py-3.5 space-y-3 max-w-[85%]">
-                <p className="text-sm text-slate-200 leading-relaxed">
-                  We&apos;ve covered some useful ground. Want me to summarise this chat and save the key insights to a card in your learning tracker?
-                </p>
-                <div className="flex gap-2 flex-wrap">
-                  <button
-                    onClick={() => { setGoalOfferDismissed(true); handleSummarise(); }}
-                    className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-semibold text-white hover:bg-violet-500 transition-colors"
-                  >
-                    Yes, save to tracker →
-                  </button>
-                  <button
-                    onClick={() => setGoalOfferDismissed(true)}
-                    className="rounded-xl border border-slate-700 px-4 py-2 text-xs text-slate-500 hover:text-slate-300 hover:border-slate-600 transition-colors"
-                  >
-                    Keep chatting
-                  </button>
+          {/* Wrap-up nudge — content-aware: fires on coverage, drift, or a long
+              session, with wording + save label matched to the reason. */}
+          {offerReason && !offerSaved && (() => {
+            const focus = milestoneTitle ?? "this topic";
+            const copy = {
+              covered: {
+                body: <>You&apos;ve worked through the key ideas for <span className="font-semibold text-violet-200">{focus}</span>. Want me to summarise this chat and save the insights to your tracker card?</>,
+                save: "Save to tracker →",
+              },
+              drift: {
+                body: <>We&apos;ve drifted a little from <span className="font-semibold text-violet-200">{focus}</span>. Want me to capture what&apos;s useful and save it so you can refocus — or keep exploring?</>,
+                save: "Save & wrap up →",
+              },
+              length: {
+                body: <>We&apos;ve covered a lot of ground here. Want me to summarise and save the key insights to your tracker card before we go further?</>,
+                save: "Save to tracker →",
+              },
+            }[offerReason];
+            return (
+              <div className="flex gap-2.5">
+                <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-900/60 text-xs font-bold text-violet-400">
+                  H
+                </div>
+                <div className="rounded-2xl rounded-tl-sm border border-violet-500/30 bg-violet-900/15 px-4 py-3.5 space-y-3 max-w-[85%]">
+                  <p className="text-sm text-slate-200 leading-relaxed">{copy.body}</p>
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      onClick={acceptOffer}
+                      className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-semibold text-white hover:bg-violet-500 transition-colors"
+                    >
+                      {copy.save}
+                    </button>
+                    <button
+                      onClick={dismissOffer}
+                      className="rounded-xl border border-slate-700 px-4 py-2 text-xs text-slate-500 hover:text-slate-300 hover:border-slate-600 transition-colors"
+                    >
+                      Keep chatting
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           <div ref={bottomRef} />
         </div>
