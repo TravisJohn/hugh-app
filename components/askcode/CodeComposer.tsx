@@ -7,14 +7,18 @@ import { keymap } from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
 import { Send, X, Code2 } from "lucide-react";
 import { languageExtension, isHighlighted } from "@/lib/askcode/language";
+import { SUPPORTED_LANGUAGES } from "@/types/askcode";
 
 interface Props {
-  language:  string;
-  value:     string;
-  disabled:  boolean;
-  onChange:  (value: string) => void;
-  onSend:    () => void;
-  onExit:    () => void;
+  language:          string;
+  value:             string;
+  disabled:          boolean;
+  placeholder?:      string;
+  /** When provided, a language toggle is shown (used when authoring, not mirroring). */
+  onLanguageChange?: (language: string) => void;
+  onChange:          (value: string) => void;
+  onSend:            () => void;
+  onExit:            () => void;
 }
 
 /**
@@ -25,7 +29,7 @@ interface Props {
  * non-blocking: no linting, no errors, no execution. On send the parent wraps the
  * buffer in a fenced block and posts it as an ordinary chat message.
  */
-export default function CodeComposer({ language, value, disabled, onChange, onSend, onExit }: Props) {
+export default function CodeComposer({ language, value, disabled, placeholder, onLanguageChange, onChange, onSend, onExit }: Props) {
   // Tab indents instead of moving focus. Static binding (no captured props), so
   // the extension set only changes when the language changes.
   const extensions = useMemo(
@@ -53,9 +57,30 @@ export default function CodeComposer({ language, value, disabled, onChange, onSe
           <div className="flex items-center gap-1.5 text-xs font-semibold text-violet-300">
             <Code2 size={13} />
             Code mode
-            <span className="rounded bg-violet-900/50 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-violet-300">
-              {langLabel}
-            </span>
+            {onLanguageChange ? (
+              // Authoring: let the learner pick the language so the fence is tagged
+              // correctly (SQL matters in a data app) and highlighting matches.
+              <div className="flex items-center gap-1">
+                {SUPPORTED_LANGUAGES.map(lang => (
+                  <button
+                    key={lang}
+                    type="button"
+                    onClick={() => onLanguageChange(lang)}
+                    className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide transition-colors ${
+                      language === lang
+                        ? "bg-violet-600 text-white"
+                        : "bg-slate-700/60 text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    {lang}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <span className="rounded bg-violet-900/50 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-violet-300">
+                {langLabel}
+              </span>
+            )}
             {!isHighlighted(language) && (
               <span className="text-[10px] font-normal text-slate-500">plain editor</span>
             )}
@@ -79,7 +104,7 @@ export default function CodeComposer({ language, value, disabled, onChange, onSe
             theme={oneDark}
             extensions={extensions}
             editable={!disabled}
-            placeholder={"Retype the snippet here, adding a comment in your own words on each line…"}
+            placeholder={placeholder ?? "Retype the snippet here, adding a comment in your own words on each line…"}
             height="100%"
             className="h-full text-[13px]"
             basicSetup={{

@@ -21,3 +21,25 @@ export function isCodeModeRequest(text: string): boolean {
   const normalised = text.toLowerCase().replace(/\s+/g, " ");
   return /\bcode mode\b/.test(normalised);
 }
+
+/**
+ * True when a message is *just* the bare code-mode command — the learner wants to
+ * open the code editor and write their own snippet, not ask Hugh a question that
+ * happens to mention code mode.
+ *
+ * Distinct from `isCodeModeRequest`: this is an exact match (after normalising
+ * whitespace/case, an optional leading slash, and trailing punctuation), so
+ * "code mode" and "/code mode." open the editor, while "explain code mode to me"
+ * still goes to Hugh as an ordinary question (flagged via `isCodeModeRequest`).
+ */
+export function isCodeModeCommand(text: string): boolean {
+  if (!text) return false;
+  const normalised = text
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^\//, "")          // tolerate a leading slash ("/code mode")
+    .replace(/[.!?\s]+$/, "")    // tolerate trailing punctuation/space
+    .trim();
+  return normalised === "code mode";
+}

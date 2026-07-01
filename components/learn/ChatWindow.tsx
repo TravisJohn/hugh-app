@@ -8,7 +8,7 @@ import SummaryPanel, { type SummaryData } from "./SummaryPanel";
 import PomodoroControl from "./PomodoroControl";
 import { usePomodoroContext } from "./PomodoroProvider";
 import CodeComposer from "@/components/askcode/CodeComposer";
-import { isCodeModeRequest } from "@/lib/askcode/detect";
+import { isCodeModeRequest, isCodeModeCommand } from "@/lib/askcode/detect";
 import { fenceCode, mergeCodeExample } from "@/lib/askcode/format";
 import type { ChatResponse } from "@/types/askcode";
 
@@ -44,6 +44,9 @@ export default function ChatWindow({ topic, goalId, milestoneId, onTranscriptCha
   const [codeMode, setCodeMode]   = useState(false);
   const [codeLang, setCodeLang]   = useState("python");
   const [codeDraft, setCodeDraft] = useState("");
+  // Authoring (learner typed "code mode" to write their own) vs mirroring (Hugh
+  // offered a snippet to retype). Drives the editor's placeholder + language toggle.
+  const [codeAuthoring, setCodeAuthoring] = useState(false);
 
   // Goal offer: surfaces after the user's 3rd reply
   const [goalOfferShown,     setGoalOfferShown]     = useState(false);
@@ -142,8 +145,18 @@ export default function ChatWindow({ topic, goalId, milestoneId, onTranscriptCha
   function sendText() {
     const text = draft.trim();
     if (!text || loading) return;
+
+    // A bare "code mode" command opens the editor for the learner to write their
+    // own snippet — it's a UI command, not a question, so it never hits the API.
+    if (isCodeModeCommand(text)) {
+      setDraft("");
+      openCodeAuthoring();
+      return;
+    }
+
     setDraft("");
-    // The keyword only gates the request; Hugh decides if code actually helps.
+    // For other messages the keyword only gates the request; Hugh decides if code
+    // actually helps (and may still proactively offer a snippet to mirror).
     void postMessage(text, isCodeModeRequest(text)).then(() => textareaRef.current?.focus());
   }
 
@@ -157,8 +170,20 @@ export default function ChatWindow({ topic, goalId, milestoneId, onTranscriptCha
     void postMessage(content, false);
   }
 
+  // Mirror path: retype the snippet Hugh just offered (language is dictated by it).
   function enterCodeMode() {
+    setCodeAuthoring(false);
     setCodeLang(offer ?? "python");
+    setCodeMode(true);
+  }
+
+  // Authoring path: the learner typed "code mode" to write their own code. Start
+  // from a blank editor; language defaults to Python but is theirs to switch.
+  function openCodeAuthoring() {
+    setOffer(null);
+    setCodeAuthoring(true);
+    setCodeLang("python");
+    setCodeDraft("");
     setCodeMode(true);
   }
 
@@ -285,6 +310,10 @@ export default function ChatWindow({ topic, goalId, milestoneId, onTranscriptCha
             language={codeLang}
             value={codeDraft}
             disabled={loading}
+            placeholder={codeAuthoring
+              ? "Write your code here — Hugh will take a look…"
+              : undefined}
+            onLanguageChange={codeAuthoring ? setCodeLang : undefined}
             onChange={setCodeDraft}
             onSend={sendCode}
             onExit={() => setCodeMode(false)}
@@ -310,7 +339,7 @@ export default function ChatWindow({ topic, goalId, milestoneId, onTranscriptCha
                 value={draft}
                 onChange={e => setDraft(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask me anything… (type “code mode” to practise code)"
+                placeholder="Ask me anything… (type “code mode” to write code)"
                 rows={1}
                 className="flex-1 resize-none bg-transparent text-sm text-slate-100 placeholder-slate-600 focus:outline-none"
               />
