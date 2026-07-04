@@ -1,0 +1,140 @@
+{
+  "id": "edtech-completion",
+  "title": "The Completion Drop",
+  "scenario": {
+    "role": "Learning Data Analyst",
+    "company": "Lernly",
+    "situation": "Course completion fell from 58% to 43% after quizzes were added to modules.",
+    "stakeholderBelief": "The content lead assumes the quizzes are driving learners away and wants them removed.",
+    "question": "Are the quizzes actually causing learners to drop off?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The content lead wants the quizzes pulled. How do you frame your investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "A/B comparison of quiz vs. no-quiz courses",
+          "detail": "Compare completion rates on courses that have quizzes to those that don't.",
+          "flag": "weak",
+          "consequence": "You find quiz courses do have lower completion — but quiz and non-quiz courses may differ in difficulty, length, and audience. The comparison is confounded before you start.",
+          "divergenceCost": "Compared non-equivalent course populations, baking in confounds."
+        },
+        {
+          "id": "B",
+          "label": "Metric audit before trend reading",
+          "detail": "Ask whether 'completion' means the same thing before and after the change, then examine engagement and pass-through rates as a counterfactual.",
+          "flag": "strong",
+          "consequence": "You discover that 'completed' was redefined when quizzes shipped — it now requires passing them. The old and new numbers are not the same metric. The investigation resets on solid ground.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Learner exit survey",
+          "detail": "Survey learners who stopped mid-course to ask why they left.",
+          "flag": "weak",
+          "consequence": "You collect anecdotes — many mention quizzes — but the sample skews toward vocal leavers, and you still don't know whether overall engagement actually fell.",
+          "divergenceCost": "Chose a slow, biased instrument that amplifies complaints without confirming a real drop."
+        },
+        {
+          "id": "D",
+          "label": "Time-series regression on completion rate",
+          "detail": "Model completion rate over time, flagging the quiz launch as an intervention.",
+          "flag": "weak",
+          "consequence": "The model confirms a drop at the launch date — but it assumes the metric was consistent across that date, which it wasn't. You've quantified an artifact, not a behavior change.",
+          "divergenceCost": "Modeled a break that was definitional, not behavioral — garbage-in, garbage-out."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You suspect the definition may have changed. Which metric do you use to assess whether learner engagement actually dropped?",
+      "artifact": {
+        "type": "bars",
+        "title": "Completion rate before vs. after quiz launch (official metric)",
+        "bars": [
+          {
+            "label": "Pre-launch (no quiz required)",
+            "value": 58
+          },
+          {
+            "label": "Post-launch (pass quiz required)",
+            "value": 43,
+            "highlight": true
+          }
+        ],
+        "caption": "The headline number looks like a 15-point drop — but both bars carry the label 'completion rate.' Do they measure the same thing?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Official completion rate (pre vs. post)",
+          "detail": "Use the reported completion figures to quantify the decline and its magnitude.",
+          "flag": "weak",
+          "consequence": "The 15-point gap looks damning — but pre-launch 'complete' meant finishing the last lesson, and post-launch it means passing quizzes too. You are comparing apples to oranges under the same label.",
+          "divergenceCost": "Trusted a metric that silently changed definition — read a measurement artifact as a real trend."
+        },
+        {
+          "id": "B",
+          "label": "Last-lesson reach rate (definition-stable metric)",
+          "detail": "Measure the share of enrolled learners who reached the final lesson in both periods — a definition that holds constant across the change.",
+          "flag": "strong",
+          "consequence": "Under a stable definition, last-lesson reach is 56% pre-launch and 54% post-launch — statistically flat. The dramatic 'drop' was entirely an artifact of the redefined metric, not a behavior change.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Last-lesson reach rate before vs. after quiz launch (definition-stable)",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "Pre-launch",
+                "value": 56
+              },
+              {
+                "label": "Post-launch",
+                "value": 54,
+                "highlight": true
+              }
+            ],
+            "caption": "Holding the definition constant, reach is virtually unchanged. The 15-point gap was a measurement artifact, not a learner behavior shift."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The definition-stable metric shows no real drop. What do you tell the content lead?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The quizzes have no effect — keep them and don't worry.\"",
+          "detail": "Declare the quizzes exonerated and close the investigation.",
+          "flag": "weak",
+          "consequence": "You've correctly identified a measurement artifact but overclaimed the conclusion. The stable reach rate rules out a mass dropout, but it doesn't prove quizzes are harmless — some friction may still exist at smaller scale.",
+          "divergenceCost": "Overclaimed a null effect from evidence that only ruled out one hypothesis."
+        },
+        {
+          "id": "B",
+          "label": "\"The drop is a metric redefinition artifact, not a behavior change — but let's track quiz-attempt and pass rates to confirm quizzes aren't adding friction.\"",
+          "detail": "Report the finding, flag the measurement issue, and propose a forward-looking monitoring plan.",
+          "flag": "strong",
+          "consequence": "You reframe the content lead's assumption with evidence, surface a data-quality issue that will recur if unaddressed, and recommend the next measurement step. The quizzes aren't condemned or fully cleared — they're under proper watch.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The completion drop was not caused by quizzes deterring learners — it was caused by a silent redefinition of 'complete' that made the pre- and post-launch numbers incomparable. Under a definition-stable metric, learner reach was flat. The lesson is metric definition stability: before reading any trend, confirm the metric means the same thing at every point in the series. A number with a changing definition is not a time series — it is two different measurements wearing the same name."
+}

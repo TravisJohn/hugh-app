@@ -1,0 +1,268 @@
+{
+  "id": "pharma-endpoint",
+  "title": "The Promising Endpoint",
+  "scenario": {
+    "role": "Biostatistics Analyst",
+    "company": "Helixa Bio",
+    "situation": "A Phase II trial readout shows a secondary endpoint reached statistical significance at p=0.03. The clinical team is excited and wants to move fast.",
+    "stakeholderBelief": "The clinical lead wants to headline the result as evidence of efficacy in the trial report, citing the p-value as proof the drug is working.",
+    "question": "Is this p=0.03 result on the secondary endpoint a genuine efficacy signal worth headlining?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The clinical lead wants to write up the significant secondary endpoint. How do you frame your investigation before drawing any conclusions?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Drill into the significant endpoint's data",
+          "detail": "Pull all the patient-level data behind this endpoint and examine the effect size, confidence interval, and subgroup breakdown.",
+          "flag": "weak",
+          "consequence": "You find a real-looking effect with a tidy forest plot. But you've spent all your time characterizing a result without ever asking whether it should have been trusted in the first place.",
+          "divergenceCost": "Anchored on the clinical lead's hypothesis and investigated the result rather than its validity."
+        },
+        {
+          "id": "B",
+          "label": "Audit the full testing landscape first",
+          "detail": "Before characterizing any single result, enumerate every endpoint tested in the trial and assess the family-wise error context.",
+          "flag": "strong",
+          "consequence": "You discover 18 secondary endpoints were pre-specified. Suddenly one crossing p<0.05 is not impressive — it is almost expected by chance. This reframes everything before you write a single sentence.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Check whether the primary endpoint also hit",
+          "detail": "Look at the primary endpoint result to decide whether the secondary can be considered supportive.",
+          "flag": "weak",
+          "consequence": "The primary endpoint missed. This context is important, but it still doesn't address the inflation problem baked into testing 18 secondaries simultaneously. You've added color without solving the core problem.",
+          "divergenceCost": "Found a relevant fact but sidestepped the multiple-comparisons issue entirely."
+        },
+        {
+          "id": "D",
+          "label": "Compare the result to historical benchmarks",
+          "detail": "Look at p-values from similar endpoints in comparable trials to see if p=0.03 is in line with historical signals.",
+          "flag": "weak",
+          "consequence": "External benchmarks suggest p=0.03 isn't unusual for this drug class. But historical comparisons can't rescue a result inflated by a multiple-testing context — you've borrowed credibility instead of earned it.",
+          "divergenceCost": "Sought external validation instead of examining the internal testing structure."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You've confirmed 18 secondary endpoints were tested. Which metric do you use to evaluate the significance of the flagged result?",
+      "artifact": {
+        "type": "bars",
+        "title": "Raw p-values for all 18 secondary endpoints",
+        "bars": [
+          {
+            "label": "Endpoint 1",
+            "value": 0.54
+          },
+          {
+            "label": "Endpoint 2",
+            "value": 0.41
+          },
+          {
+            "label": "Endpoint 3",
+            "value": 0.67
+          },
+          {
+            "label": "Endpoint 4",
+            "value": 0.22
+          },
+          {
+            "label": "Endpoint 5",
+            "value": 0.09
+          },
+          {
+            "label": "Endpoint 6",
+            "value": 0.38
+          },
+          {
+            "label": "Endpoint 7",
+            "value": 0.71
+          },
+          {
+            "label": "Endpoint 8",
+            "value": 0.15
+          },
+          {
+            "label": "Endpoint 9",
+            "value": 0.03,
+            "highlight": true
+          },
+          {
+            "label": "Endpoint 10",
+            "value": 0.49
+          },
+          {
+            "label": "Endpoint 11",
+            "value": 0.82
+          },
+          {
+            "label": "Endpoint 12",
+            "value": 0.29
+          },
+          {
+            "label": "Endpoint 13",
+            "value": 0.61
+          },
+          {
+            "label": "Endpoint 14",
+            "value": 0.44
+          },
+          {
+            "label": "Endpoint 15",
+            "value": 0.07
+          },
+          {
+            "label": "Endpoint 16",
+            "value": 0.33
+          },
+          {
+            "label": "Endpoint 17",
+            "value": 0.58
+          },
+          {
+            "label": "Endpoint 18",
+            "value": 0.19
+          }
+        ],
+        "caption": "One endpoint clears p<0.05. But with 18 tests, how surprising is that? The raw p-value doesn't account for the number of chances taken."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "The raw p-value (p=0.03)",
+          "detail": "Report the unadjusted p-value as the test of significance for this endpoint.",
+          "flag": "weak",
+          "consequence": "p=0.03 looks clean and publishable. But with 18 tests at α=0.05, the probability of getting at least one false positive by chance alone is 1 - 0.95^18 ≈ 60%. You are most likely looking at noise dressed as signal.",
+          "divergenceCost": "Reported an unadjusted p-value without accounting for the family-wise error rate."
+        },
+        {
+          "id": "B",
+          "label": "The Benjamini-Hochberg adjusted p-value across all 18 endpoints",
+          "detail": "Apply a false discovery rate correction across the full family of 18 secondary endpoints and report the adjusted value.",
+          "flag": "strong",
+          "consequence": "After BH correction the adjusted p-value for this endpoint rises to 0.54 — nowhere near significance. The single 'hit' out of 18 tests is exactly what random chance predicts. There is no headline.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Benjamini-Hochberg adjusted p-values — all 18 secondary endpoints",
+            "unit": "",
+            "bars": [
+              {
+                "label": "Endpoint 1",
+                "value": 0.81
+              },
+              {
+                "label": "Endpoint 2",
+                "value": 0.74
+              },
+              {
+                "label": "Endpoint 3",
+                "value": 0.88
+              },
+              {
+                "label": "Endpoint 4",
+                "value": 0.66
+              },
+              {
+                "label": "Endpoint 5",
+                "value": 0.43
+              },
+              {
+                "label": "Endpoint 6",
+                "value": 0.72
+              },
+              {
+                "label": "Endpoint 7",
+                "value": 0.91
+              },
+              {
+                "label": "Endpoint 8",
+                "value": 0.51
+              },
+              {
+                "label": "Endpoint 9",
+                "value": 0.54,
+                "highlight": true
+              },
+              {
+                "label": "Endpoint 10",
+                "value": 0.79
+              },
+              {
+                "label": "Endpoint 11",
+                "value": 0.95
+              },
+              {
+                "label": "Endpoint 12",
+                "value": 0.68
+              },
+              {
+                "label": "Endpoint 13",
+                "value": 0.86
+              },
+              {
+                "label": "Endpoint 14",
+                "value": 0.76
+              },
+              {
+                "label": "Endpoint 15",
+                "value": 0.4
+              },
+              {
+                "label": "Endpoint 16",
+                "value": 0.7
+              },
+              {
+                "label": "Endpoint 17",
+                "value": 0.83
+              },
+              {
+                "label": "Endpoint 18",
+                "value": 0.57
+              }
+            ],
+            "caption": "After correcting for 18 simultaneous tests, no endpoint survives. The 'significant' Endpoint 9 adjusts to p=0.54 — the signal dissolves entirely."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The adjusted p-value shows the result does not survive correction. What do you tell the clinical lead?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"This endpoint isn't significant — the trial failed.\"",
+          "detail": "Declare the result a false positive and advise against any further pursuit of this endpoint.",
+          "flag": "weak",
+          "consequence": "Technically defensible, but you've overcorrected in the other direction. Closing the door entirely ignores the possibility that this endpoint could be pre-registered as a primary in a follow-on trial with proper power. You've traded one overreach for another.",
+          "divergenceCost": "Overclaimed the negative — ruled out a potentially real signal without recommending a valid path to test it properly."
+        },
+        {
+          "id": "B",
+          "label": "\"The raw p=0.03 doesn't survive multiple-comparison correction across 18 endpoints — we can't headline this as efficacy. If this endpoint is a priority, we should pre-register it as a primary in the next trial.\"",
+          "detail": "Report the corrected finding and recommend a pre-registered confirmatory study.",
+          "flag": "strong",
+          "consequence": "You've protected the clinical lead from a regulatory and reputational risk, explained exactly why the finding is untrustworthy as-is, and given the team a legitimate scientific path forward. The finding isn't dead — it's unconfirmed.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "With 18 secondary endpoints tested, the probability of at least one crossing p<0.05 by chance is roughly 60% — so a lone p=0.03 is not a discovery, it is what noise looks like. The clinical lead's excitement was understandable but the raw p-value was the wrong metric: only after applying a false discovery rate correction did the signal dissolve. The lesson is multiple comparisons: every additional test you run inflates your false-positive rate, and the fix is either to correct for the full testing family or to pre-register the endpoint as a primary before the trial runs."
+}

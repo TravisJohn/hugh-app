@@ -78,6 +78,26 @@ export interface Case {
 
 export type Difficulty = "intro" | "core" | "hard";
 
+/** The four filterable dimensions of a case. `about`/`industry` are single;
+ *  `modelling`/`statistics` can carry more than one value. */
+export interface CaseFacets {
+  about: string;
+  industry: string;
+  modelling: string[];
+  statistics: string[];
+}
+
+/** The keys of {@link CaseFacets}, in display order — drives the filter panel. */
+export const FACET_KEYS = ["about", "industry", "modelling", "statistics"] as const;
+export type FacetKey = (typeof FACET_KEYS)[number];
+
+export const FACET_LABELS: Record<FacetKey, string> = {
+  about: "About",
+  industry: "Industry",
+  modelling: "Modelling use",
+  statistics: "Statistics",
+};
+
 /** Lightweight stub for the library index — never carries full case content. */
 export interface CaseStub {
   id: string;
@@ -86,7 +106,7 @@ export interface CaseStub {
   difficulty: Difficulty;
   domain: string;
   estMinutes: number;
-  tags: string[];
+  facets: CaseFacets;
 }
 
 /** The manifest for the active batch (the monthly rotation lives here later). */

@@ -8,11 +8,17 @@
       "difficulty": "intro",
       "domain": "Data Analysis",
       "estMinutes": 5,
-      "tags": [
-        "correlation vs causation",
-        "segmentation",
-        "metric validity"
-      ]
+      "facets": {
+        "about": "Churn",
+        "industry": "Meal-kit / D2C",
+        "modelling": [
+          "Segmentation",
+          "Diagnostic analysis"
+        ],
+        "statistics": [
+          "Correlation vs causation"
+        ]
+      }
     },
     {
       "id": "retail-promo-lift",
@@ -21,11 +27,18 @@
       "difficulty": "core",
       "domain": "Marketing Analytics",
       "estMinutes": 6,
-      "tags": [
-        "incrementality",
-        "counterfactual",
-        "cannibalization"
-      ]
+      "facets": {
+        "about": "Promotions & pricing",
+        "industry": "Retail",
+        "modelling": [
+          "Incrementality testing",
+          "Causal inference"
+        ],
+        "statistics": [
+          "Counterfactual / holdout",
+          "Cannibalization"
+        ]
+      }
     },
     {
       "id": "saas-activation-dip",
@@ -34,11 +47,18 @@
       "difficulty": "hard",
       "domain": "Product Analytics",
       "estMinutes": 7,
-      "tags": [
-        "Simpson's paradox",
-        "mix shift",
-        "segmentation"
-      ]
+      "facets": {
+        "about": "Activation & onboarding",
+        "industry": "SaaS",
+        "modelling": [
+          "Segmentation",
+          "Cohort analysis"
+        ],
+        "statistics": [
+          "Simpson's paradox",
+          "Mix shift"
+        ]
+      }
     },
     {
       "id": "neobank-fraud-spike",
@@ -47,11 +67,17 @@
       "difficulty": "hard",
       "domain": "Risk Analytics",
       "estMinutes": 7,
-      "tags": [
-        "base rates",
-        "distribution shift",
-        "precision"
-      ]
+      "facets": {
+        "about": "Fraud & risk",
+        "industry": "Fintech",
+        "modelling": [
+          "Classification / risk scoring"
+        ],
+        "statistics": [
+          "Base rates",
+          "Distribution shift"
+        ]
+      }
     },
     {
       "id": "shipfast-carrier",
@@ -60,11 +86,16 @@
       "difficulty": "intro",
       "domain": "Operations Analytics",
       "estMinutes": 5,
-      "tags": [
-        "confounding",
-        "like-for-like",
-        "segmentation"
-      ]
+      "facets": {
+        "about": "Delivery & logistics",
+        "industry": "Logistics",
+        "modelling": [
+          "Segmentation"
+        ],
+        "statistics": [
+          "Confounding"
+        ]
+      }
     },
     {
       "id": "cartly-checkout",
@@ -73,11 +104,17 @@
       "difficulty": "core",
       "domain": "Product Analytics",
       "estMinutes": 6,
-      "tags": [
-        "segmentation",
-        "funnel",
-        "aggregation trap"
-      ]
+      "facets": {
+        "about": "Checkout & conversion",
+        "industry": "E-commerce",
+        "modelling": [
+          "Funnel analysis",
+          "Segmentation"
+        ],
+        "statistics": [
+          "Aggregation trap"
+        ]
+      }
     },
     {
       "id": "streamly-abtest",
@@ -86,11 +123,17 @@
       "difficulty": "hard",
       "domain": "Experimentation",
       "estMinutes": 7,
-      "tags": [
-        "peeking",
-        "sample ratio mismatch",
-        "novelty effect"
-      ]
+      "facets": {
+        "about": "Experimentation",
+        "industry": "Streaming / media",
+        "modelling": [
+          "A/B testing"
+        ],
+        "statistics": [
+          "Peeking / early stopping",
+          "Sample ratio mismatch"
+        ]
+      }
     },
     {
       "id": "subly-ltv",
@@ -99,11 +142,18 @@
       "difficulty": "core",
       "domain": "Growth Analytics",
       "estMinutes": 6,
-      "tags": [
-        "survivorship bias",
-        "cohort immaturity",
-        "LTV"
-      ]
+      "facets": {
+        "about": "Retention economics",
+        "industry": "Consumer subscription",
+        "modelling": [
+          "Cohort analysis",
+          "LTV modelling"
+        ],
+        "statistics": [
+          "Survivorship bias",
+          "Cohort immaturity"
+        ]
+      }
     },
     {
       "id": "helply-csat",
@@ -112,11 +162,17 @@
       "difficulty": "intro",
       "domain": "CX Analytics",
       "estMinutes": 5,
-      "tags": [
-        "response bias",
-        "mix shift",
-        "metric validity"
-      ]
+      "facets": {
+        "about": "Customer satisfaction",
+        "industry": "Customer support",
+        "modelling": [
+          "Survey analysis"
+        ],
+        "statistics": [
+          "Response / selection bias",
+          "Mix shift"
+        ]
+      }
     },
     {
       "id": "pantree-stockouts",
@@ -125,11 +181,205 @@
       "difficulty": "core",
       "domain": "Supply Analytics",
       "estMinutes": 6,
-      "tags": [
-        "aggregation trap",
-        "concentration",
-        "Pareto"
-      ]
+      "facets": {
+        "about": "Inventory & supply",
+        "industry": "Grocery / supply",
+        "modelling": [
+          "Segmentation",
+          "Pareto analysis"
+        ],
+        "statistics": [
+          "Aggregation trap",
+          "Concentration"
+        ]
+      }
+    },
+    {
+      "id": "hospital-readmission",
+      "title": "The Readmission Rise",
+      "company": "Mercy General",
+      "difficulty": "hard",
+      "domain": "Healthcare Analytics",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Quality & outcomes",
+        "industry": "Healthcare",
+        "modelling": [
+          "Risk adjustment",
+          "Segmentation"
+        ],
+        "statistics": [
+          "Case-mix / confounding"
+        ]
+      }
+    },
+    {
+      "id": "gaming-arpu",
+      "title": "The ARPU Slide",
+      "company": "PixelForge",
+      "difficulty": "core",
+      "domain": "Gaming Analytics",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Monetization",
+        "industry": "Gaming",
+        "modelling": [
+          "Distribution analysis"
+        ],
+        "statistics": [
+          "Mean vs median",
+          "Outliers"
+        ]
+      }
+    },
+    {
+      "id": "b2b-pipeline",
+      "title": "The Win-Rate Wobble",
+      "company": "Cloudspan",
+      "difficulty": "hard",
+      "domain": "Sales Analytics",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Sales pipeline",
+        "industry": "B2B SaaS",
+        "modelling": [
+          "Cohort analysis",
+          "Funnel analysis"
+        ],
+        "statistics": [
+          "Right-censoring",
+          "Cohort immaturity"
+        ]
+      }
+    },
+    {
+      "id": "social-engagement",
+      "title": "The Engagement Cliff",
+      "company": "Chatter",
+      "difficulty": "intro",
+      "domain": "Product Analytics",
+      "estMinutes": 5,
+      "facets": {
+        "about": "Engagement",
+        "industry": "Social media",
+        "modelling": [
+          "Data validation"
+        ],
+        "statistics": [
+          "Data quality / instrumentation"
+        ]
+      }
+    },
+    {
+      "id": "pharma-endpoint",
+      "title": "The Promising Endpoint",
+      "company": "Helixa Bio",
+      "difficulty": "hard",
+      "domain": "Clinical Analytics",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Clinical trial",
+        "industry": "Pharma",
+        "modelling": [
+          "Hypothesis testing"
+        ],
+        "statistics": [
+          "Multiple comparisons"
+        ]
+      }
+    },
+    {
+      "id": "telco-churn-model",
+      "title": "The Perfect Model",
+      "company": "Telcom",
+      "difficulty": "hard",
+      "domain": "Data Science",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Churn prediction",
+        "industry": "Telecom",
+        "modelling": [
+          "Classification / risk scoring",
+          "Model validation"
+        ],
+        "statistics": [
+          "Data leakage"
+        ]
+      }
+    },
+    {
+      "id": "edtech-completion",
+      "title": "The Completion Drop",
+      "company": "Lernly",
+      "difficulty": "core",
+      "domain": "Product Analytics",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Course completion",
+        "industry": "EdTech",
+        "modelling": [
+          "Funnel analysis"
+        ],
+        "statistics": [
+          "Metric definition change"
+        ]
+      }
+    },
+    {
+      "id": "ride-cancellations",
+      "title": "The Cancellation Climb",
+      "company": "Zipp",
+      "difficulty": "core",
+      "domain": "Marketplace Analytics",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Marketplace ops",
+        "industry": "Mobility / marketplace",
+        "modelling": [
+          "Segmentation"
+        ],
+        "statistics": [
+          "Aggregation trap",
+          "Confounding"
+        ]
+      }
+    },
+    {
+      "id": "energy-forecast",
+      "title": "The Forecast Miss",
+      "company": "Voltiq",
+      "difficulty": "core",
+      "domain": "Forecasting",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Demand forecasting",
+        "industry": "Energy / utilities",
+        "modelling": [
+          "Forecasting",
+          "Model validation"
+        ],
+        "statistics": [
+          "Distribution shift / extrapolation"
+        ]
+      }
+    },
+    {
+      "id": "insurance-approval",
+      "title": "The Approval Slowdown",
+      "company": "Assura",
+      "difficulty": "intro",
+      "domain": "Operations Analytics",
+      "estMinutes": 5,
+      "facets": {
+        "about": "Claims operations",
+        "industry": "Insurance",
+        "modelling": [
+          "Segmentation"
+        ],
+        "statistics": [
+          "Confounding / mix shift"
+        ]
+      }
     }
   ]
 }

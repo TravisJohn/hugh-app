@@ -1,0 +1,156 @@
+{
+  "id": "b2b-pipeline",
+  "title": "The Win-Rate Wobble",
+  "scenario": {
+    "role": "Revenue Operations Analyst",
+    "company": "Cloudspan",
+    "situation": "Win rate on deals created since the new sales script launched six weeks ago looks 9 points lower than the historical baseline (34% vs 43%), and the VP Sales wants to roll back the script immediately.",
+    "stakeholderBelief": "The VP Sales is convinced the new script is confusing reps and losing deals that the old script would have won.",
+    "question": "Is the new script actually underperforming, or is something else explaining the gap?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The VP wants answers fast. How do you frame the investigation before touching the data?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Before/after comparison on the script launch date",
+          "detail": "Split all deals into pre-launch and post-launch and compare win rates directly.",
+          "flag": "weak",
+          "consequence": "You confirm the 9-point gap — but pre-launch deals had months to close while post-launch deals are only weeks old. You've compared resolved outcomes to unresolved ones without realizing it.",
+          "divergenceCost": "Anchored on the VP's timeline and compared cohorts with fundamentally different outcome maturity."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic cohort audit",
+          "detail": "Ask: are all deals in the comparison equally old enough to have had a realistic chance to close? Check the distribution of deal ages and closure status across cohorts before computing any win rates.",
+          "flag": "strong",
+          "consequence": "You immediately notice that post-launch deals are 6 weeks old on average against a ~90-day sales cycle. Most of them are still open — not lost. This flags a data-maturity problem before a single win-rate calculation is made.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Rep-level performance breakdown",
+          "detail": "See whether the drop is driven by a subset of reps who struggled with the new script.",
+          "flag": "weak",
+          "consequence": "The rep-level analysis is noisy and inconclusive — too few post-launch closed deals per rep to draw conclusions. You've spent time on a dead end while the real issue stays hidden.",
+          "divergenceCost": "Drilled into rep performance before validating that the outcome metric itself was trustworthy."
+        },
+        {
+          "id": "D",
+          "label": "Regression model controlling for deal size, industry, and rep tenure",
+          "detail": "Build a multivariate model to isolate the script's effect.",
+          "flag": "weak",
+          "consequence": "Your model controls for observable deal attributes but still trains on the same immature post-launch cohort. It produces a confident-looking coefficient for the script that is actually measuring fast losses vs. unresolved deals.",
+          "divergenceCost": "Applied sophisticated modeling to a fundamentally biased outcome variable — garbage in, garbage out."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "Your audit confirms most post-launch deals are still open. Now you need the right metric to test whether script performance truly differs. Which view do you trust?",
+      "artifact": {
+        "type": "bars",
+        "title": "Win rate by cohort — all deals created in each period",
+        "bars": [
+          {
+            "label": "Q1 (old script)",
+            "value": 44
+          },
+          {
+            "label": "Q2 (old script)",
+            "value": 42
+          },
+          {
+            "label": "Q3 (old script)",
+            "value": 43
+          },
+          {
+            "label": "Last 6 wks (new script)",
+            "value": 34,
+            "highlight": true
+          }
+        ],
+        "caption": "Raw win rates across all deals. The new-script cohort looks 9 pts lower — but nearly 70% of those deals are still open and excluded from the numerator."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Raw win rate across all deals in each period",
+          "detail": "Use the standard win-rate formula (closed-won ÷ total closed) applied to each calendar cohort.",
+          "flag": "weak",
+          "consequence": "The gap looks real and damning. But you're dividing by only the deals that have resolved — and post-launch deals resolve almost exclusively as fast losses so far. The wins are still in flight, invisible to this metric.",
+          "divergenceCost": "Trusted a metric computed on incomplete outcomes, making the new cohort look worse than the data actually support."
+        },
+        {
+          "id": "B",
+          "label": "Win rate restricted to age-matched, fully-seasoned deals (≥90 days old, closed)",
+          "detail": "Filter every cohort to deals that are at least 90 days old AND have a closed outcome, then compare win rates on this apples-to-apples slice.",
+          "flag": "strong",
+          "consequence": "With the age filter applied, only 11 post-launch deals qualify as fully seasoned. Their win rate is 41% — indistinguishable from the old-script baseline. The 9-point gap vanishes when you compare like for like.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Win rate — age-matched cohorts only (deals ≥90 days old, closed)",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "Q1 (old script)",
+                "value": 44
+              },
+              {
+                "label": "Q2 (old script)",
+                "value": 42
+              },
+              {
+                "label": "Q3 (old script)",
+                "value": 43
+              },
+              {
+                "label": "Last 6 wks (new script, n=11)",
+                "value": 41,
+                "highlight": true
+              }
+            ],
+            "caption": "Restricted to fully-seasoned deals, the new-script cohort performs in line with historical rates. The apparent gap was entirely an artifact of outcome immaturity."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Age-matched win rates show no difference, but the new-script cohort has only 11 qualifying deals. What do you tell the VP Sales?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The new script is fine — the 9-point drop is a data artifact. No rollback needed.\"",
+          "detail": "Make the definitive call and recommend holding the script.",
+          "flag": "weak",
+          "consequence": "You're directionally right, but 11 deals is a very thin evidential base for a definitive conclusion. If the VP pushes back or the script really does have a subtle problem, you've burned credibility by overclaiming certainty from a small sample.",
+          "divergenceCost": "Overclaimed certainty from a sample of 11 — correct diagnosis, but unsupported confidence level."
+        },
+        {
+          "id": "B",
+          "label": "\"The gap appears to be right-censoring, not script quality — age-matched data shows no difference — but the sample is small. Hold the rollback and re-evaluate in 6 weeks when ~60 more deals mature.\"",
+          "detail": "Present the finding, name the statistical limitation, and propose a concrete re-measurement date.",
+          "flag": "strong",
+          "consequence": "The VP understands why the metric was misleading, trusts the analysis because you've been transparent about its limits, and agrees to a 6-week hold. You've protected the script from a premature rollback while giving the business a credible checkpoint.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The 9-point win-rate drop was entirely an artifact of right-censoring: recent deals hadn't had 90 days to close, so the only resolved outcomes in that cohort were fast losses, mechanically suppressing the win rate. Once cohorts were age-matched, performance was flat. The lesson is that measuring outcomes on entities that haven't had time to resolve systematically understates success — any conversion or win-rate metric must be restricted to fully-seasoned cohorts, or the signal is noise."
+}

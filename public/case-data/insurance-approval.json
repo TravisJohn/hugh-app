@@ -1,0 +1,171 @@
+{
+  "id": "insurance-approval",
+  "title": "The Approval Slowdown",
+  "scenario": {
+    "role": "Claims Operations Analyst",
+    "company": "Assura",
+    "situation": "Average claim approval time rose from 4 to 6 days after the company onboarded a cohort of new adjusters last quarter.",
+    "stakeholderBelief": "The claims manager is convinced the new adjusters are underperforming and wants to extend their training program by six weeks.",
+    "question": "Are the new adjusters actually slower — or is something else driving the increase?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The claims manager wants you to confirm the new adjusters are the problem. How do you frame the investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Compare new vs. veteran adjuster approval times",
+          "detail": "Pull average approval time for new-cohort adjusters versus experienced ones and compare directly.",
+          "flag": "weak",
+          "consequence": "New adjusters do show a higher average time — but you haven't checked what types of claims each group is handling. Veterans may be doing mostly simple personal-auto claims while new adjusters were assigned more complex commercial cases. The comparison is confounded from the start.",
+          "divergenceCost": "Anchored on the manager's hypothesis and compared groups without accounting for what work each group actually handles."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic segmentation by claim characteristics",
+          "detail": "Segment approval times by claim attributes — complexity tier, claim type, and adjuster cohort — to find where the slowdown actually concentrates.",
+          "flag": "strong",
+          "consequence": "Slicing by claim complexity immediately reveals a striking pattern: the slowdown does not concentrate within any adjuster group. Instead, it concentrates in a specific claim type whose volume surged this quarter — an insight the manager's framing would never have surfaced.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Interview new adjusters about their workflow",
+          "detail": "Talk to the new cohort to find bottlenecks in how they process claims.",
+          "flag": "weak",
+          "consequence": "You gather qualitative color, but the adjusters describe a normal workflow with no obvious gaps. You've spent time on a channel that can't tell you whether the composition of claims changed — and you've implicitly accepted the manager's premise.",
+          "divergenceCost": "Chose a slow, premise-accepting instrument when the answer was already in the operational data."
+        },
+        {
+          "id": "D",
+          "label": "Track approval time as a time series and find the change point",
+          "detail": "Plot daily average approval time to pinpoint exactly when the metric started rising.",
+          "flag": "weak",
+          "consequence": "The change point lines up neatly with the new-adjuster onboarding date — which looks like a smoking gun. But timing alone can't distinguish between 'new adjusters caused this' and 'something else changed at the same time.' You've confirmed the timeline, not the cause.",
+          "divergenceCost": "Conflated temporal coincidence with causation — the new adjusters and the claim-mix shift happened simultaneously."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "Your segmentation points toward claim type as a possible driver. Which metric do you use to confirm or refute that?",
+      "artifact": {
+        "type": "bars",
+        "title": "Average approval time by claim type — this quarter (days)",
+        "bars": [
+          {
+            "label": "Personal Auto",
+            "value": 3.8
+          },
+          {
+            "label": "Personal Property",
+            "value": 4.1
+          },
+          {
+            "label": "Small Commercial",
+            "value": 6.2
+          },
+          {
+            "label": "Complex Commercial",
+            "value": 9.4,
+            "highlight": true
+          }
+        ],
+        "caption": "Complex Commercial claims take the longest — but volume could explain why the blended average moved. Is this a performance problem or a mix problem?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Overall average approval time before vs. after onboarding",
+          "detail": "Compare the company-wide average approval time for the quarter before and the quarter after new adjusters joined.",
+          "flag": "weak",
+          "consequence": "The average went from 4.0 to 6.1 days — compelling evidence of a slowdown. But this number blends all claim types together. If Complex Commercial claims tripled in volume, the average would rise even if every adjuster got faster. You're reading the mix, not performance.",
+          "divergenceCost": "Compared blended averages across periods with different claim-type compositions — the classic mix-shift confound."
+        },
+        {
+          "id": "B",
+          "label": "Approval time by complexity tier, current quarter vs. prior quarter",
+          "detail": "Break average approval time into like-for-like tiers and compare each tier period-over-period, then also look at how the volume share of each tier changed.",
+          "flag": "strong",
+          "consequence": "Within every complexity tier, approval time is essentially flat quarter-over-quarter. What changed is the share of Complex Commercial claims, which jumped from 8% to 31% of total volume. The blended average rose because the mix shifted toward inherently slower work — not because anyone got slower.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Approval time by complexity tier: prior quarter vs. current quarter (days)",
+            "bars": [
+              {
+                "label": "Personal Auto — Prior",
+                "value": 3.7
+              },
+              {
+                "label": "Personal Auto — Current",
+                "value": 3.8
+              },
+              {
+                "label": "Personal Property — Prior",
+                "value": 4
+              },
+              {
+                "label": "Personal Property — Current",
+                "value": 4.1
+              },
+              {
+                "label": "Small Commercial — Prior",
+                "value": 6.1
+              },
+              {
+                "label": "Small Commercial — Current",
+                "value": 6.2
+              },
+              {
+                "label": "Complex Commercial — Prior",
+                "value": 9.3
+              },
+              {
+                "label": "Complex Commercial — Current",
+                "value": 9.4,
+                "highlight": true
+              }
+            ],
+            "caption": "Within every tier, times are flat. Complex Commercial volume share surged from 8% to 31% — the mix shift explains the entire blended average increase."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Within-tier approval times are flat; Complex Commercial volume share surged. What do you tell the claims manager?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"It's a mix shift, not the adjusters — cancel the extended training.\"",
+          "detail": "Make the definitive call and recommend dropping the training extension.",
+          "flag": "weak",
+          "consequence": "You've correctly identified the mix shift, but canceling training based on one quarter of data is a firm causal claim from correlational evidence. If new adjusters happen to have been assigned disproportionately to complex claims, a lurking assignment bias could still be masking a real performance gap. You've given a good answer with more confidence than the data warrants.",
+          "divergenceCost": "Overclaimed certainty — recommended a policy reversal without confirming the assignment pattern or ruling out a hidden confound."
+        },
+        {
+          "id": "B",
+          "label": "\"The mix shift — not adjuster speed — is the stronger signal; let's verify assignment patterns before acting on training.\"",
+          "detail": "Present the within-tier finding, flag that assignment allocation should be checked, and recommend a short controlled comparison before reversing the training decision.",
+          "flag": "strong",
+          "consequence": "You've reframed the manager's assumption with clear evidence, named the real driver, and honestly flagged the remaining uncertainty. The manager now has a concrete next step — audit how claims were assigned — before committing to a six-week training extension or canceling it. That's the right level of confidence for the data you have.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The approval slowdown was not a performance problem — it was a composition problem. Complex Commercial claims, which inherently take longer, surged from 8% to 31% of total volume in the same quarter new adjusters joined, making the timing look causal. Within every like-for-like complexity tier, approval times were flat. The lesson is mix-shift confounding: a blended average can rise purely because the work portfolio changed, and the only way to see through it is to compare within homogeneous tiers rather than trusting the overall mean."
+}

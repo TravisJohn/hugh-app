@@ -1,0 +1,172 @@
+{
+  "id": "hospital-readmission",
+  "title": "The Readmission Rise",
+  "scenario": {
+    "role": "Healthcare Data Analyst",
+    "company": "Mercy General",
+    "situation": "30-day readmission rates rose from 12% to 16% after a new discharge protocol shipped last quarter.",
+    "stakeholderBelief": "The chief of medicine is convinced the new discharge protocol is discharging patients too early and wants it scrapped immediately.",
+    "question": "Is the discharge protocol actually responsible for the rise in readmissions?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The chief of medicine wants the protocol scrapped. How do you frame the investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Before/after analysis on the protocol launch date",
+          "detail": "Compare readmission rates in the weeks before and after the protocol shipped.",
+          "flag": "weak",
+          "consequence": "Readmissions did rise after the launch date — which looks damning. But the cardiac unit also opened in the same window. You've confirmed the timing coincidence the chief already believes, not the cause.",
+          "divergenceCost": "Anchored on the stakeholder's hypothesis and treated a coincidence as confirmation."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic segmentation by patient population",
+          "detail": "Segment readmissions by patient characteristics — diagnosis type, acuity, unit — to see where the rise concentrates before assuming the protocol is responsible.",
+          "flag": "strong",
+          "consequence": "Slicing by unit and patient severity immediately reveals the rise is not uniform: it clusters in the new cardiac unit, which admits a sicker patient mix. This opens a case-mix thread that the protocol hypothesis never would have surfaced.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Interview discharging physicians",
+          "detail": "Ask attending physicians whether they feel pressured to discharge patients earlier under the new protocol.",
+          "flag": "weak",
+          "consequence": "Physicians do report feeling some pressure, which feels like a signal — but this is self-report susceptible to availability bias and social pressure. It doesn't rule out a population shift and won't survive scrutiny in a board review.",
+          "divergenceCost": "Chose a biased qualitative instrument when the quantitative answer was already in the data."
+        },
+        {
+          "id": "D",
+          "label": "Audit individual readmission cases",
+          "detail": "Pull a sample of readmitted patients and review their charts for protocol compliance.",
+          "flag": "weak",
+          "consequence": "Chart review is slow and scoped to compliance, not causation. You might confirm the protocol was followed correctly, but that still doesn't explain the rate increase — you've answered the wrong question.",
+          "divergenceCost": "Investigated process compliance when the real question was population composition."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "Segmentation flags the cardiac unit as the source. Which metric do you use to confirm whether care quality actually declined?",
+      "artifact": {
+        "type": "bars",
+        "title": "Readmitted patients by unit — this quarter vs last quarter",
+        "bars": [
+          {
+            "label": "General Med (prev)",
+            "value": 98
+          },
+          {
+            "label": "General Med (curr)",
+            "value": 101
+          },
+          {
+            "label": "Surgery (prev)",
+            "value": 54
+          },
+          {
+            "label": "Surgery (curr)",
+            "value": 57
+          },
+          {
+            "label": "Cardiac (prev)",
+            "value": 12
+          },
+          {
+            "label": "Cardiac (curr)",
+            "value": 89,
+            "highlight": true
+          }
+        ],
+        "caption": "Raw readmission counts. The cardiac unit's bar exploded this quarter — but the unit also admitted far more patients, and much sicker ones."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Raw readmission counts and overall rate",
+          "detail": "Compare total readmitted patients and the aggregate 30-day rate across both periods.",
+          "flag": "weak",
+          "consequence": "The overall rate jumped from 12% to 16% and the cardiac unit's raw count is the obvious culprit. But the cardiac unit also tripled its patient volume and admits far higher-acuity cases. You're reading a population change as a quality failure.",
+          "divergenceCost": "Compared raw rates across populations with fundamentally different risk profiles."
+        },
+        {
+          "id": "B",
+          "label": "Risk-adjusted readmission rate by severity tier",
+          "detail": "Stratify patients by severity index (low / moderate / high acuity) and compute readmission rates within each tier for both periods.",
+          "flag": "strong",
+          "consequence": "Within every severity tier, readmission rates held flat or improved. The overall rate rose only because the hospital is now treating a higher proportion of high-acuity patients. The protocol is not the driver — case mix is.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Risk-adjusted readmission rate by severity tier (% within tier)",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "Low acuity — prev",
+                "value": 5.1
+              },
+              {
+                "label": "Low acuity — curr",
+                "value": 4.9
+              },
+              {
+                "label": "Moderate acuity — prev",
+                "value": 12.4
+              },
+              {
+                "label": "Moderate acuity — curr",
+                "value": 12.1
+              },
+              {
+                "label": "High acuity — prev",
+                "value": 21.3
+              },
+              {
+                "label": "High acuity — curr",
+                "value": 20.8,
+                "highlight": true
+              }
+            ],
+            "caption": "Adjusted for severity, every tier is flat or slightly improved. The aggregate rate rose because the high-acuity population — highlighted — grew sharply with the new cardiac unit."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Risk-adjusted rates held flat or improved across every severity tier. What do you tell the chief of medicine?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The protocol is fine — this is purely a case-mix effect. Don't scrap it.\"",
+          "detail": "Make the definitive causal call that the protocol is not responsible.",
+          "flag": "weak",
+          "consequence": "Your segmentation is compelling, but the cardiac unit and the protocol launched in the same quarter. A confound you haven't fully ruled out is whether high-acuity cardiac patients are also disproportionately subject to the new protocol's discharge criteria. You've overclaimed certainty.",
+          "divergenceCost": "Overclaimed causation from a correlational segmentation without proposing a confirmatory step."
+        },
+        {
+          "id": "B",
+          "label": "\"Case mix, not the protocol, is the stronger explanation — risk-adjusted rates improved. Before acting, let's validate with a severity-matched cohort comparison to close the remaining confound.\"",
+          "detail": "Present the finding, name the likely driver, and recommend a confirmatory analysis before a final decision.",
+          "flag": "strong",
+          "consequence": "You've reframed the chief's assumption with clear evidence, preserved the credibility of the protocol, and flagged the one step needed to be certain. The chief can pause the rollback decision with confidence while you close the loop — this is what rigorous analysis looks like.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The readmission rise had nothing to do with the discharge protocol: Mercy General opened a cardiac unit that selectively admits higher-acuity patients, shifting the overall case mix toward people who readmit more often by nature of their condition. Risk-adjusted rates within every severity tier held flat or improved — the protocol was working. The lesson is case-mix adjustment: whenever a hospital (or any system) changes its patient population at the same time it changes its process, raw outcome rates conflate who you're treating with how well you're treating them. Adjust for the population before judging the intervention."
+}

@@ -1,0 +1,156 @@
+{
+  "id": "energy-forecast",
+  "title": "The Forecast Miss",
+  "scenario": {
+    "role": "Forecasting Analyst",
+    "company": "Voltiq (regional energy utility)",
+    "situation": "The demand-forecast model's mean absolute error tripled last week, triggering an alert. The analytics lead wants an emergency retrain before the next peak period.",
+    "stakeholderBelief": "The analytics lead is convinced the model has degraded — weights have drifted, data pipelines shifted, or something inside the model broke — and that retraining immediately is the only fix.",
+    "question": "Has the model actually degraded, or is something else driving the error spike?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "Before touching the model, how do you structure your investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Audit the model internals for drift",
+          "detail": "Check feature importances, weight distributions, and pipeline logs for signs of model or data drift.",
+          "flag": "weak",
+          "consequence": "You spend a day inspecting the model and find nothing obviously broken inside — because nothing is. The investigation stalls and you're no closer to understanding why errors spiked.",
+          "divergenceCost": "Anchored on the degradation hypothesis and searched inside the model when the cause was outside it."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic slicing by input conditions",
+          "detail": "Slice forecast errors by the conditions under which predictions were made — day type, temperature band, season — to see whether the error is uniform or concentrated.",
+          "flag": "strong",
+          "consequence": "Errors cluster sharply in a specific temperature band corresponding to last week's heatwave. On all other days the model is accurate. The pattern points away from model rot and toward an out-of-distribution input regime.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Immediately retrain on the most recent data",
+          "detail": "Add last week's data to the training set and retrain the model right away.",
+          "flag": "weak",
+          "consequence": "The retrained model fits last week well but overweights the anomalous heatwave period. On typical days, accuracy actually worsens — you've introduced overfitting while fixing nothing structural.",
+          "divergenceCost": "Jumped to a solution before diagnosing the problem, risking overfitting to an anomaly."
+        },
+        {
+          "id": "D",
+          "label": "Compare this week's error to historical error distributions",
+          "detail": "Pull the model's MAE over the past 12 months and see if last week is a statistical outlier.",
+          "flag": "weak",
+          "consequence": "Last week's error is obviously an outlier — you already knew that from the alert. The historical comparison confirms severity but tells you nothing about why it happened or whether the model is at fault.",
+          "divergenceCost": "Confirmed the symptom already known from the alert without advancing toward the cause."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You've sliced errors by temperature band. Which metric do you rely on to determine whether the model is broken or simply out of range?",
+      "artifact": {
+        "type": "bars",
+        "title": "Total forecast error (MWh) by temperature band — last 30 days",
+        "bars": [
+          {
+            "label": "< 75°F",
+            "value": 1200
+          },
+          {
+            "label": "75–84°F",
+            "value": 1850
+          },
+          {
+            "label": "85–94°F",
+            "value": 2100
+          },
+          {
+            "label": "95°F+ (heatwave)",
+            "value": 8400,
+            "highlight": true
+          }
+        ],
+        "caption": "Raw total error MWh per band. The heatwave band dominates — but heatwave days also had the highest demand. Is the model bad here, or just stretched far beyond its range?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Total absolute error (MWh) by temperature band",
+          "detail": "Sum the raw forecast errors within each temperature band.",
+          "flag": "weak",
+          "consequence": "The heatwave band shows by far the most total error — but heatwave days also had record-high demand. The raw error is large partly because the numbers themselves are large. You can't tell if the model is proportionally worse or just operating at greater scale.",
+          "divergenceCost": "Compared raw error volumes across bands with very different demand scales — a classic size confound."
+        },
+        {
+          "id": "B",
+          "label": "Mean absolute percentage error (MAPE) by temperature band",
+          "detail": "Normalize forecast error as a percentage of actual demand within each band.",
+          "flag": "strong",
+          "consequence": "Normalized, the story is unmistakable: MAPE in the sub-95°F bands is stable at 2–4%, consistent with historical performance. In the 95°F+ band — temperatures the model has seen fewer than five times in training — MAPE spikes to 31%. The model isn't broken; it's extrapolating wildly outside its training distribution.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Mean Absolute Percentage Error (MAPE) by temperature band — last 30 days",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "< 75°F",
+                "value": 2.1
+              },
+              {
+                "label": "75–84°F",
+                "value": 3.4
+              },
+              {
+                "label": "85–94°F",
+                "value": 3.9
+              },
+              {
+                "label": "95°F+ (heatwave)",
+                "value": 31.2,
+                "highlight": true
+              }
+            ],
+            "caption": "Normalized to actual demand, the heatwave band's error dwarfs all others. Every other band is performing within normal historical range — the model is fine; last week's temperatures were not."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "MAPE is high only in the extreme-heat band, which the model has rarely seen in training. What do you tell the analytics lead?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"It's the heatwave, not model rot — no retrain needed.\"",
+          "detail": "Assert the cause confidently and recommend closing the retrain request.",
+          "flag": "weak",
+          "consequence": "You've stated a plausible finding but made a definitive causal claim from a single week of data. If there's also a subtle pipeline issue coinciding with the heatwave, you've given the analytics lead false certainty and a reason to skip a more careful validation.",
+          "divergenceCost": "Overclaimed certainty from a correlation, foreclosing further validation that could catch a real secondary issue."
+        },
+        {
+          "id": "B",
+          "label": "\"The error concentrates entirely in the extreme-heat band — temperatures rarely seen in training. On all other days the model is normal. Retraining on one anomalous week risks overfitting; I'd recommend validating on the next hot period and, if we expect more extreme heat, augmenting training data deliberately rather than emergency-retraining now.\"",
+          "detail": "Share the finding, flag the extrapolation mechanism, advise against immediate retrain, and propose a deliberate path forward.",
+          "flag": "strong",
+          "consequence": "The analytics lead now has a concrete, evidence-based reframe: the model isn't broken, the inputs were out of range. You've also given a credible alternative action — deliberate data augmentation — and a validation trigger, turning a panic retrain into a measured improvement plan.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The forecast miss had nothing to do with model degradation — the model performed normally on every day within its training distribution; it only failed at temperatures it had almost never seen. Retraining on a single anomalous week would have overfit the model to an extreme event and degraded everyday accuracy. The core lesson is distribution shift versus model rot: before retraining, a sound analyst checks whether the inputs themselves moved out of range, not just whether the error got larger. Distinguishing an extrapolation failure from a degradation failure requires normalizing error by scale and slicing by input conditions — the same diagnostic instinct that prevents the most expensive kind of model 'fix.'"
+}

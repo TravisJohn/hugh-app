@@ -1330,3 +1330,16 @@ scarce skill (judgment) only. Named surface: "The Case Room".
   rendered, no runtime errors (the lone 500 is the expected progress-save miss
   until migration 023 is applied). The Case Room is feature-complete for the
   first batch — pending only the migration + your content review.
+- **Module 8 — 10 more cases + faceted filter (2026-07-04):** grew the batch to
+  **20**. Added 10 cases via the pipeline (case-mix/risk-adjustment, mean-vs-median,
+  right-censoring, data-quality/instrumentation, multiple comparisons, data
+  leakage, metric-definition change, zone segmentation, distribution-shift
+  forecasting, complexity mix-shift) — all passed schema + critic first pass.
+  Introduced a 4-facet tag scheme — **About / Industry / Modelling use /
+  Statistics** — as a `FACETS` map in the authoring script (keyed by id, separate
+  from the generation seeds), surfaced as `CaseFacets` on the manifest stub
+  (replaced flat `tags`). Rebuilt `CaseLanding` as a client component with a
+  right-hand facet filter panel (OR within a facet, AND across; counts per value;
+  clear-all). Verified: tsc + eslint clean; Playwright run — filter works
+  (Fintech → 1/20, clear → 20/20) and all **20 cases play gold → 3/3** with
+  insight, no unexpected errors.

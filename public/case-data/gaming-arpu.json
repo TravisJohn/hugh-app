@@ -1,0 +1,168 @@
+{
+  "id": "gaming-arpu",
+  "title": "The ARPU Slide",
+  "scenario": {
+    "role": "Games Data Analyst",
+    "company": "PixelForge",
+    "situation": "ARPU fell 22% in the week after the monetization update shipped, triggering alarm across the business.",
+    "stakeholderBelief": "The monetization lead believes the update broke the spending funnel and wants to revert it immediately before more revenue is lost.",
+    "question": "Did the monetization update actually cause the revenue drop?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The monetization lead wants a verdict on the update. How do you structure the investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Before/after ARPU comparison on the update date",
+          "detail": "Pull ARPU for the week before and week after the update shipped and compare them directly.",
+          "flag": "weak",
+          "consequence": "ARPU is lower after the date — but ARPU is a mean, and this framing never asks whether the mean is a reliable summary here. You've confirmed the symptom, not the cause.",
+          "divergenceCost": "Anchored on the stakeholder's timeline and treated a noisy aggregate as a signal."
+        },
+        {
+          "id": "B",
+          "label": "Distribution diagnostic: examine the full spend distribution before and after",
+          "detail": "Look at the shape of per-user spend — including median, percentiles, and the high-spend tail — to see whether the typical player changed or just the outliers.",
+          "flag": "strong",
+          "consequence": "You immediately see the distribution is highly right-skewed. The bottom 90% of users barely moved; the drop is concentrated at the very top of the spend tail. This opens the real thread.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "A/B test the monetization update retroactively",
+          "detail": "Treat the update as an experiment: find any users who didn't receive it and compare ARPU.",
+          "flag": "weak",
+          "consequence": "The update was a full rollout — there is no clean control group. You spend time constructing a flawed quasi-experiment that still can't explain why the mean fell.",
+          "divergenceCost": "Reached for experimental framing when the data structure didn't support it."
+        },
+        {
+          "id": "D",
+          "label": "Survey high-spending players about the new features",
+          "detail": "Reach out to top spenders and ask for feedback on the monetization changes.",
+          "flag": "weak",
+          "consequence": "You get qualitative complaints about features, but the top spenders who churned are gone and won't respond. The survey biases toward current users and misses the actual leavers.",
+          "divergenceCost": "Chose a slow, survivor-biased instrument when the answer was in the existing data."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You decide to dig into the spend distribution. Which metric gives you the honest picture of what happened to typical player revenue?",
+      "artifact": {
+        "type": "bars",
+        "title": "Revenue contribution by player spend tier — post-update week",
+        "bars": [
+          {
+            "label": "Non-spenders",
+            "value": 0
+          },
+          {
+            "label": "Minnows ($1–$4)",
+            "value": 18200
+          },
+          {
+            "label": "Mid spenders ($5–$49)",
+            "value": 41500
+          },
+          {
+            "label": "Dolphins ($50–$199)",
+            "value": 38900
+          },
+          {
+            "label": "Whales ($200+)",
+            "value": 9800,
+            "highlight": true
+          }
+        ],
+        "caption": "Raw revenue by tier after the update. Whale revenue looks modest now — but how does that compare to before?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "ARPU (mean spend per total user)",
+          "detail": "Divide total revenue by total active users for each period and compare.",
+          "flag": "weak",
+          "consequence": "ARPU is down 22% — the same alarming number you started with. The mean is being dragged down by the absence of a handful of whale accounts. The typical player's behavior is invisible inside this average.",
+          "divergenceCost": "Restated the original metric without questioning whether the mean is appropriate for a skewed distribution."
+        },
+        {
+          "id": "B",
+          "label": "Median spend per paying user + paying-user conversion rate, compared across periods",
+          "detail": "Compute the median (not mean) spend among users who spent anything, and track what share of active users converted to any spend at all.",
+          "flag": "strong",
+          "consequence": "Median spend per paying user is flat. Paying-user conversion rate is flat. Whale-tier accounts dropped from 9 to 2 — a seasonal pattern visible in last year's data at the same week. The mean collapsed; the typical player didn't move.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Median spend per paying user & conversion rate — pre vs post update",
+            "bars": [
+              {
+                "label": "Median spend — pre ($)",
+                "value": 8.4
+              },
+              {
+                "label": "Median spend — post ($)",
+                "value": 8.1
+              },
+              {
+                "label": "Conversion rate — pre (%)",
+                "value": 6.2
+              },
+              {
+                "label": "Conversion rate — post (%)",
+                "value": 6.1
+              },
+              {
+                "label": "Whale accounts — pre",
+                "value": 9,
+                "highlight": true
+              },
+              {
+                "label": "Whale accounts — post",
+                "value": 2,
+                "highlight": true
+              }
+            ],
+            "caption": "Median spend and conversion are essentially unchanged. The entire ARPU collapse traces to seven fewer whale accounts — consistent with last year's seasonal churn at the same calendar week."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Median spend and conversion held firm; whale count dropped in line with a seasonal pattern from last year. What do you tell the monetization lead?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The update didn't cause this — it's seasonal whale churn. Don't revert.\"",
+          "detail": "Make the causal call directly and recommend against the rollback.",
+          "flag": "weak",
+          "consequence": "Your evidence is compelling but circumstantial. One prior year's seasonal dip is a pattern, not a proof. If another factor — say, a competitor event — also coincided, you've given the team false certainty and blocked a legitimate conversation.",
+          "divergenceCost": "Overclaimed causation from a single-year seasonal parallel and a correlation."
+        },
+        {
+          "id": "B",
+          "label": "\"The ARPU drop is driven by a few whale accounts leaving — median spend and conversion are flat. The timing matches last year's seasonal dip, not the update. I'd recommend holding the rollback and checking two more data points: last year's whale return rate after this week, and whether these specific accounts left before or after the update went live.\"",
+          "detail": "Present the finding, surface the causal gap, and give a concrete path to confirmation.",
+          "flag": "strong",
+          "consequence": "The monetization lead pauses the rollback. Within two days, logs confirm the whale accounts lapsed before the update reached them, and last year's data shows the same cohort returned by week four. The update is exonerated with evidence, not just reassurance.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "ARPU fell because the arithmetic mean is sensitive to outliers on a heavily right-skewed distribution — a handful of whale departures collapsed the average while the typical player's behavior was unchanged. The monetization update was a red herring that fit the timeline; the real driver was seasonal high-spender churn that recurred identically the prior year. The lesson is foundational: on skewed distributions, always interrogate the mean with the median and the full shape of the distribution before treating an average movement as a signal about typical users."
+}

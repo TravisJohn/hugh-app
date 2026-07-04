@@ -1,0 +1,172 @@
+{
+  "id": "social-engagement",
+  "title": "The Engagement Cliff",
+  "scenario": {
+    "role": "Product Data Analyst",
+    "company": "Chatter",
+    "situation": "Daily engagement events dropped 15% overnight, coinciding exactly with the latest app release pushed to production yesterday morning.",
+    "stakeholderBelief": "The PM is convinced the new feed algorithm is surfacing lower-quality content, killing interactions, and wants the algorithm rolled back before the week is out.",
+    "question": "Is the PM right — did the algorithm change depress user engagement?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The PM is pushing for an immediate rollback. How do you frame your investigation before touching the algorithm?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Audit the metric pipeline before anything else",
+          "detail": "Check whether the engagement event itself is being fired and collected correctly across platform versions — treat the measurement as a hypothesis before treating the algorithm as one.",
+          "flag": "strong",
+          "consequence": "You pull event-level logs and immediately notice client-side engagement events are suppressed in the new iOS build version, while Android and server-side session counts are unchanged. The cliff is in the data collection layer, not user behavior.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "B",
+          "label": "Analyze feed ranking changes",
+          "detail": "Diff the new algorithm's outputs against the old one — compare content scores, diversity metrics, and click-through rates on served posts.",
+          "flag": "weak",
+          "consequence": "The algorithm diff looks plausible and you find some minor ranking shifts, but nothing that would predict a 15% drop. You've spent hours validating a red herring and still have no answer.",
+          "divergenceCost": "Anchored on the PM's hypothesis and investigated the algorithm before verifying the measurement."
+        },
+        {
+          "id": "C",
+          "label": "Survey or interview recent active users",
+          "detail": "Reach out to users who were active before the release to ask whether their experience has changed.",
+          "flag": "weak",
+          "consequence": "Users report no noticeable change in their feed experience, which is useful color but inconclusive and took 48 hours to gather — during which the PM nearly pulled the rollback trigger.",
+          "divergenceCost": "Chose a slow qualitative method when a pipeline audit would have surfaced the answer in minutes."
+        },
+        {
+          "id": "D",
+          "label": "Run a time-series anomaly model on engagement",
+          "detail": "Fit a forecasting model to historical engagement and flag the deviation as an anomaly for root-cause attribution.",
+          "flag": "weak",
+          "consequence": "The model confirms what everyone already knows — there's a statistically significant drop starting at release time. It adds rigor to the obvious but tells you nothing about whether the cause is algorithmic or instrumental.",
+          "divergenceCost": "Applied a sophisticated model to confirm the known symptom instead of diagnosing its source."
+        }
+      ],
+      "gold": "A"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You decide to compare signals across platforms and collection layers. Which metric cut best tells you whether behavior actually changed?",
+      "artifact": {
+        "type": "bars",
+        "title": "Daily engagement events by platform — day before vs. day after release",
+        "bars": [
+          {
+            "label": "iOS (before)",
+            "value": 4200000
+          },
+          {
+            "label": "iOS (after)",
+            "value": 3100000,
+            "highlight": false
+          },
+          {
+            "label": "Android (before)",
+            "value": 2800000
+          },
+          {
+            "label": "Android (after)",
+            "value": 2790000
+          },
+          {
+            "label": "Web (before)",
+            "value": 1100000
+          },
+          {
+            "label": "Web (after)",
+            "value": 1095000
+          }
+        ],
+        "caption": "Raw client-side engagement event counts. Total drops 15%, but is the drop uniform or platform-specific?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Total daily engagement events (client-side)",
+          "detail": "Use the same aggregate engagement metric the PM is looking at — total events fired per day across all platforms.",
+          "flag": "weak",
+          "consequence": "The aggregate 15% drop is real and alarming, but it hides the breakdown. You've confirmed the symptom without learning anything about its source — platform, collection layer, or behavior.",
+          "divergenceCost": "Relied on the aggregate metric that obscures whether the drop is real or an artifact of a single platform's instrumentation."
+        },
+        {
+          "id": "B",
+          "label": "Server-side sessions and engagement events split by platform version",
+          "detail": "Cross-reference client-side event counts against server-side session logs, broken out by platform and app version.",
+          "flag": "strong",
+          "consequence": "Server-side sessions are flat across all platforms. Client-side events are down only on iOS running the new build version. Android and web are unchanged. The gap between server sessions and client events on the new iOS build is the fingerprint of a logging bug, not a behavior change.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Server-side sessions vs. client-side events — post-release, by platform",
+            "unit": "M",
+            "bars": [
+              {
+                "label": "iOS sessions (server)",
+                "value": 3.8
+              },
+              {
+                "label": "iOS events (client)",
+                "value": 2.3,
+                "highlight": true
+              },
+              {
+                "label": "Android sessions (server)",
+                "value": 2.5
+              },
+              {
+                "label": "Android events (client)",
+                "value": 2.5
+              },
+              {
+                "label": "Web sessions (server)",
+                "value": 1
+              },
+              {
+                "label": "Web events (client)",
+                "value": 1
+              }
+            ],
+            "caption": "iOS server sessions held steady while iOS client-side events cratered — the gap exists only on the new iOS build. Android and web show no divergence. This is instrumentation, not behavior."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The server-session vs. client-event gap is only on the new iOS build. What do you tell the PM?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"It's a logging bug in the iOS build — don't roll back the algorithm, fix the SDK.\"",
+          "detail": "Make the definitive call and redirect engineering to the instrumentation layer.",
+          "flag": "weak",
+          "consequence": "You're almost certainly right, but you've stated a causal conclusion from a diagnostic correlation. If there's an additional behavioral effect hidden under the instrumentation gap, it'll be invisible until the logging is fixed — and you've given the team no way to verify the fix worked.",
+          "divergenceCost": "Overclaimed certainty before the fix could be validated, risking a blind spot if a real behavioral issue co-exists."
+        },
+        {
+          "id": "B",
+          "label": "\"The drop is concentrated in iOS client events while server sessions are flat — this pattern points to an instrumentation bug, not an algorithm effect. Hold the rollback, fix the logging, then re-measure engagement once the fix is confirmed to verify behavior hasn't also changed.\"",
+          "detail": "Present the finding, name the most likely cause, and recommend a verification step before closing the investigation.",
+          "flag": "strong",
+          "consequence": "The PM holds the rollback. Engineering patches the iOS logging bug in the next hot-fix. Post-fix, engagement metrics on iOS return to baseline — confirming the instrumentation explanation — and the feed algorithm is cleared. The investigation is closed with evidence at every step.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "A",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The 15% engagement drop was real in the data but entirely an artifact of measurement: a logging change in the new iOS build under-fired the engagement event, while actual user behavior — visible in server-side sessions — never moved. The PM's algorithm hypothesis was a plausible red herring because the timing was perfect. The lesson is that a sudden step-change in a metric should first be treated as a data-quality problem: validate the pipeline across collection layers and platforms before attributing the movement to any product or behavior change."
+}

@@ -1,0 +1,155 @@
+{
+  "id": "telco-churn-model",
+  "title": "The Perfect Model",
+  "scenario": {
+    "role": "Data Scientist",
+    "company": "Telcom",
+    "situation": "A new churn prediction model just scored AUC 0.95 on the offline test set. The team is excited and wants to ship it to production next sprint.",
+    "stakeholderBelief": "The DS manager argues the 0.95 AUC speaks for itself — this is the best model the team has ever built and any further delay costs the retention team a competitive edge.",
+    "question": "Is this model actually ready to deploy?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "Before signing off on deployment, how do you investigate whether the model's performance is trustworthy?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Benchmark against previous models",
+          "detail": "Compare the 0.95 AUC to prior churn models to confirm the improvement is real.",
+          "flag": "weak",
+          "consequence": "The new model does beat prior models — but prior models were also trained on the same dataset with the same pipeline. If something is wrong with the data, every comparison is equally contaminated.",
+          "divergenceCost": "Anchored on relative performance within a potentially flawed pipeline — contamination doesn't show up in peer comparisons."
+        },
+        {
+          "id": "B",
+          "label": "Audit the feature set for data integrity",
+          "detail": "Review every feature for its real-world availability at prediction time — can each variable actually be observed before a customer churns?",
+          "flag": "strong",
+          "consequence": "Walking through each feature's generation logic, you spot a flag called 'cancellation_request_submitted'. You trace it: it is written to the database only after a customer initiates a cancellation — after the outcome you are trying to predict. This single feature demands immediate scrutiny.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Tune the decision threshold for production",
+          "detail": "Accept the model's quality and focus on finding the optimal precision/recall tradeoff for the retention team's workflow.",
+          "flag": "weak",
+          "consequence": "You produce a carefully tuned threshold, but the underlying AUC is what determines how much room threshold-tuning has to work with. If the AUC is artificial, threshold work is cosmetic.",
+          "divergenceCost": "Jumped to operationalizing a result whose validity hadn't been confirmed — premature optimization."
+        },
+        {
+          "id": "D",
+          "label": "Run a shadow deployment for two weeks",
+          "detail": "Deploy in shadow mode alongside the existing system and compare live predictions to eventual outcomes.",
+          "flag": "weak",
+          "consequence": "Shadow deployment will eventually reveal the truth — but it takes weeks and could expose customers to a bad intervention strategy if the team acts on shadow scores. It also delays surfacing a problem that a quick data audit would catch today.",
+          "divergenceCost": "Chose a slow live experiment when a preventable design flaw was detectable by inspection."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You've flagged 'cancellation_request_submitted' as suspicious. Which metric cut convinces you — and the manager — whether leakage is real?",
+      "artifact": {
+        "type": "bars",
+        "title": "Model AUC across evaluation splits",
+        "bars": [
+          {
+            "label": "Random split (all features)",
+            "value": 0.95,
+            "highlight": true
+          },
+          {
+            "label": "Random split (flag removed)",
+            "value": 0.88
+          },
+          {
+            "label": "Temporal split (all features)",
+            "value": 0.91
+          },
+          {
+            "label": "Temporal split (flag removed)",
+            "value": 0.61
+          }
+        ],
+        "caption": "Four AUC scores depending on split strategy and feature inclusion. Which comparison is actually valid?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "AUC on a random train/test split with all features",
+          "detail": "Use the standard holdout the team already ran — the 0.95 figure.",
+          "flag": "weak",
+          "consequence": "A random split mixes future information into training. Rows where 'cancellation_request_submitted' is TRUE will appear in both train and test, and the model has essentially memorized the answer. The 0.95 tells you nothing about real-world predictive power.",
+          "divergenceCost": "Trusted a split that leaks the outcome across train and test sets — the contamination is invisible in the number itself."
+        },
+        {
+          "id": "B",
+          "label": "AUC on a time-respecting split with the suspicious feature removed",
+          "detail": "Re-evaluate using only data available before the churn event, train on earlier months, test on the most recent month, and exclude 'cancellation_request_submitted'.",
+          "flag": "strong",
+          "consequence": "The model drops to AUC 0.61 — barely above a naive baseline of 0.60. The 34-point gap between 0.95 and 0.61 is entirely explained by a single leaky feature. The manager can now see the gap in a single chart rather than debate it abstractly.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "AUC: leaky random split vs. leakage-free temporal split",
+            "bars": [
+              {
+                "label": "Random split (all features)",
+                "value": 0.95
+              },
+              {
+                "label": "Random split (flag removed)",
+                "value": 0.88
+              },
+              {
+                "label": "Temporal split (all features)",
+                "value": 0.91
+              },
+              {
+                "label": "Temporal split (flag removed)",
+                "value": 0.61,
+                "highlight": true
+              }
+            ],
+            "caption": "Only the temporal, leakage-free split reflects production reality. The model collapses to near-baseline once the future-derived flag is removed and time ordering is respected."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The leakage-free AUC is 0.61. What do you tell the DS manager?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The model is broken — we need to start over.\"",
+          "detail": "Frame the finding as a failure and recommend rebuilding from scratch.",
+          "flag": "weak",
+          "consequence": "This is technically warranted but framed unproductively. It doesn't tell the manager what to do next, doesn't acknowledge that remaining features may still carry real signal, and risks triggering a defensive reaction that buries the finding.",
+          "divergenceCost": "Overclaimed a complete failure without charting a constructive path — accurate finding, poor analytical communication."
+        },
+        {
+          "id": "B",
+          "label": "\"The 0.95 is driven by a single leaky feature. The leakage-free model sits at 0.61 — real but modest. We should rebuild with a temporal split policy, drop the flag, and re-evaluate before any deployment decision.\"",
+          "detail": "Name the specific cause, quantify the real performance, and recommend a concrete remediation path.",
+          "flag": "strong",
+          "consequence": "The manager now has the precise diagnosis, a comparable honest baseline, and an actionable next step. The team avoids deploying a model that would silently fail in production — where 'cancellation_request_submitted' will never be available at prediction time.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The model's 0.95 AUC was almost entirely explained by 'cancellation_request_submitted' — a flag written to the database only after a customer decides to leave, making it a direct encoding of the outcome rather than a predictor of it. A random train/test split cannot detect this because leaky rows appear on both sides; only a temporally ordered, leakage-free split exposes the collapse. The lesson is that outstanding offline metrics should trigger scrutiny, not confidence: always audit features for temporal availability and validate with splits that mirror the production timeline."
+}

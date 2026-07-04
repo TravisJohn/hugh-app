@@ -1,0 +1,166 @@
+{
+  "id": "ride-cancellations",
+  "title": "The Cancellation Climb",
+  "scenario": {
+    "role": "Marketplace Analyst",
+    "company": "Zipp",
+    "situation": "Rider cancellations rose 30% the month surge pricing was tweaked.",
+    "stakeholderBelief": "The pricing PM is convinced the surge change caused riders to bail and wants it reverted city-wide immediately.",
+    "question": "Is the surge tweak actually driving cancellations — and if so, where?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The PM wants an answer fast. How do you frame the investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Before/after analysis on the surge change date",
+          "detail": "Compare total cancellation rates in the weeks before and after the surge tweak shipped.",
+          "flag": "weak",
+          "consequence": "Cancellations did rise after the date — but so did the start of peak-season demand. The timing is consistent with the PM's story, yet it can't separate surge from any other concurrent change. You've confirmed a timeline, not a cause.",
+          "divergenceCost": "Anchored on the PM's narrative and conflated timing with causation."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic segmentation by zone and time-of-day",
+          "detail": "Break cancellations down by geographic zone, hour block, and whether surge was active to see where the increase actually concentrates.",
+          "flag": "strong",
+          "consequence": "The segmentation immediately shows the 30% lift is not uniform across the city — it clusters sharply in specific zones at specific hours. This opens a thread the price hypothesis alone never would have.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Regression of surge multiplier against cancellation rate",
+          "detail": "Model cancellation rate as a function of the surge multiplier across all rides.",
+          "flag": "weak",
+          "consequence": "The city-wide regression returns a modest positive coefficient on surge — plausible but weak. Aggregating across zones with very different supply conditions buries the real signal in noise.",
+          "divergenceCost": "Jumped to city-wide modeling that averaged away the localized driver."
+        },
+        {
+          "id": "D",
+          "label": "Pull rider complaints and support tickets",
+          "detail": "Scan cancellation-related support contacts to understand what riders are saying.",
+          "flag": "weak",
+          "consequence": "Tickets mention long wait times and high prices — both — but the sample skews toward the angriest riders and can't tell you whether the root cause is supply or price. Useful color, not a diagnosis.",
+          "divergenceCost": "Chose a biased, anecdotal signal when structured data could answer the question directly."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "Segmenting by zone reveals some zones look very different. Which metric do you use to confirm the pattern?",
+      "artifact": {
+        "type": "bars",
+        "title": "Raw cancellation counts by zone — current month",
+        "bars": [
+          {
+            "label": "Downtown Core",
+            "value": 1840
+          },
+          {
+            "label": "Midtown",
+            "value": 1620
+          },
+          {
+            "label": "North Zone",
+            "value": 980
+          },
+          {
+            "label": "Outer East",
+            "value": 1750,
+            "highlight": true
+          },
+          {
+            "label": "Outer West",
+            "value": 1690,
+            "highlight": true
+          }
+        ],
+        "caption": "Raw cancelled ride counts. Outer zones look high — but are they actually riskier, or just busier this month?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Raw cancellation counts by zone",
+          "detail": "Compare the absolute number of cancellations across zones.",
+          "flag": "weak",
+          "consequence": "Outer East and Outer West do show big counts — but request volume also spiked in those zones this month. You're reading demand growth, not necessarily a worse cancellation problem. The signal is confounded by zone size.",
+          "divergenceCost": "Compared absolute counts across zones with different request volumes — read size, not risk."
+        },
+        {
+          "id": "B",
+          "label": "Cancellation rate by zone × peak-hour block (normalized)",
+          "detail": "Cancellations as a percentage of ride requests, split by zone and hour block.",
+          "flag": "strong",
+          "consequence": "Normalized and sliced by time, the picture is unmistakable: Outer East and Outer West spike to 38–41% cancellation rates during peak hours — versus 7–9% citywide. Downtown and Midtown are flat. The surge tweak zones are unremarkable; supply collapse at peak hours in the outer zones is the real signal.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Peak-hour cancellation RATE by zone (% of requests cancelled)",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "Downtown Core",
+                "value": 7.2
+              },
+              {
+                "label": "Midtown",
+                "value": 8.1
+              },
+              {
+                "label": "North Zone",
+                "value": 9
+              },
+              {
+                "label": "Outer East",
+                "value": 39.4,
+                "highlight": true
+              },
+              {
+                "label": "Outer West",
+                "value": 37.8,
+                "highlight": true
+              }
+            ],
+            "caption": "Normalized to requests per zone, the outer zones dwarf the rest at peak hours. Surge-affected zones are unremarkable."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Outer-zone peak-hour cancellation rates are 4–5× the city average, and driver supply data shows a sharp drop in those zones at those hours. What do you tell the PM?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"It's a supply collapse in the outer zones — don't revert surge, fix driver incentives there.\"",
+          "detail": "Make the causal call and prescribe the fix directly.",
+          "flag": "weak",
+          "consequence": "You've given the PM a confident, action-ready answer — but you've leapt from correlation to cause. If an unobserved factor (e.g., a competing platform's promotion pulling drivers away) is driving both low supply and high cancellations, the prescribed fix still misses it. Confidence without a causal check risks a costly misdirection.",
+          "divergenceCost": "Overclaimed causation from correlational zone-level data."
+        },
+        {
+          "id": "B",
+          "label": "\"The 30% lift concentrates in two outer zones at peak hours — not citywide. Supply, not price, is the stronger correlate. A city-wide revert would leave the real problem untouched. Recommend a targeted driver-incentive pilot in those zones to confirm the supply hypothesis before any pricing change.\"",
+          "detail": "Report the finding, flag the causal gap, and propose a targeted test.",
+          "flag": "strong",
+          "consequence": "You've reframed the PM's city-wide narrative with granular evidence, stayed honest about what correlation can and can't prove, and handed leadership a cheap, targeted test that will confirm or refute the supply story before committing to any policy change.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The 30% cancellation rise wasn't a pricing story — it was a supply story hidden inside a city-wide average. Two outer zones at peak hours accounted for almost all the lift; every other zone was flat. The trap was a plausible narrative (something changed, blame that thing) and a metric — raw city-wide cancellations — that was technically correct but analytically useless at the aggregate level. The lesson: before attributing a city-wide metric shift to the one thing that changed, segment by the dimensions that could reveal where the shift actually lives."
+}

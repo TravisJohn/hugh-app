@@ -40,7 +40,10 @@ export default function CaseCard({
       </div>
 
       <div className="flex flex-wrap gap-1.5">
-        {stub.tags.map((t) => (
+        <span className="rounded-md bg-slate-800/70 px-1.5 py-0.5 text-[11px] text-slate-400">
+          {stub.facets.industry}
+        </span>
+        {stub.facets.statistics.slice(0, 2).map((t) => (
           <span
             key={t}
             className="rounded-md bg-slate-800/70 px-1.5 py-0.5 text-[11px] text-slate-400"

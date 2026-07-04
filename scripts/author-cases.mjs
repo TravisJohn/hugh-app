@@ -140,7 +140,122 @@ const BRIEFS = [
     realDriver: "About 80% of the stockouts come from just 3 SKUs sharing one supplier whose lead time blew out. The rest of the catalogue is fine. A blanket restock ties up capital for no reason.",
     lesson: "Aggregation hides concentration. Disaggregate (Pareto) to find where the problem actually lives before taking a blanket, expensive action.",
   },
+  {
+    id: "hospital-readmission", title: "The Readmission Rise", company: "Mercy General",
+    domain: "Healthcare Analytics", difficulty: "hard", estMinutes: 7,
+    role: "Healthcare Data Analyst",
+    situation: "30-day readmissions rose from 12% to 16% after a new discharge protocol shipped.",
+    belief: "The chief of medicine blames the new discharge protocol and wants it scrapped.",
+    realDriver: "The hospital opened a cardiac unit that admits sicker, higher-risk patients — a case-mix shift. Risk-adjusted, readmission rates held or improved within every severity tier.",
+    lesson: "Case-mix / risk adjustment: a raw outcome rate confounds patient severity with care quality. Adjust for the population before judging an intervention.",
+  },
+  {
+    id: "gaming-arpu", title: "The ARPU Slide", company: "PixelForge",
+    domain: "Gaming Analytics", difficulty: "core", estMinutes: 6,
+    role: "Games Data Analyst",
+    situation: "Average revenue per user (ARPU) fell 22% after the monetization update.",
+    belief: "The monetization lead assumes the update backfired and wants to revert it.",
+    realDriver: "A handful of 'whale' spenders churned for seasonal reasons; the mean collapsed while the median spend and paying-user conversion held. The average was dominated by a few outliers, not the typical player.",
+    lesson: "Mean vs median on a skewed distribution: a mean ruled by outliers misrepresents the typical user. Look at the distribution, not just the average.",
+  },
+  {
+    id: "b2b-pipeline", title: "The Win-Rate Wobble", company: "Cloudspan",
+    domain: "Sales Analytics", difficulty: "hard", estMinutes: 7,
+    role: "Revenue Operations Analyst",
+    situation: "Win rate on deals created since the new sales script looks 9 points lower.",
+    belief: "The VP Sales blames the new script and wants to roll back to the old one.",
+    realDriver: "Recent deals haven't had time to close (the sales cycle is ~90 days), so the recent cohort is right-censored — its 'win rate' only counts the fast losses. Age-matched cohorts show no difference.",
+    lesson: "Right-censoring / immature cohorts: measuring outcomes on entities that haven't had time to resolve understates success. Compare age-matched cohorts.",
+  },
+  {
+    id: "social-engagement", title: "The Engagement Cliff", company: "Chatter",
+    domain: "Product Analytics", difficulty: "intro", estMinutes: 5,
+    role: "Product Data Analyst",
+    situation: "Daily engagement events dropped 15% overnight after an app release.",
+    belief: "The PM assumes the new feed algorithm tanked engagement and wants it reverted.",
+    realDriver: "A logging change in the new iOS build under-fires the 'engagement' event; server-side sessions are flat. It's an instrumentation bug, not a behavior change.",
+    lesson: "Data quality / instrumentation: a metric can move because measurement changed, not behavior. Validate the pipeline before trusting a sudden step-change.",
+  },
+  {
+    id: "pharma-endpoint", title: "The Promising Endpoint", company: "Helixa Bio",
+    domain: "Clinical Analytics", difficulty: "hard", estMinutes: 7,
+    role: "Biostatistics Analyst",
+    situation: "A secondary endpoint came back significant (p=0.03) in the trial readout.",
+    belief: "The clinical lead wants to headline it as evidence of efficacy in the report.",
+    realDriver: "Eighteen secondary endpoints were tested; at least one crossing p<0.05 by chance is expected. After multiple-comparison correction the endpoint is not significant.",
+    lesson: "Multiple comparisons: testing many endpoints inflates the false-positive rate. Correct for it (or pre-register) before claiming a finding.",
+  },
+  {
+    id: "telco-churn-model", title: "The Perfect Model", company: "Telcom",
+    domain: "Data Science", difficulty: "hard", estMinutes: 7,
+    role: "Data Scientist",
+    situation: "A new churn model scores AUC 0.95 offline — the team wants to deploy it.",
+    belief: "The DS manager wants to ship it on the strength of the standout offline performance.",
+    realDriver: "One feature is a 'cancellation request submitted' flag that only exists after a customer decides to churn — target leakage. With a leakage-free, time-respecting split the model is barely above baseline.",
+    lesson: "Data leakage: a feature that encodes the outcome inflates offline metrics and collapses in production. Validate with temporal, leakage-free splits.",
+  },
+  {
+    id: "edtech-completion", title: "The Completion Drop", company: "Lernly",
+    domain: "Product Analytics", difficulty: "core", estMinutes: 6,
+    role: "Learning Data Analyst",
+    situation: "Course completion fell from 58% to 43% after quizzes were added to modules.",
+    belief: "The content lead assumes the quizzes are driving learners away and wants them removed.",
+    realDriver: "Adding quizzes changed the definition of 'complete' (it now requires passing them), so the metric isn't comparable across the change. Under the old definition, finish and engagement rates are steady.",
+    lesson: "Metric definition change: comparing a metric across a redefinition compares two different things. Hold the definition constant before reading a trend.",
+  },
+  {
+    id: "ride-cancellations", title: "The Cancellation Climb", company: "Zipp",
+    domain: "Marketplace Analytics", difficulty: "core", estMinutes: 6,
+    role: "Marketplace Analyst",
+    situation: "Rider cancellations rose 30% the month surge pricing was tweaked.",
+    belief: "The pricing PM blames the surge change and wants it reverted city-wide.",
+    realDriver: "Cancellations concentrate in two outer zones at peak hours where driver supply collapsed — a supply/demand imbalance, not price. Most zones are unchanged; a city-wide revert misdiagnoses it.",
+    lesson: "Aggregation hides a localized supply problem. Segment by zone and time before attributing a city-wide metric to the one thing that changed.",
+  },
+  {
+    id: "energy-forecast", title: "The Forecast Miss", company: "Voltiq",
+    domain: "Forecasting", difficulty: "core", estMinutes: 6,
+    role: "Forecasting Analyst",
+    situation: "The demand-forecast model's error tripled last week.",
+    belief: "The analytics lead assumes the model degraded and wants an emergency retrain.",
+    realDriver: "A record heatwave pushed demand far outside the model's training range — an out-of-distribution regime, not model rot. On normal days it's still accurate; retraining on one anomaly would overfit.",
+    lesson: "Distribution shift / extrapolation: a model can be fine yet fail outside its training regime. Distinguish an anomaly from degradation before retraining.",
+  },
+  {
+    id: "insurance-approval", title: "The Approval Slowdown", company: "Assura",
+    domain: "Operations Analytics", difficulty: "intro", estMinutes: 5,
+    role: "Claims Operations Analyst",
+    situation: "Average claim approval time rose from 4 to 6 days after onboarding new adjusters.",
+    belief: "The claims manager blames the new adjusters and wants to extend their training.",
+    realDriver: "A surge of complex commercial claims (which always take longer) shifted the mix; within each claim-complexity tier, approval time is flat. The new adjusters aren't slower.",
+    lesson: "Mix shift / confounding: a blended average can rise purely because the composition of work changed. Compare within like-for-like tiers.",
+  },
 ];
+
+// ── Filter facets (About / Industry / Modelling use / Statistics) ────────────
+// Kept as a map keyed by id so it's independent of the generation seeds above.
+const FACETS = {
+  "freshbox-churn":      { about: "Churn",                    industry: "Meal-kit / D2C",         modelling: ["Segmentation", "Diagnostic analysis"], statistics: ["Correlation vs causation"] },
+  "retail-promo-lift":   { about: "Promotions & pricing",     industry: "Retail",                 modelling: ["Incrementality testing", "Causal inference"], statistics: ["Counterfactual / holdout", "Cannibalization"] },
+  "saas-activation-dip": { about: "Activation & onboarding",  industry: "SaaS",                   modelling: ["Segmentation", "Cohort analysis"], statistics: ["Simpson's paradox", "Mix shift"] },
+  "neobank-fraud-spike": { about: "Fraud & risk",             industry: "Fintech",                modelling: ["Classification / risk scoring"], statistics: ["Base rates", "Distribution shift"] },
+  "shipfast-carrier":    { about: "Delivery & logistics",     industry: "Logistics",              modelling: ["Segmentation"], statistics: ["Confounding"] },
+  "cartly-checkout":     { about: "Checkout & conversion",    industry: "E-commerce",             modelling: ["Funnel analysis", "Segmentation"], statistics: ["Aggregation trap"] },
+  "streamly-abtest":     { about: "Experimentation",          industry: "Streaming / media",      modelling: ["A/B testing"], statistics: ["Peeking / early stopping", "Sample ratio mismatch"] },
+  "subly-ltv":           { about: "Retention economics",      industry: "Consumer subscription",  modelling: ["Cohort analysis", "LTV modelling"], statistics: ["Survivorship bias", "Cohort immaturity"] },
+  "helply-csat":         { about: "Customer satisfaction",    industry: "Customer support",       modelling: ["Survey analysis"], statistics: ["Response / selection bias", "Mix shift"] },
+  "pantree-stockouts":   { about: "Inventory & supply",       industry: "Grocery / supply",       modelling: ["Segmentation", "Pareto analysis"], statistics: ["Aggregation trap", "Concentration"] },
+  "hospital-readmission":{ about: "Quality & outcomes",       industry: "Healthcare",             modelling: ["Risk adjustment", "Segmentation"], statistics: ["Case-mix / confounding"] },
+  "gaming-arpu":         { about: "Monetization",             industry: "Gaming",                 modelling: ["Distribution analysis"], statistics: ["Mean vs median", "Outliers"] },
+  "b2b-pipeline":        { about: "Sales pipeline",           industry: "B2B SaaS",               modelling: ["Cohort analysis", "Funnel analysis"], statistics: ["Right-censoring", "Cohort immaturity"] },
+  "social-engagement":   { about: "Engagement",               industry: "Social media",           modelling: ["Data validation"], statistics: ["Data quality / instrumentation"] },
+  "pharma-endpoint":     { about: "Clinical trial",           industry: "Pharma",                 modelling: ["Hypothesis testing"], statistics: ["Multiple comparisons"] },
+  "telco-churn-model":   { about: "Churn prediction",         industry: "Telecom",                modelling: ["Classification / risk scoring", "Model validation"], statistics: ["Data leakage"] },
+  "edtech-completion":   { about: "Course completion",        industry: "EdTech",                 modelling: ["Funnel analysis"], statistics: ["Metric definition change"] },
+  "ride-cancellations":  { about: "Marketplace ops",          industry: "Mobility / marketplace", modelling: ["Segmentation"], statistics: ["Aggregation trap", "Confounding"] },
+  "energy-forecast":     { about: "Demand forecasting",       industry: "Energy / utilities",     modelling: ["Forecasting", "Model validation"], statistics: ["Distribution shift / extrapolation"] },
+  "insurance-approval":  { about: "Claims operations",        industry: "Insurance",              modelling: ["Segmentation"], statistics: ["Confounding / mix shift"] },
+};
 
 // ── Prompts ──────────────────────────────────────────────────────────────────
 const SYSTEM = `You author cases for "The Case Room", a strategic-judgment trainer for data/analytics learners. A case teaches ONE analytical lesson by making the learner commit to high-level decisions, each with a baked-in consequence, then diffing their path against a gold path.
@@ -304,9 +419,9 @@ async function main() {
 
   // Rebuild the manifest: churn first, then every authored case that exists.
   const stubs = [
-    { id: "freshbox-churn", title: "The Churn Spike", company: "FreshBox", difficulty: "intro", domain: "Data Analysis", estMinutes: 5, tags: ["correlation vs causation", "segmentation", "metric validity"] },
+    { id: "freshbox-churn", title: "The Churn Spike", company: "FreshBox", difficulty: "intro", domain: "Data Analysis", estMinutes: 5, facets: FACETS["freshbox-churn"] },
     ...BRIEFS.filter((b) => existsSync(path.join(DATA_DIR, `${b.id}.json`))).map((b) => ({
-      id: b.id, title: b.title, company: b.company, difficulty: b.difficulty, domain: b.domain, estMinutes: b.estMinutes, tags: b.tags,
+      id: b.id, title: b.title, company: b.company, difficulty: b.difficulty, domain: b.domain, estMinutes: b.estMinutes, facets: FACETS[b.id],
     })),
   ];
   writeFileSync(path.join(DATA_DIR, "manifest.json"), JSON.stringify({ batch: "2026-07", cases: stubs }, null, 2) + "\n");
