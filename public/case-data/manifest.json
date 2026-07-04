@@ -1,0 +1,14 @@
+{
+  "batch": "2026-07",
+  "cases": [
+    {
+      "id": "freshbox-churn",
+      "title": "The Churn Spike",
+      "company": "FreshBox",
+      "difficulty": "intro",
+      "domain": "Data Analysis",
+      "estMinutes": 5,
+      "tags": ["correlation vs causation", "segmentation", "metric validity"]
+    }
+  ]
+}

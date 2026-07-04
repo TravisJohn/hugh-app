@@ -1257,3 +1257,64 @@ Restructured the post-login IA:
 
 Flow: `/home` (pick activity) → Learn → `/home/learn` (topics) → open goal → Track
 board (Track/Ask/Converse tabs). Typecheck clean.
+
+---
+
+## Phase 26 — The Case Room (strategic-judgment case trainer)
+
+A new, isolated feature living on the **Show** card: fast, deterministic strategic
+case analysis. A learner works a real business case, commits to the major
+decisions (commit → consequence → reveal), and gets an A/B counterfactual of
+their path vs an expert's + a 3-muscle scorecard. **No code, no runtime AI** — the
+scarce skill (judgment) only. Named surface: "The Case Room".
+
+### PRD & decisions (agreed 2026-07-04)
+- **Goal:** train the strategic analytical judgment an AI can't replace; strip
+  mechanical execution.
+- **Users:** Hugh's logged-in learners.
+- **Loop:** blog-style library → play a case → scorecard + counterfactual +
+  planted insight → progress saved per learner.
+- **Out of scope now:** code-sketch step (dropped — off-theme), monthly rotation
+  UI, GCP hosting (portable, not yet moved), user-authored cases.
+- **Decisions:** build in Hugh (Vercel+Supabase) but **GCP-portable**; blog-index
+  landing; progress + login from the start; churn case by hand then **AI-author 9
+  with an AI reviewer + human gate**; entry on the **Show** card; **zero runtime
+  AI cost**.
+- **GCP seam:** `lib/cases/loader.ts` (fs reads today → GCS/CDN fetch later) — the
+  only thing that changes on the cloud move.
+- **Scroll:** player is viewport-fit (no scroll, per the interview-loop rule); the
+  landing is a scrolling blog index (deliberate, approved deviation).
+
+### Build log
+- **Module 1 — content layer (2026-07-04):** `types/cases.ts` (code step removed;
+  all decisions are choices); `lib/cases/loader.ts` (server-only fs reads of
+  `public/case-data/`, path-traversal-guarded, documented as the single GCP swap
+  seam); churn case ported verbatim (minus code step) to
+  `public/case-data/freshbox-churn.json` + `manifest.json` (batch `2026-07`).
+- **Module 2 — scoring engine (2026-07-04):** `lib/cases/scoring.ts` — pure
+  `computeFlags` / `heldCount` / `diffAgainstGold` + muscle mapping (decisions
+  matched to muscles by `flag`, so case-agnostic). 9 Vitest units in
+  `scoring.test.ts` (gold path all-strong, weak flips, arc order, divergence
+  cost). All pass.
+- **Module 3 — player components (2026-07-04):** `components/cases/` — `Artifact`
+  (dark bars/table), `Scorecard` (3-muscle pills), `DecisionStep`
+  (commit-before-reveal; consequence absent from DOM until locked in),
+  `RevealScreen` (counterfactual diff + muscle strip + insight), `CasePlayer`
+  (client orchestrator: intro → step* → reveal, viewport-fit no-scroll, saves
+  attempt best-effort). Dark Hugh theme (#0A0F1E / slate / sky / emerald·amber).
+- **Module 4 + 5 — pages, progress, Show card (2026-07-04):**
+  `023_case_room.sql` (`case_attempts` + RLS `FOR ALL USING (auth.uid()=user_id)`);
+  `POST /api/cases/progress` (RLS insert, no AI); `app/cases/page.tsx` (auth-gated
+  blog-index landing — manifest + rolled-up progress, **tolerant of the migration
+  not being applied** → empty progress if the table is absent); `app/cases/[id]/page.tsx`
+  (auth-gated, `loadCase` → `CasePlayer`, 404 on miss); `CaseLanding` + `CaseCard`;
+  **Show card** on `/home` lit up (amber) → `/cases`.
+- **Verified (2026-07-04):** tsc + eslint clean; 44/44 Vitest. Full logged-in
+  Playwright run (18/18, zero console errors): login → Show → library → open churn
+  → commit-before-reveal on all 3 decisions → artifacts → counterfactual (2 of 3
+  held) → insight → back-to-library.
+- **Pending deploy step:** apply `supabase/migrations/023_case_room.sql` in the
+  Supabase dashboard — until then, progress saves are best-effort no-ops and the
+  library badges stay blank (by design; everything else works).
+- **Next — Module 7:** the AI authoring pipeline (Claude Sonnet generate → schema
+  check → Sonnet critic → human gate) to fill the batch to 10 cases.

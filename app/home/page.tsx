@@ -7,8 +7,8 @@ import SignOutButton from "@/components/landing/SignOutButton";
 import HeaderUsage from "@/components/usage/HeaderUsage";
 
 // Top-level activity picker — the post-login landing for every user. Picking
-// "Learn" is what leads to the "What do you want to learn?" dashboard
-// (/home/learn). Apply and Show are locked placeholders for now.
+// "Learn" leads to the "What do you want to learn?" dashboard (/home/learn);
+// "Show" opens The Case Room (/cases). "Apply" is a locked placeholder for now.
 export default async function HomePage() {
   const supabase = await createClient();
   const { user } = await verifyUserAccess(supabase);
@@ -113,23 +113,30 @@ export default async function HomePage() {
             </div>
           </div>
 
-          {/* Show — locked placeholder */}
-          <div className="relative flex flex-col gap-3 rounded-2xl border border-slate-800/60 bg-slate-900/30 p-5 backdrop-blur-sm cursor-not-allowed select-none">
-            <div className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-600">
-              <Lock size={9} />
-              Coming soon
-            </div>
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-800/60 text-slate-700">
+          {/* Show — The Case Room */}
+          <Link
+            href="/cases"
+            className="group flex flex-col gap-3 rounded-2xl border border-amber-500/40 bg-amber-900/10 p-5 shadow-lg shadow-amber-900/20 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-amber-400/60 hover:bg-amber-900/20 hover:shadow-xl hover:shadow-amber-500/20"
+          >
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400 transition-transform duration-300 group-hover:scale-110">
               <Trophy size={22} />
             </div>
             <div>
-              <p className="font-semibold text-slate-600 text-base mb-1">Show</p>
-              <p className="text-xs text-slate-700 leading-relaxed">
-                Demonstrate what you&apos;ve mastered and build a record of what
-                you can do.
+              <div className="flex items-center gap-1.5 mb-1">
+                <p className="font-semibold text-slate-100 text-base">Show</p>
+                <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-xs font-semibold text-amber-400">
+                  New
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Work real business cases in The Case Room — make the calls that
+                matter and test your judgment against an expert&apos;s.
               </p>
             </div>
-          </div>
+            <span className="mt-auto text-xs font-semibold text-amber-400 transition-all group-hover:text-amber-300">
+              Enter the Case Room →
+            </span>
+          </Link>
 
         </div>
       </main>

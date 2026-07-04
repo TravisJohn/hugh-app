@@ -1,0 +1,126 @@
+{
+  "id": "freshbox-churn",
+  "title": "The Churn Spike",
+  "scenario": {
+    "role": "Junior Data Analyst",
+    "company": "FreshBox (meal-kit startup)",
+    "situation": "Churn jumped 12% last quarter.",
+    "stakeholderBelief": "The CMO is convinced it's the price increase that shipped at the start of the quarter.",
+    "question": "Is she right?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The CMO wants an answer. How do you frame the investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Event study on the price change",
+          "detail": "Compare churn before/after the price-change date.",
+          "flag": "weak",
+          "consequence": "You see churn did rise after the date — but so did three other things that quarter. The timing is suggestive but confounded; you can't isolate price this way.",
+          "divergenceCost": "Anchored on the CMO's hypothesis and confounded the answer from the start."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic segmentation",
+          "detail": "Segment churn by customer attributes to see where it concentrates.",
+          "flag": "strong",
+          "consequence": "You slice churn by segment and immediately see it's NOT uniform — it clusters hard in one group. This opens a thread the price hypothesis never would have.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Survey churned customers",
+          "detail": "Ask people why they left.",
+          "flag": "weak",
+          "consequence": "Slow, and the response sample is biased toward the loudest leavers. Useful color later, but it won't answer the question with the data you have now.",
+          "divergenceCost": "Chose a slow, biased instrument when the answer was already in the data."
+        },
+        {
+          "id": "D",
+          "label": "Build a churn prediction model",
+          "detail": "Jump straight to modeling churn.",
+          "flag": "weak",
+          "consequence": "You have a model that predicts churn but no understanding of *why*. You've optimized before you diagnosed.",
+          "divergenceCost": "Jumped to modeling before understanding — premature sophistication."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "Segmenting reveals one group churns far more. Which metric do you trust to confirm it?",
+      "artifact": {
+        "type": "bars",
+        "title": "Churned customers by segment — this quarter",
+        "bars": [
+          { "label": "Established", "value": 540 },
+          { "label": "New (≤3 mo)", "value": 210 },
+          { "label": "Hit price increase", "value": 300 },
+          { "label": "2+ late deliveries", "value": 280, "highlight": true }
+        ],
+        "caption": "Raw churned counts. The biggest segment shows the biggest bar — but is that risk, or just size?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Raw churn counts by segment",
+          "detail": "Count churned customers in each segment.",
+          "flag": "weak",
+          "consequence": "The biggest segment shows the most churned customers — but it's also the biggest segment. You're reading size, not risk.",
+          "divergenceCost": "Compared raw counts across different-sized cohorts — a classic confound."
+        },
+        {
+          "id": "B",
+          "label": "Churn rate by segment (normalized)",
+          "detail": "Churn as a % within each segment.",
+          "flag": "strong",
+          "consequence": "Normalized, the signal is unmistakable: churn rate is highest among customers who had 2+ late deliveries — NOT among those who hit the price increase.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Churn RATE by segment (% within segment)",
+            "unit": "%",
+            "bars": [
+              { "label": "Established", "value": 4.5 },
+              { "label": "New (≤3 mo)", "value": 5.3 },
+              { "label": "Hit price increase", "value": 5.0 },
+              { "label": "2+ late deliveries", "value": 18.7, "highlight": true }
+            ],
+            "caption": "Normalized to segment size, the late-delivery cohort dwarfs the rest — and the price cohort is unremarkable."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Delivery-delay correlates with churn more than price does. What do you tell the CMO?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"It's delivery delays, not price — fix logistics.\"",
+          "detail": "Make the causal call.",
+          "flag": "weak",
+          "consequence": "Confident — but you've made a causal claim from correlational data. If a hidden factor drives both delays and churn, you've sent the company chasing the wrong fix.",
+          "divergenceCost": "Overclaimed causation from a correlation."
+        },
+        {
+          "id": "B",
+          "label": "\"Price isn't the main signal; delivery reliability is the stronger correlate — let's run a holdout/A-B before acting.\"",
+          "detail": "Recommend confirming causally.",
+          "flag": "strong",
+          "consequence": "You've reframed the CMO's assumption with evidence AND flagged the causal gap. This is what a strong analyst does — findings + appropriate caution + a path to certainty.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": { "framing": "B", "evidence": "B", "interpretation": "B" },
+  "insight": "The churn spike wasn't price — it concentrated among customers with repeated late deliveries. The data was engineered so the CMO's intuition was a plausible red herring. The skill wasn't computing anything hard; it was framing the question to find the real driver and staying honest about correlation vs cause."
+}
