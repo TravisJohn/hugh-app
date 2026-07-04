@@ -58,7 +58,7 @@ export async function pauseSession(sessionId: string): Promise<void> {
     .update({ status: "paused", ended_at: now() })
     .eq("id", sessionId);
   if (error) throw new Error(`Failed to pause session: ${error.message}`);
-  redirect("/home");
+  redirect("/home/learn");
 }
 
 // Passive mode: fewer than 5 questions answered — pause and show notice
@@ -69,7 +69,7 @@ export async function pauseSessionWithNotice(sessionId: string): Promise<void> {
     .update({ status: "paused", ended_at: now() })
     .eq("id", sessionId);
   if (error) throw new Error(`Failed to pause session: ${error.message}`);
-  redirect("/home?notice=min5");
+  redirect("/home/learn?notice=min5");
 }
 
 // Passive mode: 5+ questions answered — mark completed, redirect to summary

@@ -118,7 +118,7 @@ export default function GoalCard({ goal, onDelete }: Props) {
 
         {status === "ready" ? (
           <Link
-            href={`/study/${goal.id}`}
+            href={`/study/${goal.id}/track`}
             className="glow-amber rounded-xl bg-amber-500 px-4 py-2 text-sm font-bold text-slate-900 hover:bg-amber-400 transition-colors"
           >
             Start →

@@ -57,7 +57,7 @@ export default async function StudyTrackPage({ params, searchParams }: Props) {
       <header className="flex shrink-0 items-center justify-between border-b border-slate-800 px-6 py-3">
         <div className="flex items-center gap-4">
           <Link
-            href={`/study/${goalId}`}
+            href="/home/learn"
             className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300 transition-colors"
           >
             <ArrowLeft size={14} />

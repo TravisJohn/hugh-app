@@ -48,7 +48,7 @@ export default async function TrackerPage({ searchParams }: Props) {
           {/* Back link — goes to the study room if we know where we came from */}
           {backGoal ? (
             <Link
-              href={`/study/${backGoal.id}`}
+              href={`/study/${backGoal.id}/track`}
               className="flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-slate-300"
             >
               <ArrowLeft size={14} />

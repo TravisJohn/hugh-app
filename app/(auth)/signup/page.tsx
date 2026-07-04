@@ -40,7 +40,7 @@ export default function SignupPage() {
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/home`,
+        emailRedirectTo: `${window.location.origin}/auth/confirm?next=/home`,
       },
     });
 
@@ -61,6 +61,12 @@ export default function SignupPage() {
       setSent(true);
       return;
     }
+
+    // Immediate login only succeeds when "Confirm email" is OFF. In that mode
+    // there's no verification step to auto-approve the account, so approve it
+    // here — otherwise the user lands on /pending. No-op once email
+    // confirmation is enabled (this branch won't run).
+    await fetch("/api/auth/self-approve", { method: "POST" });
 
     router.push("/home");
     router.refresh();

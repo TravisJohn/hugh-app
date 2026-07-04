@@ -13,16 +13,18 @@ export default function PendingPage() {
         </div>
 
         <div>
-          <h1 className="text-2xl font-bold text-slate-100">You&apos;re on the list</h1>
+          <h1 className="text-2xl font-bold text-slate-100">Almost there</h1>
           <p className="mt-3 text-sm text-slate-400 leading-relaxed max-w-xs mx-auto">
-            Hugh is currently invite-only while we&apos;re in early access. Your account is pending approval — we&apos;ll be in touch shortly.
+            We&apos;re finalizing your access. If you just signed up, confirm your
+            email using the link we sent, then sign in again — that activates your
+            account automatically.
           </p>
         </div>
 
         <div className="rounded-2xl border border-slate-800 bg-slate-900/50 px-5 py-4 text-sm text-slate-500 leading-relaxed">
           <div className="flex items-center gap-2 justify-center">
             <Mail size={14} />
-            <span>Questions? Reach out to <span className="text-slate-300">tjmariohn@gmail.com</span></span>
+            <span>Still stuck? Reach out to <span className="text-slate-300">tjmariohn@gmail.com</span></span>
           </div>
         </div>
 

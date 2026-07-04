@@ -37,7 +37,7 @@ export default async function LearnPage({ searchParams }: Props) {
         <div className="flex items-center gap-5">
           {fromGoalId ? (
             <Link
-              href={`/study/${fromGoalId}`}
+              href={`/study/${fromGoalId}/track`}
               className="flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-slate-300"
             >
               <ArrowLeft size={14} />
@@ -78,7 +78,7 @@ export default async function LearnPage({ searchParams }: Props) {
               {topic}
             </span>
             <Link
-              href={fromGoalId ? `/study/${fromGoalId}` : "/learn"}
+              href={fromGoalId ? `/study/${fromGoalId}/track` : "/learn"}
               className="ml-auto text-xs text-slate-600 hover:text-slate-400 transition-colors"
             >
               Change topic

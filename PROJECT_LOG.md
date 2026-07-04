@@ -1159,3 +1159,101 @@ text as the reply — restoring the long-standing prose fallback — while still
 refusing to echo a malformed-but-JSON object (no brace re-leak). Added 3 tests
 (prose fallback, fence-stripped prose, no-brace-leak) → 29 total. Route also logs
 `stop_reason` + raw head if a reply is ever still empty.
+
+### Phase 23 — Study hub simplified to three paths: Learn · Apply · Show
+UX cleanup of the per-goal hub (`app/study/[goalId]/page.tsx`). Replaced the
+2×3 grid of six cards (Track, Ask, Converse + coming-soon Listen, Code, Events)
+with **three independent cards**:
+- **Learn** (live) — the entire existing experience. Links straight to
+  `/study/[goalId]/track`, which already carries the Track / Ask / Converse tab
+  bar (`StudyTabs`), so nothing under that route moved. Icon: `GraduationCap`,
+  green "Start here" accent.
+- **Apply** (locked placeholder) — hands-on challenges, not yet built. `Rocket`.
+- **Show** (locked placeholder) — demonstrate mastery, not yet built. `Trophy`.
+
+Decisions (confirmed with Travis):
+- Learn → straight into the Track board (no new intermediate sub-hub).
+- Listen / Code / Events cards **removed** (their ideas can fold into Apply/Show).
+- Apply / Show render as non-clickable "Coming soon" locked cards, matching the
+  existing locked-card styling.
+
+Also dropped the now-unused `converseUnlocked` DB lookup (tracks + milestones
+count) from the hub page — Converse lives as a tab inside Learn, so the hub no
+longer needs it. Navigation loop unchanged: hub → Learn → Track board → back to
+hub. Typecheck clean (`tsc --noEmit`).
+
+Marketing landing (`components/landing/FeatureCards.tsx`, shown pre-login) also
+re-themed to match: three cards **Learn** (Live → sign in / create account),
+**Apply** and **Show** (both "Coming soon" locked). Same icons as the hub
+(`GraduationCap` / `Rocket` / `Trophy`). Simplified the old per-card `active`
+state (was a `CardId` union for three toggleable cards) to a single boolean since
+only Learn expands now. Left untouched (still accurate): the hero copy and the
+four-step "How It Works" section on `app/page.tsx`.
+
+**Test user tooling.** Added `scripts/seed-test-user.mjs` — seeds/approves a
+local test learner (`test_user@testmail.com` / `password1234`) using the
+service-role key, bypassing email confirmation + the approval gate
+(`verifyUserAccess` → `/pending` for unapproved non-admins). `--reset` wipes the
+user's tracks (milestones cascade) + learning_goals to restore a blank
+new-learner dashboard. Idempotent; dev/test only.
+
+### Phase 24 — Email verification as the access gate (auto-approve on confirm)
+Moved from **invite-only manual approval** to **open sign-up gated by email
+verification**. Decision (Travis): auto-approve on verify, keep the admin board's
+block control for abuse (excessive token usage).
+- **`app/auth/confirm/route.ts`** (new GET handler) — the target of the sign-up
+  confirmation email. Handles both PKCE (`code` → `exchangeCodeForSession`) and
+  token-hash (`token_hash`+`type` → `verifyOtp`) flows. On success: sets the
+  session, service-client `UPDATE profiles SET approved = true` (non-fatal),
+  redirects to `next` (same-origin only, default `/home`).
+- **`app/(auth)/signup/page.tsx`** — `emailRedirectTo` now
+  `${origin}/auth/confirm?next=/home` (was `/home`). The existing "check your
+  inbox" screen still shows when confirmation is required.
+- **`app/pending/page.tsx`** — reworded from "invite-only / pending approval" to a
+  soft "confirm your email / finalizing access" fallback (auto-approve means
+  verified users skip it; only edge cases land there).
+- Admin board (`app/admin`) already lists per-user token usage + approve/block —
+  no change needed; the block switch is the abuse control.
+- Auto-approve implemented in the route, not a DB trigger, to avoid a manual
+  migration (DDL on `auth.users` can't go via the service key/PostgREST).
+
+**Requires Supabase dashboard steps (not code):** Auth → enable "Confirm email";
+add redirect URL `http://localhost:3000/auth/confirm` (+ prod domain); recommended
+to set the "Confirm signup" email template link to
+`{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/home`.
+Test account: `vtravisjohn@yahoo.com` / `password1234` (real inbox — sign up via
+UI, do not pre-seed). Typecheck clean.
+
+**Follow-up — deferred to GCP + interim unstick.** Diagnosed that "Confirm email"
+is OFF in Supabase (signups auto-confirmed, `confirmation_sent_at` null, no mail
+sent). Travis is bookmarking email verification + SMTP until the GCP move. Two
+consequences handled:
+- With confirmation OFF, `/auth/confirm` never runs, so new signups were
+  auto-confirmed but **not approved** → stuck at `/pending`. Added
+  `app/api/auth/self-approve/route.ts` (POST, service-role, sets `approved=true`
+  for the current user, never `is_blocked`), called from signup's immediate-login
+  branch (only reached when confirmation is OFF). **Remove this route + its fetch
+  when email verification is turned on.**
+- Scripts: `scripts/check-user.mjs <email>` (confirmation state),
+  `scripts/delete-user.mjs <email>` (reset an account), `scripts/approve-user.mjs
+  <email>|--all` (clear the pending wall). Ran `--all` to unstick the existing
+  pending account.
+
+### Phase 25 — Three activities promoted to a top-level picker
+The per-goal Learn/Apply/Show hub repeated a choice better made once, up front.
+Restructured the post-login IA:
+- **`app/home/page.tsx`** → now the **activity picker** (Learn · Apply🔒 · Show🔒),
+  the landing for every logged-in user. Learn → `/home/learn`.
+- **`app/home/learn/page.tsx`** (new) → the "What do you want to learn?" dashboard
+  (goal input + library + quota bar + min5 notice), moved out of `/home`. Adds a
+  back-link to `/home`.
+- **Opening a goal → straight to `/study/[goalId]/track`** (GoalCard Start
+  updated). Removed the per-goal hub body; `app/study/[goalId]/page.tsx` is now a
+  `redirect()` to `/track` so old links/bookmarks still resolve.
+- Back-links/redirects updated: track board back → `/home/learn`; `session.ts`
+  pause redirects → `/home/learn` (+`?notice=min5`); bare `/study/${id}` links in
+  `app/learn` + `app/tracker` repointed to `/track` (skip the redirect hop).
+- Apply/Show at the top level are locked "Coming soon" placeholders.
+
+Flow: `/home` (pick activity) → Learn → `/home/learn` (topics) → open goal → Track
+board (Track/Ask/Converse tabs). Typecheck clean.
