@@ -1,0 +1,155 @@
+{
+  "id": "streamly-abtest",
+  "title": "The Winning Test",
+  "scenario": {
+    "role": "Experimentation Analyst",
+    "company": "Streamly (streaming subscription platform)",
+    "situation": "A new paywall variant has been running for three days. It shows a 6% lift in subscription conversions and has crossed p<0.05. The PM is ready to ship.",
+    "stakeholderBelief": "The PM believes the variant is a clear winner and that waiting longer wastes revenue on an inferior control.",
+    "question": "Should you call this test and ship the variant?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The PM wants a green light. How do you frame your investigation before touching the results?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Confirm the lift is statistically significant",
+          "detail": "Re-run the significance test yourself to verify the PM's p<0.05 claim.",
+          "flag": "weak",
+          "consequence": "You confirm p<0.05 — and stop there. But verifying the PM's conclusion with the same test doesn't catch any of the structural problems that could be manufacturing this signal. You've added a step without adding insight.",
+          "divergenceCost": "Anchored on the stakeholder's conclusion and treated significance as the finish line, not the starting line."
+        },
+        {
+          "id": "B",
+          "label": "Run a test-health diagnostic before reading the results",
+          "detail": "Check sample ratio, traffic composition, elapsed vs. planned duration, and whether results were observed early — before interpreting the lift.",
+          "flag": "strong",
+          "consequence": "You find three problems before even looking at lift: the sample split is off, bot traffic is elevated in one arm, and the test is at 30% of its pre-registered runtime. The 6% signal now has obvious alternative explanations to investigate.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Segment the result by user cohort",
+          "detail": "Break out conversion lift by new vs. returning users to see which segment is driving the 6%.",
+          "flag": "weak",
+          "consequence": "Segmentation is useful — but done before checking test health, you're analyzing a potentially contaminated result. Any segment-level finding inherits the same structural problems.",
+          "divergenceCost": "Skipped test-validity checks and began interpreting a result that may be structurally unsound."
+        },
+        {
+          "id": "D",
+          "label": "Estimate revenue impact and ship if it's large enough",
+          "detail": "Project the 6% lift to annual revenue; if the number is big, the business case overrides statistical caution.",
+          "flag": "weak",
+          "consequence": "A large projected number accelerates the decision — but projecting a lift that may be a false positive just scales the error. Revenue framing bypasses the analytical question entirely.",
+          "divergenceCost": "Substituted a business-impact projection for a validity check, compounding the risk of a false winner."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "Your diagnostic flags two issues: a possible sample-ratio mismatch and early stopping. Which view of the data do you trust to assess what's actually happening?",
+      "artifact": {
+        "type": "bars",
+        "title": "Observed conversion lift by day — Control vs. Variant",
+        "bars": [
+          {
+            "label": "Day 1 lift",
+            "value": 9.2
+          },
+          {
+            "label": "Day 2 lift",
+            "value": 7.8
+          },
+          {
+            "label": "Day 3 lift (current)",
+            "value": 6.1,
+            "highlight": true
+          },
+          {
+            "label": "Day 4 (projected pre-reg end)",
+            "value": 0
+          }
+        ],
+        "caption": "Raw daily lift percentages. The lift is declining each day and the test is at 30% of its planned duration — but p<0.05 was crossed on Day 3."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "The current p-value and observed lift",
+          "detail": "Use the live significance result: p=0.043, lift=6.1%.",
+          "flag": "weak",
+          "consequence": "p<0.05 is real — but it was computed on day 3 of a 10-day pre-registered test. Checking significance repeatedly and stopping the moment it crosses is exactly how false positives are manufactured. The p-value is valid only at the pre-registered sample size.",
+          "divergenceCost": "Treated a mid-test p-value as a terminal result, ignoring that repeated peeking inflates the false-positive rate."
+        },
+        {
+          "id": "B",
+          "label": "Sample-ratio check + lift trend at full pre-registered duration",
+          "detail": "Verify that control and variant received their intended traffic share; then model the lift trajectory through the planned end date.",
+          "flag": "strong",
+          "consequence": "The sample ratio is 52/48 instead of 50/50 — a statistically significant mismatch (p=0.01) pointing to bot inflation in the variant arm. Projecting the declining lift trend to day 10 puts the confidence interval squarely overlapping zero. There is no detectable winner.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Sample-ratio check + lift at pre-registered horizon",
+            "bars": [
+              {
+                "label": "Expected variant share (%)",
+                "value": 50
+              },
+              {
+                "label": "Observed variant share (%)",
+                "value": 52.3,
+                "highlight": true
+              },
+              {
+                "label": "Lift at Day 3 (%)",
+                "value": 6.1
+              },
+              {
+                "label": "Projected lift at Day 10 (%)",
+                "value": 0.4
+              }
+            ],
+            "caption": "Variant arm is over-allocated by 2.3 points — a significant sample-ratio mismatch. Projected lift at the pre-registered horizon is 0.4%, indistinguishable from zero."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The sample-ratio mismatch and declining lift trend undercut the early result. What do you tell the PM?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The test is invalid — bot traffic broke it. Don't ship.\"",
+          "detail": "Make the call: declare the test void and stop the conversation.",
+          "flag": "weak",
+          "consequence": "You're probably right, but 'don't ship' without a path forward leaves the PM with nothing actionable and invites them to override you. Declaring invalidity without a remediation plan isn't an analytical recommendation — it's a veto.",
+          "divergenceCost": "Overclaimed a definitive conclusion and skipped the remediation path, reducing credibility and leaving no forward plan."
+        },
+        {
+          "id": "B",
+          "label": "\"Early results look promising but two validity problems prevent a clean call — here's how we get a trustworthy answer.\"",
+          "detail": "Present the SRM finding and peeking risk; recommend bot-traffic filtering, resetting the test, and running to the pre-registered 10-day horizon before deciding.",
+          "flag": "strong",
+          "consequence": "The PM understands why the current signal can't be trusted, sees a concrete path to a real answer, and the business doesn't ship a potentially null change. You've added rigor without blocking progress.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The 6% lift was a mirage assembled from three compounding errors: repeated significance peeking (which inflates false positives each time you look), a sample-ratio mismatch from bot traffic that over-allocated users to the variant, and a novelty effect that faded by day three. When the test was projected to its pre-registered 10-day horizon with clean traffic, the lift collapsed to near zero. The lesson is that a p-value is only valid at the sample size for which it was pre-registered — stopping the moment significance appears is not optional discipline, it is the entire mechanism that keeps A/B testing honest."
+}

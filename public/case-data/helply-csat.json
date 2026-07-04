@@ -1,0 +1,151 @@
+{
+  "id": "helply-csat",
+  "title": "The CSAT Drop",
+  "scenario": {
+    "role": "CX Analyst",
+    "company": "Helply (B2B support platform)",
+    "situation": "Average CSAT fell from 4.4 to 3.9 this month across all support tickets.",
+    "stakeholderBelief": "The Support Director is convinced agents have gotten sloppy — she wants to launch a coaching plan and flag low-scorers in their performance reviews.",
+    "question": "Is the CSAT drop actually an agent-quality problem?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The Support Director wants action now. How do you frame the investigation before touching the agent data?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Rank agents by CSAT and find the low performers",
+          "detail": "Pull each agent's average CSAT this month vs. last and sort ascending to find who dropped.",
+          "flag": "weak",
+          "consequence": "You produce a ranking — but if the overall metric is broken, the ranking inherits the same flaw. You've identified which agents are lowest in a corrupted sample, not who actually declined in quality.",
+          "divergenceCost": "Anchored on the Director's hypothesis and inherited the metric's hidden flaw."
+        },
+        {
+          "id": "B",
+          "label": "Audit the metric itself before blaming the people it measures",
+          "detail": "Ask: did anything change about HOW or WHOM CSAT is collected from before asking whether agents changed?",
+          "flag": "strong",
+          "consequence": "You surface two recent changes — a new survey trigger and a ticket-mix shift toward billing issues — that could move the number without any agent behavior changing. This is the thread.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Run a regression of CSAT on agent attributes",
+          "detail": "Model CSAT as a function of agent tenure, shift, and ticket volume to find structural causes.",
+          "flag": "weak",
+          "consequence": "The model returns some significant coefficients, but you're fitting a noisy, potentially biased outcome variable. Sophistication here amplifies the measurement problem rather than diagnosing it.",
+          "divergenceCost": "Jumped to modeling before validating the outcome metric — garbage in, garbage out."
+        },
+        {
+          "id": "D",
+          "label": "Survey customers who gave low scores",
+          "detail": "Follow up with 1-star and 2-star raters to ask what went wrong.",
+          "flag": "weak",
+          "consequence": "Qualitative feedback trickles in slowly and reflects the already-skewed responder pool. You get color on why angry customers are angry, but no signal on whether agent quality actually changed.",
+          "divergenceCost": "Chose a slow instrument that samples from the same biased pool causing the problem."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You find that a new survey trigger launched this month AND billing tickets spiked. Which cut of the data do you trust to assess agent quality?",
+      "artifact": {
+        "type": "bars",
+        "title": "Average CSAT by ticket category — this month (all respondents)",
+        "bars": [
+          {
+            "label": "Billing",
+            "value": 3.1,
+            "highlight": false
+          },
+          {
+            "label": "Technical",
+            "value": 3.8
+          },
+          {
+            "label": "Onboarding",
+            "value": 4.3
+          },
+          {
+            "label": "Account Mgmt",
+            "value": 4.2
+          }
+        ],
+        "caption": "Raw CSAT averages by category this month. Billing drags the overall score — but is that agents, or the broken billing feature itself?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Overall average CSAT, month-over-month",
+          "detail": "Compare this month's 3.9 to last month's 4.4 across all tickets and all respondents.",
+          "flag": "weak",
+          "consequence": "The 0.5-point drop looks damning, but it folds together a response-pool change (angrier customers now get the survey) and a ticket-mix shift (more billing tickets). You cannot tell if agents caused any of it.",
+          "divergenceCost": "Used an aggregate that conflates measurement change, mix shift, and agent quality into one uninterpretable number."
+        },
+        {
+          "id": "B",
+          "label": "Agent CSAT on non-billing tickets, like-for-like responder cohort",
+          "detail": "Hold ticket category constant (exclude billing) and compare only customers who met the OLD trigger criteria both months.",
+          "flag": "strong",
+          "consequence": "Controlling for category and responder eligibility, agent CSAT on comparable tickets is 4.3 this month vs. 4.4 last month — a 0.1-point difference well within normal variance. Agent quality is essentially flat; the drop lives entirely in mix shift and sample composition.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Agent CSAT — non-billing tickets, like-for-like responder cohort",
+            "bars": [
+              {
+                "label": "Last month (all categories, old trigger)",
+                "value": 4.4
+              },
+              {
+                "label": "This month (billing excluded, old trigger criteria)",
+                "value": 4.3,
+                "highlight": true
+              },
+              {
+                "label": "This month (billing only, new trigger)",
+                "value": 3.1
+              }
+            ],
+            "caption": "When you hold the measurement population and ticket mix constant, agent performance is unchanged. The drop is entirely explained by who is surveyed and what they needed help with."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Like-for-like data shows agents are flat, but billing tickets tanked CSAT. What do you tell the Support Director?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"It's 100% the billing bug and the survey trigger — agents are fine, cancel the coaching plan.\"",
+          "detail": "Make the full causal claim and recommend no agent action.",
+          "flag": "weak",
+          "consequence": "You've correctly identified the drivers, but overclaiming certainty means the Director either dismisses you as defensive of agents, or acts on your word without a verifiable path. If any residual agent issue exists, it goes unmonitored.",
+          "divergenceCost": "Overclaimed certainty and left no mechanism for the Director to verify or for real agent issues to surface."
+        },
+        {
+          "id": "B",
+          "label": "\"The metric moved because of who we're measuring and what they asked about — agent quality looks stable, but let's confirm with a clean scorecard before closing the loop.\"",
+          "detail": "Present the mix-shift and responder-bias findings, hold the causal claim appropriately, and propose a like-for-like agent scorecard going forward.",
+          "flag": "strong",
+          "consequence": "The Director sees the evidence reframing her assumption, understands the measurement problem, and agrees to pause the coaching plan while a cleaner CSAT instrument is designed. You've protected agents from an unfair action and improved the measurement system.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The CSAT drop was not an agent-quality story — it was a measurement story. A new survey trigger selectively captured dissatisfied customers, and a spike in billing tickets (driven by a broken feature) flooded the sample with low scores that had nothing to do with agent behavior. The lesson is that a metric's population can shift under you without anyone noticing: before blaming the people being measured, audit who is being measured, under what conditions, and whether the mix of what they experienced has changed."
+}

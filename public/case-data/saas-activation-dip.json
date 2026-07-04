@@ -1,0 +1,172 @@
+{
+  "id": "saas-activation-dip",
+  "title": "The Activation Dip",
+  "scenario": {
+    "role": "Product Analyst",
+    "company": "Flowdesk",
+    "situation": "Activation rate dropped from 41% to 34% right after the onboarding redesign shipped two weeks ago. The PM is preparing a rollback.",
+    "stakeholderBelief": "The PM is convinced the redesign broke activation and wants to revert it this week before more users are harmed.",
+    "question": "Did the redesign actually hurt activation — or is something else moving the blended number?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The PM wants a fast answer to justify the rollback. How do you structure the investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Before/after comparison on the redesign ship date",
+          "detail": "Compare overall activation rate the two weeks before launch vs. the two weeks after.",
+          "flag": "weak",
+          "consequence": "You confirm the drop exists — 41% before, 34% after. But the before/after framing accepts the PM's causal story without questioning what else changed at the same time. The paid-marketing surge happened in the same window and is invisible to this analysis.",
+          "divergenceCost": "Anchored on the redesign as the cause and treated a coincident change as background noise."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic segmentation across acquisition channels and cohorts",
+          "detail": "Break activation by acquisition source and signup cohort to see whether the drop is uniform or concentrated in a specific slice.",
+          "flag": "strong",
+          "consequence": "Slicing by acquisition source immediately reveals that activation improved or held steady inside every organic and paid segment individually — but a new flood of low-intent paid signups arrived at the same time and is dragging the blended rate down. The redesign itself is off the hook.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Review session recordings of new users hitting the onboarding flow",
+          "detail": "Watch Hotjar/FullStory recordings to find where users drop off in the redesigned flow.",
+          "flag": "weak",
+          "consequence": "You find some confusing UI moments, but the drop-off pattern is similar to pre-launch recordings. The qualitative signal doesn't explain a 7-point blended decline and takes days to synthesize without pointing to the real driver.",
+          "divergenceCost": "Chose a slow qualitative instrument when the answer was already in the quantitative acquisition data."
+        },
+        {
+          "id": "D",
+          "label": "Run a statistical significance test on the overall rate change",
+          "detail": "Test whether 41% → 34% is statistically significant given signup volume.",
+          "flag": "weak",
+          "consequence": "The drop is highly significant — but significance only tells you the number really changed, not why. You've validated the alarm without diagnosing the cause, and the PM's rollback narrative gets extra fuel with no new insight.",
+          "divergenceCost": "Answered 'is the drop real?' instead of 'what caused it?' — precision without diagnosis."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You decide to look at activation by acquisition segment. Which view of the data do you use to make your case?",
+      "artifact": {
+        "type": "bars",
+        "title": "Activated users by acquisition segment — post-redesign period",
+        "bars": [
+          {
+            "label": "Organic Search",
+            "value": 870
+          },
+          {
+            "label": "Direct / Brand",
+            "value": 530
+          },
+          {
+            "label": "Product-Led Referral",
+            "value": 410
+          },
+          {
+            "label": "Paid Performance",
+            "value": 340,
+            "highlight": true
+          }
+        ],
+        "caption": "Raw activated user counts. Paid Performance looks manageable in absolute terms — but is the base it came from normal?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Activated user counts by segment",
+          "detail": "Count how many users activated within each acquisition segment after the redesign.",
+          "flag": "weak",
+          "consequence": "Paid Performance doesn't look alarming in absolute activated users — 340 is mid-table. You'd miss that it brought in 2,800 raw signups vs. the usual 900, making its activation rate a fraction of normal. The mix-shift story stays hidden.",
+          "divergenceCost": "Compared raw activated counts without accounting for the surge in signup volume — size confounded the signal."
+        },
+        {
+          "id": "B",
+          "label": "Activation rate by segment, pre- vs. post-redesign",
+          "detail": "Calculate activation % within each segment for both periods and compare them side by side.",
+          "flag": "strong",
+          "consequence": "The segment-level rates tell the opposite story from the blended number: Organic Search, Direct, and Referral all improved slightly. Paid Performance's rate is low both periods — but its share of total signups tripled after the marketing push, pulling the average down. The redesign didn't cause the dip; the mix shift did.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Activation RATE by segment — pre vs. post redesign (%)",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "Organic Search (pre)",
+                "value": 52
+              },
+              {
+                "label": "Organic Search (post)",
+                "value": 55
+              },
+              {
+                "label": "Direct / Brand (pre)",
+                "value": 48
+              },
+              {
+                "label": "Direct / Brand (post)",
+                "value": 51
+              },
+              {
+                "label": "Prod-Led Referral (pre)",
+                "value": 44
+              },
+              {
+                "label": "Prod-Led Referral (post)",
+                "value": 47
+              },
+              {
+                "label": "Paid Performance (pre)",
+                "value": 18
+              },
+              {
+                "label": "Paid Performance (post)",
+                "value": 12,
+                "highlight": true
+              }
+            ],
+            "caption": "Every organic segment improved post-redesign. Paid Performance's rate is low both periods — but its signup volume tripled, dragging the blended rate from 41% to 34%. The redesign is not the culprit."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Segment-level activation rates tell the opposite story from the blended number. What do you tell the PM?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The redesign worked — it's the paid campaign that broke activation. Kill the campaign.\"",
+          "detail": "Attribute the dip entirely to the marketing mix shift and recommend stopping paid spend.",
+          "flag": "weak",
+          "consequence": "You've replaced one causal overclaim with another. Paid Performance's low rate may reflect intent, targeting, landing-page fit, or audience quality — you haven't isolated which lever is responsible. Cutting the campaign without that clarity could waste real growth opportunity.",
+          "divergenceCost": "Overclaimed causation in the opposite direction — swapped the redesign story for a campaign story without validating either."
+        },
+        {
+          "id": "B",
+          "label": "\"The blended drop looks like a mix-shift effect, not a redesign failure — every segment held or improved. Before rolling back, let's confirm with a controlled holdout and audit the paid campaign's audience targeting.\"",
+          "detail": "Present the segment evidence, flag the mix-shift mechanism, and propose a causal confirmation step before any product or marketing decision.",
+          "flag": "strong",
+          "consequence": "The PM sees the segment data, understands why the blended number moved, and agrees to pause the rollback. You've protected a redesign that actually worked while flagging the paid campaign for targeting review — and you've named the next confirmatory step rather than pretending correlation is causation.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The activation dip was a textbook Simpson's paradox: the blended rate fell from 41% to 34% while activation improved inside every acquisition segment. A paid-marketing surge tripled the share of low-intent signups, and their low base-rate dragged the average down — the redesign had nothing to do with it. The lesson is to segment before you conclude: a pooled metric can move in the opposite direction of every subgroup, and anchoring on a stakeholder's narrative without checking the composition of the data is how sound redesigns get rolled back for no reason."
+}

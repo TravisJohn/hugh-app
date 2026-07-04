@@ -1,0 +1,156 @@
+{
+  "id": "subly-ltv",
+  "title": "The Golden Cohort",
+  "scenario": {
+    "role": "Growth Analyst",
+    "company": "Subly (B2C subscription app)",
+    "situation": "The headline LTV figure is up 34% year-over-year, and leadership is preparing to double the acquisition budget to capitalise on what looks like a highly profitable user base.",
+    "stakeholderBelief": "The CFO believes the rising LTV proves the product has found its groove and that spending more on acquisition now will compound returns — he wants budget approved this week.",
+    "question": "Does the LTV number actually support raising the acquisition budget?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The CFO wants a green light. How do you frame your investigation before touching the numbers?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Validate the LTV model inputs",
+          "detail": "Check the formula — ARPU, gross margin, discount rate — and confirm each input is accurate.",
+          "flag": "weak",
+          "consequence": "The inputs check out individually, so the model looks fine on paper. But a correct formula applied to a biased population still produces a biased answer — you've confirmed arithmetic, not validity.",
+          "divergenceCost": "Audited the mechanics of the model without questioning who was included in it."
+        },
+        {
+          "id": "B",
+          "label": "Decompose LTV by cohort maturity and inclusion criteria",
+          "detail": "Ask which users were included in the LTV calculation, then compare LTV across cohorts of different ages to see whether the number holds up as cohorts mature.",
+          "flag": "strong",
+          "consequence": "You immediately discover that LTV was calculated only on still-active users and that the most recent cohorts are less than six months old — nowhere near churn equilibrium. The headline figure is a function of who was included, not how good the product is.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Benchmark LTV against industry comps",
+          "detail": "Pull competitor or industry LTV benchmarks to judge whether Subly's number is credible.",
+          "flag": "weak",
+          "consequence": "Industry benchmarks confirm the LTV is within a plausible range, which feels reassuring — but benchmarks also use varied methodologies, so this comparison doesn't reveal whether Subly's own number is computed correctly.",
+          "divergenceCost": "Used external comparisons to validate a number whose internal construction was the real problem."
+        },
+        {
+          "id": "D",
+          "label": "Segment LTV by acquisition channel to find the best performers",
+          "detail": "Break LTV down by paid, organic, and referral channels to identify where to concentrate budget.",
+          "flag": "weak",
+          "consequence": "You surface channel-level LTV differences, but every channel figure inherits the same survivorship bias from the headline number. You've subdivided a flawed metric, not fixed it.",
+          "divergenceCost": "Optimised channel mix on top of a biased baseline, amplifying rather than catching the error."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You pull LTV by cohort. Which view do you use to make the case to leadership?",
+      "artifact": {
+        "type": "bars",
+        "title": "Reported LTV by acquisition cohort (active-user LTV, all ages)",
+        "bars": [
+          {
+            "label": "2021 Q1",
+            "value": 187
+          },
+          {
+            "label": "2022 Q1",
+            "value": 201
+          },
+          {
+            "label": "2023 Q1",
+            "value": 224
+          },
+          {
+            "label": "2024 Q1",
+            "value": 239,
+            "highlight": true
+          }
+        ],
+        "caption": "LTV appears to be rising every year — the 2024 cohort looks like the strongest ever. But each bar is computed only on users still active today, and the 2024 cohort is only 4 months old."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Reported LTV by cohort (active users only, all ages pooled)",
+          "detail": "Use the existing LTV figures broken out by cohort year as produced by the current model.",
+          "flag": "weak",
+          "consequence": "The upward trend looks compelling — but every bar excludes churned users, and the newest cohorts have had almost no time to churn. The rising line reflects survivorship bias compounding with cohort immaturity, not genuine improvement.",
+          "divergenceCost": "Presented a trend built on a population that excludes the very users who define long-run LTV."
+        },
+        {
+          "id": "B",
+          "label": "Cohort-complete LTV at 12-month age (churn-adjusted, like-for-like)",
+          "detail": "Recalculate LTV using all users ever acquired per cohort (including churned), truncated at 12 months of age so every cohort is compared at the same life stage.",
+          "flag": "strong",
+          "consequence": "Normalized to the same cohort age and inclusive of churned users, the picture reverses: older cohorts show healthy LTV, but 2023 and 2024 cohorts come in well below CAC. The 'rising' trend was an artifact of who was counted and how young the cohorts were.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Cohort-complete LTV at 12-month cohort age (all acquired users, churn-adjusted)",
+            "unit": "$",
+            "bars": [
+              {
+                "label": "2021 Q1",
+                "value": 164
+              },
+              {
+                "label": "2022 Q1",
+                "value": 158
+              },
+              {
+                "label": "2023 Q1",
+                "value": 97
+              },
+              {
+                "label": "2024 Q1",
+                "value": 71,
+                "highlight": true
+              }
+            ],
+            "caption": "At the same cohort age and including churned users, LTV is falling — and the 2024 cohort ($71) sits well below the current blended CAC of $118."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Cohort-complete LTV for recent cohorts is below CAC. What do you tell the CFO?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"LTV is overstated and the acquisition budget should be cut immediately.\"",
+          "detail": "Make the directional call and recommend a budget reduction.",
+          "flag": "weak",
+          "consequence": "You've correctly identified the bias, but a hard budget-cut recommendation from correlational cohort data may be premature — 2024 cohorts are still maturing, and a confounding factor (e.g., a bad seasonal campaign) could explain part of the drop. Acting without a causal check risks overcorrecting.",
+          "divergenceCost": "Translated a valid measurement finding into a causal prescription without ruling out confounders."
+        },
+        {
+          "id": "B",
+          "label": "\"The headline LTV is inflated by survivorship bias and cohort immaturity — recent cohorts look unprofitable on a like-for-like basis. We should hold the budget increase and run a cohort-controlled analysis before committing.\"",
+          "detail": "Present the finding, name the methodological cause, and recommend a controlled validation step before acting.",
+          "flag": "strong",
+          "consequence": "You've reframed the CFO's assumption with rigorous evidence, explained exactly why the headline figure is misleading, and proposed a clear next step — a cohort-controlled review with CAC benchmarked against mature-cohort LTV. This protects the company from a costly mistake while giving leadership a concrete path forward.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The 34% LTV increase was entirely an artifact of two compounding biases: computing LTV only on surviving (active) users excluded the churned population that defines true long-run value, and anchoring on young cohorts that hadn't yet reached churn equilibrium made recent performance look artificially strong. When cohorts are compared at the same age and include all acquired users, LTV is falling — and drops below CAC for the most recent cohorts. The lesson is that LTV is only trustworthy when it is cohort-complete, churn-adjusted, and compared like-for-like across cohort ages; anything less risks pouring acquisition budget into a funnel that is quietly losing money."
+}

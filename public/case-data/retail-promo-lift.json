@@ -1,0 +1,143 @@
+{
+  "id": "retail-promo-lift",
+  "title": "The Promo That Worked",
+  "scenario": {
+    "role": "Junior Marketing Analyst",
+    "company": "RetailCo",
+    "situation": "Sales spiked 18% the week of a 20%-off promotion. The Head of Growth is thrilled and wants to run it every month.",
+    "stakeholderBelief": "The Head of Growth is convinced the promo drove the spike and believes scaling it monthly will compound revenue growth.",
+    "question": "Did the promo actually generate incremental sales — or did something else explain the spike?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The Head of Growth wants confirmation before locking in the monthly calendar. How do you frame the investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Before/after sales comparison",
+          "detail": "Compare total store sales the promo week against the prior week.",
+          "flag": "weak",
+          "consequence": "Sales did jump 18% week-over-week — exactly what the Head of Growth already knows. But you haven't ruled out seasonality, pull-forward, or anything else that moved in the same window. You've confirmed the observation, not the cause.",
+          "divergenceCost": "Anchored on the stakeholder's framing and confirmed the observation without testing its cause."
+        },
+        {
+          "id": "B",
+          "label": "Counterfactual comparison against a holdout region",
+          "detail": "Identify regions that did not receive the promo and compare their sales trajectory to the promo regions over the same period.",
+          "flag": "strong",
+          "consequence": "You now have a baseline: non-promo regions show a nearly identical sales trend that week. The gap between promo and holdout — incremental lift — is far smaller than the raw spike suggested, and a different driver becomes visible.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Survey customers who purchased during the promo",
+          "detail": "Ask buyers whether the discount motivated their purchase.",
+          "flag": "weak",
+          "consequence": "Nearly everyone says the deal influenced them — because you only asked people who bought during a sale. Non-purchasers and holdout shoppers aren't in the sample, so you've measured self-reported motivation, not incremental demand.",
+          "divergenceCost": "Surveyed only the treated group, producing a sample biased entirely toward confirming the promo's appeal."
+        },
+        {
+          "id": "D",
+          "label": "Build a revenue attribution model",
+          "detail": "Run a multi-touch attribution model across marketing channels for the promo week.",
+          "flag": "weak",
+          "consequence": "The model allocates credit across channels and awards the promo a large share — but attribution models assume the spend caused the sale. They don't test whether the sale would have happened anyway, so pull-forward and seasonality remain invisible.",
+          "divergenceCost": "Applied attribution modeling before establishing a counterfactual, embedding the causal assumption rather than testing it."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You have sales data for both promo and holdout regions across the promo week. Which metric do you use to assess the promo's true effect?",
+      "artifact": {
+        "type": "bars",
+        "title": "Total sales — promo week, by region type",
+        "bars": [
+          {
+            "label": "Promo regions",
+            "value": 2360000
+          },
+          {
+            "label": "Holdout regions",
+            "value": 2180000
+          }
+        ],
+        "caption": "Raw weekly sales. Promo regions look higher — but holdout regions are smaller markets. Is the gap real lift or just market size?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Raw sales totals in promo vs. holdout regions",
+          "detail": "Compare the absolute dollar sales figures between the two region groups that week.",
+          "flag": "weak",
+          "consequence": "Promo regions show $180K more in sales — which sounds like lift. But holdout regions are smaller markets with a different baseline. You're comparing apples to oranges, and the gap reflects market size as much as promo impact.",
+          "divergenceCost": "Compared raw totals across markets of different sizes, mistaking a scale difference for an incremental effect."
+        },
+        {
+          "id": "B",
+          "label": "Indexed sales lift: promo-week growth rate vs. holdout-week growth rate",
+          "detail": "Calculate each region's week-over-week sales growth rate, then compare the two rates. The difference is the incremental lift attributable to the promo.",
+          "flag": "strong",
+          "consequence": "Indexed to each region's own baseline, holdout regions grew 16.1% that same week — nearly matching the promo regions' 18%. Incremental lift is roughly 2 percentage points, not 18. The bulk of the spike was seasonal, and the promo week's dip in full-price units confirms pull-forward cannibalization.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Week-over-week sales growth rate: promo vs. holdout regions",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "Holdout regions (no promo)",
+                "value": 16.1
+              },
+              {
+                "label": "Promo regions",
+                "value": 18
+              },
+              {
+                "label": "Incremental lift (difference)",
+                "value": 1.9,
+                "highlight": true
+              }
+            ],
+            "caption": "Indexed to each region's own prior-week baseline, incremental lift collapses to ~2 pp. The remaining 16 pp was seasonal demand that arrived with or without the promo."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Indexed against the holdout, incremental lift is ~2 pp — and full-price unit sales dipped post-promo, suggesting pull-forward. What do you tell the Head of Growth?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The promo didn't work — it was just seasonality. Cancel the monthly plan.\"",
+          "detail": "Make the causal call and recommend stopping.",
+          "flag": "weak",
+          "consequence": "You've correctly identified the problem but overplayed certainty. A two-region comparison is suggestive, not definitive — different regional demographics or distribution patterns could explain part of the gap. Recommending a full cancel without a confirmatory test risks being wrong in the other direction.",
+          "divergenceCost": "Overclaimed certainty in the opposite direction and recommended action without a confirmatory test."
+        },
+        {
+          "id": "B",
+          "label": "\"The raw spike looks like seasonality and pull-forward, not promo lift — holdout data puts incremental gain near 2 pp. Before committing to monthly, let's run a designed holdout experiment to confirm and size the true effect.\"",
+          "detail": "Present the finding, flag the causal gap, and propose a confirmatory path.",
+          "flag": "strong",
+          "consequence": "You reframe the Head of Growth's assumption with concrete evidence — the 18% spike dissolves to ~2 pp against a baseline — while acknowledging the limits of a two-region comparison. You propose a controlled experiment to get a defensible answer before scaling spend.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The 18% sales spike was almost entirely explained by a seasonal peak that lifted holdout regions just as much as promo regions — and the post-promo dip in full-price units confirmed that part of the promo-week demand was simply borrowed from future weeks. The real lesson is that raw before/after comparisons are nearly useless for measuring promotion effectiveness: a seasonal trend, a holiday, or a weather event can produce the same shape. Incrementality only becomes visible when you hold something back and measure the gap — and even then, a single holdout comparison warrants a confirmatory experiment before you scale."
+}

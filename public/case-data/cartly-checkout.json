@@ -1,0 +1,148 @@
+{
+  "id": "cartly-checkout",
+  "title": "The Checkout Cliff",
+  "scenario": {
+    "role": "Growth Analyst",
+    "company": "Cartly",
+    "situation": "Checkout abandonment jumped from 68% to 76% the week the new checkout redesign launched.",
+    "stakeholderBelief": "The design lead is convinced the redesign is the culprit and is pushing for an immediate full revert before the week is out.",
+    "question": "Should the redesign be reverted, or is the story more specific than the aggregate suggests?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The design lead wants a fast answer. How do you structure the investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Before/after comparison on overall abandonment rate",
+          "detail": "Compare the single aggregate abandonment metric for the week before vs. the week after the redesign launched.",
+          "flag": "weak",
+          "consequence": "The aggregate confirms abandonment went up 8 points — which looks damning. But you've only validated the number everyone already knew. The investigation hasn't moved; you're still stuck at the same level of detail the design lead was.",
+          "divergenceCost": "Anchored on the aggregate metric and confirmed the obvious without adding diagnostic value."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic segmentation before drawing conclusions",
+          "detail": "Segment abandonment by device type, browser, and traffic source to see where the spike is concentrated — before assuming the whole redesign is at fault.",
+          "flag": "strong",
+          "consequence": "Slicing by segment immediately reveals the spike is not uniform. Desktop abandonment held steady or improved; the entire delta is concentrated on mobile. A concentrated failure is a fixable failure — very different from a wholesale design regression.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Run a user survey on checkout experience",
+          "detail": "Send a post-abandonment survey to users who dropped off asking what stopped them from completing the purchase.",
+          "flag": "weak",
+          "consequence": "Survey responses trickle in over days, and only the most motivated users respond — skewing toward frustrated power users. You get qualitative color but no timely signal about where in the funnel or which segment is actually failing.",
+          "divergenceCost": "Chose a slow, self-selected instrument when a behavioral data cut was immediately available."
+        },
+        {
+          "id": "D",
+          "label": "Audit every UI change in the redesign spec",
+          "detail": "Go through the design changelog line by line and guess which element might be causing drop-off.",
+          "flag": "weak",
+          "consequence": "You produce a long list of candidate changes with no data to rank them. Without knowing which segment is affected, you're guessing — and you could easily flag the wrong element while the real culprit (the mobile address field) stays live.",
+          "divergenceCost": "Substituted design intuition for data — generated hypotheses without evidence to prioritize them."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "Segmenting by device type surfaces a difference. Which metric do you use to confirm where the real problem lives?",
+      "artifact": {
+        "type": "bars",
+        "title": "Abandoned checkouts by device — this week (raw counts)",
+        "bars": [
+          {
+            "label": "Desktop",
+            "value": 14200
+          },
+          {
+            "label": "Mobile",
+            "value": 19800,
+            "highlight": true
+          },
+          {
+            "label": "Tablet",
+            "value": 3100
+          }
+        ],
+        "caption": "Raw abandoned-checkout counts. Mobile shows the largest bar — but mobile also drives the majority of Cartly's traffic. Is this risk or just volume?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Raw abandoned-checkout counts by device",
+          "detail": "Look at the absolute number of abandoned checkouts on each device type.",
+          "flag": "weak",
+          "consequence": "Mobile has the most abandoned checkouts — but mobile is also Cartly's highest-traffic device by far. You're reading traffic share, not abandonment risk. Desktop could be quietly improving and tablet quietly worsening; you'd never know from counts alone.",
+          "divergenceCost": "Compared raw counts across device segments with very different traffic volumes — a classic size confound."
+        },
+        {
+          "id": "B",
+          "label": "Abandonment rate by device, this week vs. last week",
+          "detail": "Calculate abandonment rate (abandoned ÷ checkout-initiated) within each device segment, and compare the change week-over-week.",
+          "flag": "strong",
+          "consequence": "Normalized by traffic, the picture flips: desktop abandonment actually fell 2 points, tablet was flat, and mobile abandonment surged 14 points — from 71% to 85%. The aggregate jump is entirely a mobile story. The redesign didn't get worse overall; one platform-specific element broke.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Abandonment rate change by device (this week vs. last week, percentage points)",
+            "unit": "pp",
+            "bars": [
+              {
+                "label": "Desktop",
+                "value": -2.1
+              },
+              {
+                "label": "Tablet",
+                "value": 0.3
+              },
+              {
+                "label": "Mobile",
+                "value": 14.2,
+                "highlight": true
+              }
+            ],
+            "caption": "Normalized to initiated checkouts, mobile abandonment jumped +14.2 pp while desktop actually improved. The aggregate hid a concentrated, platform-specific failure."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Mobile abandonment rate spiked sharply while desktop improved. What do you tell the design lead?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The redesign broke mobile autofill — patch the address field and don't revert.\"",
+          "detail": "Make the full causal call and prescribe the fix.",
+          "flag": "weak",
+          "consequence": "You've correctly identified mobile as the locus and autofill as the likely culprit — but you've stated a causal conclusion from correlational timing data. If another mobile-only change shipped the same week (a third-party script, a CDN config), you could be patching the wrong thing and leaving the real break live.",
+          "divergenceCost": "Overclaimed causation from a correlation — skipped the step that guards against fixing the wrong thing."
+        },
+        {
+          "id": "B",
+          "label": "\"The aggregate masks a mobile-specific spike; desktop improved. The strongest correlate is the new address field disrupting autofill — recommend a targeted mobile fix or isolated mobile rollback, and instrument the field to confirm before touching desktop.\"",
+          "detail": "State the segmented finding, name the likely driver, and recommend a targeted action with a validation step.",
+          "flag": "strong",
+          "consequence": "You've reframed the design lead's all-or-nothing revert with evidence: the redesign isn't uniformly worse, and a full revert would discard real desktop gains. You've named the hypothesis precisely enough to act on, flagged the causal gap, and proposed a scoped fix that protects learnings while addressing the real failure.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The 8-point abandonment jump was real — but it was entirely a mobile phenomenon hiding inside an aggregate number. Desktop actually improved, and tablet was flat. The new address field disrupted browser autofill on mobile, concentrating the failure in one segment. The lesson: before reverting anything, cut your funnel metric by device and platform. An aggregate that moves doesn't tell you what broke or where — and acting on it can mean throwing away real gains to fix a problem that never existed there."
+}

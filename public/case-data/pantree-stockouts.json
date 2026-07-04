@@ -1,0 +1,154 @@
+{
+  "id": "pantree-stockouts",
+  "title": "The Stockout Surge",
+  "scenario": {
+    "role": "Supply Chain Analyst",
+    "company": "Pantree (online grocery platform)",
+    "situation": "Stockout incidents rose 40% last quarter, triggering customer complaints and lost revenue.",
+    "stakeholderBelief": "The Ops VP is convinced the whole catalogue is under-buffered and wants to raise safety stock levels across every SKU immediately.",
+    "question": "Is the stockout surge a catalogue-wide inventory problem, or is something more specific going on?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The Ops VP wants you to model how much safety stock to add across the catalogue. How do you frame your investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Model optimal safety stock levels for all SKUs",
+          "detail": "Use demand variability and lead-time data to recalculate safety stock thresholds catalogue-wide.",
+          "flag": "weak",
+          "consequence": "You produce a clean model, but it assumes the problem is uniform. You've answered a question the data never validated — and the VP's assumption is baked into your output from step one.",
+          "divergenceCost": "Accepted the stakeholder's framing uncritically and optimized before diagnosing."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic concentration analysis",
+          "detail": "Before prescribing a fix, segment stockouts by SKU, category, and supplier to see where they actually concentrate.",
+          "flag": "strong",
+          "consequence": "You map stockouts across the catalogue and immediately see they are not uniform — a handful of SKUs account for the vast majority of incidents. The investigation now has a real thread to pull.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Compare this quarter to prior quarters for each category",
+          "detail": "Look at stockout trend lines by product category to spot which categories worsened most.",
+          "flag": "weak",
+          "consequence": "Trends by category smooth over SKU-level spikes. You see a few categories look worse, but you can't tell whether it's one bad SKU dragging the category or a broad problem — the signal is still aggregated.",
+          "divergenceCost": "Aggregated at the category level, masking the true concentration at the SKU and supplier level."
+        },
+        {
+          "id": "D",
+          "label": "Survey warehouse ops staff about fulfillment pain points",
+          "detail": "Talk to the team closest to the problem to gather qualitative explanations.",
+          "flag": "weak",
+          "consequence": "Staff surface anecdotes about a few problem products, but without data to back it up you can't quantify the impact or convince the VP. Useful color, not the answer.",
+          "divergenceCost": "Chose a slow, anecdotal instrument when the pattern was already in the stockout records."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "Your segmentation reveals stockout incidents are not spread evenly. Which metric do you use to confirm where the real problem lives?",
+      "artifact": {
+        "type": "bars",
+        "title": "Stockout incidents by SKU group — this quarter (raw counts)",
+        "bars": [
+          {
+            "label": "SKUs 1–3 (shared supplier)",
+            "value": 187
+          },
+          {
+            "label": "SKUs 4–20 (mixed suppliers)",
+            "value": 43
+          },
+          {
+            "label": "SKUs 21–80 (top sellers)",
+            "value": 61
+          },
+          {
+            "label": "SKUs 81–500 (long tail)",
+            "value": 62
+          }
+        ],
+        "caption": "Raw incident counts across SKU groups. SKUs 1–3 look large, but could they just have higher sales volume?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Raw stockout incident counts by SKU group",
+          "detail": "Rank SKU groups by total number of stockout events this quarter.",
+          "flag": "weak",
+          "consequence": "SKUs 1–3 do show the most incidents in absolute terms — but high-volume SKUs naturally have more exposure. You can't tell if this is a rate problem or just a size effect, and the VP can push back.",
+          "divergenceCost": "Used raw counts that don't control for sales volume — conflated exposure with risk."
+        },
+        {
+          "id": "B",
+          "label": "Stockout rate AND supplier lead-time deviation by SKU group",
+          "detail": "Calculate stockouts per 100 order-days for each group, then cross-reference with supplier lead-time data to see if the concentration maps to a single supply source.",
+          "flag": "strong",
+          "consequence": "Normalized for volume, SKUs 1–3 have a stockout rate 11× the catalogue average — and all three share the one supplier whose lead time blew out by 18 days this quarter. The rest of the catalogue is statistically unremarkable.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Stockout rate (per 100 order-days) by SKU group — this quarter",
+            "bars": [
+              {
+                "label": "SKUs 1–3 (shared supplier)",
+                "value": 34.2,
+                "highlight": true
+              },
+              {
+                "label": "SKUs 4–20 (mixed suppliers)",
+                "value": 3.1
+              },
+              {
+                "label": "SKUs 21–80 (top sellers)",
+                "value": 2.8
+              },
+              {
+                "label": "SKUs 81–500 (long tail)",
+                "value": 3
+              }
+            ],
+            "caption": "Normalized for volume, SKUs 1–3 are clear outliers at 34.2 — all three share the supplier whose lead time extended 18 days. The rest of the catalogue clusters near 3.0."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "SKUs 1–3, all from the same supplier with a blown-out lead time, account for roughly 80% of the stockout surge. What do you tell the Ops VP?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"It's the supplier's lead time — cancel the blanket restock and fix that one relationship.\"",
+          "detail": "Make the causal call and recommend a targeted supplier action only.",
+          "flag": "weak",
+          "consequence": "You've correctly identified the concentration, but asserting causation without a controlled comparison leaves you exposed. The lead-time blowout and stockouts are correlated; a confounding factor — like a demand spike on those three SKUs — could be co-driving the result.",
+          "divergenceCost": "Overclaimed causation from correlation, skipping the step needed to rule out confounders."
+        },
+        {
+          "id": "B",
+          "label": "\"The data doesn't support a blanket restock — 80% of incidents trace to 3 SKUs sharing one supplier whose lead time extended sharply. That's the priority. Before committing capital, let's verify by pulling the demand signal on those SKUs and confirming lead-time records with the supplier.\"",
+          "detail": "Present the concentration finding, flag the causal gap, and propose a targeted next step before acting.",
+          "flag": "strong",
+          "consequence": "You've reframed the VP's assumption with hard evidence, protected the company from unnecessary capital lock-up, and defined a clear, fast path to causal confirmation. That's the full analyst job.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The 40% stockout surge was not a catalogue-wide buffering failure — roughly 80% of incidents were concentrated in just three SKUs tied to a single supplier whose lead time extended significantly. A blanket safety-stock increase would have locked up capital across hundreds of SKUs to solve a problem that lived in three. The core lesson is Pareto thinking applied to operations: always disaggregate before prescribing, because aggregate metrics routinely hide the concentration that makes the real fix cheap and targeted."
+}

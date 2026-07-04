@@ -1316,5 +1316,17 @@ scarce skill (judgment) only. Named surface: "The Case Room".
 - **Pending deploy step:** apply `supabase/migrations/023_case_room.sql` in the
   Supabase dashboard — until then, progress saves are best-effort no-ops and the
   library badges stay blank (by design; everything else works).
-- **Next — Module 7:** the AI authoring pipeline (Claude Sonnet generate → schema
-  check → Sonnet critic → human gate) to fill the batch to 10 cases.
+- **Module 7 — authoring pipeline + 9 cases (2026-07-04):** `scripts/author-cases.mjs`
+  — generate (Sonnet) → deterministic schema validate/repair → Sonnet critic
+  (rubric) → revise loop → write + rebuild manifest. The human supplies each
+  brief's belief-vs-real-driver + lesson (the judgment); the model drafts; the
+  validator + critic raise the hit rate. Authored 9 cases (marketing
+  incrementality, Simpson's paradox, base-rate/fraud, confounding, funnel
+  segmentation, A/B peeking, survivorship LTV, response-bias CSAT, Pareto
+  stockouts) — all passed schema + critic first pass, 0 revisions. Batch now 10.
+- **Verified (2026-07-04):** spot-read two hard cases (quality strong — plausible
+  red herrings, orthogonal muscles, numerically consistent artifacts). Full
+  logged-in Playwright run played **all 10 gold paths → 3/3 held**, insight
+  rendered, no runtime errors (the lone 500 is the expected progress-save miss
+  until migration 023 is applied). The Case Room is feature-complete for the
+  first batch — pending only the migration + your content review.

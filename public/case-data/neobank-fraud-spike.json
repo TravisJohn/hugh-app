@@ -1,0 +1,148 @@
+{
+  "id": "neobank-fraud-spike",
+  "title": "The Fraud Spike",
+  "scenario": {
+    "role": "Risk Analyst",
+    "company": "NeoBank",
+    "situation": "The fraud model's flagged transactions tripled last month, alarming the Risk team.",
+    "stakeholderBelief": "The Head of Risk assumes the model has broken down and wants it retrained immediately before more fraud slips through.",
+    "question": "Has the model actually degraded, or is something else driving the spike in flags?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The Head of Risk wants the model retrained by end of week. How do you frame your investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Audit the model's recent code and feature pipeline",
+          "detail": "Check whether a deployment error or data pipeline bug changed the model's inputs or thresholds last month.",
+          "flag": "weak",
+          "consequence": "The pipeline looks clean — no bugs, no threshold drift. You've ruled out one failure mode but spent a day confirming the model is running correctly, without learning why flags tripled.",
+          "divergenceCost": "Anchored on a technical failure story without first checking whether the input population shifted."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic segmentation by product and customer cohort",
+          "detail": "Break flagged transactions down by product line and customer cohort to see where the spike concentrates before assuming anything about the model.",
+          "flag": "strong",
+          "consequence": "Immediately visible: the spike concentrates almost entirely among customers on the new product launched last month. This cohort didn't exist in the training population. The thread is now about the population, not the model.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Pull the model's overall precision and recall for the month",
+          "detail": "Compute aggregate precision and recall across all transactions to see if model quality dropped.",
+          "flag": "weak",
+          "consequence": "Aggregate precision looks roughly stable — but you're mixing the old and new cohorts together. The blended metric masks what's happening in each population and gives you false reassurance that nothing has changed structurally.",
+          "divergenceCost": "Computed aggregate metrics across a mixed population, obscuring the cohort-level story."
+        },
+        {
+          "id": "D",
+          "label": "Immediately begin retraining on last month's data",
+          "detail": "Treat the spike as a label-shift signal and start retraining the model on the most recent labeled fraud cases.",
+          "flag": "weak",
+          "consequence": "You retrain on a month that includes a genuinely riskier new cohort. The model shifts its decision boundary to match the new base rate — but you've made a permanent change based on a distribution shift you never diagnosed.",
+          "divergenceCost": "Jumped to retraining before diagnosing — risks encoding a structural change as if it were model error."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "The spike concentrates in the new product cohort. Which metric do you use to judge whether the model itself has degraded on that population?",
+      "artifact": {
+        "type": "bars",
+        "title": "Flagged transactions by cohort — this month vs. last month",
+        "bars": [
+          {
+            "label": "Existing customers",
+            "value": 1200
+          },
+          {
+            "label": "New product cohort",
+            "value": 3600,
+            "highlight": true
+          },
+          {
+            "label": "All other new accounts",
+            "value": 980
+          }
+        ],
+        "caption": "Raw flag counts. The new product cohort dominates — but is this because the model is misfiring, or because that cohort is simply larger and riskier?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Raw flagged transaction count by cohort",
+          "detail": "Compare the number of transactions flagged in each cohort this month versus last month.",
+          "flag": "weak",
+          "consequence": "The new product cohort has by far the most flags — but it also has far more transactions and a higher underlying fraud rate. You're reading population size and base rate, not model performance. The count tells you nothing about whether the model is right or wrong.",
+          "divergenceCost": "Compared raw flag volumes across cohorts with different sizes and base rates — conflated base rate with model quality."
+        },
+        {
+          "id": "B",
+          "label": "Precision and recall within each cohort separately",
+          "detail": "For the new product cohort and the existing cohort independently, compute: of transactions the model flagged, what fraction were confirmed fraud (precision); of all confirmed fraud, what fraction did the model catch (recall).",
+          "flag": "strong",
+          "consequence": "Within the new product cohort, precision is 71% — nearly identical to the model's historical 73% on existing customers. Recall is also stable. The model is performing as well as it ever did; the flag count rose because the cohort is genuinely riskier, not because the model degraded.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Model precision by cohort (% of flags confirmed as fraud)",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "Existing customers",
+                "value": 73
+              },
+              {
+                "label": "All other new accounts",
+                "value": 68
+              },
+              {
+                "label": "New product cohort",
+                "value": 71,
+                "highlight": true
+              }
+            ],
+            "caption": "Normalized to each cohort's own population, the new product cohort's precision matches historical norms — the model is not misfiring."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Within the new product cohort, the model's precision is unchanged. What do you tell the Head of Risk?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The model is fine — the new product attracted riskier customers. No action needed.\"",
+          "detail": "Make the causal call and close the investigation.",
+          "flag": "weak",
+          "consequence": "You've correctly identified the base-rate shift, but 'no action needed' is too strong. You don't yet know whether the model will stay well-calibrated as the new cohort grows, and you haven't flagged that the new product's risk profile may need a policy response — not a modeling one.",
+          "divergenceCost": "Overclaimed certainty and skipped the path to ongoing validation and a business policy recommendation."
+        },
+        {
+          "id": "B",
+          "label": "\"The spike is a base-rate effect, not model degradation — precision is stable within the new cohort. We should monitor cohort-level metrics going forward and assess whether the new product's risk profile requires a policy adjustment, not a retrain.\"",
+          "detail": "Present the finding, flag the causal limit, and recommend a monitoring and policy path.",
+          "flag": "strong",
+          "consequence": "You've reframed the Head of Risk's assumption with evidence, correctly separated base rate from model quality, and given a concrete next step. The recommendation to review product risk policy rather than retrain keeps the team from solving the wrong problem.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The fraud flag spike was driven entirely by a new product cohort with a higher underlying fraud rate — a base-rate shift, not model failure. Raw flag counts are blind to this because they conflate how many fraudsters exist in the population with how well the model finds them. The correct instrument is precision and recall computed within each cohort separately; on that view, the model was performing exactly as designed. The lesson: never judge a classifier by how many flags it raises — judge it by what fraction of those flags are right, inside a stable population."
+}

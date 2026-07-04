@@ -8,7 +8,128 @@
       "difficulty": "intro",
       "domain": "Data Analysis",
       "estMinutes": 5,
-      "tags": ["correlation vs causation", "segmentation", "metric validity"]
+      "tags": [
+        "correlation vs causation",
+        "segmentation",
+        "metric validity"
+      ]
+    },
+    {
+      "id": "retail-promo-lift",
+      "title": "The Promo That Worked",
+      "company": "RetailCo",
+      "difficulty": "core",
+      "domain": "Marketing Analytics",
+      "estMinutes": 6,
+      "tags": [
+        "incrementality",
+        "counterfactual",
+        "cannibalization"
+      ]
+    },
+    {
+      "id": "saas-activation-dip",
+      "title": "The Activation Dip",
+      "company": "Flowdesk",
+      "difficulty": "hard",
+      "domain": "Product Analytics",
+      "estMinutes": 7,
+      "tags": [
+        "Simpson's paradox",
+        "mix shift",
+        "segmentation"
+      ]
+    },
+    {
+      "id": "neobank-fraud-spike",
+      "title": "The Fraud Spike",
+      "company": "NeoBank",
+      "difficulty": "hard",
+      "domain": "Risk Analytics",
+      "estMinutes": 7,
+      "tags": [
+        "base rates",
+        "distribution shift",
+        "precision"
+      ]
+    },
+    {
+      "id": "shipfast-carrier",
+      "title": "The Slower Deliveries",
+      "company": "ShipFast",
+      "difficulty": "intro",
+      "domain": "Operations Analytics",
+      "estMinutes": 5,
+      "tags": [
+        "confounding",
+        "like-for-like",
+        "segmentation"
+      ]
+    },
+    {
+      "id": "cartly-checkout",
+      "title": "The Checkout Cliff",
+      "company": "Cartly",
+      "difficulty": "core",
+      "domain": "Product Analytics",
+      "estMinutes": 6,
+      "tags": [
+        "segmentation",
+        "funnel",
+        "aggregation trap"
+      ]
+    },
+    {
+      "id": "streamly-abtest",
+      "title": "The Winning Test",
+      "company": "Streamly",
+      "difficulty": "hard",
+      "domain": "Experimentation",
+      "estMinutes": 7,
+      "tags": [
+        "peeking",
+        "sample ratio mismatch",
+        "novelty effect"
+      ]
+    },
+    {
+      "id": "subly-ltv",
+      "title": "The Golden Cohort",
+      "company": "Subly",
+      "difficulty": "core",
+      "domain": "Growth Analytics",
+      "estMinutes": 6,
+      "tags": [
+        "survivorship bias",
+        "cohort immaturity",
+        "LTV"
+      ]
+    },
+    {
+      "id": "helply-csat",
+      "title": "The CSAT Drop",
+      "company": "Helply",
+      "difficulty": "intro",
+      "domain": "CX Analytics",
+      "estMinutes": 5,
+      "tags": [
+        "response bias",
+        "mix shift",
+        "metric validity"
+      ]
+    },
+    {
+      "id": "pantree-stockouts",
+      "title": "The Stockout Surge",
+      "company": "Pantree",
+      "difficulty": "core",
+      "domain": "Supply Analytics",
+      "estMinutes": 6,
+      "tags": [
+        "aggregation trap",
+        "concentration",
+        "Pareto"
+      ]
     }
   ]
 }

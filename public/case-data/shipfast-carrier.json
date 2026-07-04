@@ -1,0 +1,164 @@
+{
+  "id": "shipfast-carrier",
+  "title": "The Slower Deliveries",
+  "scenario": {
+    "role": "Operations Analyst",
+    "company": "ShipFast",
+    "situation": "Average delivery time rose from 2.1 to 2.9 days in the two weeks after switching to a new carrier.",
+    "stakeholderBelief": "The Ops lead is convinced the new carrier is slower and wants to switch back immediately to avoid customer complaints.",
+    "question": "Is the new carrier actually responsible for the longer delivery times?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The Ops lead wants a quick answer. How do you frame your investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Carrier performance audit",
+          "detail": "Pull the new carrier's on-time delivery rate and compare it to the old carrier's historical rate.",
+          "flag": "weak",
+          "consequence": "The new carrier's aggregate on-time rate looks worse — but the comparison lumps together very different lanes, volumes, and regions. You've anchored on the Ops lead's hypothesis without checking whether the conditions are comparable.",
+          "divergenceCost": "Anchored on the stakeholder's hypothesis and compared carriers under different conditions."
+        },
+        {
+          "id": "B",
+          "label": "Mix-and-context diagnostic",
+          "detail": "Ask what else changed the same week: volume, lane mix, geography, seasonality. Then segment delivery time by lane, region, and volume tier before attributing anything to the carrier.",
+          "flag": "strong",
+          "consequence": "You immediately surface two concurrent changes — a holiday volume surge and a newly-served remote region — that could fully explain the headline shift. The investigation is now open to the real driver.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Customer complaint analysis",
+          "detail": "Count and categorize customer complaints about late deliveries since the carrier switch.",
+          "flag": "weak",
+          "consequence": "Complaints did rise — but they track the same headline average you already know rose. Complaints tell you the business impact, not the cause. You still don't know whether the carrier is to blame.",
+          "divergenceCost": "Used a downstream symptom as evidence for a root cause — circular reasoning."
+        },
+        {
+          "id": "D",
+          "label": "Time-series trend on average delivery days",
+          "detail": "Plot daily average delivery time before and after the carrier switch date.",
+          "flag": "weak",
+          "consequence": "The chart shows a clear step-up at the switch date — which looks damning. But any event on the same day would show the same pattern. You've confirmed timing, not causation.",
+          "divergenceCost": "Treated a temporal correlation with the switch date as evidence of carrier fault."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You've flagged that lane mix and volume both changed. Which metric do you use to evaluate carrier performance?",
+      "artifact": {
+        "type": "bars",
+        "title": "Average delivery time by lane — all shipments, post-switch period",
+        "bars": [
+          {
+            "label": "Urban core",
+            "value": 1.8
+          },
+          {
+            "label": "Suburban",
+            "value": 2.4
+          },
+          {
+            "label": "Rural standard",
+            "value": 3.1
+          },
+          {
+            "label": "Remote / new region",
+            "value": 6.2,
+            "highlight": true
+          }
+        ],
+        "caption": "Raw average delivery days per lane. The remote region is slow — but does that reflect carrier quality or inherent geography?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Overall average delivery time before vs. after switch",
+          "detail": "Compare the two-week pre-switch average (2.1 days) to the two-week post-switch average (2.9 days).",
+          "flag": "weak",
+          "consequence": "The 0.8-day rise looks like proof the carrier is slower. But the post-switch period contains a holiday volume surge and a brand-new remote region — neither of which existed in the pre-switch window. You're averaging apples and oranges.",
+          "divergenceCost": "Compared averages across periods with different lane mixes and volumes — a classic composition confound."
+        },
+        {
+          "id": "B",
+          "label": "Like-for-like lane delivery time: new carrier vs. old carrier, same lanes only, adjusted for volume tier",
+          "detail": "Restrict to lanes the old carrier also served, exclude the new remote region, and match high-volume holiday days to comparable prior peaks.",
+          "flag": "strong",
+          "consequence": "On identical lanes at comparable volumes, the new carrier averages 1.9 days versus the old carrier's 2.1 days. The new carrier is actually faster on a level playing field. The headline rise came entirely from the remote region and holiday surge entering the mix.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Like-for-like delivery time: old vs. new carrier, matched lanes & volume tiers",
+            "unit": "days",
+            "bars": [
+              {
+                "label": "Old carrier — urban core",
+                "value": 2
+              },
+              {
+                "label": "New carrier — urban core",
+                "value": 1.7
+              },
+              {
+                "label": "Old carrier — suburban",
+                "value": 2.3
+              },
+              {
+                "label": "New carrier — suburban",
+                "value": 2.1
+              },
+              {
+                "label": "Old carrier — rural standard",
+                "value": 3.2
+              },
+              {
+                "label": "New carrier — rural standard",
+                "value": 2.9,
+                "highlight": true
+              }
+            ],
+            "caption": "Across every matched lane, the new carrier is equal or faster. The overall average rose because the mix shifted — not because carrier performance degraded."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "On like-for-like lanes, the new carrier is faster than the old one. What do you tell the Ops lead?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The new carrier is better — keep it and ignore the headline average.\"",
+          "detail": "Make the full causal call in favor of the new carrier.",
+          "flag": "weak",
+          "consequence": "You're right that the mix explains the rise, but you've overclaimed certainty. The like-for-like sample didn't cover the new remote region at scale, and holiday surges can mask capacity problems. Switching the conclusion as confidently as the Ops lead held theirs is the same error, just in the opposite direction.",
+          "divergenceCost": "Overclaimed certainty — flipped the stakeholder's error rather than adding appropriate caution."
+        },
+        {
+          "id": "B",
+          "label": "\"The headline rise is explained by mix shift — a new remote region and holiday volume — not carrier degradation. On matched lanes the new carrier is slightly faster. I'd recommend holding the switch decision until we see one full non-holiday week of remote-region data to confirm there's no capacity issue at scale.\"",
+          "detail": "Present the finding, name the confounders, and propose a concrete confirmation step.",
+          "flag": "strong",
+          "consequence": "The Ops lead sees that the data reframes the question, not just the answer. The new carrier isn't exonerated by assumption — it's exonerated by evidence, with one open gap named and a fast path to close it. The organization learns to ask 'what else changed?' before acting.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The average delivery time rose not because the new carrier was slower, but because the mix being averaged changed: a holiday surge inflated volume and a remote region with structurally long transit times entered the denominator for the first time. On identical lanes at comparable volumes, the new carrier was actually faster. The lesson is Simpson's-paradox-adjacent confounding: a headline average can move entirely because of what you're averaging, not how well the thing you changed is performing. The antidote is always to ask 'what else changed?' and compare like-for-like before attributing a shift to the one visible change."
+}
