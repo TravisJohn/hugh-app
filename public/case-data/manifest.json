@@ -380,6 +380,237 @@
           "Confounding / mix shift"
         ]
       }
+    },
+    {
+      "id": "realtime-dashboard",
+      "title": "The Real-Time Mandate",
+      "company": "Marketly",
+      "difficulty": "core",
+      "domain": "Data Engineering",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Batch vs streaming",
+        "industry": "Retail",
+        "modelling": [
+          "Streaming",
+          "Micro-batch"
+        ],
+        "statistics": [
+          "Freshness SLA"
+        ],
+        "stack": [
+          "Kafka",
+          "Flink",
+          "BigQuery"
+        ]
+      }
+    },
+    {
+      "id": "partition-skew",
+      "title": "The One Slow Reducer",
+      "company": "Adverva",
+      "difficulty": "hard",
+      "domain": "Data Engineering",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Distributed compute",
+        "industry": "Ad tech",
+        "modelling": [
+          "Spark tuning"
+        ],
+        "statistics": [
+          "Data skew"
+        ],
+        "stack": [
+          "Spark",
+          "Dataproc"
+        ]
+      }
+    },
+    {
+      "id": "warehouse-vs-lakehouse",
+      "title": "The Lakehouse Rewrite",
+      "company": "Brightform",
+      "difficulty": "hard",
+      "domain": "Data Engineering",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Storage architecture",
+        "industry": "B2B SaaS",
+        "modelling": [
+          "Lakehouse",
+          "Warehouse"
+        ],
+        "statistics": [
+          "Scan volume / concurrency"
+        ],
+        "stack": [
+          "BigQuery",
+          "Spark",
+          "Iceberg"
+        ]
+      }
+    },
+    {
+      "id": "orchestration-cron",
+      "title": "The Cron That Grew",
+      "company": "Ledgerline",
+      "difficulty": "core",
+      "domain": "Data Engineering",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Orchestration",
+        "industry": "Fintech",
+        "modelling": [
+          "Workflow orchestration"
+        ],
+        "statistics": [
+          "Failure / retry rate"
+        ],
+        "stack": [
+          "Airflow",
+          "Cloud Composer"
+        ]
+      }
+    },
+    {
+      "id": "nosql-vs-sql",
+      "title": "The Scale Panic",
+      "company": "Trovi",
+      "difficulty": "core",
+      "domain": "Data Engineering",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Database selection",
+        "industry": "Marketplace",
+        "modelling": [
+          "OLTP design"
+        ],
+        "statistics": [
+          "Throughput (QPS)"
+        ],
+        "stack": [
+          "PostgreSQL",
+          "Cassandra"
+        ]
+      }
+    },
+    {
+      "id": "exactly-once",
+      "title": "The Duplicate Rows",
+      "company": "Shiplytics",
+      "difficulty": "hard",
+      "domain": "Data Engineering",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Streaming semantics",
+        "industry": "Logistics",
+        "modelling": [
+          "Idempotency",
+          "Streaming"
+        ],
+        "statistics": [
+          "Duplicate rate"
+        ],
+        "stack": [
+          "Kafka",
+          "dbt",
+          "BigQuery"
+        ]
+      }
+    },
+    {
+      "id": "file-format-scans",
+      "title": "The Slow Scans",
+      "company": "Streamhaus",
+      "difficulty": "core",
+      "domain": "Data Engineering",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Storage architecture",
+        "industry": "Media",
+        "modelling": [
+          "Columnar storage",
+          "Partitioning"
+        ],
+        "statistics": [
+          "Bytes scanned"
+        ],
+        "stack": [
+          "Parquet",
+          "S3",
+          "Athena"
+        ]
+      }
+    },
+    {
+      "id": "cdc-vs-fullload",
+      "title": "The Nightly Full Reload",
+      "company": "Cartwheel",
+      "difficulty": "core",
+      "domain": "Data Engineering",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Ingestion pattern",
+        "industry": "E-commerce",
+        "modelling": [
+          "CDC / incremental"
+        ],
+        "statistics": [
+          "Change rate"
+        ],
+        "stack": [
+          "Debezium",
+          "BigQuery",
+          "dbt"
+        ]
+      }
+    },
+    {
+      "id": "capacity-autoscale",
+      "title": "The Black-Friday Cluster",
+      "company": "Peakline",
+      "difficulty": "intro",
+      "domain": "Data Engineering",
+      "estMinutes": 5,
+      "facets": {
+        "about": "Cost & scaling",
+        "industry": "Retail",
+        "modelling": [
+          "Autoscaling",
+          "Serverless"
+        ],
+        "statistics": [
+          "Peak-to-median ratio"
+        ],
+        "stack": [
+          "Dataflow",
+          "GCP"
+        ]
+      }
+    },
+    {
+      "id": "data-quality-gate",
+      "title": "The Silent Corruption",
+      "company": "Welltrace",
+      "difficulty": "intro",
+      "domain": "Data Engineering",
+      "estMinutes": 5,
+      "facets": {
+        "about": "Data quality",
+        "industry": "Healthcare",
+        "modelling": [
+          "Data contracts",
+          "Validation"
+        ],
+        "statistics": [
+          "Null / anomaly rate"
+        ],
+        "stack": [
+          "dbt",
+          "Great Expectations"
+        ]
+      }
     }
   ]
 }

@@ -1,0 +1,128 @@
+{
+  "id": "orchestration-cron",
+  "title": "The Cron That Grew",
+  "scenario": {
+    "role": "Data Engineer",
+    "company": "Ledgerline (fintech)",
+    "situation": "The nightly data pipeline is a chain of 30 cron jobs on a single VM. When one fails midway, the team finds out from broken morning reports and reruns everything by hand. The lead proposes building a custom scheduler on Kubernetes.",
+    "stakeholderBelief": "The lead believes the fix is a bespoke Kubernetes-based scheduler the team builds in-house.",
+    "question": "What's the real gap in the cron setup, and what's the right-sized way to close it?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "How do you approach the fix?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Start building the custom Kubernetes scheduler",
+          "detail": "Begin implementing the in-house orchestrator the lead proposed.",
+          "flag": "weak",
+          "consequence": "You begin writing a bespoke orchestrator — retries, DAG state, backfills, a UI — reinventing a solved problem before you've even named which capabilities you actually need.",
+          "divergenceCost": "Started building a scheduler before specifying which orchestration capabilities are missing."
+        },
+        {
+          "id": "B",
+          "label": "Enumerate what's actually failing about cron",
+          "detail": "List the concrete gaps: dependencies, retries, visibility, backfills.",
+          "flag": "strong",
+          "consequence": "You list the real gaps: no dependency awareness (jobs fire on a clock, not on upstream success), no automatic retries, no run visibility, and painful manual backfills. These are exactly the problems a workflow orchestrator solves.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Wrap the existing crons in more error-handling shell",
+          "detail": "Add retry loops and alerting scripts around the current jobs.",
+          "flag": "weak",
+          "consequence": "You bolt retry loops and alerts onto brittle bash; it helps a little, but dependency ordering and backfills are still manual, and you've grown the very tangle you meant to escape.",
+          "divergenceCost": "Patched the symptoms in shell instead of addressing the missing orchestration model."
+        },
+        {
+          "id": "D",
+          "label": "Move the crons onto a bigger, more reliable VM",
+          "detail": "Assume the machine is the weak point and upgrade it.",
+          "flag": "weak",
+          "consequence": "A beefier VM does nothing — the failures aren't about the machine, they're about the lack of dependency-aware scheduling and recovery.",
+          "divergenceCost": "Treated an orchestration-reliability gap as a hardware problem."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You've named the gaps. How do you decide between building a scheduler and adopting one?",
+      "artifact": {
+        "type": "table",
+        "title": "The four gaps — who provides them?",
+        "headers": ["Capability", "Custom build", "Managed orchestrator"],
+        "rows": [
+          ["Dependency-aware DAGs", "Build yourself", "Built-in"],
+          ["Automatic retries", "Build yourself", "Built-in"],
+          ["Backfills", "Build yourself", "Built-in"],
+          ["Run visibility / UI", "Build yourself", "Built-in"]
+        ]
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Compare on how much control a custom build gives you",
+          "detail": "Weigh the flexibility of owning every line of the scheduler.",
+          "flag": "weak",
+          "consequence": "A bespoke scheduler would give total control — and total ownership of retries, state, UI, and every future edge case, forever. You'd be maintaining infrastructure that isn't your product.",
+          "divergenceCost": "Weighed control while ignoring the permanent maintenance cost of owning undifferentiated infrastructure."
+        },
+        {
+          "id": "B",
+          "label": "Compare capability coverage and total maintenance cost of adopt vs build",
+          "detail": "Ask which option closes all four gaps, in what time, and who maintains it afterwards.",
+          "flag": "strong",
+          "consequence": "A managed orchestrator (e.g. Airflow / Cloud Composer) covers all four gaps out of the box in days, versus months to build and years to maintain a custom one. Orchestration is undifferentiated heavy lifting — nothing about it is specific to your business. Adopt wins decisively.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "table",
+            "title": "Adopt vs build — effort and ownership",
+            "headers": ["", "Build custom", "Adopt orchestrator"],
+            "rows": [
+              ["Time to first pipeline", "~2-3 months", "~1 week"],
+              ["Ongoing maintenance", "Your team, forever", "Vendor / community"],
+              ["Covers all 4 gaps", "Eventually", "Day one"]
+            ]
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "What do you recommend?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Recommend building the custom scheduler for maximum flexibility",
+          "detail": "Own the orchestrator so you can tailor every behavior.",
+          "flag": "weak",
+          "consequence": "The team signs up to build and forever maintain a general-purpose orchestrator — undifferentiated work that competes with actual data delivery for engineering time. Flexibility you'll rarely use, paid for continuously.",
+          "divergenceCost": "Recommended owning undifferentiated infrastructure for flexibility the team is unlikely to need."
+        },
+        {
+          "id": "B",
+          "label": "Adopt a managed orchestrator, note the lock-in tradeoff, migrate incrementally",
+          "detail": "Propose an existing orchestrator, acknowledge the tradeoff, and move the crons over in stages.",
+          "flag": "strong",
+          "consequence": "You propose adopting an existing orchestrator that closes all four gaps, acknowledge the tradeoff (some framework lock-in and a learning curve), and plan an incremental migration so nothing breaks at once. The team gets reliability in weeks and keeps its time for work that's actually theirs.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "Cron's failures weren't about the machine or missing error-handling — they were the absence of an orchestration model: dependency-aware scheduling, automatic retries, backfills, and run visibility. Every one of those is standard in an existing orchestrator, so building a bespoke Kubernetes scheduler would have re-implemented — and then permanently maintained — a solved, undifferentiated problem. The lesson is to separate the capabilities you genuinely need from the instinct to build: adopt commodity infrastructure and reserve engineering for what's actually specific to your business."
+}

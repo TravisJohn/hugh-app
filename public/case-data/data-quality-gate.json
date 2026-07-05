@@ -1,0 +1,129 @@
+{
+  "id": "data-quality-gate",
+  "title": "The Silent Corruption",
+  "scenario": {
+    "role": "Analytics / Data Engineer",
+    "company": "Welltrace (healthcare analytics)",
+    "situation": "A miscalculated metric from a corrupted upstream feed reached an executive report before anyone noticed. Shaken, the lead wants to buy a full data-observability platform to prevent it happening again.",
+    "stakeholderBelief": "The lead believes only a comprehensive observability platform can prevent another silent data-quality failure.",
+    "question": "What actually let the bad data through, and what's the right-sized way to catch it?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "How do you approach preventing a recurrence?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Procure the full data-observability platform",
+          "detail": "Buy and integrate a broad monitoring suite across every table.",
+          "flag": "weak",
+          "consequence": "You start a lengthy purchase-and-integration of a broad monitoring suite before understanding how this specific failure slipped through — buying a wide net without knowing where the hole was.",
+          "divergenceCost": "Committed to a broad platform before diagnosing how the specific failure got through."
+        },
+        {
+          "id": "B",
+          "label": "Root-cause how the bad data reached the report unchecked",
+          "detail": "Trace the corrupt value back to where it entered and why nothing stopped it.",
+          "flag": "strong",
+          "consequence": "You trace it: the upstream feed silently changed a units field, and the pipeline had no validation at ingestion — no schema check, no row-count or range assertion — so corrupt values flowed straight through to the report. The gap is a missing quality gate, not a missing platform.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Add a manual review step before reports publish",
+          "detail": "Have someone eyeball outputs before they go out.",
+          "flag": "weak",
+          "consequence": "A human eyeballing outputs is slow, unreliable, and doesn't scale — it will miss the next subtle corruption exactly as this one was missed, just later in the process.",
+          "divergenceCost": "Inserted fragile manual review instead of an automated check at the point of failure."
+        },
+        {
+          "id": "D",
+          "label": "Alert on the final metric when it looks abnormal",
+          "detail": "Watch the end report and fire an alert on anomalies.",
+          "flag": "weak",
+          "consequence": "Alerting only on the end metric catches problems after they've propagated through every downstream table — you learn something broke, but late and far from the cause.",
+          "divergenceCost": "Monitored the far-downstream symptom instead of validating data where it enters."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "There's no validation at ingestion. Which approach do you evaluate to close the gap?",
+      "artifact": {
+        "type": "table",
+        "title": "Two ways to stop the next silent corruption",
+        "headers": ["", "Full observability platform", "Assertion tests at the boundary"],
+        "rows": [
+          ["Scope", "Monitors every table & metric", "Validates data at ingestion & key outputs"],
+          ["Time to protect this pipeline", "Weeks (procure + integrate)", "Days"],
+          ["Would it have caught this?", "Yes, eventually downstream", "Yes, at ingestion"],
+          ["Ongoing cost", "Platform licence + upkeep", "Tests live in the pipeline"]
+        ]
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Coverage breadth of the observability platform",
+          "detail": "Judge the options by how much they monitor.",
+          "flag": "weak",
+          "consequence": "The platform would monitor everything — an appealing, comprehensive net — but breadth isn't what failed here; a single missing check at ingestion was. You'd buy wide coverage to fix a narrow, specific hole, and still owe the integration and licence cost.",
+          "divergenceCost": "Weighed breadth of monitoring when a targeted check at ingestion was what was missing."
+        },
+        {
+          "id": "B",
+          "label": "Whether a targeted check at ingestion would have blocked this failure",
+          "detail": "Test the counterfactual: would boundary assertions have caught the feed change?",
+          "flag": "strong",
+          "consequence": "You test the counterfactual: a few assertions at ingestion — schema/type conformance, row-count within range, a units/enum check, freshness — would have failed the run the moment the feed changed, before a single downstream table updated. It catches this class of failure at the source, in days, with tests that live in the pipeline.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "table",
+            "title": "Assertion gate at ingestion — what it catches",
+            "headers": ["Check", "Would it have caught this feed change?"],
+            "rows": [
+              ["Schema / type conformance", "Yes"],
+              ["Row count within expected range", "Yes"],
+              ["Units / enum / range assertion", "Yes — this was the failure"],
+              ["Freshness / recency", "Yes"]
+            ]
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "What do you recommend?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Buy the observability platform to cover everything",
+          "detail": "Invest in the broad tool so nothing slips through again.",
+          "flag": "weak",
+          "consequence": "You purchase a broad platform and a long integration to prevent a failure a handful of ingestion assertions would have stopped in days. Real protection arrives weeks later, and you've taken on licence and upkeep cost sized to a problem far narrower than the tool.",
+          "divergenceCost": "Bought a broad platform for a gap a few boundary assertions would have closed sooner and cheaper."
+        },
+        {
+          "id": "B",
+          "label": "Add assertion-based checks (data contracts) at ingestion now, revisit fuller observability later",
+          "detail": "Ship boundary validation immediately; treat a platform as a later, evidence-based upgrade.",
+          "flag": "strong",
+          "consequence": "You recommend implementing data-contract assertions at ingestion and on key outputs immediately — schema, ranges, freshness, referential checks — so the pipeline fails fast on bad data. You note that a broader observability platform can be justified later if scale or table sprawl demands it, making it an evidence-based upgrade rather than a panic buy. Protection lands in days.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The bad data reached the executive report because the pipeline had no validation where the feed entered — no schema, range, or freshness checks — so a silent upstream change flowed straight through; the failure was a missing quality gate, not a missing platform. A handful of assertion-based contract checks at ingestion would have failed the run the moment the feed drifted, catching this class of error at the source in days rather than weeks. The lesson is to put validation where data enters and fail fast: right-size data quality to the actual failure mode with targeted contracts first, and treat a full observability platform as a later, evidence-driven step rather than the reflexive answer to one scare."
+}

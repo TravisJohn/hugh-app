@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { BookMarked, Sparkles } from "lucide-react";
+import { BookMarked, Sparkles, Loader2, AlertTriangle } from "lucide-react";
 import { type LearningGoal } from "@/types";
+import { classifyTopic, type TopicDomainVerdict } from "@/lib/learn/topic-domain";
 import GoalCard from "./GoalCard";
 import RefinementFlow from "./RefinementFlow";
 
@@ -40,6 +41,11 @@ export default function DashboardPanel({ initialGoals }: Props) {
   const [pendingTopic, setPendingTopic] = useState("");
   const [pendingEndDate, setPendingEndDate] = useState("");
 
+  // Domain gate: judge the topic before building anything. `gate` holds the
+  // kind reminder when the topic is out of Hugh's data & analytics domain.
+  const [checking, setChecking] = useState(false);
+  const [gate, setGate]         = useState<TopicDomainVerdict | null>(null);
+
   const today = todayStr();
 
   function resolvedEndDate(): string {
@@ -52,15 +58,31 @@ export default function DashboardPanel({ initialGoals }: Props) {
   const endDate    = resolvedEndDate();
   const canSubmit  = topic.trim().length > 0 && endDate.length > 0;
 
-  function handleFinalize() {
-    if (!canSubmit) return;
+  async function handleFinalize() {
+    if (!canSubmit || checking) return;
+    setChecking(true);
+    setGate(null);
+
+    // Strict domain gate — block out-of-domain topics before any track is built.
+    const verdict = await classifyTopic(topic.trim());
+    setChecking(false);
+    if (!verdict.inDomain) {
+      setGate(verdict);
+      return;
+    }
+
     setPendingTopic(topic.trim());
     setPendingEndDate(endDate);
     setRefining(true);
   }
 
+  function handleTopicChange(value: string) {
+    setTopic(value);
+    if (gate) setGate(null); // editing the topic clears the reminder
+  }
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") handleFinalize();
+    if (e.key === "Enter") void handleFinalize();
   }
 
   function handleGoalCreated(goal: LearningGoal) {
@@ -109,11 +131,44 @@ export default function DashboardPanel({ initialGoals }: Props) {
               <input
                 type="text"
                 value={topic}
-                onChange={e => setTopic(e.target.value)}
+                onChange={e => handleTopicChange(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="e.g. Apache Airflow, dbt, SQL window functions, ML pipelines…"
                 className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500 transition-colors"
               />
+
+              {/* Out-of-domain reminder (strict data & analytics gate) */}
+              {gate && !gate.inDomain && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+                  <div className="flex items-start gap-2.5">
+                    <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-400" />
+                    <div className="space-y-2.5">
+                      <p className="text-sm leading-relaxed text-slate-200">
+                        {gate.message ||
+                          "Hugh is built specifically for data & analytics skill prep — that topic sits outside this focus. Try a data-related angle."}
+                      </p>
+                      {gate.suggestions.length > 0 && (
+                        <div>
+                          <p className="mb-1.5 text-xs font-medium text-slate-500">
+                            Try a data angle
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {gate.suggestions.map(s => (
+                              <button
+                                key={s}
+                                onClick={() => handleTopicChange(s)}
+                                className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs text-amber-200 hover:bg-amber-500/20 transition-colors"
+                              >
+                                {s}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Commitment chips */}
               <div>
@@ -149,11 +204,20 @@ export default function DashboardPanel({ initialGoals }: Props) {
 
               <button
                 onClick={handleFinalize}
-                disabled={!canSubmit}
+                disabled={!canSubmit || checking}
                 className="flex items-center justify-center gap-2 rounded-xl bg-amber-500 py-3 text-sm font-bold text-slate-900 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                <Sparkles size={15} />
-                Let&apos;s Discuss
+                {checking ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" />
+                    Checking topic…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={15} />
+                    Let&apos;s Discuss
+                  </>
+                )}
               </button>
             </div>
           )}

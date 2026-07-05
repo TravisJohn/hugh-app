@@ -1,0 +1,126 @@
+{
+  "id": "nosql-vs-sql",
+  "title": "The Scale Panic",
+  "scenario": {
+    "role": "Data Engineer",
+    "company": "Trovi (online marketplace)",
+    "situation": "Traffic is growing and the team fears the PostgreSQL database won't keep up. The lead wants to migrate the core catalog and orders to Cassandra \"for web-scale\".",
+    "stakeholderBelief": "The lead believes relational Postgres is a scaling dead-end and that NoSQL is required to handle growth.",
+    "question": "Does the workload actually exceed what Postgres can do, or is the migration solving an imaginary limit?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "How do you approach the datastore decision?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Begin migrating catalog and orders to Cassandra",
+          "detail": "Start denormalizing the schema for a NoSQL model.",
+          "flag": "weak",
+          "consequence": "You start denormalizing a richly relational schema before measuring whether Postgres is anywhere near its limits — trading joins and transactions away to solve a bottleneck you haven't confirmed exists.",
+          "divergenceCost": "Began a NoSQL migration before measuring whether the relational database was the bottleneck."
+        },
+        {
+          "id": "B",
+          "label": "Measure the real workload — data size, query patterns, current headroom",
+          "detail": "Quantify volume, access pattern, and how hard the current DB is actually working.",
+          "flag": "strong",
+          "consequence": "You measure: ~60 GB of data, ~2,000 queries/sec at peak, and a workload full of multi-table joins and transactional order writes. Postgres runs at 30% CPU with plenty of headroom, and the access pattern is deeply relational.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Read Cassandra case studies from large-scale companies",
+          "detail": "Study how hyperscalers run NoSQL at massive volume.",
+          "flag": "weak",
+          "consequence": "You find impressive stories from companies operating at 1000x your data and traffic — inspiring, and completely irrelevant to a 60 GB, 2k-qps workload.",
+          "divergenceCost": "Borrowed scaling decisions from companies whose workload is nothing like yours."
+        },
+        {
+          "id": "D",
+          "label": "Add a caching layer in front of Postgres now",
+          "detail": "Introduce a cache to relieve pressure preemptively.",
+          "flag": "weak",
+          "consequence": "A cache might help later, but bolting one on before you've found any bottleneck adds a moving part and a consistency headache to solve a problem you haven't demonstrated.",
+          "divergenceCost": "Added infrastructure to relieve pressure you hadn't shown the database was under."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You've measured the workload. Which reading decides whether Postgres is truly at its limit?",
+      "artifact": {
+        "type": "bars",
+        "title": "Peak queries per second (headline trend)",
+        "bars": [
+          { "label": "Two years ago", "value": 600 },
+          { "label": "Last year", "value": 1100 },
+          { "label": "This year", "value": 2000 }
+        ],
+        "caption": "QPS has nearly doubled year over year — the growth curve that sparked the panic. But a rising trend says nothing about whether you're near the ceiling."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "The growth rate of traffic",
+          "detail": "Project the trend forward and act on how fast it's climbing.",
+          "flag": "weak",
+          "consequence": "Traffic is clearly climbing, which feels alarming — but a growth rate with no reference to capacity is a scary-looking line with no ceiling marked. You could be at 5% of the limit or 95%; the trend alone can't tell you.",
+          "divergenceCost": "Reacted to a growth trend without measuring it against the database's actual capacity."
+        },
+        {
+          "id": "B",
+          "label": "Current load as a fraction of demonstrated capacity, given the access pattern",
+          "detail": "Benchmark how much of this query mix Postgres sustains, and where you sit on it.",
+          "flag": "strong",
+          "consequence": "Benchmarked on the same hardware, Postgres sustains ~15,000 qps of this query mix before latency degrades; you're at 2,000. You're using ~13% of proven capacity, with vertical scaling and read-replicas untouched — and the join/transaction-heavy pattern is exactly what Cassandra is worst at.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Current load vs proven Postgres capacity (thousands of qps)",
+            "bars": [
+              { "label": "Current peak", "value": 2, "highlight": true },
+              { "label": "Postgres capacity", "value": 15 }
+            ],
+            "caption": "Current load is ~13% of demonstrated capacity on the existing setup, before read-replicas or a larger instance. The relational database has years of headroom for this workload."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "What do you recommend?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Approve the Cassandra migration to get ahead of scale",
+          "detail": "Move to NoSQL now so scale never becomes a fire.",
+          "flag": "weak",
+          "consequence": "You trade away joins, foreign keys, and transactional integrity — everything the order system depends on — to escape a limit you're at 13% of. The app gets harder to build and correctness bugs creep in, all to solve a non-problem.",
+          "divergenceCost": "Traded relational guarantees the app needs to escape a limit that's years away."
+        },
+        {
+          "id": "B",
+          "label": "Stay on Postgres, name the scaling path and the real trigger to reconsider",
+          "detail": "Lay out replicas then partitioning, and define when NoSQL would actually be warranted.",
+          "flag": "strong",
+          "consequence": "You advise staying relational, lay out the incremental scaling path — read replicas, then vertical scale, then partitioning — and set a concrete trigger (sustained load approaching a set fraction of capacity, or a genuinely non-relational workload) for revisiting NoSQL. The team keeps its guarantees and its roadmap.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The migration was a solution in search of a problem: at 60 GB and 2,000 qps the database sat at ~13% of demonstrated capacity, with replicas and vertical scaling untouched — and the join- and transaction-heavy access pattern is precisely what Cassandra sacrifices. A rising traffic curve triggered the panic, but a growth rate means nothing without the capacity ceiling to measure it against. The lesson is to pick a datastore from the access pattern and the load relative to proven capacity, not from a fear of scale or the gravity of 'web-scale' NoSQL — and to keep relational guarantees until a workload actually outgrows them."
+}

@@ -1343,3 +1343,51 @@ scarce skill (judgment) only. Named surface: "The Case Room".
   clear-all). Verified: tsc + eslint clean; Playwright run — filter works
   (Fintech → 1/20, clear → 20/20) and all **20 cases play gold → 3/3** with
   insight, no unexpected errors.
+- **Module 9 — collapsible filter + 10 cloud-architecture cases (2026-07-05):**
+  grew the batch to **30**.
+  - *Filter reorg (`CaseLanding`).* Replaced the always-open facet lists with
+    **collapsible category pills** — each facet (About / Industry / Modelling use
+    / Statistics / Cloud stack) is a pill that expands to reveal its value pills;
+    a selected-count badge shows on the collapsed pill. Added an **ever-present
+    search box** that filters the case list immediately by title / company /
+    domain / any facet value, AND-combined with pill selections. Empty facets are
+    dropped from the panel (so `stack` only appears once DE cases exist).
+  - *New `stack` facet.* Added an optional 5th facet key `stack` (cloud/tools) to
+    `CaseFacets` + `FACET_KEYS`/`FACET_LABELS` (label "Cloud / stack"); `valuesOf`
+    guards the absent case so the 20 analytics cases are unaffected.
+  - *10 DE cases* (realtime-dashboard, partition-skew, warehouse-vs-lakehouse,
+    orchestration-cron, nosql-vs-sql, exactly-once, file-format-scans,
+    cdc-vs-fullload, capacity-autoscale, data-quality-gate). Reused the existing
+    3-muscle spine, retargeted to system-design judgment (belief = an over/under-
+    engineered stack; framing = scope the requirement; evidence = read the
+    workload/cost/SLA figure; interpretation = match the tool to the need).
+    Hand-authored (the pipeline's prompt is analytics-tuned) but registered as
+    briefs + FACETS in `author-cases.mjs` for replicability.
+  - *Pipeline `--manifest-only` mode.* `author-cases.mjs` can now rebuild the
+    manifest and schema-validate every case file on disk **without an API key**
+    (lazy Anthropic client), so hand-authored cases and facet edits publish
+    without a Claude call. Verified: `--manifest-only` → 30/30 files pass schema;
+    tsc + eslint clean; 44 unit tests pass; `/cases` + DE case routes compile and
+    serve 200. NOTE: authenticated visual/Playwright pass of the new filter UI
+    still pending (routes are auth-gated).
+- **Module 10 — strict domain gate at topic entry (2026-07-05):** enforced the
+  "data & analytics skill prep only" protocol at every topic entry point. Before
+  this, the course/track builder had **no domain gate** — an off-domain topic
+  (e.g. "Becoming a CPA in the Philippines") refined and built a full track.
+  - *LLM-as-judge.* New `topicDomainJudgePrompt` (`lib/claude/prompts.ts`) +
+    `POST /api/dashboard/classify-topic` (Haiku — classification) return
+    `{ inDomain, reason, message, suggestions }`. Judges by the learner's CORE
+    skill: inclusive of genuine data/analytics topics and data-lens framings
+    ("analytics for accounting"), firm on everything else, leaning OUT when unsure.
+  - *Hard gate + kind reminder (no override).* `lib/learn/topic-domain.ts`
+    exposes the verdict type + a `classifyTopic()` client helper (fails OPEN on
+    any error so a transient judge failure never blocks a real learner). Wired
+    into **both** entry points: the course builder (`DashboardPanel`, before
+    "Let's Discuss") and Focused Learning (`TopicSetup`, before "Start session").
+    Out-of-domain topics are blocked with a warm amber reminder + clickable
+    data-angle reframe chips; editing the topic clears it.
+  - Verified: tsc + eslint clean; live Haiku run over 12 topics classified
+    **12/12** as expected (CPA/PH, Spanish, law, nursing → blocked with kind
+    messages + suggestions; Airflow, dbt, SQL, ML, Power BI, analytics-for-
+    accounting → allowed); `/api/dashboard/classify-topic` compiles and is
+    auth-gated (401 unauth).

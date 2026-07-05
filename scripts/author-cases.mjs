@@ -21,6 +21,10 @@ const DATA_DIR = path.join(ROOT, "public", "case-data");
 const MODEL = "claude-sonnet-4-6"; // repo convention; reasoning-heavy generation
 const FORCE = process.argv.includes("--force");
 const ONLY = (process.argv.find((a) => a.startsWith("--only=")) ?? "").split("=")[1];
+// --manifest-only: skip authoring entirely — just re-validate every case file on
+// disk and rebuild manifest.json. Needs no API key, so hand-authored cases (and
+// facet edits) can be published without a Claude call.
+const MANIFEST_ONLY = process.argv.includes("--manifest-only");
 
 // ── env ──────────────────────────────────────────────────────────────────────
 function loadEnv() {
@@ -36,11 +40,11 @@ function loadEnv() {
   return env;
 }
 const env = loadEnv();
-if (!env.ANTHROPIC_API_KEY) {
+if (!MANIFEST_ONLY && !env.ANTHROPIC_API_KEY) {
   console.error("Missing ANTHROPIC_API_KEY in .env.local");
   process.exit(1);
 }
-const anthropic = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+const anthropic = MANIFEST_ONLY ? null : new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
 
 // ── The gold-standard example (the hand-authored churn case) ─────────────────
 const CHURN = readFileSync(path.join(DATA_DIR, "freshbox-churn.json"), "utf8");
@@ -230,6 +234,103 @@ const BRIEFS = [
     realDriver: "A surge of complex commercial claims (which always take longer) shifted the mix; within each claim-complexity tier, approval time is flat. The new adjusters aren't slower.",
     lesson: "Mix shift / confounding: a blended average can rise purely because the composition of work changed. Compare within like-for-like tiers.",
   },
+
+  // ── Cloud-architecture (data-engineering) batch ────────────────────────────
+  // Same three-muscle spine, retargeted to system-design judgment: the belief is
+  // an over- or under-engineered stack; framing = scope the requirement first;
+  // evidence = read the workload/cost/SLA number that exposes the real need;
+  // interpretation = match the tool to the need (don't over-build). `stack` facet
+  // carries the cloud/tools dimension.
+  {
+    id: "realtime-dashboard", title: "The Real-Time Mandate", company: "Marketly",
+    domain: "Data Engineering", difficulty: "core", estMinutes: 6,
+    role: "Data Engineer",
+    situation: "The CEO asked for 'real-time' sales dashboards; the lead scoped a Kafka + Flink streaming pipeline delivering events within seconds.",
+    belief: "The lead is convinced the business needs true real-time streaming and that batch would look second-rate.",
+    realDriver: "The dashboard drives a once-daily merchandising review with an 8am deadline; any pipeline fresher than hourly meets the SLA. Streaming's sub-second freshness is unconsumed and buys permanent 24/7 ops cost.",
+    lesson: "Derive the freshness SLA from the decision cadence the data serves, not the loudest adjective in the request. Match the tool to the real need.",
+  },
+  {
+    id: "partition-skew", title: "The One Slow Reducer", company: "Adverva",
+    domain: "Data Engineering", difficulty: "hard", estMinutes: 7,
+    role: "Data Engineer",
+    situation: "A nightly Spark aggregation crept from 40 minutes to over 3 hours; the lead wants to double the cluster from 20 to 40 workers.",
+    belief: "The lead assumes the job is out of compute and that adding workers will restore the runtime.",
+    realDriver: "One task runs for hours while 199 finish in under a minute — a null join key holds 200x the rows of any real key. It's data skew; no number of workers helps because one task can't be split. Salting/isolating the key fixes it on the original cluster.",
+    lesson: "In distributed processing the shape of the data (skew) governs performance more than cluster size. Read the per-partition distribution before scaling.",
+  },
+  {
+    id: "warehouse-vs-lakehouse", title: "The Lakehouse Rewrite", company: "Brightform",
+    domain: "Data Engineering", difficulty: "hard", estMinutes: 7,
+    role: "Analytics Engineer",
+    situation: "The platform team wants to migrate the cloud warehouse to a Spark lakehouse on object storage, arguing it's cheaper and more scalable.",
+    belief: "The platform lead believes the warehouse won't scale and a lakehouse is the cheaper, inevitable future.",
+    realDriver: "The workload is ~1.8 TB, 95% interactive BI SQL, high concurrency. The lakehouse's cheap-storage win is under 10% of cost; on full TCO (standing compute + ops) it costs more and gives worse BI latency. The warehouse fits.",
+    lesson: "Size the architecture to the real workload profile and full TCO, not a storage-price headline or an industry trend. Define the concrete trigger to migrate later.",
+  },
+  {
+    id: "orchestration-cron", title: "The Cron That Grew", company: "Ledgerline",
+    domain: "Data Engineering", difficulty: "core", estMinutes: 6,
+    role: "Data Engineer",
+    situation: "30 chained cron jobs on one VM fail silently mid-run; the lead proposes building a custom Kubernetes scheduler.",
+    belief: "The lead believes the fix is a bespoke in-house scheduler built on Kubernetes.",
+    realDriver: "The real gaps are dependency-aware scheduling, automatic retries, backfills, and run visibility — all standard in an existing orchestrator (Airflow/Composer), which covers them in days vs months to build and years to maintain a custom one.",
+    lesson: "Separate the capabilities you need from the instinct to build. Adopt commodity, undifferentiated infrastructure; reserve engineering for what's specific to the business.",
+  },
+  {
+    id: "nosql-vs-sql", title: "The Scale Panic", company: "Trovi",
+    domain: "Data Engineering", difficulty: "core", estMinutes: 6,
+    role: "Data Engineer",
+    situation: "Fearing growth, the lead wants to migrate the core catalog and orders from PostgreSQL to Cassandra 'for web-scale'.",
+    belief: "The lead believes relational Postgres is a scaling dead-end and NoSQL is required for growth.",
+    realDriver: "At 60 GB and 2,000 qps the DB runs at ~13% of demonstrated capacity, with replicas and vertical scaling untouched — and the join/transaction-heavy access pattern is exactly what Cassandra sacrifices. A growth trend without a capacity ceiling triggered the panic.",
+    lesson: "Pick a datastore from the access pattern and load relative to proven capacity, not fear of scale. Keep relational guarantees until a workload actually outgrows them.",
+  },
+  {
+    id: "exactly-once", title: "The Duplicate Rows", company: "Shiplytics",
+    domain: "Data Engineering", difficulty: "hard", estMinutes: 7,
+    role: "Streaming Data Engineer",
+    situation: "A Kafka-to-warehouse stream writes occasional duplicate events; the lead wants to re-architect for end-to-end exactly-once semantics.",
+    belief: "The lead believes only true exactly-once streaming semantics will fix the duplicates.",
+    realDriver: "The ~0.2% duplicates come from at-least-once retries replaying events the sink already wrote, and every event carries a natural key (event_id). An idempotent upsert on event_id makes replays no-ops in hours — no pipeline-wide transactions.",
+    lesson: "Distinguish exactly-once delivery (extraordinarily hard, rarely needed) from idempotent effectively-once results (cheap, usually sufficient). Make the sink absorb replays.",
+  },
+  {
+    id: "file-format-scans", title: "The Slow Scans", company: "Streamhaus",
+    domain: "Data Engineering", difficulty: "core", estMinutes: 6,
+    role: "Data Engineer",
+    situation: "Lake queries are slow and scan costs are climbing; the lead wants to move everything into a larger, pricier warehouse tier.",
+    belief: "The lead believes the lake can't serve fast queries and only a bigger warehouse will fix cost and performance.",
+    realDriver: "Data is stored as row-oriented, unpartitioned gzipped JSON, so every query full-scans everything. Partitioned columnar Parquet cuts a typical query's scan from 800 GB to 6 GB (~130x) on the same engine.",
+    lesson: "In lakes, file format and partitioning govern scan cost more than engine horsepower. Fix the data layout before paying to process it.",
+  },
+  {
+    id: "cdc-vs-fullload", title: "The Nightly Full Reload", company: "Cartwheel",
+    domain: "Data Engineering", difficulty: "core", estMinutes: 6,
+    role: "Data Engineer",
+    situation: "A nightly job reloads an entire 500M-row orders table into the warehouse, now over SLA; the lead wants to buy more warehouse slots.",
+    belief: "The lead believes the reload is too big for the current warehouse and more compute is the fix.",
+    realDriver: "Only ~0.5% (~2.5M) of rows change daily; the full reload re-copies 99.5% unchanged data. Incremental/CDC loading moves 200x less data and finishes in minutes on the existing compute.",
+    lesson: "Move only what changed: match ingestion volume to the actual delta and reach for CDC/incremental before scaling compute. The redundant work, not the engine, is the cost.",
+  },
+  {
+    id: "capacity-autoscale", title: "The Black-Friday Cluster", company: "Peakline",
+    domain: "Data Engineering", difficulty: "intro", estMinutes: 5,
+    role: "Data / Platform Engineer",
+    situation: "For the holiday spike the lead wants to provision a large fixed peak-sized cluster and keep it running all season.",
+    belief: "The lead believes a permanently provisioned peak-sized cluster is the safe way to survive the spike.",
+    realDriver: "Load is near peak only ~3 hours a day and ~1/8 of peak the rest; a fixed peak cluster sits ~85% idle around the clock. Autoscaling/serverless matches spend to the load curve and still absorbs the spike.",
+    lesson: "Size to the shape of the load, not its maximum. The peak figure alone always argues for over-provisioning; the load distribution reveals whether fixed capacity fits.",
+  },
+  {
+    id: "data-quality-gate", title: "The Silent Corruption", company: "Welltrace",
+    domain: "Data Engineering", difficulty: "intro", estMinutes: 5,
+    role: "Analytics / Data Engineer",
+    situation: "A corrupted upstream feed produced a wrong metric that reached an executive report; the lead wants to buy a full data-observability platform.",
+    belief: "The lead believes only a comprehensive observability platform can prevent another silent data-quality failure.",
+    realDriver: "The pipeline had no validation at ingestion, so a silently changed units field flowed straight through. A few boundary assertions (schema, row-count range, units/enum, freshness) would have failed the run at the source in days, not weeks.",
+    lesson: "Put validation where data enters and fail fast. Right-size data quality to the actual failure mode with targeted contracts first; treat a platform as a later, evidence-driven step.",
+  },
 ];
 
 // ── Filter facets (About / Industry / Modelling use / Statistics) ────────────
@@ -255,6 +356,18 @@ const FACETS = {
   "ride-cancellations":  { about: "Marketplace ops",          industry: "Mobility / marketplace", modelling: ["Segmentation"], statistics: ["Aggregation trap", "Confounding"] },
   "energy-forecast":     { about: "Demand forecasting",       industry: "Energy / utilities",     modelling: ["Forecasting", "Model validation"], statistics: ["Distribution shift / extrapolation"] },
   "insurance-approval":  { about: "Claims operations",        industry: "Insurance",              modelling: ["Segmentation"], statistics: ["Confounding / mix shift"] },
+  // Cloud-architecture (DE) cases add the `stack` facet (cloud/tools). Their
+  // `statistics` value is the quantitative signal the evidence step turns on.
+  "realtime-dashboard":  { about: "Batch vs streaming",      industry: "Retail",                 modelling: ["Streaming", "Micro-batch"], statistics: ["Freshness SLA"], stack: ["Kafka", "Flink", "BigQuery"] },
+  "partition-skew":      { about: "Distributed compute",     industry: "Ad tech",                modelling: ["Spark tuning"], statistics: ["Data skew"], stack: ["Spark", "Dataproc"] },
+  "warehouse-vs-lakehouse": { about: "Storage architecture", industry: "B2B SaaS",               modelling: ["Lakehouse", "Warehouse"], statistics: ["Scan volume / concurrency"], stack: ["BigQuery", "Spark", "Iceberg"] },
+  "orchestration-cron":  { about: "Orchestration",           industry: "Fintech",                modelling: ["Workflow orchestration"], statistics: ["Failure / retry rate"], stack: ["Airflow", "Cloud Composer"] },
+  "nosql-vs-sql":        { about: "Database selection",       industry: "Marketplace",            modelling: ["OLTP design"], statistics: ["Throughput (QPS)"], stack: ["PostgreSQL", "Cassandra"] },
+  "exactly-once":        { about: "Streaming semantics",      industry: "Logistics",              modelling: ["Idempotency", "Streaming"], statistics: ["Duplicate rate"], stack: ["Kafka", "dbt", "BigQuery"] },
+  "file-format-scans":   { about: "Storage architecture",     industry: "Media",                  modelling: ["Columnar storage", "Partitioning"], statistics: ["Bytes scanned"], stack: ["Parquet", "S3", "Athena"] },
+  "cdc-vs-fullload":     { about: "Ingestion pattern",        industry: "E-commerce",             modelling: ["CDC / incremental"], statistics: ["Change rate"], stack: ["Debezium", "BigQuery", "dbt"] },
+  "capacity-autoscale":  { about: "Cost & scaling",           industry: "Retail",                 modelling: ["Autoscaling", "Serverless"], statistics: ["Peak-to-median ratio"], stack: ["Dataflow", "GCP"] },
+  "data-quality-gate":   { about: "Data quality",             industry: "Healthcare",             modelling: ["Data contracts", "Validation"], statistics: ["Null / anomaly rate"], stack: ["dbt", "Great Expectations"] },
 };
 
 // ── Prompts ──────────────────────────────────────────────────────────────────
@@ -395,10 +508,16 @@ async function author(brief) {
 
 // ── Run ──────────────────────────────────────────────────────────────────────
 async function main() {
-  const targets = BRIEFS.filter((b) => (ONLY ? b.id === ONLY : true)).filter(
-    (b) => FORCE || !existsSync(path.join(DATA_DIR, `${b.id}.json`)),
+  const targets = MANIFEST_ONLY
+    ? []
+    : BRIEFS.filter((b) => (ONLY ? b.id === ONLY : true)).filter(
+        (b) => FORCE || !existsSync(path.join(DATA_DIR, `${b.id}.json`)),
+      );
+  console.log(
+    MANIFEST_ONLY
+      ? "Manifest-only: validating case files on disk and rebuilding manifest…\n"
+      : `Authoring ${targets.length} case(s) with ${MODEL}…\n`,
   );
-  console.log(`Authoring ${targets.length} case(s) with ${MODEL}…\n`);
 
   const results = [];
   for (const brief of targets) {
@@ -427,6 +546,27 @@ async function main() {
   writeFileSync(path.join(DATA_DIR, "manifest.json"), JSON.stringify({ batch: "2026-07", cases: stubs }, null, 2) + "\n");
 
   console.log(`\nManifest rebuilt: ${stubs.length} cases in batch 2026-07.`);
+
+  // Manifest-only: schema-check every case file on disk (hand-authored cases
+  // never went through the generate→validate loop, so verify them here).
+  if (MANIFEST_ONLY) {
+    let bad = 0;
+    for (const stub of stubs) {
+      const raw = readFileSync(path.join(DATA_DIR, `${stub.id}.json`), "utf8");
+      const errs = validate(JSON.parse(raw));
+      if (errs.length) {
+        bad++;
+        console.log(`  ✗ ${stub.id}: ${errs.join("; ")}`);
+      }
+    }
+    console.log(
+      bad === 0
+        ? `All ${stubs.length} case files passed schema validation.`
+        : `\n⚠ ${bad} case file(s) failed schema validation — fix before publishing.`,
+    );
+    return;
+  }
+
   const flagged = results.filter((r) => !r.ok || r.verdict === "revise" || r.error);
   if (flagged.length) {
     console.log(`\n⚠ ${flagged.length} case(s) need your eyes:`);

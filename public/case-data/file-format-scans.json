@@ -1,0 +1,125 @@
+{
+  "id": "file-format-scans",
+  "title": "The Slow Scans",
+  "scenario": {
+    "role": "Data Engineer",
+    "company": "Streamhaus (media / OTT analytics)",
+    "situation": "Analysts complain that queries over the event data in the data lake are slow and the cloud bill for scans is climbing. The lead wants to move everything into a larger, pricier warehouse tier.",
+    "stakeholderBelief": "The lead believes the lake can't serve fast queries and that only a bigger warehouse will fix performance and cost.",
+    "question": "Why are the scans slow and expensive, and does the fix require a bigger warehouse?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "How do you investigate?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Provision the larger warehouse tier and load the data in",
+          "detail": "Stand up a bigger engine to make queries fast.",
+          "flag": "weak",
+          "consequence": "You start standing up a bigger, costlier engine before asking why the current scans are so heavy — likely paying more to scan data in a form that's expensive to scan.",
+          "divergenceCost": "Upgraded the engine before checking whether the data layout was the real cost driver."
+        },
+        {
+          "id": "B",
+          "label": "Profile how the data is stored and how much each query actually scans",
+          "detail": "Inspect the file format, partitioning, and bytes scanned per query.",
+          "flag": "strong",
+          "consequence": "You find the events are stored as row-oriented gzipped JSON in date-less folders. Every query does a full scan of the entire dataset — even one filtering to a single day and three columns. The cost is the layout, not the engine.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Tell analysts to write more selective queries",
+          "detail": "Push tighter filters onto the query authors.",
+          "flag": "weak",
+          "consequence": "Tighter WHERE clauses barely help — with row-oriented JSON and no partitioning, the engine still reads every file regardless of the filter. You've pushed a storage problem onto the analysts.",
+          "divergenceCost": "Pushed a storage-layout problem onto query authors who can't fix it from SQL."
+        },
+        {
+          "id": "D",
+          "label": "Add more compute to the existing lake query engine",
+          "detail": "Scale the query engine to power through the scans.",
+          "flag": "weak",
+          "consequence": "More compute makes the full scans finish a bit faster but reads the same bytes — so the bill, which is driven by bytes scanned, barely moves.",
+          "divergenceCost": "Threw compute at a cost that's driven by bytes scanned, not compute."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You suspect the storage layout. Which measurement confirms the real cost driver?",
+      "artifact": {
+        "type": "bars",
+        "title": "Average query wall-clock time (seconds)",
+        "bars": [
+          { "label": "Current lake", "value": 45 },
+          { "label": "Proposed warehouse", "value": 12 }
+        ],
+        "caption": "The warehouse looks ~4x faster in a quick test — the case for upgrading. But speed on the same badly-laid-out data hides why the query was slow in the first place."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Query wall-clock time on each engine",
+          "detail": "Race the two engines and pick the faster.",
+          "flag": "weak",
+          "consequence": "The warehouse returns results faster in a bake-off, which seems to settle it — but it's fast partly because it was tested on a better-laid-out copy, and wall-clock time hides the real lever: how many bytes each query is forced to read.",
+          "divergenceCost": "Compared engine speed while ignoring bytes scanned — the thing that drives both latency and cost."
+        },
+        {
+          "id": "B",
+          "label": "Bytes scanned per query, before and after columnar + partitioning",
+          "detail": "Measure how much data a typical query reads as JSON vs as partitioned Parquet.",
+          "flag": "strong",
+          "consequence": "The measurement is stark: a typical query scans 800 GB as gzipped JSON. Converted to partitioned Parquet, the same query — filtered to one day and three columns — scans 6 GB. Columnar formats read only the needed columns; partitioning prunes to the needed days. Same engine, ~130x less data, ~130x less cost.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Bytes scanned by a typical filtered query (GB)",
+            "bars": [
+              { "label": "Row JSON, unpartitioned", "value": 800 },
+              { "label": "Partitioned Parquet", "value": 6, "highlight": true }
+            ],
+            "caption": "Storing the same data as partitioned, columnar Parquet cuts bytes scanned from 800 GB to 6 GB — the engine reads only the days and columns each query needs. Cost and latency both track bytes scanned."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "What do you recommend?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Migrate to the bigger warehouse to solve performance",
+          "detail": "Move the data into the premium tier and call it fixed.",
+          "flag": "weak",
+          "consequence": "You move badly-laid-out data into a pricier engine; queries speed up somewhat but you're now paying premium rates to scan the same bloated bytes. The upgrade masks the layout problem and raises the floor on cost.",
+          "divergenceCost": "Paid for a premium engine to scan data whose layout was the actual cost."
+        },
+        {
+          "id": "B",
+          "label": "Convert to partitioned columnar storage first, remeasure, upgrade only if still needed",
+          "detail": "Fix the layout on the existing engine, then let evidence decide the engine question.",
+          "flag": "strong",
+          "consequence": "You recommend fixing the layout — partitioned Parquet with sensible partition keys — on the existing engine first, then remeasuring. Scans and cost drop by two orders of magnitude, analysts get fast queries, and no warehouse upgrade is needed. The engine choice becomes a later, evidence-based decision.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The scans were slow and expensive because the data was stored as row-oriented, unpartitioned JSON, forcing every query to read the entire dataset regardless of its filters — the cost lived in the storage layout, not the query engine. Converting to partitioned, columnar Parquet let the engine read only the columns and days each query needed, cutting bytes scanned — and therefore both latency and cost — by ~130x on the same infrastructure. The lesson is that in data lakes, file format and partitioning govern scan cost more than engine horsepower: fix how the data is laid out before paying to process it, because most 'we need a bigger engine' problems are really 'we're scanning far more bytes than the query needs.'"
+}

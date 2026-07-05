@@ -1,0 +1,126 @@
+{
+  "id": "cdc-vs-fullload",
+  "title": "The Nightly Full Reload",
+  "scenario": {
+    "role": "Data Engineer",
+    "company": "Cartwheel (e-commerce)",
+    "situation": "A nightly job reloads an entire 500-million-row orders table from the production database into the warehouse. It now runs past the morning SLA and the warehouse bill is rising. The lead wants to buy more warehouse slots to make the reload finish faster.",
+    "stakeholderBelief": "The lead believes the reload is too big for the current warehouse and that more compute is the fix.",
+    "question": "Does the reload really need more compute, or is it moving far more data than it needs to?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "How do you approach the slow reload?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Buy more warehouse slots to speed up the reload",
+          "detail": "Add compute so the nightly job finishes inside the window.",
+          "flag": "weak",
+          "consequence": "You scale up compute to move half a billion rows faster every night — paying more to keep re-copying data that hasn't changed since yesterday.",
+          "divergenceCost": "Scaled compute to move data faster without asking how much of it actually changed."
+        },
+        {
+          "id": "B",
+          "label": "Measure how much of the table actually changes each day",
+          "detail": "Compare snapshots to find the daily insert/update volume.",
+          "flag": "strong",
+          "consequence": "You compare snapshots: of 500M rows, only ~2.5M (about 0.5%) are inserted or updated on a typical day. The nightly job re-copies 99.5% unchanged data — the reload is huge because it's redundant, not because it's inherently big.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Compress the export to move it faster",
+          "detail": "Shrink the transfer payload to save time.",
+          "flag": "weak",
+          "consequence": "Compression shrinks the transfer a bit, but you're still reading, moving, and rewriting 500M rows every night — the fundamental waste is untouched.",
+          "divergenceCost": "Optimized the transfer of data that mostly didn't need to move at all."
+        },
+        {
+          "id": "D",
+          "label": "Split the full reload across two smaller windows",
+          "detail": "Break the job in half to fit the schedule.",
+          "flag": "weak",
+          "consequence": "Splitting the same full copy into two windows reshuffles when the work happens without reducing it — still 500M rows, still redundant, still over SLA in aggregate.",
+          "divergenceCost": "Rescheduled the redundant work instead of eliminating it."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You've measured the daily change rate. Which comparison decides the pipeline pattern?",
+      "artifact": {
+        "type": "bars",
+        "title": "Reload runtime vs warehouse slots (hours)",
+        "bars": [
+          { "label": "100 slots", "value": 5.0 },
+          { "label": "200 slots", "value": 3.0 },
+          { "label": "400 slots", "value": 2.5 }
+        ],
+        "caption": "Doubling slots shortens the reload with diminishing returns and rising cost — you can buy your way under the SLA, but you'll pay every night to move data that didn't change."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Reload time as a function of warehouse compute",
+          "detail": "Find the slot count that gets the full reload under SLA.",
+          "flag": "weak",
+          "consequence": "More slots does finish the full reload faster, so throwing compute at it 'works' — but you've committed to paying more every single night to re-move 99.5% unchanged rows. You optimized the cost of the waste instead of removing it.",
+          "divergenceCost": "Optimized how fast the redundant copy runs instead of whether it needs to run."
+        },
+        {
+          "id": "B",
+          "label": "Volume moved per night: full reload vs incremental / CDC",
+          "detail": "Compare rows moved when you load everything vs only the day's changes.",
+          "flag": "strong",
+          "consequence": "The comparison is decisive: an incremental load — capturing only inserts and updates via a watermark or CDC — moves ~2.5M rows instead of 500M, a 200x reduction. It finishes in minutes on the existing warehouse, well inside the SLA, and cost falls with the volume.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Rows moved per night (millions)",
+            "bars": [
+              { "label": "Full reload", "value": 500 },
+              { "label": "Incremental / CDC", "value": 2.5, "highlight": true }
+            ],
+            "caption": "Loading only the day's changes moves 2.5M rows instead of 500M — 200x less work, comfortably inside the SLA, on the warehouse you already have. Volume, not compute, was the lever."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "What do you recommend?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Approve more warehouse slots to keep the nightly reload under SLA",
+          "detail": "Buy the compute to keep the full reload fitting the window.",
+          "flag": "weak",
+          "consequence": "You buy standing compute to keep re-copying an entire table every night. The reload fits the window again, but you've locked in a permanently higher bill to move data that barely changes — and it'll creep back over SLA as the table grows.",
+          "divergenceCost": "Bought permanent compute to sustain a redundant full reload that will only grow."
+        },
+        {
+          "id": "B",
+          "label": "Switch to incremental / CDC loading, note the tradeoff, keep current compute",
+          "detail": "Load only changes, flag the change-tracking dependency, and reconcile periodically.",
+          "flag": "strong",
+          "consequence": "You recommend an incremental load keyed on a reliable change signal (updated-at watermark or CDC log), flag the tradeoff — you now depend on accurate change tracking and should reconcile with a periodic full compare — and keep the existing warehouse. The job runs in minutes, cost drops, and it scales with change volume, not table size.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The nightly reload was slow and expensive because it re-copied all 500M rows when only ~0.5% changed each day — the job was redundant, not undersized. Buying more warehouse slots would have optimized the speed of that waste while locking in a permanently higher bill that grows with the table. Switching to incremental or change-data-capture loading moved 200x less data and finished in minutes on the existing compute. The lesson is to move only what changed: match ingestion volume to the actual delta, and reach for CDC/incremental patterns before scaling compute — the redundant work, not the engine, is almost always the real cost."
+}

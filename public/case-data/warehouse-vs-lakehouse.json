@@ -1,0 +1,125 @@
+{
+  "id": "warehouse-vs-lakehouse",
+  "title": "The Lakehouse Rewrite",
+  "scenario": {
+    "role": "Analytics Engineer",
+    "company": "Brightform (B2B SaaS)",
+    "situation": "The platform team wants to migrate the company's cloud data warehouse to a Spark-based lakehouse on object storage, arguing it's cheaper and more scalable.",
+    "stakeholderBelief": "The platform lead believes the warehouse won't scale and that a lakehouse is the inevitable, cheaper future.",
+    "question": "Does the actual workload justify a lakehouse migration, or does the warehouse still fit?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "How do you approach the migration decision?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Kick off the lakehouse migration on the scalability argument",
+          "detail": "Accept that the warehouse won't scale and begin re-platforming.",
+          "flag": "weak",
+          "consequence": "You commit a quarter to re-platforming before profiling what the workload looks like — betting the roadmap on 'scale' the current data may never reach.",
+          "divergenceCost": "Committed to a migration on a general 'won't scale' claim without profiling the actual workload."
+        },
+        {
+          "id": "B",
+          "label": "Profile the current workload — volume, query mix, concurrency, and cost",
+          "detail": "Measure what the platform actually does before choosing a shape for it.",
+          "flag": "strong",
+          "consequence": "You pull the numbers: ~1.8 TB total, 95% of queries are interactive BI SQL with high concurrency, and warehouse spend is modest. The 'scale' problem is hypothetical; the real requirement is fast, concurrent SQL.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Poll other companies about what stack they run",
+          "detail": "Survey peers to see what modern data teams are adopting.",
+          "flag": "weak",
+          "consequence": "You collect a pile of conflicting anecdotes about what worked elsewhere on entirely different workloads — interesting, but no evidence about your own.",
+          "divergenceCost": "Substituted other companies' stack choices for evidence about your own workload."
+        },
+        {
+          "id": "D",
+          "label": "Prototype the single hardest query on the lakehouse first",
+          "detail": "Benchmark your worst query on Spark to see if it holds up.",
+          "flag": "weak",
+          "consequence": "You benchmark one query in isolation and it runs fine, but a single query says nothing about concurrency, operability, or cost at the workload level where the decision actually lives.",
+          "divergenceCost": "Generalized from one prototyped query to a whole-platform decision."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You've profiled the workload. Which comparison decides whether to migrate?",
+      "artifact": {
+        "type": "bars",
+        "title": "Storage cost per TB (indexed)",
+        "bars": [
+          { "label": "Warehouse", "value": 100 },
+          { "label": "Object-store lakehouse", "value": 20 }
+        ],
+        "caption": "On raw storage price per TB the lakehouse is 5x cheaper — the headline behind the migration. But storage is a sliver of the bill, and price-per-TB says nothing about query performance or engineering cost."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Storage cost per TB",
+          "detail": "Compare the two on the price of storing data.",
+          "flag": "weak",
+          "consequence": "The lakehouse wins storage price 5:1, which looks decisive — until you notice storage is under 10% of total cost. You'd be migrating a whole platform to optimize the smallest line item.",
+          "divergenceCost": "Optimized the smallest cost line (storage) while ignoring compute, concurrency, and ops."
+        },
+        {
+          "id": "B",
+          "label": "Total cost of ownership at the real workload",
+          "detail": "Weigh compute, concurrency performance, and engineering/ops effort together at 1.8 TB.",
+          "flag": "strong",
+          "consequence": "On the actual workload the picture flips: at 1.8 TB with high BI concurrency, warehouse compute is cheap and instant, while the lakehouse needs a standing Spark cluster plus engineers to manage tuning, small-file compaction, and metadata. TCO favors staying, and BI latency is far better on the warehouse.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Estimated monthly TCO at current workload (indexed)",
+            "bars": [
+              { "label": "Warehouse (stay)", "value": 100, "highlight": true },
+              { "label": "Lakehouse (migrate)", "value": 165 }
+            ],
+            "caption": "Including compute, engineering, and operations at the real 1.8 TB / high-concurrency workload, the lakehouse costs more, not less — and delivers worse BI latency. The storage saving is dwarfed by standing compute and ops overhead."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "What do you recommend?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Endorse the migration as the scalable, cheaper future",
+          "detail": "Approve the lakehouse move on the strength of the trend.",
+          "flag": "weak",
+          "consequence": "You green-light a costly re-platform on a slogan; the team spends a quarter rebuilding, BI users get slower dashboards, and the promised savings never materialize because storage was never the cost.",
+          "divergenceCost": "Endorsed a migration whose premise (cheaper, needed for scale) the workload contradicts."
+        },
+        {
+          "id": "B",
+          "label": "Recommend staying now, and name the concrete trigger to revisit",
+          "detail": "Advise against migrating today, back it with TCO and latency evidence, and define when a lakehouse would pay off.",
+          "flag": "strong",
+          "consequence": "You advise staying on the warehouse, back it with TCO and latency evidence, and set a concrete trigger — data crossing a volume/cost threshold, or heavy ML/unstructured workloads appearing — to revisit. The team avoids a quarter of wasted rework without foreclosing the future.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The lakehouse's headline advantage — cheap object storage — optimized the smallest line on the bill; at 1.8 TB of high-concurrency BI SQL, compute and engineering effort dominate cost, and there the warehouse wins on both price and latency. 'Won't scale' was a hypothesis about data the company doesn't yet have, not a problem it faces. The lesson is to size the architecture to the real workload profile — volume, query mix, concurrency, and full TCO including ops — and to define the concrete trigger that would justify migrating later, rather than re-platforming on the momentum of a trend."
+}

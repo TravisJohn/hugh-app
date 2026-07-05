@@ -451,6 +451,36 @@ Respond with ONLY valid JSON, no markdown fences:
 {"refinedTopic": "...", "tips": ["...", "...", "..."]}`;
 }
 
+// ── Topic domain judge (entry-point gate) ─────────────────────────────────
+
+/**
+ * LLM-as-judge that decides whether a topic belongs to Hugh's data & analytics
+ * domain. Used at every topic entry point to enforce the strict "data &
+ * analytics skill prep only" protocol. Classification → Haiku is sufficient.
+ */
+export function topicDomainJudgePrompt(topic: string): string {
+  return `You are a strict but fair gatekeeper for "Hugh", a learning app dedicated EXCLUSIVELY to data and analytics skill preparation. Hugh's domain is: data engineering, data science, machine learning / AI engineering, analytics, statistics and probability, SQL and databases, Python/R for data, data pipelines, cloud data platforms, BI and data visualization, experimentation / A-B testing, and directly related data tooling.
+
+Decide whether Hugh should build a learning track for the topic below.
+
+Topic: "${topic}"
+
+Judge by the CORE SKILL the learner would build:
+- IN-DOMAIN (inDomain=true): the core skill is data / analytics / data science / data engineering / ML / statistics / SQL / BI, or a specific tool in that space (e.g. "Apache Airflow", "dbt", "window functions", "A/B testing", "pandas", "Power BI"). ALSO in-domain when a broader field is explicitly framed through a data/analytics lens (e.g. "analytics for accounting", "SQL for financial reporting", "data analysis in Excel", "marketing analytics", "healthcare data science").
+- OUT-OF-DOMAIN (inDomain=false): the core is a different profession, licensure exam, or subject, even if data is used incidentally (e.g. "CPA licensure", "pass the nursing board", "learn Spanish", "creative writing", "general project management", "front-end CSS animations", "become a lawyer"). A topic that merely COULD touch data but is not about building data skills is out of domain.
+
+Be inclusive of genuine data/analytics topics and firm on everything else. When you cannot tell that the CORE skill is data/analytics, lean OUT (false) — the protocol is strict.
+
+If OUT-OF-DOMAIN:
+- "message": a warm, encouraging 1–2 sentence note in Hugh's own voice, reminding the learner that Hugh is built specifically for data & analytics skill prep and that this topic sits outside that focus. Be kind — never scold or shame.
+- "suggestions": 0–3 short, concrete data-angle reframes IF a sensible bridge exists (e.g. for a CPA topic: ["Analytics for finance & accounting", "SQL for financial reporting"]). If there is no reasonable data bridge, return [].
+
+If IN-DOMAIN: "message" is "" and "suggestions" is [].
+
+Respond with ONLY valid JSON, no markdown fences:
+{"inDomain": true | false, "reason": "<one short clause>", "message": "...", "suggestions": ["..."]}`;
+}
+
 // ── Shared JSON parse helper ──────────────────────────────────────────────
 
 export function parseClaudeJson<T = Record<string, unknown>>(text: string): T {

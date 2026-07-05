@@ -409,7 +409,8 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
     <div className="flex items-start gap-2 rounded-xl border border-amber-500/25 bg-amber-500/5 px-3.5 py-2.5">
       <ListChecks size={14} className="mt-0.5 shrink-0 text-amber-400" />
       <p className="flex-1 text-xs leading-relaxed text-amber-200/90">
-        You still have {uncheckedCount} idea{uncheckedCount === 1 ? "" : "s"} unticked in &ldquo;What to understand.&rdquo; You can carry on, but it&apos;s worth confirming you genuinely have them first.
+        You still have {uncheckedCount} {uncheckedCount === 1 ? "idea" : "ideas"}{" "}
+        unticked in &ldquo;What to understand.&rdquo; You can carry on, but it&apos;s worth confirming you genuinely have them first.
       </p>
       <button
         onClick={() => setNudgeDismissed(true)}

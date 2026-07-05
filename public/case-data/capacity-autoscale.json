@@ -1,0 +1,126 @@
+{
+  "id": "capacity-autoscale",
+  "title": "The Black-Friday Cluster",
+  "scenario": {
+    "role": "Data / Platform Engineer",
+    "company": "Peakline (retail, seasonal traffic)",
+    "situation": "To prepare for the holiday spike, the lead wants to provision a large fixed processing cluster sized for peak load and keep it running through the season.",
+    "stakeholderBelief": "The lead believes a permanently provisioned, peak-sized cluster is the safe way to survive the holiday spike.",
+    "question": "Is a fixed peak-sized cluster the right way to handle the spike, or does the load shape call for something else?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "How do you approach capacity for the season?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Provision the fixed peak-sized cluster for the season",
+          "detail": "Stand up peak capacity and keep it running through the holidays.",
+          "flag": "weak",
+          "consequence": "You stand up peak capacity and leave it running for months — paying for the busiest hour around the clock before checking what the load actually looks like the rest of the time.",
+          "divergenceCost": "Sized standing capacity to the peak before profiling how often the peak occurs."
+        },
+        {
+          "id": "B",
+          "label": "Profile the load shape over time — how peaky, and for how long",
+          "detail": "Chart hourly demand across a representative period before choosing a capacity model.",
+          "flag": "strong",
+          "consequence": "You chart hourly load across a representative week: demand sits near a low baseline most of the day and spikes to ~8x for a few hours during evening promotions and event days. The peak is real but brief; most hours need a fraction of peak capacity.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Copy last year's cluster size",
+          "detail": "Reuse the capacity that got you through last season.",
+          "flag": "weak",
+          "consequence": "You reuse last year's number without checking whether traffic, load shape, or the workload changed — anchoring capacity to a figure that may no longer fit.",
+          "divergenceCost": "Reused last year's fixed size without reprofiling this year's load shape."
+        },
+        {
+          "id": "D",
+          "label": "Size for the average load to save money",
+          "detail": "Provision to the mean demand to keep costs down.",
+          "flag": "weak",
+          "consequence": "Sizing to the average guarantees you fall over during the very spikes the season is about — the opposite failure, trading a cost problem for an outage.",
+          "divergenceCost": "Sized to the average, leaving no capacity for the spikes that define the season."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You've profiled the load shape. Which reading tells you whether fixed provisioning fits?",
+      "artifact": {
+        "type": "bars",
+        "title": "Peak capacity needed (units)",
+        "bars": [
+          { "label": "Last season", "value": 620 },
+          { "label": "This season (est.)", "value": 800 }
+        ],
+        "caption": "Peak demand is up ~30% — the number the fixed cluster would be sized to. But peak alone says nothing about how many hours you'd actually use it."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "The peak load figure",
+          "detail": "Size the cluster to the highest demand you expect.",
+          "flag": "weak",
+          "consequence": "Sizing to the peak guarantees you never fall over — and guarantees you pay for that peak 24 hours a day when you only hit it for a few. The single peak number, read alone, always argues for over-provisioning.",
+          "divergenceCost": "Sized to the peak in isolation, ignoring how few hours the peak actually lasts."
+        },
+        {
+          "id": "B",
+          "label": "The full load distribution — peak-to-median ratio and hours near peak",
+          "detail": "Look at how the whole day's demand is distributed, not just its maximum.",
+          "flag": "strong",
+          "consequence": "The distribution tells the real story: load is at or above 80% of peak for only ~3 hours a day; the median hour needs ~1/8 of peak capacity. A fixed peak-sized cluster would sit ~85% idle. Autoscaling that follows the curve matches spend to load and still absorbs the spike.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Hours per day at each load level",
+            "bars": [
+              { "label": "Near peak (>80%)", "value": 3, "highlight": true },
+              { "label": "Mid (30-80%)", "value": 5 },
+              { "label": "Low (<30%)", "value": 16 }
+            ],
+            "caption": "The cluster would run at peak capacity 24h/day to serve a spike that lasts ~3h. Autoscaling to the load curve keeps the peak headroom while paying baseline rates the other 21 hours."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "What do you recommend?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Approve the fixed peak-sized cluster for safety",
+          "detail": "Guarantee capacity by running peak-sized hardware all season.",
+          "flag": "weak",
+          "consequence": "You buy certainty against the spike by paying peak rates around the clock — roughly 8x the compute you use in a typical hour, idle most of the day. Safe, but a large standing bill for capacity that's mostly unused.",
+          "divergenceCost": "Bought around-the-clock peak capacity to cover a spike that lasts a few hours a day."
+        },
+        {
+          "id": "B",
+          "label": "Recommend autoscaling / serverless with a floor and headroom, load-test the spike",
+          "detail": "Let capacity track the curve, name the tradeoffs, and pre-warm ahead of known peaks.",
+          "flag": "strong",
+          "consequence": "You recommend elastic capacity — autoscaling with a sensible floor and burst headroom, or a serverless engine — so cost tracks the load curve. You flag the tradeoffs (scale-up lag, cold starts) and mitigate them by pre-warming ahead of known promo windows and load-testing the spike. Peak is covered; the other 21 hours cost baseline.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The load was spiky, not sustained: demand hit peak for only about three hours a day and sat near an eighth of peak the rest of the time, so a fixed peak-sized cluster would have run ~85% idle around the clock. The lone peak figure, read in isolation, always argues for over-provisioning; the full load distribution — peak-to-median ratio and hours spent near peak — is what reveals whether fixed capacity fits. The lesson is to size to the shape of the load, not its maximum: elastic autoscaling or serverless matches spend to demand and still absorbs the spike, as long as you account for scale-up latency and pre-warm ahead of known peaks."
+}

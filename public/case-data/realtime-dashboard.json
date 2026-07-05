@@ -1,0 +1,129 @@
+{
+  "id": "realtime-dashboard",
+  "title": "The Real-Time Mandate",
+  "scenario": {
+    "role": "Data Engineer",
+    "company": "Marketly (retail analytics team)",
+    "situation": "The CEO asked for \"real-time\" sales dashboards. The lead engineer has scoped a Kafka + Flink streaming pipeline to push every order event to the dashboard within seconds.",
+    "stakeholderBelief": "The lead is convinced the business needs true real-time streaming and that a batch pipeline would be seen as second-rate.",
+    "question": "Does the business actually need streaming, or would a right-sized batch pipeline meet the real requirement?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "Before committing to an architecture, how do you scope the pipeline?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Build the Kafka + Flink streaming pipeline the lead scoped",
+          "detail": "Accept the streaming design and start implementing it.",
+          "flag": "weak",
+          "consequence": "You commit engineering months to a streaming stack before anyone has defined how fresh the data must actually be. The hardest architecture is now locked in on an unexamined premise.",
+          "divergenceCost": "Committed to streaming before establishing the freshness requirement it's meant to satisfy."
+        },
+        {
+          "id": "B",
+          "label": "Interview the dashboard's users to derive the freshness SLA from how decisions are made",
+          "detail": "Find out who reads the dashboard, how often, and what actions the data drives — then translate that into a freshness target.",
+          "flag": "strong",
+          "consequence": "You learn merchandisers review the dashboard once each morning and act on it in weekly planning; no decision hinges on sub-hour freshness. The real requirement is 'fresh by 8am', not 'within seconds'.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Benchmark Kafka against a competing streaming engine",
+          "detail": "Run a bake-off between streaming frameworks to pick the best one.",
+          "flag": "weak",
+          "consequence": "You spend a week comparing streaming engines — a careful answer to a question no one has confirmed needs asking.",
+          "divergenceCost": "Optimized the choice of streaming tool without confirming streaming is required at all."
+        },
+        {
+          "id": "D",
+          "label": "Ship a nightly batch to be safe and revisit later",
+          "detail": "Default to the simplest batch you can and move on.",
+          "flag": "weak",
+          "consequence": "You pick batch by gut rather than evidence; if a few views genuinely need intraday freshness, you'll have guessed wrong in the other direction.",
+          "divergenceCost": "Picked batch by default instead of deriving the freshness the dashboard actually needs."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You've gathered how the dashboard is used. Which signal do you trust to set the pipeline's freshness target?",
+      "artifact": {
+        "type": "bars",
+        "title": "Data latency by design (minutes — lower is fresher)",
+        "bars": [
+          { "label": "Streaming", "value": 1 },
+          { "label": "15-min micro-batch", "value": 15 },
+          { "label": "Hourly batch", "value": 60 },
+          { "label": "Nightly batch", "value": 1440 }
+        ],
+        "caption": "Streaming is 'freshest' on paper. But fresher-than-needed is wasted — the question isn't which is fastest, it's which is fast enough for how the data is actually used."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Pick the design with the lowest data latency",
+          "detail": "Choose whichever architecture gets data to the dashboard soonest.",
+          "flag": "weak",
+          "consequence": "Streaming wins the raw-latency contest, so you choose it — optimizing a number the business never asked to minimize, and taking on 24/7 operational load for freshness no one consumes.",
+          "divergenceCost": "Chose on raw latency alone, optimizing a metric the use case doesn't reward."
+        },
+        {
+          "id": "B",
+          "label": "Compare each design's freshness against the decision cadence it serves",
+          "detail": "Line each option's freshness up against the once-daily, 8am-deadline review the dashboard drives, and weigh cost and on-call load.",
+          "flag": "strong",
+          "consequence": "Against a once-daily review with an 8am deadline, every design fresher than 'hourly' clears the bar. An hourly batch meets the SLA at a fraction of the cost and none of streaming's 24/7 on-call burden — the extra freshness is entirely unconsumed.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Cost + on-call load by design (indexed) — all meet the daily SLA except nightly",
+            "bars": [
+              { "label": "Streaming", "value": 100 },
+              { "label": "15-min micro-batch", "value": 35 },
+              { "label": "Hourly batch", "value": 20, "highlight": true },
+              { "label": "Nightly batch", "value": 8 }
+            ],
+            "caption": "Every design at 'hourly' or fresher clears the once-daily SLA. Hourly batch meets it at ~1/5 the cost of streaming and none of the 24/7 on-call load — nightly is the only one that misses the 8am deadline."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "What do you recommend to the lead and the CEO?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"Streaming is the modern standard — let's proceed with Kafka + Flink.\"",
+          "detail": "Endorse the streaming build as the right, future-proof choice.",
+          "flag": "weak",
+          "consequence": "You deliver the impressive-sounding architecture, but sign the team up for permanent streaming operations to serve a dashboard read once a day. The cost lands later, quietly, as on-call fatigue and cloud spend.",
+          "divergenceCost": "Recommended the trend over the requirement, buying permanent ops cost for unused freshness."
+        },
+        {
+          "id": "B",
+          "label": "\"An hourly batch meets the SLA at a fraction of the cost — here's the tradeoff, and the trigger to upgrade if a true intraday need appears.\"",
+          "detail": "Recommend the right-sized batch, name what streaming would buy (and that nothing currently consumes it), and define when to revisit.",
+          "flag": "strong",
+          "consequence": "You give leadership a design matched to how the data is used, an explicit note that streaming buys freshness no current decision consumes, and a clear trigger to upgrade later. 'Real-time' becomes 'fresh enough, far cheaper, and easy to evolve.'",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The 'real-time' mandate was a phrasing, not a requirement: the dashboard drives a once-daily decision with an 8am deadline, so any pipeline fresher than hourly already meets it. Streaming would have delivered seconds-fresh data that no decision consumes, in exchange for permanent 24/7 operational load and several times the cost. The lesson is to derive the freshness SLA from the decision cadence the data serves, not from the loudest adjective in the request — matching the tool to the real need is the senior move, not defaulting to the most powerful stack."
+}

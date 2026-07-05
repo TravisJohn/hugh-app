@@ -41,6 +41,10 @@ yarn-error.log*
 /presentation-story/
 /HUGH_PRESENTATION.md
 
+# local scratch / analysis artifacts — kept locally, not part of the app
+/LEARNING_POINTS.md
+/case-analysis.html
+
 # architecture dashboard — generated at build (predev/prebuild)
 /lib/architecture/data.generated.json
 /public/admin-architecture/

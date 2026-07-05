@@ -1,0 +1,129 @@
+{
+  "id": "partition-skew",
+  "title": "The One Slow Reducer",
+  "scenario": {
+    "role": "Data Engineer",
+    "company": "Adverva (ad-tech attribution)",
+    "situation": "A nightly Spark job that aggregates ad impressions has crept from 40 minutes to over 3 hours. The lead proposes doubling the cluster from 20 to 40 workers to restore the runtime.",
+    "stakeholderBelief": "The lead is convinced the job is simply out of compute and that adding workers will fix it.",
+    "question": "Is the job compute-bound, or is something else stretching the runtime?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "How do you investigate before changing the cluster?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Double the cluster to 40 workers as proposed",
+          "detail": "Provision twice the workers and rerun the job.",
+          "flag": "weak",
+          "consequence": "The job barely improves — it finishes in 2h50 on double the cluster. You've doubled the cost for a ~5% gain and still don't know why it's slow.",
+          "divergenceCost": "Added hardware before diagnosing what the job was actually waiting on."
+        },
+        {
+          "id": "B",
+          "label": "Open the Spark UI and inspect the stage timeline and per-task durations",
+          "detail": "Read where the time actually goes — stage by stage, task by task.",
+          "flag": "strong",
+          "consequence": "The stage timeline shows 199 tasks finishing in under a minute while a single task runs for over two hours. The job isn't compute-bound; it's waiting on one straggler.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Port the aggregation to a different framework",
+          "detail": "Rewrite the logic in warehouse SQL or another engine to escape Spark.",
+          "flag": "weak",
+          "consequence": "You sink days porting the logic, only to hit the same slowdown — because the cause travels with the data, not the framework.",
+          "divergenceCost": "Ported the workload before finding a cause that would follow the data anywhere."
+        },
+        {
+          "id": "D",
+          "label": "Increase executor memory to avoid spills",
+          "detail": "Assume disk spills are the bottleneck and raise memory.",
+          "flag": "weak",
+          "consequence": "Bumping memory removes a few minor spills but the runtime is unchanged; the dominant cost was never memory pressure.",
+          "divergenceCost": "Tuned memory on a hunch instead of reading where the time actually went."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "One task dominates the runtime. Which view tells you whether it's a cluster problem or a data problem?",
+      "artifact": {
+        "type": "bars",
+        "title": "Records processed per task (millions, sampled)",
+        "bars": [
+          { "label": "Task 1", "value": 480, "highlight": true },
+          { "label": "Task 2", "value": 2.1 },
+          { "label": "Task 3", "value": 1.9 },
+          { "label": "Task 4", "value": 2.0 }
+        ],
+        "caption": "Nearly all tasks handle ~2M records; one handles 480M. The work isn't spread evenly — it's piled onto a single partition. That shape points to the data, not the cluster."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Total cluster CPU utilization",
+          "detail": "Check whether the cluster is fully utilized to justify more workers.",
+          "flag": "weak",
+          "consequence": "Cluster CPU sits at 30% — technically 'underutilized', which tempts you to add workers. But low utilization here is the symptom of skew (idle workers waiting on one busy task), not a shortage of compute.",
+          "divergenceCost": "Read aggregate CPU as spare capacity when it was idle time waiting on a straggler."
+        },
+        {
+          "id": "B",
+          "label": "Distribution of records per partition key",
+          "detail": "Count rows per join key to see whether one key dominates.",
+          "flag": "strong",
+          "consequence": "The record-per-key distribution is brutally skewed: a null join key absorbs ~480M rows into one partition while every real key holds ~2M. It's data skew on a hot key — no number of extra workers helps, because one task can't be split across them.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Records per join key (millions, top keys)",
+            "bars": [
+              { "label": "user_id = NULL", "value": 480, "highlight": true },
+              { "label": "key A", "value": 2.3 },
+              { "label": "key B", "value": 2.1 },
+              { "label": "key C", "value": 2.0 }
+            ],
+            "caption": "One key — the null/unknown user — holds 200x the rows of any real key. That single partition is the entire runtime. Salting or isolating it, not scaling the cluster, is the fix."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "What do you report and do?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Report the cluster is undersized and request a permanent 40-worker cluster",
+          "detail": "Lock in double the standing capacity to keep runtimes down.",
+          "flag": "weak",
+          "consequence": "You lock in double the standing cost to mask a skew that a key fix would erase. The straggler still bottlenecks the job — you've just paid more to wait for it.",
+          "divergenceCost": "Recommended standing capacity to paper over a single-key skew that scaling can't fix."
+        },
+        {
+          "id": "B",
+          "label": "Explain it's data skew on a null key, fix the key, and keep the cluster as-is",
+          "detail": "Salt or isolate the hot key, and hold the original cluster size.",
+          "flag": "strong",
+          "consequence": "You name the real cause and apply a targeted fix — salting the hot key or handling nulls separately — and the job drops back under an hour on the original 20-worker cluster. No standing cost increase, and the pattern is documented for the next skewed job.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The job wasn't short on compute — it was bottlenecked on a single skewed partition where a null join key had absorbed 200x the rows of any real key. Doubling the cluster barely helped because one task cannot be spread across more workers; the straggler sets the runtime no matter how much hardware surrounds it. The lesson is that in distributed processing the shape of the data governs performance more than the size of the cluster — read the per-partition distribution before scaling, or you pay for capacity that sits idle waiting on one hot key."
+}

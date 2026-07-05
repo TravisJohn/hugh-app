@@ -1,0 +1,129 @@
+{
+  "id": "exactly-once",
+  "title": "The Duplicate Rows",
+  "scenario": {
+    "role": "Streaming Data Engineer",
+    "company": "Shiplytics (logistics telemetry)",
+    "situation": "A Kafka-to-warehouse stream occasionally writes duplicate delivery events, so daily counts are slightly inflated. The lead wants to re-architect the pipeline for exactly-once processing semantics end to end.",
+    "stakeholderBelief": "The lead believes only true exactly-once streaming semantics will fix the duplicates, and has scoped a large re-architecture to achieve it.",
+    "question": "What actually causes the duplicates, and what's the right-sized guarantee to fix them?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "How do you approach the fix?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Re-architect the whole pipeline for end-to-end exactly-once",
+          "detail": "Introduce transactional producers, consumers, and sinks across the stack.",
+          "flag": "weak",
+          "consequence": "You commit to transactional coordination across the stack — one of the hardest guarantees in distributed systems — before even confirming where or how often the duplicates arise.",
+          "divergenceCost": "Committed to the strongest possible guarantee before measuring the actual duplication."
+        },
+        {
+          "id": "B",
+          "label": "Quantify the duplicates and trace where they enter the pipeline",
+          "detail": "Measure the duplicate rate and find the mechanism that produces them.",
+          "flag": "strong",
+          "consequence": "You measure ~0.2% duplicate rows, all appearing after consumer retries following transient failures — at-least-once delivery replaying events the sink already wrote. The duplicates carry a natural key (event_id) and a clear, narrow cause.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Switch to a different streaming platform said to handle this better",
+          "detail": "Evaluate replatforming the stream onto another system.",
+          "flag": "weak",
+          "consequence": "You evaluate migrating the whole stream to another platform — a massive change — to sidestep a duplication that a downstream key constraint could absorb.",
+          "divergenceCost": "Considered replatforming to avoid a problem the sink layer can neutralize."
+        },
+        {
+          "id": "D",
+          "label": "Add a nightly dedup batch job to clean the table",
+          "detail": "Sweep duplicates out of the warehouse table after the fact.",
+          "flag": "weak",
+          "consequence": "A nightly cleanup masks the duplicates after the fact, but intra-day counts stay wrong and you've added a second pipeline to babysit — treating the symptom on a delay.",
+          "divergenceCost": "Cleaned up after the duplicates instead of preventing them at write time."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You've traced retry-driven duplicates with a natural key. Which approach do you evaluate to fix them?",
+      "artifact": {
+        "type": "table",
+        "title": "Two ways to stop duplicate rows",
+        "headers": ["", "End-to-end exactly-once", "Idempotent upsert on event_id"],
+        "rows": [
+          ["Where it changes", "Producers, brokers, consumers, sink", "Sink write only"],
+          ["Engineering effort", "Weeks, high risk", "Hours"],
+          ["Ops complexity", "High (transactions everywhere)", "Negligible"],
+          ["Result for the table", "No duplicates", "No duplicates"]
+        ]
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Full exactly-once semantics across producers, brokers, and consumers",
+          "detail": "Guarantee each event is processed exactly once end to end.",
+          "flag": "weak",
+          "consequence": "End-to-end exactly-once would eliminate the duplicates — at the cost of transactional coordination across every stage, a large latency and complexity hit, and ongoing operational fragility. It's the maximal guarantee for a minor, well-bounded problem.",
+          "divergenceCost": "Chose the maximal distributed guarantee for a problem confined to the sink write."
+        },
+        {
+          "id": "B",
+          "label": "Idempotent upserts on the natural key (event_id) at the sink",
+          "detail": "Make the sink write an insert-or-ignore keyed on event_id so replays are no-ops.",
+          "flag": "strong",
+          "consequence": "Because every event carries a unique event_id, making the sink write an idempotent upsert makes replays harmless — the second write of the same event is a no-op. This delivers effectively-once results at the sink in a few hours' work, no pipeline-wide transactions, no latency cost.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "table",
+            "title": "Idempotent upsert — effort vs guarantee",
+            "headers": ["Property", "Value"],
+            "rows": [
+              ["Change scope", "Sink write -> upsert on event_id"],
+              ["Effort", "A few hours"],
+              ["Latency impact", "None"],
+              ["Duplicates after fix", "Zero (replays are no-ops)"]
+            ]
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "What do you recommend?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Proceed with the exactly-once re-architecture for correctness",
+          "detail": "Deliver the end-to-end guarantee to be sure it never recurs.",
+          "flag": "weak",
+          "consequence": "You deliver a technically pristine guarantee, but at the price of weeks of high-risk work and a permanently more complex, higher-latency pipeline — to solve a 0.2% duplication a one-line upsert would have erased.",
+          "divergenceCost": "Bought a pipeline-wide guarantee, and its permanent complexity, for a problem the sink could absorb."
+        },
+        {
+          "id": "B",
+          "label": "Use idempotent upserts, explain effectively-once vs exactly-once, keep at-least-once delivery",
+          "detail": "Recommend the sink-level fix and the reasoning behind it.",
+          "flag": "strong",
+          "consequence": "You recommend keeping at-least-once delivery and making the sink idempotent, and explain the distinction: exactly-once delivery is nearly impossible and unnecessary here, while idempotent writes give exactly-once results where it matters — the data. The duplicates vanish, the pipeline stays simple.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The duplicates came from ordinary at-least-once retries replaying events the sink had already written — a narrow, 0.2% problem with a natural key attached. Pursuing end-to-end exactly-once semantics would have rebuilt the entire pipeline with transactional coordination to guarantee something a single idempotent upsert on event_id achieves in hours. The lesson is the distinction between exactly-once delivery (extraordinarily hard, rarely needed) and idempotent, effectively-once results (cheap and usually sufficient): design the sink to make replays harmless and you get correctness where it counts without paying for the strongest guarantee in distributed systems."
+}

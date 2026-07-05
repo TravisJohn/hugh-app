@@ -78,17 +78,20 @@ export interface Case {
 
 export type Difficulty = "intro" | "core" | "hard";
 
-/** The four filterable dimensions of a case. `about`/`industry` are single;
- *  `modelling`/`statistics` can carry more than one value. */
+/** The filterable dimensions of a case. `about`/`industry` are single;
+ *  `modelling`/`statistics` can carry more than one value. `stack` is the
+ *  cloud/tooling dimension — OPTIONAL: only the data-engineering architecture
+ *  cases populate it, so analytics cases omit it entirely. */
 export interface CaseFacets {
   about: string;
   industry: string;
   modelling: string[];
   statistics: string[];
+  stack?: string[];
 }
 
 /** The keys of {@link CaseFacets}, in display order — drives the filter panel. */
-export const FACET_KEYS = ["about", "industry", "modelling", "statistics"] as const;
+export const FACET_KEYS = ["about", "industry", "modelling", "statistics", "stack"] as const;
 export type FacetKey = (typeof FACET_KEYS)[number];
 
 export const FACET_LABELS: Record<FacetKey, string> = {
@@ -96,6 +99,7 @@ export const FACET_LABELS: Record<FacetKey, string> = {
   industry: "Industry",
   modelling: "Modelling use",
   statistics: "Statistics",
+  stack: "Cloud / stack",
 };
 
 /** Lightweight stub for the library index — never carries full case content. */
