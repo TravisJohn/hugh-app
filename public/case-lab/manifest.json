@@ -10,6 +10,36 @@
       "rows": 12000,
       "releaseDate": "2026-07-05",
       "blurb": "Marketing swears the Q3 win-back email lifted 90-day retention by 30 points. You've got the user-level export. Is the lift real, or is something else going on?"
+    },
+    {
+      "id": "support-churn",
+      "title": "Do support tickets cause churn — should we cut the team?",
+      "company": "Meridian — B2B SaaS",
+      "trap": "Confounding / reverse causality",
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-04",
+      "blurb": "Accounts that contact support churn far more, so the COO wants to cut the support team to save money and reduce churn. Does the data actually support that?"
+    },
+    {
+      "id": "checkout-redesign",
+      "title": "The new checkout converts worse overall — roll it back?",
+      "company": "Kettle — DTC e-commerce",
+      "trap": "Simpson's paradox",
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-03",
+      "blurb": "The redesigned checkout converts lower than the old one overall, and the Head of Growth wants to roll it back. Split the data before she does."
+    },
+    {
+      "id": "sales-team-winrate",
+      "title": "Team A's win rate beats Team B — is B underperforming?",
+      "company": "Vantage — B2B sales",
+      "trap": "Simpson's paradox",
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-02",
+      "blurb": "Team A closes 37% of deals, Team B only 30%, and the VP wants to reshuffle B. Compare the pods fairly before anyone gets moved."
     }
   ]
 }

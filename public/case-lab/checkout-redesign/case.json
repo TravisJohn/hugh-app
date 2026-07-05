@@ -1,0 +1,67 @@
+{
+  "id": "checkout-redesign",
+  "title": "The new checkout converts worse overall — do we roll it back?",
+  "trap": "Simpson's paradox",
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the analyst on the growth team at Kettle",
+    "company": "Kettle — a direct-to-consumer kitchenware store",
+    "situation": "The team shipped a redesigned checkout and rolled it out gradually. Two weeks in, the Head of Growth pulls the numbers and is alarmed: overall, sessions on the new checkout converted about 1.4 points LOWER than the old one. She's ready to roll it back before it costs more sales and wants your read on the experiment data first.",
+    "stakeholderBelief": "\"The new checkout converts worse than the old one overall. It's hurting us — roll it back.\"",
+    "question": "Is the new checkout actually worse? Work out its real effect on conversion and recommend whether to keep it, roll it back, or change the rollout."
+  },
+  "dataset": {
+    "file": "/case-lab/checkout-redesign/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "session_id", "type": "int", "description": "Unique checkout session identifier" },
+      { "name": "device", "type": "string", "description": "Device the session was on: desktop or mobile" },
+      { "name": "traffic_source", "type": "string", "description": "How the session arrived: organic, paid, email, or referral" },
+      { "name": "variant", "type": "string", "description": "Which checkout the session saw: old or new" },
+      { "name": "converted", "type": "int", "description": "1 if the session completed a purchase, else 0" }
+    ],
+    "sample": [
+      { "session_id": 1, "device": "desktop", "traffic_source": "referral", "variant": "old", "converted": 0 },
+      { "session_id": 2, "device": "desktop", "traffic_source": "email", "variant": "old", "converted": 0 },
+      { "session_id": 3, "device": "mobile", "traffic_source": "paid", "variant": "new", "converted": 0 },
+      { "session_id": 4, "device": "desktop", "traffic_source": "email", "variant": "old", "converted": 0 },
+      { "session_id": 5, "device": "mobile", "traffic_source": "referral", "variant": "new", "converted": 0 },
+      { "session_id": 6, "device": "desktop", "traffic_source": "referral", "variant": "new", "converted": 1 },
+      { "session_id": 7, "device": "mobile", "traffic_source": "email", "variant": "new", "converted": 1 },
+      { "session_id": 8, "device": "desktop", "traffic_source": "referral", "variant": "old", "converted": 0 }
+    ]
+  },
+  "guidingQuestions": [
+    "What's the overall conversion gap between the new and old checkout? (This is the -1.4 point number the Head of Growth is worried about.)",
+    "How was the rollout split across devices? Compare the share of new-checkout vs old-checkout sessions that were on mobile.",
+    "Split conversion by device: within desktop, and within mobile, which variant converts better?",
+    "Why does the new checkout win within every device but lose overall? Which variable is driving the reversal?",
+    "What do you recommend — roll back, keep, or change the rollout? What's the apples-to-apples effect of the new checkout?"
+  ],
+  "suggestedApproach": [
+    "Reproduce the headline first — overall conversion for new vs old — so you're testing the exact claim.",
+    "Before trusting an overall average, check that the two groups are comparable. Look at how new vs old sessions are distributed across device.",
+    "Break the comparison down by device (and any other segment that differs between the groups). Compute the new-vs-old gap within each segment.",
+    "If the new checkout wins in every segment but loses overall, you have a mix effect — the segments aren't weighted the same in each group. Standardize to a common device mix.",
+    "Recommend based on the within-segment (mix-adjusted) effect, and flag that the uneven rollout is what created the misleading headline."
+  ],
+  "teachingNote": {
+    "naiveRead": "Overall, new-checkout sessions converted about 1.4 points lower than old-checkout sessions. Taken at face value, the redesign hurt conversion and should be rolled back before it does more damage.",
+    "theTrap": "The rollout wasn't balanced across devices. The new checkout was pushed to mobile first — 70% of new-checkout sessions were on mobile, versus only 30% of old-checkout sessions. Mobile converts far lower than desktop for everyone (thumbs, small screens, distractions). So the new checkout's audience was loaded with low-converting mobile traffic. That device mix, not the design, dragged its overall number below the old checkout's desktop-heavy number. This is Simpson's paradox: the aggregate reverses the within-group truth because the groups aren't mixed the same way.",
+    "honestAnswer": "Compare like with like. Within desktop, the new checkout converts about +3.2 points higher; within mobile, about +2.6 points higher. Standardized to a common device mix, the new checkout is roughly +2.9 points BETTER, not worse. The redesign is a win on every device — the only problem is that it was rolled out disproportionately to mobile, which manufactured a scary-looking aggregate.",
+    "howToGetThere": [
+      "Compute the overall new-vs-old conversion gap: ~-1.4 pts. That's the alarming headline.",
+      "Check comparability: mobile share is 70% for new vs 30% for old — the groups have very different device mixes.",
+      "Split by device: within desktop new beats old (~+3.2 pts); within mobile new beats old (~+2.6 pts).",
+      "Reconcile: the new checkout wins in every segment but loses overall because it's overweight on low-converting mobile — classic Simpson's paradox.",
+      "Standardize: weight the within-device effects by the overall device mix to get the mix-adjusted effect (~+2.9 pts)."
+    ],
+    "numbers": [
+      { "label": "Naive overall gap (new − old)", "value": "−1.4 pts" },
+      { "label": "Within desktop (new − old)", "value": "+3.2 pts" },
+      { "label": "Within mobile (new − old)", "value": "+2.6 pts" },
+      { "label": "Mix-adjusted effect", "value": "≈ +2.9 pts (better)" }
+    ],
+    "lesson": "An overall average silently weights each subgroup by how many observations it contributes — and if a treatment is rolled out unevenly across subgroups, that weighting can flip the sign of the result. Before trusting an aggregate comparison, check that the groups have the same mix on anything that affects the outcome. Here the new checkout was better on every device; only the mobile-heavy rollout made it look worse. Keep the design, fix the rollout, and next time randomize (or at least balance) the assignment across segments."
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "id": "support-churn",
+  "title": "Do support tickets cause churn — should we cut the support team?",
+  "trap": "Confounding / reverse causality",
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the analyst at Meridian",
+    "company": "Meridian — a B2B project-management SaaS",
+    "situation": "The COO is looking for costs to cut and has landed on the support team. His evidence: accounts that opened a support ticket last quarter churned at about 59%, versus 31% for accounts that never contacted support — a 28-point gap. His read is that support interactions frustrate customers and push them out the door, so shrinking the team will both save money and reduce churn. He wants your analysis before he signs off on the headcount cut.",
+    "stakeholderBelief": "\"Contacting support is associated with way more churn. Support is driving customers away — cut the team and churn will drop.\"",
+    "question": "Does contacting support actually cause churn? Estimate support's real effect on churn and tell the COO whether cutting the team will reduce it."
+  },
+  "dataset": {
+    "file": "/case-lab/support-churn/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "account_id", "type": "int", "description": "Unique account identifier" },
+      { "name": "industry", "type": "string", "description": "Account's industry vertical" },
+      { "name": "seats", "type": "int", "description": "Number of paid seats on the account" },
+      { "name": "tenure_months", "type": "int", "description": "Months the account has been a customer" },
+      { "name": "health_score", "type": "float", "description": "Account health (0-100) at the START of the quarter, before any support contact — product usage, adoption, and engagement rolled up" },
+      { "name": "contacted_support", "type": "int", "description": "1 if the account opened a support ticket during the quarter, else 0" },
+      { "name": "churned", "type": "int", "description": "1 if the account cancelled by the end of the quarter, else 0" }
+    ],
+    "sample": [
+      { "account_id": 1, "industry": "Health", "seats": 55, "tenure_months": 25, "health_score": 58.8, "contacted_support": 0, "churned": 0 },
+      { "account_id": 2, "industry": "SaaS", "seats": 8, "tenure_months": 47, "health_score": 44.5, "contacted_support": 0, "churned": 1 },
+      { "account_id": 3, "industry": "Media", "seats": 151, "tenure_months": 16, "health_score": 36.7, "contacted_support": 1, "churned": 1 },
+      { "account_id": 4, "industry": "SaaS", "seats": 169, "tenure_months": 3, "health_score": 56.0, "contacted_support": 1, "churned": 1 },
+      { "account_id": 5, "industry": "Retail", "seats": 47, "tenure_months": 41, "health_score": 70.1, "contacted_support": 0, "churned": 1 },
+      { "account_id": 6, "industry": "Health", "seats": 336, "tenure_months": 4, "health_score": 27.3, "contacted_support": 1, "churned": 0 },
+      { "account_id": 7, "industry": "Retail", "seats": 388, "tenure_months": 1, "health_score": 82.0, "contacted_support": 0, "churned": 0 },
+      { "account_id": 8, "industry": "Retail", "seats": 389, "tenure_months": 41, "health_score": 71.2, "contacted_support": 0, "churned": 0 }
+    ]
+  },
+  "guidingQuestions": [
+    "What's the naive churn gap between accounts that contacted support and those that didn't? (This is the COO's 28-point number.)",
+    "Why would a struggling account be more likely to BOTH contact support and churn? What does health_score look like for the two groups?",
+    "Which variable confounds the support→churn comparison, and which direction does it bias the naive gap?",
+    "Estimate support's effect on churn holding account health constant — stratify on health_score deciles, or model churned ~ health_score + contacted_support. What sign and size do you get now?",
+    "What do you tell the COO? Will cutting the support team reduce churn — or could it make things worse?"
+  ],
+  "suggestedApproach": [
+    "Reproduce the COO's number first — churn rate for contacted_support = 1 vs 0 — so you know exactly what claim you're testing.",
+    "Ask which way the causal arrow runs: do tickets cause churn, or do already-struggling accounts raise tickets? Look at health_score by group before deciding.",
+    "If a pre-existing variable drives both contacting support and churning, it's confounding the comparison — plan to hold it constant.",
+    "Re-estimate support's effect within similar-health accounts (stratify on health deciles, or add health to a model). Note the sign carefully.",
+    "Translate into a recommendation — and if the effect flips protective, say plainly what cutting support would do."
+  ],
+  "teachingNote": {
+    "naiveRead": "Accounts that contacted support churned at ~59% versus ~31% for those that didn't — a +28.4 point gap. Read naively, support looks actively harmful, and cutting the team looks like a two-for-one win: lower cost and lower churn.",
+    "theTrap": "The arrow runs the other way. Accounts contact support because they're already in trouble: the contacted group averages a health_score of 41, versus 65 for accounts that never reached out. Low health is what actually drives churn — and it's also what makes an account raise a ticket. So support contact is a symptom of an at-risk account, not a cause of its departure. The naive gap is almost entirely the pre-existing health difference between who does and doesn't contact support.",
+    "honestAnswer": "Hold account health constant — stratify on health deciles, or model churned ~ health_score + contacted_support — and support's effect doesn't just shrink, it flips: about -5 points. Among accounts in the same health band, the ones that engaged support were slightly MORE likely to stay. Support is a retention lever, not a churn driver. Cutting the team would remove a protective intervention from exactly the accounts most at risk.",
+    "howToGetThere": [
+      "Compute the raw churn gap: mean(churned) for contacted_support=1 minus =0. You'll get ~+28.4 pts — the COO's number.",
+      "Profile the groups on health_score: contacted ≈ 41 vs not ≈ 65. The groups are not comparable to begin with.",
+      "Recognise health_score as a confounder that drives both contacting support and churning — and that it inflates (here, entirely manufactures) the naive gap.",
+      "Adjust: within health deciles, take the size-weighted churn difference for contacted vs not — or fit a model with health as a covariate. The effect lands near -5 pts.",
+      "Sanity-check the sign flip: it's stable across deciles and methods, which is the tell that the raw comparison was confounded."
+    ],
+    "numbers": [
+      { "label": "Naive churn gap (contacted − not)", "value": "+28.4 pts" },
+      { "label": "Mean health — contacted vs not", "value": "40.8 vs 64.9" },
+      { "label": "Health-adjusted effect of support", "value": "≈ −5.1 pts (protective)" },
+      { "label": "Overall quarterly churn", "value": "44.4%" }
+    ],
+    "lesson": "A raw association can point the exact opposite way to the causal effect. Before acting on 'X is associated with more of the bad outcome,' ask what leads people to X in the first place — here, accounts contact support because they're already struggling, and struggling is what causes churn. Condition on that pre-existing state and support turns out mildly protective. Cutting it to 'reduce churn' would strip help from the most at-risk accounts. When a marker of trouble correlates with a bad outcome, don't mistake the smoke alarm for the fire."
+  }
+}

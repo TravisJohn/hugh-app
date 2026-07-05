@@ -1,0 +1,67 @@
+{
+  "id": "sales-team-winrate",
+  "title": "Team A's win rate beats Team B — is B underperforming?",
+  "trap": "Simpson's paradox",
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the RevOps analyst at Vantage",
+    "company": "Vantage — a B2B analytics platform",
+    "situation": "The VP of Sales is reviewing the two account-executive pods. Team A closed 37% of its opportunities last year; Team B closed just 30%. She's ready to reshuffle Team B — maybe move its pipeline to A, maybe put B on a performance plan. Before she does, she wants you to confirm the read from the opportunity-level data.",
+    "stakeholderBelief": "\"Team A wins 37% of deals, Team B only 30%. Team B is clearly the weaker pod — let's move their pipeline to A.\"",
+    "question": "Is Team B actually worse at closing? Compare the teams fairly and tell the VP whether B is underperforming."
+  },
+  "dataset": {
+    "file": "/case-lab/sales-team-winrate/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "opportunity_id", "type": "int", "description": "Unique opportunity identifier" },
+      { "name": "team", "type": "string", "description": "Which pod owned the opportunity: A or B" },
+      { "name": "deal_size_band", "type": "string", "description": "Deal size tier: smb, mid, or enterprise" },
+      { "name": "deal_value_k", "type": "float", "description": "Opportunity value in thousands of dollars" },
+      { "name": "won", "type": "int", "description": "1 if the opportunity was won (closed-won), else 0" }
+    ],
+    "sample": [
+      { "opportunity_id": 1, "team": "A", "deal_size_band": "mid", "deal_value_k": 73.6, "won": 0 },
+      { "opportunity_id": 2, "team": "B", "deal_size_band": "enterprise", "deal_value_k": 226.4, "won": 0 },
+      { "opportunity_id": 3, "team": "A", "deal_size_band": "mid", "deal_value_k": 83.3, "won": 0 },
+      { "opportunity_id": 4, "team": "B", "deal_size_band": "enterprise", "deal_value_k": 538.0, "won": 0 },
+      { "opportunity_id": 5, "team": "A", "deal_size_band": "mid", "deal_value_k": 44.8, "won": 1 },
+      { "opportunity_id": 6, "team": "A", "deal_size_band": "enterprise", "deal_value_k": 153.3, "won": 0 },
+      { "opportunity_id": 7, "team": "B", "deal_size_band": "mid", "deal_value_k": 67.3, "won": 0 },
+      { "opportunity_id": 8, "team": "A", "deal_size_band": "smb", "deal_value_k": 17.6, "won": 1 }
+    ]
+  },
+  "guidingQuestions": [
+    "Confirm the headline: what are the overall win rates for Team A and Team B? (37% vs 30%.)",
+    "What kinds of deals does each team work? Compare the deal_size_band mix for A vs B.",
+    "Win rates fall as deals get bigger. Within each band (smb, mid, enterprise), which team wins more?",
+    "Why does Team B win within every band but lose overall? Which variable creates the reversal?",
+    "What do you tell the VP — is B underperforming, and would moving B's pipeline to A actually help?"
+  ],
+  "suggestedApproach": [
+    "Reproduce the overall win rates for A and B so you're testing the exact claim.",
+    "Before ranking the teams, check what each is actually working. Compare their deal_size_band mix — are they even playing the same game?",
+    "Win probability depends heavily on deal size. Compare the teams within each band so you're holding difficulty constant.",
+    "If one team wins every band but loses overall, the deal mix is doing the work — standardize both teams to a common band mix.",
+    "Recommend based on the like-for-like comparison, and flag what moving pipeline between differently-loaded teams would really do."
+  ],
+  "teachingNote": {
+    "naiveRead": "Team A closed 37% of its opportunities; Team B closed 30%. A 7-point gap looks decisive — Team B is the weaker pod, and shifting its pipeline to A should lift overall win rate.",
+    "theTrap": "The two teams aren't working the same deals. Team A's book is mostly SMB (small, easy-to-close) deals; Team B's is mostly enterprise (large, hard-to-close) deals. Win rates fall steeply with deal size, so A's easy mix inflates its overall rate and B's hard mix deflates its. Compare within each band and the picture flips: Team B wins MORE than A among SMB deals (+4.6 pts), mid deals (+6.9 pts), AND enterprise deals (+5.8 pts). B is the stronger closer at every level; the raw rate just reflects who was handed the easy pipeline.",
+    "honestAnswer": "Standardize both teams to a common deal-size mix and Team B is about +5.7 points BETTER than Team A, not 7 points worse. B is the more effective pod; it only trails on the headline because it carries the hard, enterprise-heavy book. Moving B's pipeline to A would hand harder deals to the weaker closer and likely LOWER total wins — the exact opposite of the intended fix.",
+    "howToGetThere": [
+      "Confirm the overall win rates: A ≈ 37%, B ≈ 30% (the VP's 7-point gap).",
+      "Profile the mix: A is SMB-heavy, B is enterprise-heavy — and win rate drops sharply from SMB to enterprise.",
+      "Compare within band: B beats A among smb (+4.6), mid (+6.9), and enterprise (+5.8) deals.",
+      "Reconcile: B wins every band yet loses overall because it's overweight on hard enterprise deals — Simpson's paradox.",
+      "Standardize: weight each band's B-minus-A gap by the overall band mix → B is ~+5.7 pts better."
+    ],
+    "numbers": [
+      { "label": "Overall win rate — A vs B", "value": "37.0% vs 29.9%" },
+      { "label": "Within SMB / mid / enterprise (B − A)", "value": "+4.6 / +6.9 / +5.8 pts" },
+      { "label": "Mix-adjusted (B − A)", "value": "≈ +5.7 pts (B better)" },
+      { "label": "Naive read", "value": "B looks 7 pts worse" }
+    ],
+    "lesson": "Comparing raw rates between groups that face different difficulty is comparing apples to oranges. A headline win rate blends skill with the deal mix a team happens to carry — so a stronger closer working harder deals can post a lower number. Before ranking people or teams, hold the difficulty constant: compare within like-for-like segments and standardize to a common mix. Here Team B is better at every level; rewarding the raw rate would punish the stronger team and hand hard deals to the weaker one."
+  }
+}
