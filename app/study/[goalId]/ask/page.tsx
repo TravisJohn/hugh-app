@@ -73,15 +73,14 @@ export default async function StudyAskPage({ params, searchParams }: Props) {
 
       {/* Header — back goes to the tracker board */}
       <header className="relative flex shrink-0 items-center justify-between border-b border-slate-800 px-6 py-3">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <Link
             href={`/study/${goalId}/track`}
-            className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300 transition-colors"
+            aria-label="Back to the track board"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-colors"
           >
-            <ArrowLeft size={14} />
-            <span className="max-w-[200px] truncate">{g.topic}</span>
+            <ArrowLeft size={16} />
           </Link>
-          <span className="text-slate-700">|</span>
           <span className="font-serif text-base font-semibold text-white">Hugh.</span>
         </div>
 
@@ -97,7 +96,7 @@ export default async function StudyAskPage({ params, searchParams }: Props) {
       </header>
 
       {/* Tab bar */}
-      <StudyTabs goalId={goalId} activeTab="ask" />
+      <StudyTabs goalId={goalId} activeTab="ask" courseTitle={g.topic} endDate={g.end_date} />
 
       {/* Milestone focus strip — persists with the focused milestone */}
       {focusTitle && (
