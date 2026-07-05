@@ -8,7 +8,7 @@ import HeaderUsage from "@/components/usage/HeaderUsage";
 
 // Top-level activity picker — the post-login landing for every user. Picking
 // "Learn" leads to the "What do you want to learn?" dashboard (/home/learn);
-// "Show" opens The Case Room (/cases). "Apply" is a locked placeholder for now.
+// "Cases" opens The Case Room (/cases). "Apply" is a locked placeholder for now.
 export default async function HomePage() {
   const supabase = await createClient();
   const { user } = await verifyUserAccess(supabase);
@@ -67,7 +67,7 @@ export default async function HomePage() {
           </h1>
         </div>
 
-        {/* ── Three activities: Learn · Apply · Show ───────────────── */}
+        {/* ── Three activities: Learn · Apply · Cases ───────────────── */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-3xl shrink-0">
 
           {/* Learn — the whole learning experience */}
@@ -113,7 +113,7 @@ export default async function HomePage() {
             </div>
           </div>
 
-          {/* Show — The Case Room */}
+          {/* Cases — The Case Room */}
           <Link
             href="/cases"
             className="group flex flex-col gap-3 rounded-2xl border border-amber-500/40 bg-amber-900/10 p-5 shadow-lg shadow-amber-900/20 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-amber-400/60 hover:bg-amber-900/20 hover:shadow-xl hover:shadow-amber-500/20"
@@ -123,7 +123,7 @@ export default async function HomePage() {
             </div>
             <div>
               <div className="flex items-center gap-1.5 mb-1">
-                <p className="font-semibold text-slate-100 text-base">Show</p>
+                <p className="font-semibold text-slate-100 text-base">Cases</p>
                 <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-xs font-semibold text-amber-400">
                   New
                 </span>
