@@ -1,0 +1,166 @@
+{
+  "id": "unweighted-average",
+  "title": "The Blended Rate",
+  "scenario": {
+    "role": "Sales Analyst",
+    "company": "Assurico",
+    "situation": "The blended conversion rate across agents rose from 18.2% to 21.4% this quarter, and leadership is celebrating.",
+    "stakeholderBelief": "The VP of Sales is convinced a new coaching program rolled out this quarter improved agent performance across the board.",
+    "question": "Did agents actually get better, or is something else moving the blended number?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "Leadership wants to credit the coaching program. How do you frame your investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Before/after comparison on coaching cohorts",
+          "detail": "Compare each coached agent's conversion rate before and after the program launched.",
+          "flag": "weak",
+          "consequence": "You find some agents improved and some didn't — but you're still working inside the coaching hypothesis. You haven't checked whether the blended figure itself is telling the truth.",
+          "divergenceCost": "Anchored on leadership's hypothesis and never questioned the validity of the blended metric."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic decomposition of the blended rate",
+          "detail": "Ask what the blended rate is actually averaging: who contributes to it, how many leads each agent handled, and whether the mix changed.",
+          "flag": "strong",
+          "consequence": "Immediately you see the blended rate is a simple mean of per-agent rates — no volume weighting. The composition question is now live, and the coaching story is on hold until you check whether the math is sound.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Survey agents on what changed",
+          "detail": "Ask agents which coaching techniques they adopted and correlate with their rates.",
+          "flag": "weak",
+          "consequence": "You collect qualitative signals but have no way to verify them against the actual movement in the blended number. The math problem underneath stays invisible.",
+          "divergenceCost": "Went qualitative when a numerical decomposition would have exposed the real issue immediately."
+        },
+        {
+          "id": "D",
+          "label": "Build a regression model of conversion drivers",
+          "detail": "Model conversion rate as a function of coaching participation, tenure, region, and lead source.",
+          "flag": "weak",
+          "consequence": "The model runs, but it inherits the flawed blended rate as its target variable. Garbage in, garbage out — and the composition problem never surfaces.",
+          "divergenceCost": "Jumped to modeling before validating the metric being modeled."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You pull per-agent conversion rates and lead volumes. Which metric do you trust to assess whether agents genuinely improved?",
+      "artifact": {
+        "type": "bars",
+        "title": "Per-agent conversion rate this quarter (unweighted)",
+        "bars": [
+          {
+            "label": "Agent 1 (820 leads)",
+            "value": 17.1
+          },
+          {
+            "label": "Agent 2 (754 leads)",
+            "value": 18.4
+          },
+          {
+            "label": "Agent 3 (698 leads)",
+            "value": 16.9
+          },
+          {
+            "label": "Agent 4 (612 leads)",
+            "value": 19.2
+          },
+          {
+            "label": "Agent 5 (41 leads)",
+            "value": 55,
+            "highlight": true
+          },
+          {
+            "label": "Agent 6 (38 leads)",
+            "value": 61.8,
+            "highlight": true
+          },
+          {
+            "label": "Agent 7 (29 leads)",
+            "value": 58.6,
+            "highlight": true
+          }
+        ],
+        "caption": "Each agent's rate is given equal weight in the blended figure, regardless of how many leads they handled. Three agents with tiny volumes and very high rates are pulling the average up."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Simple (unweighted) mean of per-agent rates",
+          "detail": "Average the conversion rate across all agents, treating each agent equally.",
+          "flag": "weak",
+          "consequence": "The mean comes out at 21.4% — matching the number leadership celebrated. But agents 5, 6, and 7 combined handled fewer than 110 leads total, while agents 1–4 handled over 2,800. The tiny cohort is doing the heavy lifting in the average.",
+          "divergenceCost": "Treated every agent as equally representative regardless of how much volume they actually handled."
+        },
+        {
+          "id": "B",
+          "label": "Volume-weighted conversion rate across agents",
+          "detail": "Weight each agent's rate by their share of total leads before averaging.",
+          "flag": "strong",
+          "consequence": "Volume-weighted, the blended rate is 18.6% — essentially flat versus last quarter's 18.2%. The apparent 3.2-point gain evaporates. The high-rate agents were real, but statistically negligible given their lead volumes.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Conversion rate: unweighted vs. volume-weighted",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "Last quarter (weighted)",
+                "value": 18.2
+              },
+              {
+                "label": "This quarter (unweighted)",
+                "value": 21.4
+              },
+              {
+                "label": "This quarter (volume-weighted)",
+                "value": 18.6,
+                "highlight": true
+              }
+            ],
+            "caption": "Weighted by lead volume, this quarter's rate is 18.6% — statistically flat. The unweighted figure is an artifact of three low-volume, high-rate agents receiving the same weight as the four agents who handled 96% of leads."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Volume-weighted, conversion is flat. The unweighted rise is driven by three low-volume agents. What do you tell the VP of Sales?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The coaching program didn't work — conversion is actually flat.\"",
+          "detail": "Make the definitive call that agents did not improve.",
+          "flag": "weak",
+          "consequence": "You've correctly identified that the headline number was misleading, but you've overclaimed in the other direction. It's possible the coaching helped the high-volume agents hold steady under harder conditions, or that the three high-rate agents are early adopters showing real signal. You haven't ruled those out.",
+          "divergenceCost": "Overclaimed a null result without investigating whether coaching had any genuine localized effect."
+        },
+        {
+          "id": "B",
+          "label": "\"The blended gain is a weighting artifact — volume-weighted, we're flat. The coaching program's true effect is still open and worth isolating properly.\"",
+          "detail": "Correct the metric, flag the limitation, and recommend a proper causal test.",
+          "flag": "strong",
+          "consequence": "You've dismantled the misleading headline with evidence, protected leadership from a false conclusion, and opened a credible path — a holdout design or matched-cohort analysis — to actually measure whether coaching works. That's the full analyst job.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The apparent improvement in blended conversion was entirely an artifact of computing a simple mean across agents with wildly unequal lead volumes — three agents handling fewer than 110 leads collectively pulled the average up by over 3 points. Volume-weighted, the rate was flat. The lesson is precise: whenever you average rates or percentages across groups, those groups must be weighted by the denominator they represent, or small high-rate groups will distort the aggregate. The coaching program may or may not have worked — but the raw blended number was never a valid way to find out."
+}

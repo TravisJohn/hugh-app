@@ -1,0 +1,159 @@
+{
+  "id": "denominator-shift",
+  "title": "The Rising Rate",
+  "scenario": {
+    "role": "Risk Analyst",
+    "company": "Paywave",
+    "situation": "The fraud rate per active user jumped from 0.8% to 1.3% this month — a 63% relative increase.",
+    "stakeholderBelief": "The risk team assumes fraudsters got more active and wants to tighten transaction rules immediately.",
+    "question": "Did fraud actually surge, or is something else driving the rate increase?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The risk team is ready to escalate. How do you frame your investigation before touching any fraud data?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Audit the fraud detection pipeline",
+          "detail": "Check whether the detection model or rules changed this month, which could inflate flagged cases.",
+          "flag": "weak",
+          "consequence": "The pipeline looks clean — no rule changes, no model retraining. You've ruled out one thing but spent time on a dead end, and you still don't know why the rate moved.",
+          "divergenceCost": "Looked for a technical artifact before decomposing the metric itself."
+        },
+        {
+          "id": "B",
+          "label": "Decompose the rate into numerator and denominator trends separately",
+          "detail": "Before assuming fraud grew, chart absolute fraud counts and active-user counts independently to see which component moved.",
+          "flag": "strong",
+          "consequence": "Plotting both series immediately reveals the divergence: fraud counts are flat while active users dropped sharply. The rate rose because the base shrank — a finding the risk team's framing would never surface.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Segment fraud cases by attack vector",
+          "detail": "Break down fraud by type — account takeover, card not present, synthetic identity — to find which vector spiked.",
+          "flag": "weak",
+          "consequence": "No single vector shows a meaningful spike. You've sliced a flat numerator into smaller flat pieces and produced noise, not signal.",
+          "divergenceCost": "Assumed the numerator drove the move and segmented before verifying it changed at all."
+        },
+        {
+          "id": "D",
+          "label": "Compare this month's fraud rate to the same month last year",
+          "detail": "Use a year-over-year view to control for seasonality.",
+          "flag": "weak",
+          "consequence": "The YoY rate is also elevated — but last year's denominator was different too. You've added a second confounded comparison without resolving the first.",
+          "divergenceCost": "Reached for a benchmark comparison before understanding what the current rate is actually measuring."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You decide to inspect the components. Which metric view do you bring to the team to confirm what actually moved?",
+      "artifact": {
+        "type": "bars",
+        "title": "Fraud rate per active user — last 3 months",
+        "bars": [
+          {
+            "label": "3 months ago",
+            "value": 0.75
+          },
+          {
+            "label": "2 months ago",
+            "value": 0.8
+          },
+          {
+            "label": "This month",
+            "value": 1.3,
+            "highlight": true
+          }
+        ],
+        "caption": "The rate jumped sharply this month. Is the problem in the numerator, the denominator, or both?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Fraud rate trend over time",
+          "detail": "Show the month-over-month fraud rate chart — the same number that triggered the alert.",
+          "flag": "weak",
+          "consequence": "The chart confirms the rate rose, but it still doesn't tell you whether fraud counts climbed or active users fell. You're presenting the question, not the answer.",
+          "divergenceCost": "Re-presented the alerting metric without decomposing it — the original confusion remains intact."
+        },
+        {
+          "id": "B",
+          "label": "Side-by-side absolute counts: fraud events vs. active users",
+          "detail": "Plot raw fraud event counts and raw active-user counts on the same time axis so both components are visible.",
+          "flag": "strong",
+          "consequence": "The picture is unambiguous: fraud event counts have been flat for three months while active users dropped by 38% this month following a churn event. The rate rise is entirely denominator-driven — there is no fraud surge.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Absolute fraud events vs. active users — last 3 months",
+            "bars": [
+              {
+                "label": "Fraud events (3mo ago)",
+                "value": 1200
+              },
+              {
+                "label": "Fraud events (2mo ago)",
+                "value": 1280
+              },
+              {
+                "label": "Fraud events (this month)",
+                "value": 1250
+              },
+              {
+                "label": "Active users (3mo ago)",
+                "value": 160000
+              },
+              {
+                "label": "Active users (2mo ago)",
+                "value": 160000
+              },
+              {
+                "label": "Active users (this month)",
+                "value": 96000,
+                "highlight": true
+              }
+            ],
+            "caption": "Fraud counts are flat. Active users fell 38% after a churn event. The denominator collapse — not a fraud surge — drove the rate increase."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The data shows flat fraud counts and a collapsed active-user base. What do you tell the risk team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"There is no fraud surge — the rate moved because users churned. Stand down.\"",
+          "detail": "Make the definitive call and recommend no action.",
+          "flag": "weak",
+          "consequence": "You've correctly identified the denominator effect, but standing down entirely is premature. The churn event changed your user mix, which could expose new fraud patterns going forward. Confidence without a forward-looking check leaves a real risk unmonitored.",
+          "divergenceCost": "Overclaimed certainty and skipped a forward-looking risk check after a major base change."
+        },
+        {
+          "id": "B",
+          "label": "\"The rate rise appears denominator-driven — fraud counts are flat and active users dropped 38%. Tightening rules now would likely be premature, but we should monitor absolute fraud counts closely over the next cycle and assess whether the new user mix carries different risk characteristics.\"",
+          "detail": "Report the finding, flag the limit of the analysis, and propose a monitoring path.",
+          "flag": "strong",
+          "consequence": "You've reframed the alert with evidence, prevented a potentially harmful rule change, and built in a credible forward check. The risk team gets a clear, defensible answer with a responsible next step.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "Fraud didn't surge — the active-user base shrank 38% after a churn event, and the flat numerator divided by a smaller denominator produced the alarming rate. The lesson is structural: any rate metric can move because its denominator moved, entirely independent of the phenomenon you think you're measuring. Before investigating why a rate changed, verify which component — numerator or denominator — actually changed, and by how much."
+}

@@ -1,0 +1,159 @@
+{
+  "id": "ratio-spurious",
+  "title": "The Efficiency Correlation",
+  "scenario": {
+    "role": "Operations Analyst",
+    "company": "Forgeworks",
+    "situation": "A cross-plant analysis shows that cost-per-unit and defects-per-unit correlate strongly (r = 0.81) across the company's 14 manufacturing plants.",
+    "stakeholderBelief": "The operations team concludes that cost-cutting initiatives will also reduce defects — two birds, one stone.",
+    "question": "Is the correlation between cost-per-unit and defects-per-unit a real operational signal, or something else?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "Leadership wants you to validate the cost-cutting plan. How do you frame your investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Validate the correlation with a regression",
+          "detail": "Run a regression of defects-per-unit on cost-per-unit across plants to quantify the relationship.",
+          "flag": "weak",
+          "consequence": "The regression confirms a strong, statistically significant relationship — but you've fit a model to two ratios that share the same denominator. The math looks solid; the premise is not.",
+          "divergenceCost": "Anchored on the team's hypothesis and laundered a spurious correlation through a more sophisticated method."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic decomposition by plant volume",
+          "detail": "Before trusting the ratio correlation, decompose each metric into its raw numerators and check whether plant volume explains the pattern.",
+          "flag": "strong",
+          "consequence": "You immediately see that the plants with the highest ratios are the lowest-volume plants — the shared denominator is inflating both metrics together. The correlation is an artifact, not a signal.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Interview plant managers about cost-cutting and quality trade-offs",
+          "detail": "Gather qualitative evidence from managers about whether their cost-reduction efforts affected defect rates.",
+          "flag": "weak",
+          "consequence": "Managers give plausible stories in both directions. Qualitative evidence is useful color, but it can't resolve whether the correlation is real or a mathematical artifact.",
+          "divergenceCost": "Sought qualitative validation for a correlation whose validity hadn't been tested quantitatively."
+        },
+        {
+          "id": "D",
+          "label": "Benchmark the highest-cost, highest-defect plants for a fix",
+          "detail": "Identify the worst-performing plants on both ratios and treat them as the intervention targets.",
+          "flag": "weak",
+          "consequence": "You've targeted the lowest-volume plants for intervention. But their ratios are high because they produce few units, not because they are operationally broken — the fix would address the wrong problem.",
+          "divergenceCost": "Jumped to intervention before checking whether the metric identified the right plants."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You've decided to look at volume. Which metric do you use to assess whether the correlation is real?",
+      "artifact": {
+        "type": "bars",
+        "title": "Cost-per-unit vs. Defects-per-unit correlation — plant-level ratios",
+        "bars": [
+          {
+            "label": "Plant A (high vol)",
+            "value": 1.2
+          },
+          {
+            "label": "Plant B (high vol)",
+            "value": 1.4
+          },
+          {
+            "label": "Plant C (mid vol)",
+            "value": 2.8
+          },
+          {
+            "label": "Plant D (mid vol)",
+            "value": 3.1
+          },
+          {
+            "label": "Plant E (low vol)",
+            "value": 7.4
+          },
+          {
+            "label": "Plant F (low vol)",
+            "value": 8.9,
+            "highlight": false
+          }
+        ],
+        "caption": "Both ratios are high for low-volume plants and low for high-volume plants. But is this cost driving defects, or a shared denominator at work?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "The ratio correlation itself (cost-per-unit vs. defects-per-unit)",
+          "detail": "Continue using the per-unit ratios as the evidence base, since they normalize for scale.",
+          "flag": "weak",
+          "consequence": "The correlation holds — because both ratios still share units-produced in the denominator. Normalizing for scale is exactly what created the artifact; using the ratios as evidence doesn't resolve the question.",
+          "divergenceCost": "Used the artifact-generating metrics as evidence of their own validity."
+        },
+        {
+          "id": "B",
+          "label": "Raw total costs and raw total defects, plotted against plant volume",
+          "detail": "Strip the denominator out and look at absolute costs, absolute defects, and units produced separately across plants.",
+          "flag": "strong",
+          "consequence": "Plotted against volume, raw costs and raw defects do NOT move together — high-volume plants have high absolute costs but low absolute defects. The per-unit correlation vanishes when the shared denominator is removed.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Raw defect counts by plant volume tier (denominator removed)",
+            "bars": [
+              {
+                "label": "High-vol plants (avg)",
+                "value": 412
+              },
+              {
+                "label": "Mid-vol plants (avg)",
+                "value": 398
+              },
+              {
+                "label": "Low-vol plants (avg)",
+                "value": 389,
+                "highlight": true
+              }
+            ],
+            "caption": "Raw defect counts are nearly flat across volume tiers. Low-volume plants look worse only because their unit count shrinks the denominator — not because they produce more defects."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The raw numerators don't co-move. The ratio correlation is likely a shared-denominator artifact. What do you tell leadership?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The correlation is spurious — cost-cutting will not reduce defects. Cancel the initiative.\"",
+          "detail": "Make the definitive call and advise against the plan.",
+          "flag": "weak",
+          "consequence": "You've correctly identified a likely artifact but overreached. It's possible some real cost-quality link exists within volume tiers that this analysis didn't fully rule out — and recommending cancellation without a confirmatory step leaves leadership with nowhere to go.",
+          "divergenceCost": "Overclaimed a definitive causal conclusion from a single decomposition and offered no confirmatory path."
+        },
+        {
+          "id": "B",
+          "label": "\"The correlation appears to be a shared-denominator artifact, not a real cost-quality link — we should verify by analyzing plants within similar volume tiers before acting on it.\"",
+          "detail": "Present the finding, name the mechanism, and recommend a confirmatory within-tier analysis before committing to the initiative.",
+          "flag": "strong",
+          "consequence": "You've reframed the team's assumption with a concrete mechanism, shown the evidence cleanly, and prescribed a next step that can confirm or refute the finding. Leadership gets a finding AND a decision-ready path forward.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The strong correlation between cost-per-unit and defects-per-unit was entirely explained by plant volume: low-volume plants inflate both ratios simultaneously because the shared denominator (units produced) is small. When raw numerators were examined, the relationship disappeared. The lesson is that ratios sharing a denominator will tend to correlate even when their numerators are unrelated — always strip the denominator out and check volumes before treating a ratio correlation as a real signal."
+}

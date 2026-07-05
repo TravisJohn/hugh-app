@@ -1,0 +1,182 @@
+{
+  "id": "materialized-views",
+  "title": "The Recomputed Dashboard",
+  "scenario": {
+    "role": "Analytics Engineer",
+    "company": "Pulsegrid",
+    "situation": "A business-critical dashboard reruns a massive multi-table aggregation on every single load, and warehouse compute costs have tripled in 30 days.",
+    "stakeholderBelief": "The data team wants to either add a BI-layer cache or upgrade to a larger warehouse cluster to handle the query load.",
+    "question": "Is compute capacity the real problem, or is there a cheaper structural fix?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "Costs are soaring and pressure is high. How do you frame your investigation before touching any settings?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Benchmark current cluster vs. next tier up",
+          "detail": "Run the same dashboard query on a larger warehouse and compare execution time and cost.",
+          "flag": "weak",
+          "consequence": "The larger cluster does run the query faster — but you're still running the full aggregation on every load. The monthly bill goes up, not down.",
+          "divergenceCost": "Treated a compute-efficiency question as a hardware-sizing question."
+        },
+        {
+          "id": "B",
+          "label": "Characterize query frequency and data-change rate",
+          "detail": "Ask: how often does this query run, and how often does the underlying data actually change? Look at query logs and source-table update timestamps.",
+          "flag": "strong",
+          "consequence": "Query logs show the dashboard loads dozens of times per hour. Source tables update once nightly. You've just found a 95%+ redundancy window — the same expensive result is being recomputed from scratch every time.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Audit the BI cache configuration",
+          "detail": "Check whether the BI tool's built-in cache is misconfigured or disabled.",
+          "flag": "weak",
+          "consequence": "The BI cache is indeed enabled, but it only caches at the HTTP layer — it can't cache results from a live warehouse query. The aggregation still fires on every session. You've fixed nothing.",
+          "divergenceCost": "Assumed the solution space before understanding the problem."
+        },
+        {
+          "id": "D",
+          "label": "Rewrite the query for performance",
+          "detail": "Optimize joins, add indexes, and tune the SQL to run faster.",
+          "flag": "weak",
+          "consequence": "You shave 20% off each query run — a modest win — but you're still running the query hundreds of times a day on static data. Costs drop slightly, then creep back up as usage grows.",
+          "divergenceCost": "Optimized the per-run cost instead of eliminating redundant runs."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "Query logs are available. Which metric best reveals whether a materialized view would actually help?",
+      "artifact": {
+        "type": "bars",
+        "title": "Dashboard query executions — last 7 days (raw count by hour)",
+        "bars": [
+          {
+            "label": "Mon",
+            "value": 312
+          },
+          {
+            "label": "Tue",
+            "value": 298
+          },
+          {
+            "label": "Wed",
+            "value": 341
+          },
+          {
+            "label": "Thu",
+            "value": 327
+          },
+          {
+            "label": "Fri",
+            "value": 356
+          },
+          {
+            "label": "Sat",
+            "value": 89
+          },
+          {
+            "label": "Sun",
+            "value": 74
+          }
+        ],
+        "caption": "Raw execution counts look high — but does each run actually see fresh data, or is it recomputing the same result repeatedly?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Total query executions per day",
+          "detail": "Count how many times the dashboard query runs each day.",
+          "flag": "weak",
+          "consequence": "High counts confirm the query runs a lot — but not whether it needs to. Without knowing how often the data changes, you can't tell if those reruns produce new results or identical ones.",
+          "divergenceCost": "Measured query volume without anchoring it to data freshness — can't prove redundancy."
+        },
+        {
+          "id": "B",
+          "label": "Query executions per source-data update cycle (runs per refresh)",
+          "detail": "Divide total daily query runs by the number of times the underlying source tables actually updated that day.",
+          "flag": "strong",
+          "consequence": "The ratio is stark: source tables update once per day, yet the aggregation reruns over 300 times. Each day produces ~300 identical result sets at full compute cost. A materialized view recomputing nightly would serve all 300 loads for the price of one.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Query reruns per source-data update (redundancy ratio)",
+            "bars": [
+              {
+                "label": "Mon",
+                "value": 312,
+                "highlight": true
+              },
+              {
+                "label": "Tue",
+                "value": 298,
+                "highlight": true
+              },
+              {
+                "label": "Wed",
+                "value": 341,
+                "highlight": true
+              },
+              {
+                "label": "Thu",
+                "value": 327,
+                "highlight": true
+              },
+              {
+                "label": "Fri",
+                "value": 356,
+                "highlight": true
+              },
+              {
+                "label": "Sat",
+                "value": 89
+              },
+              {
+                "label": "Sun",
+                "value": 74
+              }
+            ],
+            "caption": "Source tables update exactly once per day. Every bar above 1 is a redundant recomputation. Weekday ratio averages ~327×. A nightly materialized view collapses this to 1."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The redundancy ratio averages 300+ on weekdays. What do you recommend to the team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"Cache and cluster upgrades are wasteful — just add a materialized view and costs will drop 99%.\"",
+          "detail": "Assert the fix and the savings figure with confidence.",
+          "flag": "weak",
+          "consequence": "You've likely identified the dominant driver, but a 99% claim made without a test run could embarrass you if incremental updates carry hidden overhead or if source-data latency is uneven across tables. Stakeholders will ask how you know.",
+          "divergenceCost": "Overclaimed precise savings from a structural change not yet piloted."
+        },
+        {
+          "id": "B",
+          "label": "\"The data shows ~300 redundant recomputations per weekday against a once-daily source refresh. A scheduled materialized or incremental view is the high-probability fix — let's deploy to a non-production environment first to validate the refresh cost and confirm query-result parity before rolling out.\"",
+          "detail": "Present the finding, quantify the signal, and recommend a controlled pilot.",
+          "flag": "strong",
+          "consequence": "The team gets a clear, evidence-backed diagnosis and a concrete next step. The pilot surfaces any edge cases (partial intraday updates, schema drift) before the change goes live, protecting credibility and cost estimates.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The cost problem wasn't cluster size or BI caching — it was structural: a heavy aggregation running hundreds of times daily against data that changed only once. The redundancy ratio (runs per source update) made this undeniable. The lesson is to match computation frequency to data-change frequency: when an aggregation is stable within a window, precompute it once with a materialized or incremental view and serve the cached result, eliminating nearly all the redundant work without touching infrastructure size."
+}

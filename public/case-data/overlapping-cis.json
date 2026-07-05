@@ -1,0 +1,142 @@
+{
+  "id": "overlapping-cis",
+  "title": "The Overlapping Bars",
+  "scenario": {
+    "role": "Product Analyst",
+    "company": "Gaugely",
+    "situation": "An A/B test of two onboarding variants finished last week. The bar chart on the dashboard shows error bars for Variant A and Variant B that visibly overlap, and the team is ready to call it a tie and move on.",
+    "stakeholderBelief": "The product team concludes that because the confidence-interval bars overlap on the chart, there is no statistically significant difference and the test should be declared inconclusive.",
+    "question": "Is the team right to call it a tie?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team is ready to close the test. How do you frame your investigation before signing off?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Accept the visual read and document the tie",
+          "detail": "The bars overlap on the chart — write up the result as inconclusive and move on.",
+          "flag": "weak",
+          "consequence": "You've anchored on the team's interpretation without questioning whether the visual is the right test. Overlapping bars look convincing, but the chart is not a significance test — you may be discarding a real effect.",
+          "divergenceCost": "Accepted a visual heuristic as a statistical test without verifying."
+        },
+        {
+          "id": "B",
+          "label": "Re-run the correct statistical test on the difference itself",
+          "detail": "Set aside the chart and directly compute a test — or confidence interval — for the difference between the two variants' conversion rates.",
+          "flag": "strong",
+          "consequence": "You immediately reframe the question from 'do the bars overlap?' to 'what does the distribution of the difference tell us?' This is the only frame that can actually answer whether the test is a tie.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Extend the test to collect more data",
+          "detail": "Argue that the bars overlap because the sample is too small and push for a longer run.",
+          "flag": "weak",
+          "consequence": "More data might be warranted eventually, but you're proposing a cure before diagnosing the disease. The existing data may already be sufficient — you haven't checked.",
+          "divergenceCost": "Diagnosed insufficient data before verifying what the current data actually says."
+        },
+        {
+          "id": "D",
+          "label": "Segment results by user cohort",
+          "detail": "Break the conversion rates down by acquisition channel or device to look for heterogeneity.",
+          "flag": "weak",
+          "consequence": "Segmentation can be valuable later, but the primary question — is the overall difference significant? — hasn't been answered yet. Jumping to segments skips the foundational test.",
+          "divergenceCost": "Skipped the primary significance question and risked multiple-comparison issues prematurely."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You pull the numbers. Which view do you use to determine whether the difference is real?",
+      "artifact": {
+        "type": "bars",
+        "title": "Conversion rate by variant with 95% CIs",
+        "bars": [
+          {
+            "label": "Variant A",
+            "value": 12.1
+          },
+          {
+            "label": "Variant B",
+            "value": 14.3
+          }
+        ],
+        "caption": "Error bars (±2.4 pp for A, ±2.6 pp for B) visibly overlap. The team reads this as no significant difference."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Individual variant CIs from the dashboard chart",
+          "detail": "Read significance off the overlap of each variant's own 95% confidence interval bar.",
+          "flag": "weak",
+          "consequence": "Two CIs can overlap substantially — even up to ~29% of their half-widths — while the difference is still statistically significant at p < 0.05. Reading overlap is not a valid test; it systematically overstates ties.",
+          "divergenceCost": "Used an invalid visual heuristic that is known to be overly conservative."
+        },
+        {
+          "id": "B",
+          "label": "95% CI on the difference (B minus A)",
+          "detail": "Compute the confidence interval for the difference in conversion rates directly, and check whether it excludes zero.",
+          "flag": "strong",
+          "consequence": "The CI on the difference is [+0.3 pp, +4.1 pp] — it excludes zero entirely. The difference is statistically significant despite the overlapping individual bars. The test is not a tie.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "95% CI on the difference (Variant B minus Variant A)",
+            "bars": [
+              {
+                "label": "Lower bound",
+                "value": 0.3
+              },
+              {
+                "label": "Point estimate",
+                "value": 2.2,
+                "highlight": true
+              },
+              {
+                "label": "Upper bound",
+                "value": 4.1
+              }
+            ],
+            "caption": "The entire CI for the difference sits above zero (+0.3 to +4.1 pp). A difference whose CI excludes zero is significant — the overlap on the raw chart was misleading."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The CI on the difference excludes zero. What do you tell the product team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"Variant B wins — ship it immediately.\"",
+          "detail": "The test is significant; declare a winner and push to production.",
+          "flag": "weak",
+          "consequence": "Statistical significance is established, but you haven't flagged effect-size magnitude, whether the test ran cleanly (no novelty effects, no SRM), or whether the lift is large enough to matter practically. Overclaiming invites bad deployment decisions.",
+          "divergenceCost": "Conflated statistical significance with practical certainty and skipped deployment sanity checks."
+        },
+        {
+          "id": "B",
+          "label": "\"The visual was misleading — the difference is significant. Verify test health and practical lift before shipping.\"",
+          "detail": "Correct the team's interpretation, present the CI on the difference, and recommend confirming sample-ratio mismatch and business impact before acting.",
+          "flag": "strong",
+          "consequence": "You've corrected a methodological misconception with evidence, quantified the effect (+2.2 pp, CI [+0.3, +4.1]), and flagged the remaining steps needed before a confident ship decision. That's the full analyst job.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "Overlapping individual confidence intervals do not imply a non-significant difference — two CIs can overlap noticeably while the CI on their difference still excludes zero. The valid test is always on the difference itself, not on the visual gap between two separate bars. The team's mistake was treating a chart aesthetic as a statistical procedure. The lesson: when evaluating an A/B test, compute and inspect the CI for B-minus-A; that is the only quantity whose relationship to zero actually answers the question."
+}

@@ -1,0 +1,157 @@
+{
+  "id": "eventual-consistency",
+  "title": "The Missing Record",
+  "scenario": {
+    "role": "Data Engineer",
+    "company": "Cartpath",
+    "situation": "After a recent traffic spike, the support queue fills with 'record not found' errors that appear seconds after a successful write. The on-call team added retry logic to every read path, which reduced complaints but didn't eliminate them.",
+    "stakeholderBelief": "The engineering lead is convinced the primary database is intermittently flaky — hardware or connection-pool exhaustion under load.",
+    "question": "Is the database actually unreliable, or is something else causing reads to miss freshly written records?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The engineering lead wants a root-cause answer before deciding whether to migrate to a new database. How do you frame the investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Monitor the primary for errors and connection drops",
+          "detail": "Attach observability to the primary DB node and watch for timeouts, connection-pool exhaustion, and error rates during peak load.",
+          "flag": "weak",
+          "consequence": "The primary looks healthy — low error rate, stable connections, normal query latency. You've confirmed what you were looking for and found nothing, but the 'not found' errors keep happening. The investigation anchored on the hypothesis and missed the real thread.",
+          "divergenceCost": "Anchored on the flaky-database hypothesis and instrumented the wrong node."
+        },
+        {
+          "id": "B",
+          "label": "Classify errors by which DB endpoint the read hit",
+          "detail": "Tag each 'record not found' error with the connection string or endpoint used — primary vs. replica — and see whether the errors cluster on one path.",
+          "flag": "strong",
+          "consequence": "The breakdown is stark: virtually all 'not found' errors come from reads routed to replica endpoints, and errors on the primary are near zero. The database isn't flaky — the read path determines the outcome.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Reproduce the error in a load test and tune retry counts",
+          "detail": "Run synthetic load against the stack, reproduce the miss rate, and find the retry count that reduces it below threshold.",
+          "flag": "weak",
+          "consequence": "You can reduce the visible error rate with more retries, but the underlying cause is never identified. The team ships a higher retry budget that masks latency and wastes connections without fixing anything.",
+          "divergenceCost": "Optimized around the symptom instead of diagnosing the cause."
+        },
+        {
+          "id": "D",
+          "label": "Compare error rates across geographic regions",
+          "detail": "Check whether the problem is worse in certain data-center regions, pointing to network or hardware locality issues.",
+          "flag": "weak",
+          "consequence": "Error rates are roughly uniform across regions, so geography is ruled out — but you're no closer to the actual driver. You've spent time on a dimension that doesn't cut the data meaningfully.",
+          "divergenceCost": "Investigated a dimension orthogonal to the real driver, burning time with no signal."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "Logs are tagged by endpoint. Which metric do you use to confirm where the problem lives?",
+      "artifact": {
+        "type": "bars",
+        "title": "'Record not found' errors by DB endpoint — last 7 days (raw count)",
+        "bars": [
+          {
+            "label": "Primary (writes + reads)",
+            "value": 41
+          },
+          {
+            "label": "Replica A (read pool)",
+            "value": 1830
+          },
+          {
+            "label": "Replica B (read pool)",
+            "value": 1764
+          },
+          {
+            "label": "Replica C (read pool)",
+            "value": 1692
+          }
+        ],
+        "caption": "Raw error counts. Replicas look far worse — but replicas also handle the majority of read traffic. Is this risk, or just volume?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Raw 'not found' error counts per endpoint",
+          "detail": "Use the absolute number of 'record not found' errors logged against each DB endpoint.",
+          "flag": "weak",
+          "consequence": "Replicas show thousands of errors vs. dozens on the primary — alarming. But replicas handle ~95% of all reads. You're reading traffic volume, not error probability. The primary might be just as error-prone per read if you squint wrong.",
+          "divergenceCost": "Compared raw counts across endpoints with very different traffic volumes — a classic size confound."
+        },
+        {
+          "id": "B",
+          "label": "Error rate per endpoint (errors ÷ total reads on that endpoint)",
+          "detail": "Normalize errors by the total number of reads routed to each endpoint to get a true miss probability.",
+          "flag": "strong",
+          "consequence": "Normalized, the signal is unambiguous: replica error rates are 18–21%, while the primary's error rate is 0.04%. This isn't noise or volume — reads on replicas miss fresh records at 400× the rate of reads on the primary.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "'Record not found' error RATE by DB endpoint (% of reads on that endpoint)",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "Primary (writes + reads)",
+                "value": 0.04
+              },
+              {
+                "label": "Replica A (read pool)",
+                "value": 18.3,
+                "highlight": true
+              },
+              {
+                "label": "Replica B (read pool)",
+                "value": 20.1,
+                "highlight": true
+              },
+              {
+                "label": "Replica C (read pool)",
+                "value": 19.7,
+                "highlight": true
+              }
+            ],
+            "caption": "Normalized to read volume per endpoint, replicas miss ~1 in 5 reads on recently written records. The primary is essentially error-free. This is a consistency boundary, not hardware."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Replica error rates are ~400× higher than the primary's for reads that follow recent writes. What do you tell the engineering lead?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The replicas are broken — route all reads to the primary immediately.\"",
+          "detail": "Make the causal call and prescribe a fix.",
+          "flag": "weak",
+          "consequence": "You've correctly identified the replica pattern but overclaimed — the replicas aren't broken, they're operating exactly as eventually-consistent replicas should. Routing all reads to the primary fixes the symptom but collapses read scalability and still doesn't confirm that replication lag is the true mechanism.",
+          "divergenceCost": "Overclaimed causation and prescribed a fix that trades one operational risk for another."
+        },
+        {
+          "id": "B",
+          "label": "\"Replica reads are the strong correlate — this looks like replication lag, not hardware. Before re-architecting, let's confirm with a targeted test: force a read-your-writes path (primary read or version check) for post-write reads and measure whether error rate drops to baseline.\"",
+          "detail": "Present the finding, name the likely mechanism, and propose a causal confirmation step before acting.",
+          "flag": "strong",
+          "consequence": "You've reframed the flaky-database assumption with clear evidence, named the likely mechanism (eventual consistency / replication lag), and proposed a low-risk confirmation step. The engineering lead can greenlight a targeted fix — read-your-writes routing — rather than a full DB migration, and the team will know within hours whether the hypothesis holds.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The database wasn't flaky — reads routed to eventually-consistent replicas simply hadn't received the latest write yet, a normal property of asynchronous replication. Retries reduced visible errors only because the replica caught up during the delay, treating a consistency problem as a reliability problem. The real fix is read-your-writes: route post-write reads to the primary (or use a version/token check), not blanket retries everywhere. The lesson is that understanding your system's consistency model tells you which read path to use; papering over it with retries is an expensive non-answer."
+}

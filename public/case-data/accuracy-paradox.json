@@ -1,0 +1,164 @@
+{
+  "id": "accuracy-paradox",
+  "title": "The 99% Model",
+  "scenario": {
+    "role": "Data Scientist",
+    "company": "Sentrybank",
+    "situation": "The fraud team has trained a new detection model that scores 99% accuracy on the holdout set. Leadership is eager to deploy it to production next sprint.",
+    "stakeholderBelief": "The VP of Risk is convinced 99% accuracy proves the model is ready — 'that's better than any analyst we have.'",
+    "question": "Is 99% accuracy enough evidence that this model is deployment-ready?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The VP wants sign-off by end of week. How do you frame your evaluation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Benchmark against the VP's target accuracy",
+          "detail": "Verify the 99% figure holds across a few slices and declare it ready if it does.",
+          "flag": "weak",
+          "consequence": "The 99% holds up across slices — because the model predicts 'no fraud' nearly everywhere and the dataset is 99% legitimate. You've validated the VP's belief without ever testing what the model actually catches.",
+          "divergenceCost": "Anchored on the stakeholder's metric and never asked whether that metric measures the right thing."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic counterfactual: compare model to a naive baseline",
+          "detail": "Ask what a trivially dumb model (predict-never-fraud) would score, then measure the real model against that baseline on fraud-specific outcomes.",
+          "flag": "strong",
+          "consequence": "The naive baseline also scores 99% accuracy — instantly exposing that accuracy is not discriminating between 'great model' and 'useless model.' You now have the right thread to pull.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Run a cost-benefit analysis on deployment",
+          "detail": "Estimate revenue impact if the model goes live, using the 99% figure as the effectiveness input.",
+          "flag": "weak",
+          "consequence": "Your cost-benefit looks great — because it inherits the inflated accuracy figure. You've built a rigorous-looking case on a flawed foundation.",
+          "divergenceCost": "Jumped to business impact before validating the underlying metric."
+        },
+        {
+          "id": "D",
+          "label": "Tune the decision threshold to maximize accuracy further",
+          "detail": "Search for the threshold that pushes accuracy even higher before evaluating.",
+          "flag": "weak",
+          "consequence": "Accuracy nudges up slightly — because the optimal threshold for accuracy is to flag almost nothing as fraud. You've maximized the wrong objective and moved further from catching actual fraud.",
+          "divergenceCost": "Optimized the wrong objective and deepened the class-imbalance blind spot."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You pull the confusion matrix. Which metric view do you trust to confirm what the model is actually doing?",
+      "artifact": {
+        "type": "bars",
+        "title": "Model performance — headline metrics",
+        "bars": [
+          {
+            "label": "Accuracy",
+            "value": 99.1
+          },
+          {
+            "label": "Precision",
+            "value": 61
+          },
+          {
+            "label": "Recall",
+            "value": 8.3
+          },
+          {
+            "label": "PR-AUC",
+            "value": 19.4
+          }
+        ],
+        "caption": "All four metrics for the same model on the same holdout set. Accuracy looks excellent — but does it tell the same story as the others?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Accuracy (99.1%)",
+          "detail": "Treat the headline accuracy figure as the primary performance signal.",
+          "flag": "weak",
+          "consequence": "At 99.1% the model looks stellar — but the naive predict-never-fraud baseline also hits 99.0%. Accuracy cannot distinguish between a working detector and a model that ignores fraud almost entirely.",
+          "divergenceCost": "Used a metric that cannot discriminate between a useful model and a trivial baseline on imbalanced data."
+        },
+        {
+          "id": "B",
+          "label": "Precision, Recall, and PR-AUC (fraud class)",
+          "detail": "Evaluate the model specifically on its ability to find and flag actual fraud cases.",
+          "flag": "strong",
+          "consequence": "The picture is damning: recall is 8.3% — the model misses 9 out of 10 fraud cases. PR-AUC of 19.4% is barely above the no-skill baseline. Precision at 61% sounds acceptable, but it means nothing if the model almost never fires. Accuracy was hiding a near-useless detector.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Fraud-class metrics: model vs. naive baseline",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "Accuracy (model)",
+                "value": 99.1
+              },
+              {
+                "label": "Accuracy (baseline)",
+                "value": 99
+              },
+              {
+                "label": "Recall — model",
+                "value": 8.3,
+                "highlight": true
+              },
+              {
+                "label": "Recall — baseline",
+                "value": 0
+              },
+              {
+                "label": "PR-AUC — model",
+                "value": 19.4,
+                "highlight": true
+              },
+              {
+                "label": "PR-AUC — baseline",
+                "value": 1
+              }
+            ],
+            "caption": "Normalized to the fraud class: recall and PR-AUC expose the model as marginally better than doing nothing. Accuracy was masking a near-zero detection rate."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Recall is 8.3% and PR-AUC is 19.4%. What do you tell the VP of Risk?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"This model is broken — don't deploy it, start over.\"",
+          "detail": "Make a definitive rejection and recommend rebuilding from scratch.",
+          "flag": "weak",
+          "consequence": "The VP pushes back: 'start over based on what plan?' You've correctly identified the problem but offered no path forward. The team loses confidence in the analysis because it feels like a dead end rather than actionable guidance.",
+          "divergenceCost": "Overclaimed a verdict without pairing it with a diagnostic path or remediation options."
+        },
+        {
+          "id": "B",
+          "label": "\"Accuracy is misleading here — recall and PR-AUC show the model catches almost no fraud. We should retrain optimizing for PR-AUC and validate with a precision-recall threshold study before any deployment decision.\"",
+          "detail": "Reframe the evaluation, name the real metrics, and recommend a concrete next step.",
+          "flag": "strong",
+          "consequence": "The VP now understands why accuracy failed as a signal and has a concrete plan: retrain with a cost-sensitive objective, evaluate on precision-recall curves, and set a recall floor before sign-off. You've turned a near-miss deployment into a well-defined improvement path.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "When fraud is ~1% of transactions, a model that predicts 'no fraud' every single time scores 99% accuracy — identical to the deployed model. Accuracy is structurally incapable of measuring minority-class detection on imbalanced data. The right instruments are recall (did we catch the fraud that existed?), precision (when we flagged fraud, were we right?), and PR-AUC (how does that tradeoff look across all thresholds?). The lesson: always ask what a trivially dumb baseline scores before trusting a headline metric."
+}

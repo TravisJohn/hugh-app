@@ -1,0 +1,162 @@
+{
+  "id": "temporal-cv",
+  "title": "The Shuffled Split",
+  "scenario": {
+    "role": "Data Scientist",
+    "company": "Foreside",
+    "situation": "The sales forecasting model validated with random k-fold CV shows a strong R² of 0.91 and low MAE in testing, but since deployment it has consistently underperformed — missing actuals by 20–30% and surprising the sales team every month.",
+    "stakeholderBelief": "The team believes the model is fundamentally sound and that production lag is caused by noisy input data from the CRM or a recent shift in market conditions.",
+    "question": "Why does a model that validated so well perform so poorly in production?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team is ready to clean up CRM data and retrain on a larger dataset. How do you frame the investigation before touching anything?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Audit the CRM data pipeline for input noise",
+          "detail": "Trace the features from source to model to find dirty or delayed data fields.",
+          "flag": "weak",
+          "consequence": "You spend a week auditing the pipeline and find minor data-quality issues — nothing that accounts for a 20–30% miss. The real problem remains invisible because you never questioned the validation methodology itself.",
+          "divergenceCost": "Anchored on the team's hypothesis and investigated inputs while the flaw lived in the evaluation design."
+        },
+        {
+          "id": "B",
+          "label": "Interrogate the validation methodology before touching data or features",
+          "detail": "Ask whether the CV setup could have produced an optimistic score even on a weak model — check for any structural mismatch between how the model was validated and how it is used in production.",
+          "flag": "strong",
+          "consequence": "You immediately surface a structural question: the model is always predicting future sales from past signals, but k-fold randomly scrambles time. This framing points straight at the real driver without any new data collection.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Collect more recent data and retrain",
+          "detail": "Assume market drift is real and expand the training window with the latest months.",
+          "flag": "weak",
+          "consequence": "The retrained model still validates at R² 0.90 and still underperforms in production by a similar margin. You've reproduced the same flawed loop at higher cost.",
+          "divergenceCost": "Reran the broken experiment with fresher data — the flaw in the evaluation design repeated itself."
+        },
+        {
+          "id": "D",
+          "label": "Compare feature importances to business intuition",
+          "detail": "Review which features the model relies on most and ask the sales team if those make sense.",
+          "flag": "weak",
+          "consequence": "The features look reasonable to the sales team, reinforcing confidence in the model. The root cause — a leaky validation split — is invisible to feature-importance analysis.",
+          "divergenceCost": "Validated model logic with domain intuition while the real issue was in the evaluation procedure, not the features."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You suspect the validation setup may be inflating scores. Which evaluation result do you trust to confirm or refute the model's true predictive power?",
+      "artifact": {
+        "type": "bars",
+        "title": "Model CV scores — random k-fold (5 folds)",
+        "bars": [
+          {
+            "label": "Fold 1 R²",
+            "value": 0.89
+          },
+          {
+            "label": "Fold 2 R²",
+            "value": 0.92
+          },
+          {
+            "label": "Fold 3 R²",
+            "value": 0.91
+          },
+          {
+            "label": "Fold 4 R²",
+            "value": 0.9
+          },
+          {
+            "label": "Fold 5 R²",
+            "value": 0.93
+          }
+        ],
+        "caption": "All five random folds score above 0.89. Impressive — but each fold's training set contains rows from dates that fall after some of the rows it predicts."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Random k-fold R² (the existing result)",
+          "detail": "Use the five-fold cross-validated R² of ~0.91 already in the model card.",
+          "flag": "weak",
+          "consequence": "The 0.91 R² looks decisive, but random folds allow the model to train on January data while predicting the previous October — effectively peeking at the future. The metric measures memorization across time, not genuine forward forecasting ability.",
+          "divergenceCost": "Trusted a metric whose data-splitting procedure violates the temporal order the model faces in production."
+        },
+        {
+          "id": "B",
+          "label": "Time-ordered walk-forward CV R² (re-evaluated)",
+          "detail": "Re-run CV using forward-chaining splits: train on months 1–N, predict month N+1; expand and repeat. Compute R² only on out-of-time folds.",
+          "flag": "strong",
+          "consequence": "Walk-forward CV exposes the true signal: R² drops to 0.54 on average and the latest folds — the ones most like production — score as low as 0.41. The gap between 0.91 and 0.54 is the exact fingerprint of future-data leakage through random splits.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Model R² — walk-forward time-ordered CV (same model)",
+            "bars": [
+              {
+                "label": "Period 1→2",
+                "value": 0.71
+              },
+              {
+                "label": "Period 2→3",
+                "value": 0.63
+              },
+              {
+                "label": "Period 3→4",
+                "value": 0.55
+              },
+              {
+                "label": "Period 4→5",
+                "value": 0.48
+              },
+              {
+                "label": "Period 5→6 (≈ production)",
+                "value": 0.41,
+                "highlight": true
+              }
+            ],
+            "caption": "Performance degrades as the prediction horizon approaches production conditions. The most recent period — closest to live deployment — scores 0.41, versus the 0.91 claimed by random k-fold."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Walk-forward CV reveals R² of ~0.54 versus the reported 0.91. What do you tell the team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The model is broken because of future data leakage — scrap it and rebuild with time-ordered splits.\"",
+          "detail": "Make a definitive diagnosis and prescribe immediate replacement.",
+          "flag": "weak",
+          "consequence": "You've correctly identified the validation flaw, but 'scrap it' overstates certainty. The model's architecture may be salvageable; the problem is the evaluation design, not necessarily every modelling choice. Acting without a controlled comparison risks discarding genuinely useful signal.",
+          "divergenceCost": "Overclaimed by collapsing a validation-design finding into a verdict on the whole model."
+        },
+        {
+          "id": "B",
+          "label": "\"Random k-fold inflated scores by allowing future rows into training — walk-forward CV shows true out-of-time R² is ~0.54 and declining. We should retrain the same architecture under time-ordered splits and benchmark it against a naive baseline before deciding next steps.\"",
+          "detail": "Report the finding, name the mechanism, and recommend a controlled next step rather than full replacement.",
+          "flag": "strong",
+          "consequence": "The team understands why the gap exists, not just that it exists. Proposing a retrain under correct splits — plus a naive baseline — gives a decision-ready benchmark without prematurely discarding the modelling work already done.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The model was never as good as it looked: random k-fold let future rows leak into training, inflating R² from a true ~0.54 to a fictitious 0.91. The production gap wasn't noisy CRM data or market drift — it was the evaluation procedure systematically violating the temporal order the model faces in the real world. The lesson is structural: for any temporal forecasting task, validation splits must respect time, and walk-forward (forward-chaining) CV is the minimum credible standard. A strong analyst questions the measurement instrument before questioning the data."
+}

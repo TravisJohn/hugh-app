@@ -1,0 +1,155 @@
+{
+  "id": "query-cost-governance",
+  "title": "The Runaway Bill",
+  "scenario": {
+    "role": "Analytics Engineer",
+    "company": "Quantify",
+    "situation": "The data warehouse bill tripled last quarter and finance is demanding a hard cap on warehouse size.",
+    "stakeholderBelief": "The team assumes the warehouse itself has grown too large — too many tables, too much data retained — and that shrinking storage is the fix.",
+    "question": "Is the warehouse size actually the problem, or is something else driving the cost spike?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "Finance wants a plan to cap the warehouse. How do you frame your investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Audit table sizes and retention policies",
+          "detail": "Inventory every table, check row counts and storage volume, and flag tables that exceed a size threshold.",
+          "flag": "weak",
+          "consequence": "You produce a list of large tables, but storage pricing is a small fraction of the bill. The cost spike is still unexplained and finance is no closer to a real fix.",
+          "divergenceCost": "Anchored on the storage hypothesis and missed the query-cost dimension entirely."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic segmentation of cost by query pattern",
+          "detail": "Pull the warehouse query logs and segment total bytes billed by query type, user, and table access pattern to see where cost concentrates.",
+          "flag": "strong",
+          "consequence": "Immediately you see cost is not spread evenly — it clusters in a small number of queries doing full table scans. This opens a thread the storage hypothesis never would have reached.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Interview the team about recent schema changes",
+          "detail": "Ask engineers and analysts whether any large tables were added or schemas were expanded last quarter.",
+          "flag": "weak",
+          "consequence": "You surface a few schema additions, but none of them correlate with the bill spike. You've spent time on qualitative input when the signal was already in the query logs.",
+          "divergenceCost": "Chose a slow, anecdotal instrument when the answer was already in structured log data."
+        },
+        {
+          "id": "D",
+          "label": "Model future warehouse cost and set a budget alert",
+          "detail": "Forecast cost growth and configure a billing alert at the current threshold.",
+          "flag": "weak",
+          "consequence": "You have an alert that fires again next month but still no understanding of what caused the spike. You've instrumented the symptom without diagnosing the cause.",
+          "divergenceCost": "Jumped to mitigation before diagnosis — the bill will spike again."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "Query logs are available. Which metric do you use to identify the costliest queries?",
+      "artifact": {
+        "type": "bars",
+        "title": "Total queries executed by category — last quarter",
+        "bars": [
+          {
+            "label": "Scheduled reports",
+            "value": 14200
+          },
+          {
+            "label": "Ad-hoc analyst queries",
+            "value": 9800
+          },
+          {
+            "label": "SELECT-star dashboards",
+            "value": 310
+          },
+          {
+            "label": "ETL pipeline jobs",
+            "value": 6500
+          }
+        ],
+        "caption": "Raw query counts. SELECT-star dashboards are rare — but does frequency equal cost?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Query count by category",
+          "detail": "Count how many queries each category executed last quarter.",
+          "flag": "weak",
+          "consequence": "SELECT-star dashboards appear negligible at 310 runs. You'd deprioritize them — but you're reading frequency, not cost. The most dangerous queries run rarely but scan billions of rows each time.",
+          "divergenceCost": "Confused query frequency with query cost — a classic count-vs-impact confound."
+        },
+        {
+          "id": "B",
+          "label": "Total bytes billed per query category (normalized)",
+          "detail": "Sum bytes billed — the actual billing unit — for every query, grouped by category.",
+          "flag": "strong",
+          "consequence": "Normalized to cost, the picture inverts completely: SELECT-star dashboards and unpartitioned ad-hoc scans account for the overwhelming majority of bytes billed despite being a tiny share of query volume.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Total bytes billed by query category — last quarter (TB)",
+            "unit": "TB",
+            "bars": [
+              {
+                "label": "Scheduled reports",
+                "value": 1.8
+              },
+              {
+                "label": "Ad-hoc analyst queries",
+                "value": 2.4
+              },
+              {
+                "label": "SELECT-star dashboards",
+                "value": 31.7,
+                "highlight": true
+              },
+              {
+                "label": "ETL pipeline jobs",
+                "value": 0.9
+              }
+            ],
+            "caption": "Bytes billed tells the real story — SELECT-star full-scan dashboards dwarf every other category despite their low run count."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Full-scan SELECT-star queries correlate overwhelmingly with the cost spike. What do you tell finance?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The warehouse is fine — ban SELECT-star queries and add partitioning now.\"",
+          "detail": "Make the causal call and prescribe the fix immediately.",
+          "flag": "weak",
+          "consequence": "You've confidently prescribed a solution from correlational log data. If a confounding factor — like a new dataset that happens to be unpartitioned — is the true driver, the ban alone won't hold. You've also bypassed the stakeholder alignment needed to enforce governance.",
+          "divergenceCost": "Overclaimed causation and skipped the validation step needed to make governance stick."
+        },
+        {
+          "id": "B",
+          "label": "\"Storage isn't the main signal; a handful of full-scan queries are the strongest correlate — let's tag those queries, enforce max-bytes-billed limits on a pilot group, and measure bill impact before rolling out a policy.\"",
+          "detail": "Reframe the hypothesis with evidence, recommend a causal confirmation step, and propose a governance path.",
+          "flag": "strong",
+          "consequence": "You've redirected finance away from a capacity cap that wouldn't have worked, backed the claim with the bytes-billed metric, and proposed a controlled test that will confirm causation before org-wide policy change. This is what a strong analytics engineer does.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The warehouse bill tripled not because the warehouse grew, but because a small number of unpartitioned SELECT-star dashboards were billing for full table scans on every refresh. The storage hypothesis was a plausible red herring because size and cost feel synonymous. The key skill was resisting that anchor, segmenting cost by query pattern rather than by table volume, and reading bytes billed — the actual billing unit — instead of query counts. The lesson: govern the query patterns first; capacity caps treat the wrong variable."
+}

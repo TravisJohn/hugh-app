@@ -1,0 +1,147 @@
+{
+  "id": "ceiling-effect",
+  "title": "The Plateau",
+  "scenario": {
+    "role": "Product Analyst",
+    "company": "Onboardly",
+    "situation": "A UX improvement to the onboarding flow showed no statistically significant lift on the overall activation metric in an A/B test. The team is ready to scrap the change.",
+    "stakeholderBelief": "The team concludes the redesign simply didn't work — the activation rate was nearly identical between control and treatment — and plans to move on to a different experiment.",
+    "question": "Did the UX change actually fail, or is something in the data structure hiding a real effect?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team says the test failed and wants to move on. How do you frame your investigation before agreeing?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Recheck statistical significance",
+          "detail": "Run the significance test again with a longer observation window to make sure the null result is real.",
+          "flag": "weak",
+          "consequence": "You extend the window and confirm: still no significant lift overall. You've validated the null result but never questioned whether the aggregate metric is the right lens. The real signal remains invisible.",
+          "divergenceCost": "Doubled down on the aggregate view instead of questioning whether it could even detect an effect."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic segmentation by baseline activation",
+          "detail": "Before accepting the null result, segment users by their pre-test activation baseline to check whether headroom varies across groups.",
+          "flag": "strong",
+          "consequence": "Immediately you see the population splits into two very different groups: one already activating near 100%, the other with substantial room to grow. The aggregate metric was averaging across incompatible situations — the investigation is now pointed at the right question.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Interview users who didn't activate",
+          "detail": "Talk to non-activators in both arms to understand qualitative blockers.",
+          "flag": "weak",
+          "consequence": "Interviews surface general friction themes but can't explain why the aggregate metric showed no lift. You've gathered useful color without diagnosing the structural issue in the test design.",
+          "divergenceCost": "Reached for qualitative research before exhausting what the existing data could reveal."
+        },
+        {
+          "id": "D",
+          "label": "Test a different UX variant instead",
+          "detail": "Accept the null result and immediately design a follow-up experiment with a bolder change.",
+          "flag": "weak",
+          "consequence": "A new experiment starts, but it's aimed at the same high-baseline segment. You've iterated without diagnosing — the ceiling effect will likely suppress the new result too.",
+          "divergenceCost": "Iterated on the solution before understanding why the measurement failed."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You've split users by baseline activation level. Which metric view do you use to evaluate the experiment's true effect?",
+      "artifact": {
+        "type": "bars",
+        "title": "Activation rate — Treatment vs Control (overall)",
+        "bars": [
+          {
+            "label": "Control",
+            "value": 91.2
+          },
+          {
+            "label": "Treatment",
+            "value": 91.8
+          }
+        ],
+        "caption": "Overall activation rates look nearly identical. The 0.6pp difference is well within noise — but this collapses two very different user groups into one number."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Overall activation rate (treatment vs. control)",
+          "detail": "Compare the single aggregate activation rate between arms.",
+          "flag": "weak",
+          "consequence": "The rates are 91.2% vs 91.8% — indistinguishable. You confirm the null result and move on, never realizing you were averaging a ceiling-constrained group with a headroom-rich group, which mathematically guaranteed a near-zero aggregate lift.",
+          "divergenceCost": "Trusted an aggregate metric that structurally could not surface a segment-level effect."
+        },
+        {
+          "id": "B",
+          "label": "Activation rate by segment — high-baseline vs. low-baseline",
+          "detail": "Split treatment and control within each baseline segment and compare rates separately.",
+          "flag": "strong",
+          "consequence": "The segmented view is unambiguous: in the high-baseline segment both arms sit at ~96%, confirming no headroom for any intervention to show lift. In the low-baseline segment, treatment activates at 71% vs. control's 58% — a 13pp lift. The UX change works; it was just invisible in the aggregate.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Activation rate by segment — Treatment vs Control",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "High-baseline — Control",
+                "value": 95.9
+              },
+              {
+                "label": "High-baseline — Treatment",
+                "value": 96.2
+              },
+              {
+                "label": "Low-baseline — Control",
+                "value": 58.1
+              },
+              {
+                "label": "Low-baseline — Treatment",
+                "value": 71.4,
+                "highlight": true
+              }
+            ],
+            "caption": "Segmented by baseline headroom, the low-baseline treatment arm lifts 13pp — a real, material effect that the aggregate metric completely buried."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The segmented data shows a 13pp lift in the low-baseline group and near-zero movement in the high-baseline group. What do you tell the team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The change works — ship it to low-baseline users immediately.\"",
+          "detail": "Declare the segmented lift causal and recommend a targeted rollout now.",
+          "flag": "weak",
+          "consequence": "You act on a post-hoc subgroup finding without confirming it in a pre-specified test. The segment split wasn't planned before the experiment, so the 13pp lift could partially reflect multiple-comparison noise or a confounded segment definition — you've overclaimed a correlational pattern as established fact.",
+          "divergenceCost": "Treated a post-hoc subgroup finding as a confirmed causal result without a pre-registered replication."
+        },
+        {
+          "id": "B",
+          "label": "\"The aggregate null result was a ceiling artifact; the low-baseline segment shows a strong correlate of lift — we should pre-register a targeted retest in that segment before shipping.\"",
+          "detail": "Present the finding as a hypothesis generated by the data, not a proven conclusion, and propose a confirmatory experiment.",
+          "flag": "strong",
+          "consequence": "The team sees both the evidence and its limits: the redesign is almost certainly helping users who had room to improve, but the finding was found post-hoc and deserves a clean confirmatory test. You've rescued a valuable change from the scrap pile AND maintained analytical credibility.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The UX change wasn't a failure — the measurement was. When ~96% of the tested segment was already activating, the aggregate metric had almost no mathematical room to move, guaranteeing a near-zero result regardless of whether the change worked. Segmenting by baseline headroom revealed a genuine 13pp lift in users who actually needed help. The lesson: before concluding an intervention has no effect, ask whether the metric could have detected one — ceiling effects routinely bury real signals in aggregate numbers."
+}

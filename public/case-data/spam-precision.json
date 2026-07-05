@@ -1,0 +1,156 @@
+{
+  "id": "spam-precision",
+  "title": "The Aggressive Filter",
+  "scenario": {
+    "role": "Product Analyst",
+    "company": "Postbox",
+    "situation": "The spam filter was retuned last week and now flags 5x as many messages as before.",
+    "stakeholderBelief": "Leadership assumes the new filter is catching far more spam and wants to roll it out to all users immediately.",
+    "question": "Is the new filter actually performing better?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "Leadership wants confirmation before the full rollout. How do you frame the investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Count how much spam the new filter catches",
+          "detail": "Compare total spam caught by the old and new filters.",
+          "flag": "weak",
+          "consequence": "The new filter does catch more spam — but it also flags vastly more total messages. You've confirmed leadership's assumption without checking what's inside those new flags.",
+          "divergenceCost": "Anchored on the stakeholder's framing and measured only one side of the trade-off."
+        },
+        {
+          "id": "B",
+          "label": "Decompose flagged messages by what they actually are",
+          "detail": "Break the flagged set into true spam vs. legitimate mail to see what the filter is really doing at the new threshold.",
+          "flag": "strong",
+          "consequence": "You immediately see the flagged volume has exploded while the composition has shifted sharply — most of the new flags are legitimate messages. This reframes the question entirely.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Survey users about missed spam",
+          "detail": "Ask users whether spam is getting through to their inboxes.",
+          "flag": "weak",
+          "consequence": "Users report less spam in their inboxes — because the filter is sweeping aggressively. But users whose good mail is silently filtered never connect the loss to the filter. The real harm stays invisible.",
+          "divergenceCost": "Used a biased instrument that captures only one failure mode and misses the other entirely."
+        },
+        {
+          "id": "D",
+          "label": "Track the trend in flag volume over time",
+          "detail": "Plot daily flag counts before and after the retune to confirm the increase is real and stable.",
+          "flag": "weak",
+          "consequence": "The 5x increase is confirmed and stable — which is exactly what leadership already told you. You've spent time validating the input, not interrogating its meaning.",
+          "divergenceCost": "Described the phenomenon leadership already observed instead of diagnosing its quality."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You have labeled data from a sample of flagged messages. Which metric do you use to judge the filter?",
+      "artifact": {
+        "type": "bars",
+        "title": "Flagged message counts — old vs. new filter (sampled week)",
+        "bars": [
+          {
+            "label": "Old filter — spam caught",
+            "value": 1800
+          },
+          {
+            "label": "Old filter — good mail flagged",
+            "value": 200
+          },
+          {
+            "label": "New filter — spam caught",
+            "value": 2100
+          },
+          {
+            "label": "New filter — good mail flagged",
+            "value": 7900,
+            "highlight": true
+          }
+        ],
+        "caption": "Raw flagged counts. The new filter catches more spam — but the bars don't reveal what share of each filter's flags are actually spam."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Total spam caught (true positives)",
+          "detail": "Compare the number of actual spam messages flagged by each filter.",
+          "flag": "weak",
+          "consequence": "The new filter caught 300 more spam messages — a 17% gain. But you've ignored the 7,700 additional good messages also swept up. You're measuring recall in isolation while the cost of false positives stays hidden.",
+          "divergenceCost": "Measured only true positives and ignored the surge in false positives — a dangerously incomplete picture."
+        },
+        {
+          "id": "B",
+          "label": "Precision at the new threshold (spam share of all flags)",
+          "detail": "Of all messages the filter flags, what fraction are actually spam?",
+          "flag": "strong",
+          "consequence": "Precision collapsed from 90% to 21%: the vast majority of the new filter's flags are legitimate mail. Recall rose only modestly. Given that spam is a small share of total mail volume, the new threshold is creating far more harm than benefit.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Filter precision and recall — old vs. new (sampled week)",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "Old filter — precision",
+                "value": 90
+              },
+              {
+                "label": "Old filter — recall",
+                "value": 62
+              },
+              {
+                "label": "New filter — recall",
+                "value": 72
+              },
+              {
+                "label": "New filter — precision",
+                "value": 21,
+                "highlight": true
+              }
+            ],
+            "caption": "Precision dropped from 90% to 21% while recall gained only 10 points. Most flags are now false positives."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Precision has collapsed at the new threshold. What do you tell leadership?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The filter is broken — roll it back immediately.\"",
+          "detail": "Make the call: the new threshold is wrong and the old one should be restored.",
+          "flag": "weak",
+          "consequence": "You've correctly identified the problem but overstepped. You don't yet know whether a middle threshold exists that improves recall without destroying precision, or what the acceptable false-positive rate actually is for Postbox users. You've closed the conversation instead of opening the right one.",
+          "divergenceCost": "Jumped to a binary rollback recommendation without exploring the precision-recall curve or business tolerance."
+        },
+        {
+          "id": "B",
+          "label": "\"Flagging volume is up 5x, but precision dropped from 90% to 21% — most new flags are good mail. Before any rollout, we should map the full precision-recall curve and confirm an acceptable operating threshold with a user-impact test.\"",
+          "detail": "Report the finding, explain the base-rate dynamic, and propose a path to a defensible threshold.",
+          "flag": "strong",
+          "consequence": "Leadership now understands why raw flag count is a misleading signal, what precision means at this base rate, and that the answer isn't simply old vs. new — it's finding the right threshold. You've reframed the decision and given them a concrete next step.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The filter flagging 5x more messages looked like a win only if you measured recall in isolation. Because spam is a small share of total mail, even a modest drop in threshold floods the flagged set with legitimate messages — precision collapsed from 90% to 21%. The lesson is that any classifier must be judged by precision at its operating point given the base rate, not by raw output volume. Catching more spam while burying users' real mail is not an improvement; it's a different kind of failure."
+}

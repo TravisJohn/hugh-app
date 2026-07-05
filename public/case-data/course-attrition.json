@@ -1,0 +1,139 @@
+{
+  "id": "course-attrition",
+  "title": "The Dropout Skew",
+  "scenario": {
+    "role": "Learning Analyst",
+    "company": "Studia",
+    "situation": "An A/B test of a harder course variant (B) vs. the standard variant (A) shows the hard variant's completers scored 11 points higher on the final exam. The test ran for one full cohort cycle with ~2,000 students randomly assigned.",
+    "stakeholderBelief": "The content lead wants to ship the harder variant immediately, citing the 11-point exam score lift as proof it produces better learning outcomes.",
+    "question": "Does the harder variant actually improve learning, or is something else driving the score gap?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The content lead is ready to ship. How do you frame your investigation before touching the exam scores?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Validate the score lift with a significance test",
+          "detail": "Run a t-test on final-exam scores between completers in variant A and variant B.",
+          "flag": "weak",
+          "consequence": "The t-test confirms the 11-point gap is statistically significant. You've answered whether the gap is real among completers — but not whether the completers are still comparable groups. The framing accepted the content lead's premise without questioning who made it to the exam.",
+          "divergenceCost": "Anchored on the stakeholder's conclusion and skipped the population-integrity check."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic cohort audit",
+          "detail": "Before looking at scores, compare who dropped out across both variants — check whether randomization still holds among those who reached the exam.",
+          "flag": "strong",
+          "consequence": "You immediately spot that completion rates differ sharply between variants. The groups who sat the final exam are no longer equivalent, so the score comparison is comparing different populations — not the same students under different content. This opens the attrition thread.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Collect qualitative feedback from completers",
+          "detail": "Survey students who finished the hard variant to understand what made it effective.",
+          "flag": "weak",
+          "consequence": "You hear enthusiastic praise for the harder content — but your sample is exclusively survivors. Students who found it too hard and dropped are invisible. The feedback loop flatters the intervention and hides the dropout problem.",
+          "divergenceCost": "Surveyed only survivors, compounding the survivorship bias already in the data."
+        },
+        {
+          "id": "D",
+          "label": "Build a score-prediction model across both variants",
+          "detail": "Train a regression to predict exam scores using variant assignment and learner attributes.",
+          "flag": "weak",
+          "consequence": "The model finds variant B is a strong positive predictor of score — because the training data contains only completers. The model has learned the attrition pattern, not a true treatment effect, and will generalize poorly to a full rollout.",
+          "divergenceCost": "Modeled on a non-representative subset, encoding the bias rather than detecting it."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "Your cohort audit flags a completion gap. Which metric do you use to evaluate the variant's true effect?",
+      "artifact": {
+        "type": "bars",
+        "title": "Mean final-exam score — completers only",
+        "bars": [
+          {
+            "label": "Variant A (standard)",
+            "value": 71
+          },
+          {
+            "label": "Variant B (hard)",
+            "value": 82,
+            "highlight": true
+          }
+        ],
+        "caption": "Scores look compelling — but these are only students who reached the exam. Variant B had 38% fewer students make it that far."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Mean exam score among completers",
+          "detail": "Average final-exam score for students who finished each variant.",
+          "flag": "weak",
+          "consequence": "The 11-point gap holds. But variant B lost 38% of its assigned students before the exam, versus 12% for variant A. The high scorers in B are a self-selected elite — not a representative sample of who would actually take the hard course at scale.",
+          "divergenceCost": "Trusted a metric that measured only survivors, not the assigned population."
+        },
+        {
+          "id": "B",
+          "label": "Intent-to-treat (ITT) mean score",
+          "detail": "Assign a score of 0 to every student who dropped before the exam, then compute the mean across all originally assigned students in each variant.",
+          "flag": "strong",
+          "consequence": "With dropouts scored as 0, variant B's mean collapses to 51 and variant A's holds at 62. The hard variant's apparent lift vanishes — and variant A now outperforms on the full assigned population. The differential attrition was carrying the entire result.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Intent-to-treat mean score (all assigned students, dropouts = 0)",
+            "bars": [
+              {
+                "label": "Variant A (standard)",
+                "value": 62,
+                "highlight": true
+              },
+              {
+                "label": "Variant B (hard)",
+                "value": 51
+              }
+            ],
+            "caption": "Accounting for all assigned students, the hard variant underperforms. The score gap was driven by who it shed, not what it taught."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The ITT analysis flips the result. What do you tell the content lead?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The hard variant is harmful — don't ship it and revert the content.\"",
+          "detail": "Make the causal call that harder content causes worse outcomes.",
+          "flag": "weak",
+          "consequence": "You've correctly identified the attrition problem but overclaimed the direction of causation. It's possible that harder content genuinely helps students who stay — the ITT result reflects the dropout mechanism, not necessarily the content quality for persistent learners. Recommending a full revert could discard real signal.",
+          "divergenceCost": "Overclaimed causation from an ITT correlation without accounting for heterogeneous treatment effects."
+        },
+        {
+          "id": "B",
+          "label": "\"The score lift disappears once we account for differential dropout — ITT shows no gain. We should hold the ship decision and run a redesigned test with dropout-reduction guardrails before concluding the content itself is better or worse.\"",
+          "detail": "Present the finding, name the mechanism, and recommend a causal path forward.",
+          "flag": "strong",
+          "consequence": "You've shown the content lead exactly why the result was misleading, named differential attrition as the mechanism, and proposed a path — such as a test with mandatory checkpoints that equalize completion — that could isolate the true content effect. Findings, honest caution, and a next step.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The harder variant didn't produce better learners — it filtered out weaker ones before the measurement point, leaving only high-performers to be scored. Randomization was intact at assignment but broken by the time the exam ran, so the completer comparison was no longer an apples-to-apples test. The correct instrument is intent-to-treat: score everyone assigned, not just everyone who survived. The lesson is that differential attrition is a silent randomization-breaker, and survivor-only metrics will always flatter interventions that are merely harder to complete."
+}

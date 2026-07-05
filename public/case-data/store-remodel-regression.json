@@ -1,0 +1,144 @@
+{
+  "id": "store-remodel-regression",
+  "title": "The Remodel Bump",
+  "scenario": {
+    "role": "Retail Analyst",
+    "company": "Maple & Co",
+    "situation": "The 20 worst-performing stores were remodeled last quarter. Their sales rose 12% this quarter, and the VP wants to roll out the remodel chain-wide.",
+    "stakeholderBelief": "The VP is convinced the remodel caused the sales lift and is already drafting a $40M capital plan to remodel the next 50 stores.",
+    "question": "Did the remodel actually drive the sales recovery?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The VP wants confirmation before the board meeting. How do you frame your investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Measure pre/post sales at the remodeled stores",
+          "detail": "Compare each remodeled store's sales in the quarter before and after the remodel.",
+          "flag": "weak",
+          "consequence": "You confirm a 12% lift — which matches the VP's claim exactly. But you've measured only the treated group, so you have no way to know how much would have happened anyway. The framing locks you into the VP's narrative.",
+          "divergenceCost": "Anchored on the treated group alone — no counterfactual, no signal isolation."
+        },
+        {
+          "id": "B",
+          "label": "Identify a matched control group and compare trajectories",
+          "detail": "Find stores that also had a bad quarter but were NOT remodeled, and track their sales alongside the remodeled group.",
+          "flag": "strong",
+          "consequence": "You now have a counterfactual. If both groups bounce back similarly, the remodel isn't the driver — something about starting from an extreme low is. This is the only framing that can actually answer the question.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Survey store managers about customer reaction to the remodel",
+          "detail": "Collect qualitative feedback from the 20 remodeled stores on shopper sentiment.",
+          "flag": "weak",
+          "consequence": "Managers report positive reactions, which feels validating. But anecdotes can't separate the remodel effect from the natural bounce-back. You've gathered color without answering the causal question.",
+          "divergenceCost": "Substituted qualitative sentiment for a rigorous counterfactual comparison."
+        },
+        {
+          "id": "D",
+          "label": "Build a regression model predicting sales lift from remodel features",
+          "detail": "Model which remodel elements (layout, lighting, signage) predict the biggest lift.",
+          "flag": "weak",
+          "consequence": "You produce an elegant model — but it's built entirely on the treated group and assumes the lift is real. If the lift is mostly regression to the mean, the model is explaining noise.",
+          "divergenceCost": "Jumped to optimization before confirming the effect even exists."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You've pulled data on the remodeled stores and a matched control group of equally-bad, un-remodeled stores. Which metric do you use to evaluate the remodel's impact?",
+      "artifact": {
+        "type": "bars",
+        "title": "Sales this quarter — remodeled stores vs. chain average",
+        "bars": [
+          {
+            "label": "Chain average",
+            "value": 480
+          },
+          {
+            "label": "Remodeled stores (this quarter)",
+            "value": 512,
+            "highlight": true
+          },
+          {
+            "label": "Remodeled stores (last quarter)",
+            "value": 457
+          }
+        ],
+        "caption": "Raw sales figures ($ thousands/store). Remodeled stores are up 12% quarter-over-quarter and now above chain average — looks like a clear win."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Quarter-over-quarter sales change at remodeled stores",
+          "detail": "Measure the % change from last quarter to this quarter for the 20 remodeled stores only.",
+          "flag": "weak",
+          "consequence": "The 12% lift looks real and meaningful. But you're still only watching one group that was selected precisely because it hit a low point. There is no baseline for what recovery would look like without the remodel.",
+          "divergenceCost": "Measured change in the treated group only — the selection effect is invisible."
+        },
+        {
+          "id": "B",
+          "label": "Quarter-over-quarter sales change: remodeled stores vs. matched control",
+          "detail": "Compare the % lift in remodeled stores to the % lift in equally-bad stores that were not remodeled.",
+          "flag": "strong",
+          "consequence": "The matched control group — stores equally bad last quarter but left untouched — also rose about 10%. The remodeled stores' 12% lift is barely distinguishable from the natural bounce-back. The remodel's marginal effect all but disappears.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Quarter-over-quarter sales lift: remodeled vs. matched control",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "Remodeled stores",
+                "value": 12.1
+              },
+              {
+                "label": "Matched control (no remodel)",
+                "value": 10.3,
+                "highlight": true
+              }
+            ],
+            "caption": "Control stores — selected the same way but never touched — nearly matched the remodeled group's recovery. The remodel's incremental lift is ~1.8 percentage points, not 12."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The matched control rose ~10%; the remodeled stores rose ~12%. The gap is small. What do you tell the VP?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The remodel didn't work — it's all regression to the mean. Cancel the rollout.\"",
+          "detail": "Conclude the effect is illusory and advise against the investment.",
+          "flag": "weak",
+          "consequence": "You've correctly identified the regression-to-the-mean risk, but you've overclaimed in the other direction. The ~2-point incremental gap could still be real — it's just too small and noisy to act on without a proper test. Saying 'cancel it' without a designed experiment leaves value on the table.",
+          "divergenceCost": "Overclaimed the null result without recommending a confirmatory test."
+        },
+        {
+          "id": "B",
+          "label": "\"Most of the lift is natural bounce-back, not the remodel. The incremental effect looks small — we need a randomized pilot before committing $40M.\"",
+          "detail": "Reframe the finding, name regression to the mean, and propose a controlled pilot.",
+          "flag": "strong",
+          "consequence": "You've redirected the VP from a flawed before/after read to a counterfactual one, quantified the probable real effect as modest, and given a concrete next step. The company avoids a $40M decision built on a statistical artifact while keeping the door open if the remodel genuinely helps.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The 12% sales lift was almost entirely regression to the mean: stores selected for being unusually bad tend to recover on their own, remodel or not. The matched control group — equally bad stores left untouched — rose nearly as much, shrinking the remodel's apparent effect to a rounding error. The lesson is that whenever you select on an extreme and then measure change, you are almost guaranteed to see movement — the discipline is to always compare against a control chosen by the same criterion."
+}

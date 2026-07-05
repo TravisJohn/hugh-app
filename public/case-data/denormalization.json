@@ -1,0 +1,166 @@
+{
+  "id": "denormalization",
+  "title": "The Join Storm",
+  "scenario": {
+    "role": "Data Engineer",
+    "company": "Feedly Core",
+    "situation": "A read-heavy API endpoint times out under load. Every request triggers a six-way JOIN across normalized tables before returning a response.",
+    "stakeholderBelief": "The engineering team is convinced the fix is query tuning or provisioning a larger database instance.",
+    "question": "Is the bottleneck something tuning and hardware can actually solve?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team wants a fix fast. How do you frame the investigation before touching anything?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Profile and tune the worst JOIN",
+          "detail": "Run EXPLAIN ANALYZE on the six-way query and add indexes where the planner struggles.",
+          "flag": "weak",
+          "consequence": "You shave 30–40% off the query time with better indexes — but the JOINs are still there, and at 2× load the endpoint times out again. You've optimized inside the wrong architecture.",
+          "divergenceCost": "Anchored on query tuning without questioning whether JOINs belong on the hot path at all."
+        },
+        {
+          "id": "B",
+          "label": "Characterize the access pattern first",
+          "detail": "Before touching the query, profile reads vs. writes: how often does the underlying data change versus how often it is read?",
+          "flag": "strong",
+          "consequence": "You discover reads outnumber writes by more than 200-to-1 and the response shape is nearly identical on every call. This reframes the problem entirely — it's not a slow query, it's the wrong data model for this access pattern.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Benchmark a larger instance",
+          "detail": "Spin up a bigger RDS tier and measure whether raw compute headroom removes the timeout.",
+          "flag": "weak",
+          "consequence": "Latency drops modestly, but cost doubles and the timeout returns when the next traffic spike hits. You've bought time, not a solution.",
+          "divergenceCost": "Treated a structural modeling problem as a capacity problem."
+        },
+        {
+          "id": "D",
+          "label": "Introduce a caching layer in front of the API",
+          "detail": "Add Redis in front of the endpoint to cache full responses.",
+          "flag": "weak",
+          "consequence": "Cache hit rate is lower than expected because cache keys vary per user. You've added operational complexity without resolving the underlying JOIN storm on misses.",
+          "divergenceCost": "Masked the symptom with caching before understanding why the data model is expensive."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You pull operational metrics from the past 30 days. Which cut do you trust to confirm where the cost actually lives?",
+      "artifact": {
+        "type": "bars",
+        "title": "Total query execution time by operation type (30-day sum, seconds)",
+        "bars": [
+          {
+            "label": "6-way JOIN reads",
+            "value": 91400
+          },
+          {
+            "label": "Single-table writes",
+            "value": 1200
+          },
+          {
+            "label": "Index lookups",
+            "value": 3100
+          },
+          {
+            "label": "Aggregation queries",
+            "value": 4800
+          }
+        ],
+        "caption": "Raw execution time summed. The JOIN reads dominate — but is that because each JOIN is slow, or because they run constantly on fixed data?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Total execution time per operation type",
+          "detail": "Sum all query execution time by type over the past 30 days.",
+          "flag": "weak",
+          "consequence": "The JOIN reads dwarf everything else in total time — but that could just mean they run very frequently, not that the data underneath ever changes. You can't distinguish 'expensive architecture' from 'high-churn data' with this view.",
+          "divergenceCost": "Read volume as a total without normalizing for write frequency — missed the read/write ratio signal."
+        },
+        {
+          "id": "B",
+          "label": "Read/write ratio per table with row-change velocity",
+          "detail": "For each of the six tables: reads per hour vs. row updates per hour over the same window.",
+          "flag": "strong",
+          "consequence": "The ratio is unmistakable: five of the six tables see fewer than four writes per hour but thousands of reads. The JOIN is recomputing a stable result on every request. A precomputed read model would serve this with a single primary-key lookup.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Reads-per-write ratio by table (30-day avg, higher = more read-dominant)",
+            "bars": [
+              {
+                "label": "articles",
+                "value": 3200,
+                "highlight": true
+              },
+              {
+                "label": "sources",
+                "value": 2800,
+                "highlight": true
+              },
+              {
+                "label": "categories",
+                "value": 4100,
+                "highlight": true
+              },
+              {
+                "label": "user_prefs",
+                "value": 1900,
+                "highlight": true
+              },
+              {
+                "label": "feed_memberships",
+                "value": 2600,
+                "highlight": true
+              },
+              {
+                "label": "engagement_events",
+                "value": 18
+              }
+            ],
+            "caption": "Five of six tables are overwhelmingly read-dominant with near-static data. Only engagement_events changes frequently — confirming the JOIN recomputes a nearly fixed result thousands of times per hour."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The read/write ratio confirms five tables are near-static yet joined on every request. What do you tell the team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"Denormalize now — build a precomputed read model and drop the JOINs.\"",
+          "detail": "Make the architectural call and move straight to implementation.",
+          "flag": "weak",
+          "consequence": "You're probably right about the direction, but you've skipped the write-path analysis. If write patterns shift — say, a new feature makes user_prefs update frequently — you've baked in a model that will serve stale data. The recommendation needed a guard.",
+          "divergenceCost": "Committed to an architectural change without validating write-path assumptions or proposing a rollout test."
+        },
+        {
+          "id": "B",
+          "label": "\"The read/write ratio points to over-normalization as the root cause — tuning won't fix it. I recommend a precomputed read model for this endpoint, contingent on validating write-path SLAs and piloting with a shadow rollout before cutting over.\"",
+          "detail": "State the finding, name the architectural fix, and attach the conditions needed to be confident.",
+          "flag": "strong",
+          "consequence": "You've reframed the team's assumption with hard data, named the real cost (over-normalization on a read-dominant path), proposed the right remedy, and attached a falsifiable pilot that protects against hidden write-pattern risk. The team can act with confidence.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The timeout wasn't a slow query — it was the right query for the wrong data model. Five of six joined tables updated fewer than four times per hour but were read thousands of times, meaning the JOIN recomputed a nearly identical result on every single request. Query tuning and bigger hardware treat the symptom; a precomputed read model eliminates the JOIN storm entirely. The lesson: normalization is a write-side virtue; on read-dominant, stable-shape paths, denormalize and serve from a single lookup."
+}

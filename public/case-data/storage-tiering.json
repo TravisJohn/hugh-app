@@ -1,0 +1,164 @@
+{
+  "id": "storage-tiering",
+  "title": "The Hot Archive",
+  "scenario": {
+    "role": "Data Engineer",
+    "company": "Reelstore",
+    "situation": "Storage costs have ballooned: seven years of raw logs are sitting on hot storage, and the bill is climbing 20% quarter-over-quarter.",
+    "stakeholderBelief": "The engineering team believes the root problem is the vendor's pricing and wants to open discount negotiations with the cloud provider.",
+    "question": "Is the vendor's price the real driver — or is something else inflating the bill?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team is ready to call the vendor. How do you frame your investigation before anyone picks up the phone?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Benchmark vendor pricing against competitors",
+          "detail": "Pull quotes from AWS, GCP, and Azure to see if the current per-GB rate is above market.",
+          "flag": "weak",
+          "consequence": "You find the vendor is roughly at market rate. The negotiation team has no leverage, and the underlying cost driver hasn't been examined at all.",
+          "divergenceCost": "Anchored on the team's hypothesis and skipped diagnosing the actual data estate."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic access audit — segment data by last-query recency",
+          "detail": "Query storage metadata and access logs to categorize every dataset by when it was last read, before assuming the problem is price.",
+          "flag": "strong",
+          "consequence": "You surface a clear recency distribution across the estate. The shape of that distribution tells you immediately whether the issue is price-per-unit or what is sitting on which tier.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Project cost growth forward and set a budget alert",
+          "detail": "Model the 20% QoQ trend and alert leadership when a threshold is crossed.",
+          "flag": "weak",
+          "consequence": "You have a well-formatted forecast, but costs keep rising — you've measured the symptom without diagnosing the cause.",
+          "divergenceCost": "Optimized monitoring of the problem instead of investigating its source."
+        },
+        {
+          "id": "D",
+          "label": "Immediately design a data deletion policy to free space",
+          "detail": "Propose purging logs older than two years to cut volume.",
+          "flag": "weak",
+          "consequence": "Compliance raises an objection: several log cohorts are under a seven-year retention mandate. You've proposed a solution that creates legal risk before understanding the data.",
+          "divergenceCost": "Jumped to a solution before knowing retention obligations or actual query patterns."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "Access logs are in hand. Which metric do you use to characterize what is actually driving the hot-storage bill?",
+      "artifact": {
+        "type": "bars",
+        "title": "Raw storage volume by data age bucket (TB)",
+        "bars": [
+          {
+            "label": "0–30 days",
+            "value": 18
+          },
+          {
+            "label": "31–90 days",
+            "value": 41
+          },
+          {
+            "label": "91–365 days",
+            "value": 210
+          },
+          {
+            "label": "1–3 years",
+            "value": 380
+          },
+          {
+            "label": "3–7 years",
+            "value": 490,
+            "highlight": true
+          }
+        ],
+        "caption": "Raw TB on hot storage per age bucket. The oldest buckets are largest — but volume alone doesn't tell you whether that data is being read."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "TB stored per age bucket",
+          "detail": "Use raw storage volume by data age as the primary signal.",
+          "flag": "weak",
+          "consequence": "The oldest buckets are largest, which looks alarming — but you don't know if anyone is querying that data. High volume on hot storage is only a problem if the access pattern doesn't justify the tier.",
+          "divergenceCost": "Read storage size as the signal without normalizing for whether the data is actually hot."
+        },
+        {
+          "id": "B",
+          "label": "Query-access rate by age bucket (% of stored objects queried in last 90 days)",
+          "detail": "For each age bucket, compute what fraction of stored objects received at least one read in the past 90 days.",
+          "flag": "strong",
+          "consequence": "The normalized view is unambiguous: access rate collapses to near zero past the 90-day mark, yet those buckets account for the overwhelming majority of hot-storage spend. The discount conversation becomes irrelevant.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "% of objects queried in last 90 days, by data age bucket",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "0–30 days",
+                "value": 91
+              },
+              {
+                "label": "31–90 days",
+                "value": 54
+              },
+              {
+                "label": "91–365 days",
+                "value": 4.8
+              },
+              {
+                "label": "1–3 years",
+                "value": 1.1
+              },
+              {
+                "label": "3–7 years",
+                "value": 0.3,
+                "highlight": true
+              }
+            ],
+            "caption": "Access rate by age bucket. Data older than 90 days is almost entirely unread yet lives on hot storage — the real cost driver, not the per-GB rate."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Access rates crater past 90 days, and those cold buckets account for ~85% of the hot-storage bill. What do you tell the team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"Vendor pricing is irrelevant — implement lifecycle policies to cold/archive immediately.\"",
+          "detail": "Make the causal call and recommend acting now.",
+          "flag": "weak",
+          "consequence": "You're directionally right, but the mandate ignores two open questions: whether any low-frequency workloads have latency requirements that rule out archive tiers, and whether aggregating old logs is safer than raw tiering. Without that check, a rushed rollout could break a quarterly compliance report that no one flagged.",
+          "divergenceCost": "Overclaimed certainty and skipped validating edge-case access patterns before recommending action."
+        },
+        {
+          "id": "B",
+          "label": "\"Price isn't the lever — 95%+ of data past 90 days is unread on hot storage. Lifecycle tiering likely cuts cost far more than a discount. Let's validate low-frequency workload SLAs and run a staged pilot before full rollout.\"",
+          "detail": "Present the finding, name the remaining uncertainty, and propose a safe path to action.",
+          "flag": "strong",
+          "consequence": "The team shelves the vendor call. The pilot confirms one quarterly compliance job needs a slightly warmer tier for two days at month-end — a small carve-out — and the rest tiers cleanly to cold/archive, cutting the bill by over 60%.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The cost explosion had nothing to do with the vendor's rate card: ~95% of stored data was never touched after 90 days yet sat on the most expensive tier for years. The team's instinct to negotiate was a plausible but wrong lever — the real driver was tier misclassification, not price-per-unit. The core lesson is that storage cost is a product of both volume and tier appropriateness; access-recency segmentation, not raw volume or vendor benchmarking, is the right diagnostic. Cutting costs here means matching data temperature to tier, not haggling over the bill."
+}

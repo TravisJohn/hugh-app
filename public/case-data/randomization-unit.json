@@ -1,0 +1,150 @@
+{
+  "id": "randomization-unit",
+  "title": "The Session Split",
+  "scenario": {
+    "role": "Experimentation Analyst",
+    "company": "Bytecart",
+    "situation": "A product team ran an A/B test on a new checkout flow. The experiment randomized by session and ran for two weeks. An analyst analyzed results at the user level and the p-value came back at 0.03 — just under the 0.05 threshold.",
+    "stakeholderBelief": "The team is convinced the result is real and wants to ship the new checkout flow immediately.",
+    "question": "Is the significant result trustworthy enough to ship on?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team is ready to ship. How do you investigate whether this result is actually trustworthy?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Re-run the same user-level analysis with a stricter threshold",
+          "detail": "Apply a Bonferroni correction or lower α to 0.01 and see if significance holds.",
+          "flag": "weak",
+          "consequence": "The result drops below significance at α=0.01, so you pump the brakes — but for the wrong reason. You haven't diagnosed why the original test was flawed; you've just raised the bar on a broken measurement.",
+          "divergenceCost": "Tightened the threshold without questioning whether the test itself was structurally valid."
+        },
+        {
+          "id": "B",
+          "label": "Audit the randomization and analysis unit alignment",
+          "detail": "Check what unit the experiment randomized on, what unit the analysis ran on, and whether users appeared in both arms.",
+          "flag": "strong",
+          "consequence": "You immediately surface the mismatch: sessions were the randomization unit but users were the analysis unit. You can now check how many users spanned both arms — a concrete, falsifiable diagnostic that doesn't assume the result is right or wrong.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Check for novelty effect by looking at time-series conversion",
+          "detail": "Plot daily conversion rates for both arms to see if the lift decays over the experiment window.",
+          "flag": "weak",
+          "consequence": "The time-series looks stable, so you conclude there's no novelty effect. But the real problem isn't a novelty effect — it's that the significance itself was manufactured by a unit mismatch. A clean time-series gives false reassurance.",
+          "divergenceCost": "Investigated a real but secondary threat while the structural flaw went unexamined."
+        },
+        {
+          "id": "D",
+          "label": "Validate by running a post-hoc power calculation",
+          "detail": "Confirm the experiment was adequately powered for a user-level effect of the observed size.",
+          "flag": "weak",
+          "consequence": "The power calculation says you were well-powered — because it inherits the same inflated sample size from treating sessions as independent users. You've checked whether you had enough of the wrong unit.",
+          "divergenceCost": "Validated the power of a misconfigured analysis, compounding the original error."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You pull the assignment logs. Which cut of the data best reveals whether the significance result should be trusted?",
+      "artifact": {
+        "type": "bars",
+        "title": "Sessions assigned per arm — 2-week experiment",
+        "bars": [
+          {
+            "label": "Control sessions",
+            "value": 48200
+          },
+          {
+            "label": "Treatment sessions",
+            "value": 47900
+          },
+          {
+            "label": "Unique users (control)",
+            "value": 31400
+          },
+          {
+            "label": "Unique users (treatment)",
+            "value": 30800
+          }
+        ],
+        "caption": "Session and user counts look balanced. But do the same users appear in both arms?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Session and user counts per arm",
+          "detail": "Confirm both arms have roughly equal sessions and users to check for balance.",
+          "flag": "weak",
+          "consequence": "The arms look balanced — similar session counts, similar unique user counts. Nothing here raises a flag. But balance doesn't mean independence: it says nothing about whether the same users contributed sessions to both arms.",
+          "divergenceCost": "Checked arm balance instead of arm contamination — confirmed the wrong property."
+        },
+        {
+          "id": "B",
+          "label": "Share of users with sessions in both arms (contamination rate)",
+          "detail": "Count users who appear in both control and treatment across their sessions.",
+          "flag": "strong",
+          "consequence": "The contamination rate is stark: 34% of users had sessions in both arms. Their repeated, correlated sessions were counted as independent observations, artificially deflating the standard error and producing a p-value that understates true uncertainty.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "User assignment breakdown — contamination audit",
+            "bars": [
+              {
+                "label": "Control only",
+                "value": 20700
+              },
+              {
+                "label": "Treatment only",
+                "value": 20200
+              },
+              {
+                "label": "Both arms (contaminated)",
+                "value": 21300,
+                "highlight": true
+              }
+            ],
+            "caption": "Over one-third of users spanned both arms. Their sessions were not independent observations — the effective sample size, and therefore the p-value, is invalid."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "You've shown that 34% of users were contaminated across both arms. What do you tell the team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The experiment is invalid — the new checkout flow has no real effect.\"",
+          "detail": "Tell the team the result is false and there is no lift.",
+          "flag": "weak",
+          "consequence": "You've overcorrected. Contamination invalidates the inference but doesn't prove the null — the new checkout flow might still have a real effect. Declaring no effect is as unjustified as shipping on the original p-value.",
+          "divergenceCost": "Overclaimed in the opposite direction — declared the null from a flawed test."
+        },
+        {
+          "id": "B",
+          "label": "\"The p=0.03 result is unreliable due to a randomization-analysis unit mismatch — we can't ship on it. We should re-run the experiment randomized by user to get a valid inference.\"",
+          "detail": "Explain the structural flaw, its mechanical effect on variance, and recommend a correctly designed re-run.",
+          "flag": "strong",
+          "consequence": "You've separated what the data can and cannot say. The team understands why the result is untrustworthy, what specifically needs to change, and has a concrete path to a valid answer. That's the right outcome from a broken experiment.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The significance was an artifact of a unit mismatch: randomizing by session but analyzing by user meant correlated sessions from the same user were treated as independent observations, understating variance and shrinking the p-value artificially. Over a third of users contaminated both arms, making the effective sample size far smaller than the session count implied. The lesson is precise: you must randomize and analyze at the same unit — any mismatch breaks the independence assumption that frequentist inference depends on, and no amount of threshold-tightening or power-checking will catch it."
+}

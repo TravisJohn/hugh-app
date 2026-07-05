@@ -1,0 +1,162 @@
+{
+  "id": "schema-evolution",
+  "title": "The Breaking Column",
+  "scenario": {
+    "role": "Data Engineer",
+    "company": "Ledgerloop",
+    "situation": "An upstream team renamed a field in the transactions API overnight. Nightly ETL loads have been failing for 18 hours, and a colleague has already proposed a hotfix that simply drops the old column name from the pipeline and rewrites queries to the new name.",
+    "stakeholderBelief": "The team is convinced the fastest path to unblocking loads is to hard-rename or drop the old column everywhere in the pipeline right now.",
+    "question": "Is a destructive rename the right fix, and what does the full blast radius look like before you act?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team wants to push the rename hotfix immediately. How do you frame your investigation before touching anything?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Apply the rename everywhere it appears",
+          "detail": "Search for the old column name across pipelines and replace it with the new name to get loads running again.",
+          "flag": "weak",
+          "consequence": "Loads restart — but three downstream dashboards and a billing microservice that read the old column name from the warehouse start throwing silent nulls or hard errors. You fixed the ingestion layer and broke consumption.",
+          "divergenceCost": "Anchored on the team's proposed fix and acted without mapping downstream consumers."
+        },
+        {
+          "id": "B",
+          "label": "Blast-radius audit before any change",
+          "detail": "Before writing a single line, enumerate every consumer of the old column — pipelines, models, dashboards, APIs — to understand what a destructive rename would break.",
+          "flag": "strong",
+          "consequence": "You produce a dependency map that shows the old column is read by four distinct consumers outside the ETL pipeline. Now you can design a change that unblocks ingestion without touching any of those consumers destructively.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Roll back the upstream rename",
+          "detail": "Ask the upstream team to revert their API change so everything returns to the prior state.",
+          "flag": "weak",
+          "consequence": "The upstream team explains the rename is already live in production and consumed by other systems they own. A rollback isn't feasible, and you've lost time negotiating it.",
+          "divergenceCost": "Treated an external, already-live change as reversible — wasted negotiating time."
+        },
+        {
+          "id": "D",
+          "label": "Rebuild the pipeline from scratch",
+          "detail": "Treat the failure as a sign the pipeline is brittle and rewrite it with the new schema as a clean slate.",
+          "flag": "weak",
+          "consequence": "A rewrite takes days or weeks. Loads stay broken and downstream consumers remain in the dark the entire time. You've optimized for future elegance at the cost of present reliability.",
+          "divergenceCost": "Jumped to full rewrite before diagnosing scope — premature over-engineering."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "Your audit surfaces data about where the old column name is referenced. Which view of that data tells you the true risk of a destructive rename?",
+      "artifact": {
+        "type": "bars",
+        "title": "Raw reference count of old column name by system",
+        "bars": [
+          {
+            "label": "ETL ingest job",
+            "value": 14
+          },
+          {
+            "label": "dbt models",
+            "value": 9
+          },
+          {
+            "label": "BI dashboards",
+            "value": 6
+          },
+          {
+            "label": "Billing API",
+            "value": 3
+          },
+          {
+            "label": "Data science notebooks",
+            "value": 2
+          }
+        ],
+        "caption": "Total occurrences of the old column name across codebases. The ETL job dominates — but is reference count the right signal for blast radius?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Raw reference counts per system",
+          "detail": "Rank systems by how many times the old column name appears in their code.",
+          "flag": "weak",
+          "consequence": "The ETL job has the most references, so it looks like the biggest problem. But the billing API has only 3 references — and each one gates a financial transaction. Reference count masks criticality entirely.",
+          "divergenceCost": "Counted occurrences instead of impact — volume obscured the highest-risk consumer."
+        },
+        {
+          "id": "B",
+          "label": "Consumers rated by failure mode if column disappears",
+          "detail": "For each consumer, classify what happens if the old column vanishes: silent null, hard error, or financial/regulatory consequence.",
+          "flag": "strong",
+          "consequence": "Normalized by failure mode, the billing API and one regulated reporting model rank as critical-breakage consumers — even though they have the fewest raw references. The ETL job itself is merely the loudest failure, not the most dangerous one.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Consumer risk if old column is dropped — severity score (0–10)",
+            "bars": [
+              {
+                "label": "ETL ingest job",
+                "value": 4
+              },
+              {
+                "label": "dbt models",
+                "value": 5
+              },
+              {
+                "label": "BI dashboards",
+                "value": 3
+              },
+              {
+                "label": "Billing API",
+                "value": 10,
+                "highlight": true
+              },
+              {
+                "label": "Data science notebooks",
+                "value": 2
+              }
+            ],
+            "caption": "Weighted by failure mode (silent null = low, hard error = medium, financial/regulatory break = critical). The billing API scores highest despite fewest raw references."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Your severity map shows a destructive rename would silently break the billing API and a regulated reporting model. What do you recommend to the team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"Hard-rename is too risky — we must freeze all changes until every consumer is rewritten.\"",
+          "detail": "Block the hotfix and require all downstream teams to update before anything ships.",
+          "flag": "weak",
+          "consequence": "Loads stay broken for days while you coordinate a multi-team rewrite. You've correctly identified the risk but offered no incremental path forward, so the business pressure mounts and someone pushes the destructive rename anyway.",
+          "divergenceCost": "Diagnosed the risk correctly but gave no actionable path — paralysis, not engineering."
+        },
+        {
+          "id": "B",
+          "label": "\"A destructive rename breaks critical consumers — recommend an additive migration: add the new column, dual-write both, then deprecate the old one with a communicated sunset date.\"",
+          "detail": "Propose the backward-compatible expand-contract pattern and confirm it with a staging dry-run before prod.",
+          "flag": "strong",
+          "consequence": "You unblock ingestion immediately by adding the new column alongside the old one, give every downstream consumer time to migrate on their own schedule, and eliminate the silent-breakage risk. A staging dry-run validates the approach before it touches production.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The loud failure — broken ETL loads — pointed the team toward a fast, destructive fix, but the real risk was the consumers with low reference counts and high failure severity, especially the billing API. The lesson is that schema changes must be evaluated by downstream blast radius and failure mode, not by where the error surfaces. The sound engineering response is an additive, backward-compatible migration (add, dual-write, deprecate) that unblocks the pipeline immediately while giving every consumer a safe runway — managing schema evolution, not just silencing the alert."
+}

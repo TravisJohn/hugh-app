@@ -1,0 +1,156 @@
+{
+  "id": "dag-blast-radius",
+  "title": "The Monolith Pipeline",
+  "scenario": {
+    "role": "Data Engineer",
+    "company": "Settleworks",
+    "situation": "A single nightly ETL job with 60+ sequential steps fails at step 40 on average twice a week, forcing a full rerun from step 1. Each full rerun takes 4 hours and delays downstream reports.",
+    "stakeholderBelief": "The engineering team is convinced the fix is adding more robust try/except error handling and retry logic inside the existing script.",
+    "question": "Is more error handling really the right intervention, or is there a structural problem?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team wants to start patching error handling immediately. How do you frame your investigation before touching any code?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Audit the existing error handling",
+          "detail": "Review every try/except block and retry decorator in the script to find gaps.",
+          "flag": "weak",
+          "consequence": "You find several unhandled exceptions and add wrappers around them. Failures become quieter but the job still reruns from step 1 when anything breaks — you've treated the symptom, not the structure.",
+          "divergenceCost": "Anchored on the team's hypothesis and improved optics without reducing rerun cost."
+        },
+        {
+          "id": "B",
+          "label": "Blast-radius diagnostic",
+          "detail": "Map each failure to which steps were already complete and quantify how much work is thrown away per failure.",
+          "flag": "strong",
+          "consequence": "You discover that on average 39 already-successful steps are discarded per failure. The investigation now has a structural angle the error-handling hypothesis never surfaced.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Interview the on-call engineers",
+          "detail": "Talk to whoever pages on failures to understand what they do during incidents.",
+          "flag": "weak",
+          "consequence": "You learn the on-call process is painful and ad-hoc, which is useful color, but you leave without quantitative evidence of where time is actually lost or which structural change would help most.",
+          "divergenceCost": "Chose qualitative interviews when the failure logs already contained the quantitative answer."
+        },
+        {
+          "id": "D",
+          "label": "Benchmark against a best-practice pipeline",
+          "detail": "Find a reference architecture online and compare the current script to it.",
+          "flag": "weak",
+          "consequence": "You produce a gap analysis that correctly identifies DAG patterns as best practice, but without data on Settleworks' own failure profile you can't make a compelling internal business case for the refactor.",
+          "divergenceCost": "Jumped to external benchmarking before establishing the internal cost of the status quo."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You pull two weeks of failure logs. Which metric do you use to quantify the real cost of the current architecture?",
+      "artifact": {
+        "type": "bars",
+        "title": "Failure count by step bucket — last 14 nights",
+        "bars": [
+          {
+            "label": "Steps 1–15",
+            "value": 3
+          },
+          {
+            "label": "Steps 16–30",
+            "value": 4
+          },
+          {
+            "label": "Steps 31–45",
+            "value": 7,
+            "highlight": true
+          },
+          {
+            "label": "Steps 46–60",
+            "value": 2
+          }
+        ],
+        "caption": "Raw failure counts per step range. Most failures cluster in steps 31–45 — but does knowing *where* failures happen tell you how much work they erase?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Failure count by step bucket",
+          "detail": "Count how many failures occurred in each portion of the pipeline.",
+          "flag": "weak",
+          "consequence": "You see failures cluster in the middle of the job. But this metric says nothing about how many already-complete steps are wasted per failure — a late failure that discards 55 steps looks identical to an early one that discards 5.",
+          "divergenceCost": "Counted where failures happen instead of how much completed work each failure destroys."
+        },
+        {
+          "id": "B",
+          "label": "Wasted-step-hours per failure (normalized rerun cost)",
+          "detail": "For each failure, multiply the steps already completed by their average runtime to get the work discarded.",
+          "flag": "strong",
+          "consequence": "Normalized by completed work, the picture flips: a single mid-pipeline failure wastes more engineer-equivalent compute than six early failures combined, and the all-or-nothing rerun policy is the structural multiplier driving total delay.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Wasted step-hours per failure event — last 14 nights",
+            "unit": "hrs",
+            "bars": [
+              {
+                "label": "Steps 1–15 failures",
+                "value": 0.4
+              },
+              {
+                "label": "Steps 16–30 failures",
+                "value": 1.1
+              },
+              {
+                "label": "Steps 31–45 failures",
+                "value": 5.8,
+                "highlight": true
+              },
+              {
+                "label": "Steps 46–60 failures",
+                "value": 3.2
+              }
+            ],
+            "caption": "Each bar = avg hours of already-completed work discarded per failure. Mid-pipeline failures erase the most work — and better error handling changes none of these numbers."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Wasted-step-hours show the monolithic rerun policy — not missing error handling — drives the delay cost. What do you tell the team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"Error handling won't help — we need to rewrite this as a DAG immediately.\"",
+          "detail": "Make the structural call and push for a full refactor.",
+          "flag": "weak",
+          "consequence": "You're directionally right, but you've presented a correlation as a settled cause and skipped the question of whether a DAG refactor is feasible on the current schedule. The team may push back or scope-creep into a months-long rewrite.",
+          "divergenceCost": "Overclaimed certainty and skipped validating feasibility before recommending a large structural change."
+        },
+        {
+          "id": "B",
+          "label": "\"The wasted-step-hours data points to architecture, not error handling, as the cost driver — let's pilot decomposing one high-risk step range into an idempotent task before committing to a full DAG refactor.\"",
+          "detail": "Present the finding, name the structural hypothesis, and propose a scoped pilot to confirm.",
+          "flag": "strong",
+          "consequence": "You've reframed the team's assumption with quantitative evidence, preserved their ability to validate the fix at low risk, and created a clear before/after comparison. A scoped pilot protects the team if the refactor surfaces unexpected complexity.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The real problem wasn't missing error handling — it was that a monolithic all-or-nothing job turns every mid-pipeline failure into a maximum-blast-radius event, discarding hours of already-completed work. The wasted-step-hours metric makes this structural cost visible in a way raw failure counts never could. The lesson is architectural: modular, idempotent tasks let a pipeline retry only what failed, collapsing blast radius from the whole job to a single node. Sound framing meant resisting the team's hypothesis long enough to measure what the failure was actually destroying."
+}

@@ -1,0 +1,140 @@
+{
+  "id": "loyalty-immortal-time",
+  "title": "The Loyalty Lift",
+  "scenario": {
+    "role": "CRM Analyst",
+    "company": "Greenbasket (online grocery retailer)",
+    "situation": "Loyalty-program members spend an average of $1,840 per year versus $610 for non-members — a 3× gap that has leadership excited.",
+    "stakeholderBelief": "The VP of Growth believes the loyalty program itself drives higher spend and wants to auto-enroll all customers to replicate the effect.",
+    "question": "Does the loyalty program actually cause members to spend more, or is something else driving the gap?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "Leadership wants a rollout plan. How do you frame your investigation before committing to that recommendation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Quantify the revenue upside of full enrollment",
+          "detail": "Project how much total spend would increase if the non-member base spent at the member rate.",
+          "flag": "weak",
+          "consequence": "You produce a compelling $42M upside slide — but you've accepted the causal premise without testing it. If the program didn't create the spend gap, the projection is fiction.",
+          "divergenceCost": "Accepted leadership's causal premise and modeled a number that may be entirely illusory."
+        },
+        {
+          "id": "B",
+          "label": "Compare members and age-matched non-members",
+          "detail": "Ask whether the spend gap persists when you control for how long customers have been active — isolate tenure and enrollment timing.",
+          "flag": "strong",
+          "consequence": "You notice that members had to accumulate purchase history just to qualify for enrollment. Matching non-members by account age and prior activity reveals the gap nearly disappears — the program selected already-active buyers.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Survey members on what drives their loyalty",
+          "detail": "Ask members directly whether the program changed their shopping behavior.",
+          "flag": "weak",
+          "consequence": "Members report loving the program — but self-reported attribution is heavily biased toward recency and salience. You learn nothing about counterfactual behavior.",
+          "divergenceCost": "Relied on self-reported attribution, which can't reveal what customers would have spent without the program."
+        },
+        {
+          "id": "D",
+          "label": "Build a propensity model to predict who will benefit most",
+          "detail": "Model likelihood of spend lift from enrollment and target the highest-propensity customers.",
+          "flag": "weak",
+          "consequence": "The model is well-specified but trained on data contaminated by the same bias — it will predict high lift for customers who are already highly active, reinforcing the illusion.",
+          "divergenceCost": "Modeled on biased data, encoding the confound into every future targeting decision."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You decide to compare groups more carefully. Which metric do you use to assess whether the program lifts spend?",
+      "artifact": {
+        "type": "bars",
+        "title": "Average annual spend — members vs. non-members (raw)",
+        "bars": [
+          {
+            "label": "Non-members",
+            "value": 610
+          },
+          {
+            "label": "All members",
+            "value": 1840,
+            "highlight": true
+          }
+        ],
+        "caption": "Raw average spend. Members appear to spend 3× more — but members must shop for 90 days before enrolling. That pre-enrollment window is not counted against non-members."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Raw average annual spend: all members vs. all non-members",
+          "detail": "Compare the mean full-year spend for each group as-is.",
+          "flag": "weak",
+          "consequence": "The 3× gap looks airtight — but members had to survive 90 days of active shopping just to enroll. Non-members include brand-new and lapsed customers. You're comparing apples to fruit salad.",
+          "divergenceCost": "Included the immortal pre-enrollment period in the member average while mixing all-tenure non-members into the baseline."
+        },
+        {
+          "id": "B",
+          "label": "Post-enrollment spend vs. spend of tenure-matched non-members",
+          "detail": "Measure only spend after enrollment date for members, and match non-members who have been active for the same duration.",
+          "flag": "strong",
+          "consequence": "Once you exclude the pre-enrollment period and match on account age, the gap collapses from 3× to 1.07×. Members and active non-members of the same tenure spend almost identically — the program is selecting high spenders, not creating them.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Spend AFTER enrollment date vs. tenure-matched non-members",
+            "unit": "$",
+            "bars": [
+              {
+                "label": "Tenure-matched non-members",
+                "value": 970
+              },
+              {
+                "label": "Members (post-enrollment only)",
+                "value": 1040,
+                "highlight": true
+              }
+            ],
+            "caption": "Controlling for the immortal pre-enrollment window and matching tenure, the spend gap shrinks to 7% — far below the raw 200% gap. The program is selecting active buyers, not activating passive ones."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Post-enrollment, tenure-matched spend is nearly identical between members and non-members. What do you tell the VP of Growth?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The loyalty program has no effect — cancel it.\"",
+          "detail": "Conclude the program is worthless and recommend discontinuing it.",
+          "flag": "weak",
+          "consequence": "You've overcorrected. The corrected analysis shows no detectable lift — but it doesn't prove zero effect. The program may still drive retention or basket mix in ways this metric misses, and killing it without a proper test risks real harm.",
+          "divergenceCost": "Overclaimed a null causal result from observational data and skipped a controlled test."
+        },
+        {
+          "id": "B",
+          "label": "\"The raw gap is driven by selection, not the program — let's run a randomized enrollment test before any rollout.\"",
+          "detail": "Present the immortal-time finding, explain the bias, and recommend a holdout experiment to measure true lift.",
+          "flag": "strong",
+          "consequence": "You've reframed the narrative with evidence: the 3× figure reflects who joins the program, not what it does to them. Leadership understands why auto-enrollment won't replicate the gap, and a randomized test is greenlit to find the real effect size.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The 3× spend gap existed because customers had to shop actively for 90 days before qualifying to enroll — that pre-enrollment period guaranteed members were already high-value buyers, and it was invisible in the raw comparison. This is immortal time bias: the outcome (low spend) literally could not be observed during the qualification window, inflating the treated group's average. The lesson is that whenever group membership requires surviving a qualifying period, any metric spanning that period is contaminated — the fix is to measure only post-enrollment outcomes and match controls on the same tenure baseline."
+}

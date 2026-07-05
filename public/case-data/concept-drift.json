@@ -1,0 +1,164 @@
+{
+  "id": "concept-drift",
+  "title": "The Decaying Model",
+  "scenario": {
+    "role": "ML Engineer",
+    "company": "Streamvault",
+    "situation": "The recommender system's click-through rate has slid steadily for four months, and team morale is low.",
+    "stakeholderBelief": "The engineering team is convinced the collaborative-filtering architecture is outdated and wants to replace it with a transformer-based model.",
+    "question": "Is the architecture actually the problem?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team wants a greenlight to swap the model architecture. How do you frame the investigation before touching any code?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Benchmark architectures against each other",
+          "detail": "Run offline A/B experiments comparing collaborative filtering to a transformer model on the existing training data.",
+          "flag": "weak",
+          "consequence": "Both architectures score similarly on the held-out set — because both were trained on the same stale data. The benchmark confirms nothing about why CTR is falling.",
+          "divergenceCost": "Anchored on the team's hypothesis and tested solutions before diagnosing the problem."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic drift audit",
+          "detail": "Compare model training-data distributions and catalog composition over time to see whether the world the model learned has diverged from the world it now operates in.",
+          "flag": "strong",
+          "consequence": "The audit immediately surfaces a widening gap: the training corpus is now months stale, new content categories dominate the catalog, and user interaction patterns have shifted. The architecture never changes — the data mismatch is unmistakable.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Interview users who stopped clicking",
+          "detail": "Survey a sample of users about why they find recommendations less relevant.",
+          "flag": "weak",
+          "consequence": "Users say recommendations feel 'old' and 'repetitive,' which is interesting color but not actionable. You can't tell from surveys whether the fix is architecture, freshness, or something else entirely.",
+          "divergenceCost": "Chose a slow qualitative instrument when the signal was already in the model's own metadata."
+        },
+        {
+          "id": "D",
+          "label": "Review the model's feature importance",
+          "detail": "Inspect which features the current model weights most heavily to spot any obvious flaws in the architecture's logic.",
+          "flag": "weak",
+          "consequence": "Feature weights look reasonable for the data the model was trained on. The architecture appears sound — which is correct, but misleading. You've confirmed there's no design flaw while missing that the data itself is the problem.",
+          "divergenceCost": "Investigated model internals in isolation and mistook 'no design flaw' for 'nothing wrong.'"
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "The drift audit shows the catalog and user behavior have both changed. Which metric best confirms the model is stale rather than architecturally broken?",
+      "artifact": {
+        "type": "bars",
+        "title": "CTR by content category — last 30 days",
+        "bars": [
+          {
+            "label": "Legacy Drama",
+            "value": 4.2
+          },
+          {
+            "label": "Legacy Comedy",
+            "value": 3.8
+          },
+          {
+            "label": "Reality/Social",
+            "value": 1.1
+          },
+          {
+            "label": "Short-form Video",
+            "value": 0.9
+          },
+          {
+            "label": "Live Sports",
+            "value": 1.3
+          }
+        ],
+        "caption": "Raw CTR per category today. New categories look worst — but are they bad recommendations, or just new categories the model has barely seen?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Raw CTR by content category",
+          "detail": "Compare click-through rates across content categories in production today.",
+          "flag": "weak",
+          "consequence": "New categories like short-form video and reality content show the lowest CTR, which looks damning — but the model was barely trained on them. You're measuring exposure and novelty bias as much as recommendation quality.",
+          "divergenceCost": "Read raw CTR as a model quality signal without accounting for how underrepresented new categories are in training data."
+        },
+        {
+          "id": "B",
+          "label": "CTR delta: model trained on recent data vs. current stale model, by cohort age",
+          "detail": "Retrain an identical architecture on the most recent 60 days of interactions, then compare CTR lift against the stale model across cohorts bucketed by how long ago the training data was collected.",
+          "flag": "strong",
+          "consequence": "The retrained model — same architecture, fresh data — recovers CTR to near-baseline levels across all cohorts. The gap widens steeply with training data age. The architecture was never the variable; data staleness was.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "CTR lift: retrained (same architecture) vs. stale model, by training data age",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "0–30 days old",
+                "value": 1.2
+              },
+              {
+                "label": "30–60 days old",
+                "value": 4.7
+              },
+              {
+                "label": "60–90 days old",
+                "value": 9.1
+              },
+              {
+                "label": "90–120 days old",
+                "value": 16.3,
+                "highlight": true
+              },
+              {
+                "label": "120+ days old",
+                "value": 21.8,
+                "highlight": true
+              }
+            ],
+            "caption": "CTR lift from retraining grows sharply with data age. Architecture is constant — staleness is the driver."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Retraining the same architecture on recent data recovers most of the lost CTR. What do you tell the team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"Architecture swap cancelled — retraining fixed it. We're done.\"",
+          "detail": "Declare the problem solved and close the investigation.",
+          "flag": "weak",
+          "consequence": "The fix works today, but without a monitoring system and retrain cadence in place, CTR will quietly decay again in a few months and the team will be back at square one — or worse, blame the architecture again.",
+          "divergenceCost": "Treated a one-time retrain as a solution rather than evidence that a systematic cadence was missing."
+        },
+        {
+          "id": "B",
+          "label": "\"Data staleness — not architecture — drove the decay; retraining restores performance, but we need drift monitoring and a scheduled retrain cadence to prevent recurrence.\"",
+          "detail": "Report the finding, flag the structural gap, and propose a path to sustainable production health.",
+          "flag": "strong",
+          "consequence": "The team understands why the decay happened and has a concrete plan: a drift-detection dashboard and a monthly retrain trigger. The architecture discussion is tabled with evidence rather than opinion, and the fix is durable.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The recommender wasn't architecturally wrong — it was stale. As user tastes shifted and new content categories flooded the catalog, the model kept optimizing for a world that no longer existed. The real lesson is operational: production models decay as the world drifts, and the correct response is to monitor that drift and retrain on cadence rather than assume a performance slide means the algorithm needs replacing."
+}

@@ -1,0 +1,171 @@
+{
+  "id": "call-length-bias",
+  "title": "The Long Calls",
+  "scenario": {
+    "role": "Operations Analyst",
+    "company": "Lineup Telecom",
+    "situation": "A snapshot of all calls currently in progress shows an average handle time of 14.2 minutes — nearly double the 7.8-minute average logged in completed-call records over the past 30 days.",
+    "stakeholderBelief": "The Ops director concludes that handle times have ballooned and wants to immediately escalate to the floor supervisors for a root-cause investigation.",
+    "question": "Have handle times actually increased, or is something else distorting the snapshot?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The director wants answers fast. How do you frame your investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Compare today's snapshot to last week's snapshot",
+          "detail": "Pull an equivalent in-progress snapshot from the same time last week and compare average handle times.",
+          "flag": "weak",
+          "consequence": "Both snapshots are drawn from in-progress calls, so both suffer from the same sampling distortion. The comparison looks stable — but you've measured the same bias twice and learned nothing about actual handle times.",
+          "divergenceCost": "Compared two equally biased snapshots, confirming noise instead of finding signal."
+        },
+        {
+          "id": "B",
+          "label": "Audit the sampling method itself",
+          "detail": "Ask what population the snapshot actually captures — in-progress calls vs. completed calls — before interpreting the number.",
+          "flag": "strong",
+          "consequence": "You immediately surface the key question: calls that are still in progress are, by definition, the ones that haven't ended yet — which means long calls are overrepresented. This reframes the entire investigation away from the director's hypothesis.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Interview floor supervisors for qualitative causes",
+          "detail": "Ask supervisors whether agents have been struggling with a new script, system slowdowns, or complex call types today.",
+          "flag": "weak",
+          "consequence": "Supervisors surface a few anecdotes, but nothing systematic. You've spent time gathering color without first validating whether there's actually a problem in the data.",
+          "divergenceCost": "Sought qualitative explanation before verifying the problem was real — reversed the diagnostic order."
+        },
+        {
+          "id": "D",
+          "label": "Segment in-progress calls by agent tenure",
+          "detail": "Break down the snapshot by whether agents are new hires or veterans to find who is driving long calls.",
+          "flag": "weak",
+          "consequence": "The segmentation shows newer agents on slightly longer calls, but the pattern is weak and the difference is within normal variance. You've sliced into a distorted sample and produced a misleading attribution.",
+          "divergenceCost": "Segmented a biased sample and produced a spurious attribution instead of questioning the sample first."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You suspect the snapshot is distorted. Which metric do you use to assess whether handle times have actually changed?",
+      "artifact": {
+        "type": "bars",
+        "title": "Average handle time — in-progress snapshot by call type",
+        "bars": [
+          {
+            "label": "Billing queries",
+            "value": 12.1
+          },
+          {
+            "label": "Tech support",
+            "value": 17.4,
+            "highlight": true
+          },
+          {
+            "label": "Activations",
+            "value": 11.8
+          },
+          {
+            "label": "Cancellations",
+            "value": 15.9
+          }
+        ],
+        "caption": "Snapshot of calls in progress right now. Tech support and cancellations look alarming — but these are only the calls that haven't ended yet."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Average handle time from the in-progress snapshot, broken out by call type",
+          "detail": "Use the current snapshot, segmented by call type, to see which categories are running long.",
+          "flag": "weak",
+          "consequence": "Tech support calls look the most alarming at 17.4 minutes. But every call type in the snapshot is inflated for the same reason — only the calls still running are visible. Segmenting a biased sample produces a biased ranking, not a real finding.",
+          "divergenceCost": "Segmented a length-biased sample and treated the resulting ranking as meaningful."
+        },
+        {
+          "id": "B",
+          "label": "Average handle time from completed-call records, trended over the past 30 days",
+          "detail": "Pull the distribution of fully completed calls from the log, day by day, and compare recent days to the 30-day baseline.",
+          "flag": "strong",
+          "consequence": "Completed-call averages are flat: the 30-day trend shows no meaningful shift, and today's completed calls are tracking at 7.9 minutes — squarely in line with the baseline. The snapshot was inflated entirely by sampling calls still in progress.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Average handle time — completed calls, last 7 days vs. 30-day baseline",
+            "bars": [
+              {
+                "label": "30-day baseline",
+                "value": 7.8
+              },
+              {
+                "label": "7 days ago",
+                "value": 7.6
+              },
+              {
+                "label": "6 days ago",
+                "value": 8
+              },
+              {
+                "label": "5 days ago",
+                "value": 7.7
+              },
+              {
+                "label": "4 days ago",
+                "value": 7.9
+              },
+              {
+                "label": "3 days ago",
+                "value": 7.8
+              },
+              {
+                "label": "2 days ago",
+                "value": 8.1
+              },
+              {
+                "label": "Today (completed so far)",
+                "value": 7.9,
+                "highlight": true
+              }
+            ],
+            "caption": "Completed-call averages are unchanged. Today's figure is indistinguishable from the baseline — the snapshot alarm was a sampling artifact, not a real trend."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Completed-call records show no change in handle time. What do you tell the Ops director?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"There is no problem — the snapshot is wrong and handle times are fine.\"",
+          "detail": "Dismiss the original alarm entirely and close the investigation.",
+          "flag": "weak",
+          "consequence": "You're directionally correct, but the categorical dismissal skips over the real lesson: the snapshot metric itself is systematically misleading and will fire false alarms every time it is used. The underlying monitoring practice remains broken.",
+          "divergenceCost": "Closed the investigation without addressing the flawed monitoring method that caused the false alarm."
+        },
+        {
+          "id": "B",
+          "label": "\"The snapshot overstates handle time by design — completed-call data shows no real increase. Let's validate with a week of parallel tracking and replace the snapshot metric.\"",
+          "detail": "Explain the sampling artifact, present the completed-call evidence, and recommend fixing the monitoring instrument.",
+          "flag": "strong",
+          "consequence": "The director understands why the alarm fired without anything actually changing. You've corrected the immediate misread AND flagged that the snapshot metric will keep producing false positives until it is replaced with a completed-call trend — protecting future decisions too.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The snapshot looked alarming because calls still in progress are disproportionately the long ones — short calls had already ended and left the sample. This is length-biased sampling: the probability of a call appearing in a snapshot is proportional to its duration, so the snapshot mean is structurally higher than the true mean. Completed-call records, which are immune to this bias, showed no change at all. The lesson: any time you measure items currently 'in flight,' you are oversampling the slow ones, and the right fix is to measure completions, not snapshots."
+}

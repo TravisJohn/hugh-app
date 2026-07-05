@@ -1,0 +1,155 @@
+{
+  "id": "hiring-collider",
+  "title": "The Talented Jerk",
+  "scenario": {
+    "role": "People Analyst",
+    "company": "Nimbus Labs",
+    "situation": "A post-hire review finds that among engineers hired in the last two years, coding-assessment scores and interview-charisma ratings are negatively correlated (r ≈ −0.41). Leadership is alarmed.",
+    "stakeholderBelief": "The Head of Engineering concludes that truly skilled engineers are just bad at interviews, and wants to drop the charisma-heavy panel interview to stop losing top talent.",
+    "question": "Is the negative correlation real — and should Nimbus drop the interview?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The Head of Eng wants a quick answer. How do you frame the investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Deepen the hired-engineers analysis",
+          "detail": "Dig further into the hired cohort — break it down by team, tenure, or hiring manager to explain the negative correlation.",
+          "flag": "weak",
+          "consequence": "You find the negative correlation holds across teams and managers, which feels conclusive. But every slice still conditions on the same selection event — being hired — so the confound is baked into every cut you make.",
+          "divergenceCost": "Stayed inside the conditioned sample; every additional slice inherits the same selection bias."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic scope expansion — include the full applicant pool",
+          "detail": "Ask whether the pattern exists before the hiring decision. Pull data on all applicants, not just those who were hired, and check the correlation in the full pool.",
+          "flag": "strong",
+          "consequence": "You immediately have a comparison: the same two scores measured in a population that hasn't been filtered by hiring. Whatever you find there is not contaminated by the selection event, so you can test whether the correlation is a property of people or a property of your hiring filter.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Survey hired engineers about their interview experience",
+          "detail": "Ask high-coding-skill hires whether they felt disadvantaged by the interview format.",
+          "flag": "weak",
+          "consequence": "You get rich qualitative feedback, but it still comes entirely from people who passed both filters — you're hearing only from survivors. The correlation question is untouched.",
+          "divergenceCost": "Chose a slow, survivor-biased instrument instead of examining the selection mechanism directly."
+        },
+        {
+          "id": "D",
+          "label": "Benchmark against industry interview-design research",
+          "detail": "Pull academic and industry studies on whether technical and interpersonal skills trade off.",
+          "flag": "weak",
+          "consequence": "External research gives you priors but not an answer about Nimbus specifically. You've deferred rather than investigated, and the Head of Eng still needs a data-backed recommendation about this hiring process.",
+          "divergenceCost": "Substituted generic benchmarks for a diagnosis of Nimbus's own selection process."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You now have scores for all applicants. Which view do you trust to test whether the correlation is real?",
+      "artifact": {
+        "type": "bars",
+        "title": "Avg. charisma rating by coding-score quartile — HIRED engineers only",
+        "bars": [
+          {
+            "label": "Coding Q1 (lowest)",
+            "value": 7.8
+          },
+          {
+            "label": "Coding Q2",
+            "value": 6.9
+          },
+          {
+            "label": "Coding Q3",
+            "value": 6.1
+          },
+          {
+            "label": "Coding Q4 (highest)",
+            "value": 4.7,
+            "highlight": true
+          }
+        ],
+        "caption": "Among the 312 hired engineers, average charisma drops as coding score rises — the pattern that alarmed leadership. But this sample excludes everyone who was rejected."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Correlation of the two scores inside the hired cohort",
+          "detail": "Use the hired-engineers dataset — it's larger, cleaner, and has post-hire performance data too.",
+          "flag": "weak",
+          "consequence": "The correlation is −0.41 and looks robust at n = 312. But this is exactly the conditioned sample: every person here cleared at least one of the two bars to get hired. The negative correlation could be entirely manufactured by that filter, not by any real trade-off in the population.",
+          "divergenceCost": "Validated the signal inside the biased sample — confirmed an artifact, not a fact."
+        },
+        {
+          "id": "B",
+          "label": "Correlation of the two scores across all applicants (full pool)",
+          "detail": "Compute the same correlation on every applicant who completed both assessments, hired or not.",
+          "flag": "strong",
+          "consequence": "In the full pool of 1,847 applicants the correlation is +0.03 — statistically indistinguishable from zero. The two traits are unrelated in the population. The negative signal in the hired cohort is entirely a product of the hiring filter, not a property of engineers.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Avg. charisma rating by coding-score quartile — ALL applicants (n = 1,847)",
+            "bars": [
+              {
+                "label": "Coding Q1 (lowest)",
+                "value": 5.9
+              },
+              {
+                "label": "Coding Q2",
+                "value": 6
+              },
+              {
+                "label": "Coding Q3",
+                "value": 6.1
+              },
+              {
+                "label": "Coding Q4 (highest)",
+                "value": 6,
+                "highlight": true
+              }
+            ],
+            "caption": "Across the unfiltered applicant pool the relationship is flat. The negative correlation seen in hired engineers disappears entirely once conditioning on hiring is removed."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The full-pool correlation is essentially zero. What do you tell the Head of Engineering?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"Coding skill and charisma are unrelated — keep the interview as-is, problem solved.\"",
+          "detail": "Declare the negative correlation an artifact and close the case.",
+          "flag": "weak",
+          "consequence": "You've correctly diagnosed the bias, but 'keep everything as-is' doesn't follow from the data either. The finding reveals that your hiring bar may be excluding candidates who are strong on both dimensions — that's worth a deliberate audit, not a shrug.",
+          "divergenceCost": "Overconcluded from the fix — correct diagnosis, unjustified prescription to do nothing."
+        },
+        {
+          "id": "B",
+          "label": "\"The negative correlation is a statistical artifact of conditioning on who got hired — not a real trade-off. But this also means our filter may be discarding high-skill, high-charisma candidates. I'd recommend auditing the rejection pool and running a structured review before changing or keeping the interview design.\"",
+          "detail": "Name the collider bias, correct the misconception, and flag the implication worth investigating.",
+          "flag": "strong",
+          "consequence": "You've dissolved the false conclusion, given the Head of Eng a precise explanation of why the data was misleading, and opened a productive next question — whether the current hiring bar is optimally placed — without overclaiming what the correlation data alone can prove.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The negative correlation between coding skill and charisma was entirely manufactured by conditioning on a common effect — getting hired. Because Nimbus hires anyone who clears either bar, the hired pool is enriched with people who are high on one dimension but not both, creating a spurious negative relationship that vanishes in the full applicant pool. This is collider bias: when you filter on a variable that is caused by two others, you induce a correlation between those causes that does not exist in the world. The lesson is structural: before trusting any correlation, ask whether your sample was selected on something downstream of the variables you are measuring."
+}

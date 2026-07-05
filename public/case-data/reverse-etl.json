@@ -1,0 +1,154 @@
+{
+  "id": "reverse-etl",
+  "title": "The Trapped Insight",
+  "scenario": {
+    "role": "Analytics Engineer",
+    "company": "Outboundly",
+    "situation": "The sales team wants warehouse-defined customer segments surfaced inside the CRM for outbound campaigns. A junior analyst is hand-exporting CSVs every Monday morning and uploading them manually. Leadership is debating whether to keep that process or assign an engineer to build a custom sync service.",
+    "stakeholderBelief": "The VP of Sales believes this is a one-off ops problem — either the CSV export becomes someone's standing duty, or engineering builds a dedicated pipeline for Outboundly's exact CRM and warehouse combination.",
+    "question": "What is the right way to get warehouse segments into the CRM reliably and scalably?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The VP wants a solution by end of sprint. How do you frame your investigation before recommending anything?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Scope the custom build",
+          "detail": "Gather engineering requirements to spec out a bespoke sync service between the warehouse and CRM.",
+          "flag": "weak",
+          "consequence": "You've anchored on the VP's framing before asking whether the problem is already solved elsewhere. You'll produce a thorough spec for something that may be unnecessary.",
+          "divergenceCost": "Anchored on the stakeholder's proposed solution before auditing the solution space."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic audit of the integration pattern",
+          "detail": "Before choosing a solution, characterize what the workflow actually requires — what data moves, how often, to which destination — and ask whether this pattern has been solved before.",
+          "flag": "strong",
+          "consequence": "You map the workflow: a warehouse model needs to sync on a schedule to a CRM object. That description matches a well-known integration class. You now have the right question to evaluate solutions against.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Optimize the CSV export process",
+          "detail": "Automate the Monday export with a cron job and email delivery to reduce manual effort.",
+          "flag": "weak",
+          "consequence": "You've made a brittle process slightly less painful. The data is still stale between runs, errors are still silent, and the CRM still depends on a file attachment nobody monitors.",
+          "divergenceCost": "Polished a broken process instead of questioning whether the process should exist."
+        },
+        {
+          "id": "D",
+          "label": "Survey the sales team on their segment needs",
+          "detail": "Collect requirements from sales reps to understand which segments they want before deciding anything technical.",
+          "flag": "weak",
+          "consequence": "Useful for later prioritization, but requirements gathering doesn't resolve the delivery mechanism question. You still don't know how to get any segment — simple or complex — into the CRM reliably.",
+          "divergenceCost": "Deferred the architectural question by collecting requirements for a delivery method still undefined."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You've characterized the workflow. Now you want to compare solutions. Which view of the data best reveals the right choice?",
+      "artifact": {
+        "type": "bars",
+        "title": "Estimated engineering effort to implement each approach (days)",
+        "bars": [
+          {
+            "label": "Keep CSV export",
+            "value": 2
+          },
+          {
+            "label": "Automate export (cron)",
+            "value": 5
+          },
+          {
+            "label": "Custom sync service",
+            "value": 45
+          },
+          {
+            "label": "Reverse ETL tool",
+            "value": 3
+          }
+        ],
+        "caption": "Raw effort estimates. Custom build looks dominant in cost — but effort alone doesn't show ongoing maintenance burden or failure risk."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Initial engineering effort (days to ship)",
+          "detail": "Rank solutions by how long they take to implement the first time.",
+          "flag": "weak",
+          "consequence": "The custom build looks expensive up front, but the CSV export looks almost free. You'd be tempted to keep the export — without ever seeing that it silently fails, produces stale data, and creates a recurring manual burden that compounds over time.",
+          "divergenceCost": "Compared only build cost, hiding the ongoing failure and maintenance cost that changes the ranking."
+        },
+        {
+          "id": "B",
+          "label": "Total operational cost across dimensions (effort + reliability + maintenance)",
+          "detail": "Score each solution on initial effort, ongoing maintenance burden, failure visibility, and data freshness — the factors that determine real operational cost.",
+          "flag": "strong",
+          "consequence": "When you normalize across dimensions, the CSV export and custom build collapse: high cumulative cost, silent failures, and no monitoring. The reverse ETL tool scores low on all cost dimensions — it is purpose-built for exactly this pattern and needs no custom code to maintain.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Operational cost score by solution (lower = better; composite of effort, maintenance, reliability)",
+            "bars": [
+              {
+                "label": "Keep CSV export",
+                "value": 82
+              },
+              {
+                "label": "Automate export (cron)",
+                "value": 68
+              },
+              {
+                "label": "Custom sync service",
+                "value": 74
+              },
+              {
+                "label": "Reverse ETL tool",
+                "value": 11,
+                "highlight": true
+              }
+            ],
+            "caption": "Composite score across initial effort, recurring maintenance, failure visibility, and data freshness. Reverse ETL dominates once all dimensions are counted."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The multi-dimensional view points clearly to reverse ETL. What do you tell the VP of Sales?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"Stop the CSV exports and cancel the custom build — reverse ETL solves this.\"",
+          "detail": "Make the call and recommend immediate adoption.",
+          "flag": "weak",
+          "consequence": "You're probably right on the pattern, but you've skipped vendor evaluation, security review, and a pilot. If the chosen tool has a gap — unsupported CRM version, cost surprise, data governance constraint — you've already committed the org.",
+          "divergenceCost": "Overclaimed readiness by skipping vendor fit validation before recommending adoption."
+        },
+        {
+          "id": "B",
+          "label": "\"The CSV export is the wrong long-term solution, and a custom build solves a problem that's already been solved — this fits a known pattern called reverse ETL. I'd recommend piloting a purpose-built tool against your CRM before committing.\"",
+          "detail": "Name the pattern, show the evidence, and recommend a scoped pilot to confirm fit.",
+          "flag": "strong",
+          "consequence": "You've reframed the VP's two options as a false dilemma, introduced a known solution class with evidence, and proposed a low-risk path to validate it. The recommendation is confident and appropriately bounded.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The team was debating two options — keep the manual export or build something custom — without asking whether the pattern was already solved. Reverse ETL is a well-established tool category purpose-built to push warehouse models into operational systems like CRMs. The real skill wasn't engineering; it was recognizing the integration pattern before speccing a solution, and evaluating options on total operational cost rather than just build effort. Naming a known pattern — and recommending a pilot rather than a leap — is what separates an analytics engineer from a ticket-taker."
+}

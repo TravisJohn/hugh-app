@@ -1,0 +1,171 @@
+{
+  "id": "timezone-bug",
+  "title": "The Midnight Shift",
+  "scenario": {
+    "role": "Data Engineer",
+    "company": "Daywise",
+    "situation": "Daily active users (DAU) show a consistent dip on the last day of each month and a spike on the first day of the next — a pattern that has repeated for three months.",
+    "stakeholderBelief": "The product team believes users wind down activity at month-end (billing anxiety, habit resets) and surge at the start of a new month (fresh motivation). They want to redesign the onboarding nudge cadence around this cycle.",
+    "question": "Is this a real behavioral pattern worth acting on?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The product team wants you to validate the month-boundary behavior pattern. How do you frame your investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Segment users by billing cycle stage",
+          "detail": "Split DAU by where users fall in their billing cycle (start, middle, end) to confirm the behavioral hypothesis.",
+          "flag": "weak",
+          "consequence": "You build the segmentation and see some variation, but it's noisy and doesn't cleanly explain the sharp boundary effect. You've accepted the behavioral framing without questioning whether the data itself is reliable at those boundaries.",
+          "divergenceCost": "Anchored on the team's hypothesis and never checked whether the signal itself was trustworthy."
+        },
+        {
+          "id": "B",
+          "label": "Audit the data pipeline for boundary artifacts",
+          "detail": "Before accepting the pattern as behavioral, check whether the DAU computation itself behaves differently at month boundaries — examine how events are timestamped, bucketed, and aggregated.",
+          "flag": "strong",
+          "consequence": "You pull the event ingestion logs and notice immediately that the DAU rollup uses local date bucketing for some event sources and UTC for others. This inconsistency concentrates errors exactly at day and month boundaries — a data artifact, not user behavior.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Survey active users about month-end habits",
+          "detail": "Send an in-app survey asking users whether their engagement changes around billing or month boundaries.",
+          "flag": "weak",
+          "consequence": "The survey returns mixed, unactionable responses. You've spent time on a slow instrument that can't distinguish a real behavioral pattern from a measurement artifact anyway.",
+          "divergenceCost": "Chose a slow qualitative instrument when the real question was about data integrity."
+        },
+        {
+          "id": "D",
+          "label": "Build a forecast model to quantify the cycle",
+          "detail": "Fit a time-series model with monthly seasonality to measure the size and predict the dip/spike.",
+          "flag": "weak",
+          "consequence": "The model fits beautifully and predicts future dips and spikes — but it's encoding a pipeline bug as a feature. You've optimized around an artifact before diagnosing it.",
+          "divergenceCost": "Jumped to modeling before validating data quality — enshrined the bug as a pattern."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You suspect a timezone handling inconsistency. Which metric cut most clearly exposes whether this is a data artifact or real behavior?",
+      "artifact": {
+        "type": "bars",
+        "title": "DAU at month boundaries — raw event counts (local-date bucketing)",
+        "bars": [
+          {
+            "label": "Oct 29",
+            "value": 84200
+          },
+          {
+            "label": "Oct 30",
+            "value": 83900
+          },
+          {
+            "label": "Oct 31",
+            "value": 71400
+          },
+          {
+            "label": "Nov 1",
+            "value": 96800
+          },
+          {
+            "label": "Nov 2",
+            "value": 84500
+          },
+          {
+            "label": "Nov 3",
+            "value": 83700
+          }
+        ],
+        "caption": "Raw DAU using local-date bucketing. The Oct 31 dip and Nov 1 spike look like a behavioral pattern — but are they?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Raw DAU from the existing pipeline (local-date bucketing)",
+          "detail": "Use the same DAU numbers the dashboard already shows, segmented by day.",
+          "flag": "weak",
+          "consequence": "The dip and spike are clearly visible — but this is the metric under suspicion. Using it to confirm itself doesn't test the hypothesis; you're reading the artifact as if it were signal.",
+          "divergenceCost": "Used the suspect metric to validate itself — circular reasoning."
+        },
+        {
+          "id": "B",
+          "label": "DAU recomputed by normalizing all events to UTC before date bucketing",
+          "detail": "Re-aggregate the same raw events using a single consistent timezone (UTC) for date assignment, then compare to the original pipeline output.",
+          "flag": "strong",
+          "consequence": "The UTC-normalized DAU is flat across all month boundaries — no dip, no spike. The original dip/spike magnitude exactly matches the volume of events from users in UTC-offset timezones (particularly UTC-5 to UTC-8), whose late-evening events were being flipped into the next calendar day by the inconsistent bucketing logic.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "DAU recomputed with all events normalized to UTC",
+            "bars": [
+              {
+                "label": "Oct 29",
+                "value": 83800
+              },
+              {
+                "label": "Oct 30",
+                "value": 84100
+              },
+              {
+                "label": "Oct 31",
+                "value": 83600,
+                "highlight": true
+              },
+              {
+                "label": "Nov 1",
+                "value": 84300,
+                "highlight": true
+              },
+              {
+                "label": "Nov 2",
+                "value": 84000
+              },
+              {
+                "label": "Nov 3",
+                "value": 83900
+              }
+            ],
+            "caption": "UTC-normalized DAU is flat across the boundary. The Oct 31 dip and Nov 1 spike vanish entirely — confirming a bucketing artifact, not behavior."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "UTC-normalization flattens the boundary pattern entirely. What do you tell the product team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The dip and spike are a pipeline bug — there's no behavioral pattern. Cancel the onboarding redesign.\"",
+          "detail": "State the finding as a definitive conclusion and close out the product initiative.",
+          "flag": "weak",
+          "consequence": "You're almost certainly right about the bug, but you haven't formally validated that UTC is the correct canonical timezone for this product's use case, and you haven't confirmed the fix doesn't suppress a real but smaller behavioral signal. The team may also need a corrected historical series before making any product calls.",
+          "divergenceCost": "Overclaimed certainty and skipped the remediation and validation steps."
+        },
+        {
+          "id": "B",
+          "label": "\"The pattern disappears under UTC normalization — strong evidence it's a bucketing artifact, not behavior. We should fix ingestion, restate the historical series, and re-examine whether any real signal remains before changing the product.\"",
+          "detail": "Present the finding, flag remaining uncertainty, and recommend a concrete remediation path.",
+          "flag": "strong",
+          "consequence": "The product team pauses the redesign. The pipeline fix is scoped: all event sources standardize to UTC at ingestion. After restatement, the historical DAU series is flat at boundaries — and a smaller but real mid-month dip emerges that was previously masked. That becomes the new, legitimate investigation.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The month-boundary dip and spike were entirely an artifact of inconsistent timezone handling: events stored in UTC but bucketed by local date caused late-evening activity from US-timezone users to spill into the next calendar day, concentrating the error at midnight boundaries. Recomputing DAU with a single canonical timezone eliminated the pattern completely. The lesson is foundational: standardize timezones and timestamp semantics at ingestion, because date-bucketing bugs produce signals that are indistinguishable from real behavior until you interrogate the pipeline itself rather than the pattern it emits."
+}

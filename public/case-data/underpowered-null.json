@@ -1,0 +1,142 @@
+{
+  "id": "underpowered-null",
+  "title": "The Failed Test",
+  "scenario": {
+    "role": "Product Analyst",
+    "company": "Sproutly",
+    "situation": "An A/B test on a new onboarding feature ran for two weeks on a small segment and returned p = 0.31 — no significant difference in 7-day retention. The PM has called the feature dead.",
+    "stakeholderBelief": "The team reads the non-significant result as proof the feature does nothing and wants to move on immediately.",
+    "question": "Is the test actually conclusive evidence that the feature has no effect?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The PM wants to close the ticket and ship nothing. How do you frame your investigation before accepting that verdict?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Rerun the significance test with a looser threshold",
+          "detail": "Try p < 0.10 instead of p < 0.05 to see if the feature 'almost' worked.",
+          "flag": "weak",
+          "consequence": "Lowering the threshold post-hoc inflates false positives and is a textbook p-hacking move. You haven't learned anything new about the test's validity — you've just made it easier to fool yourself.",
+          "divergenceCost": "Manipulated the threshold after seeing the result — a p-hacking error that doesn't address whether the test was capable of detecting a real effect."
+        },
+        {
+          "id": "B",
+          "label": "Audit the test's statistical power and minimum detectable effect",
+          "detail": "Before accepting a null result, check whether the test had enough sample size to detect a plausible effect in the first place.",
+          "flag": "strong",
+          "consequence": "You immediately surface a structural problem: with ~200 users split across two arms, the test could only reliably detect an implausibly large effect. A realistic 5% retention lift would have been invisible. The null result is uninformative, not exonerating.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Survey the users in the test to get qualitative feedback",
+          "detail": "Ask participants whether they noticed and liked the new feature.",
+          "flag": "weak",
+          "consequence": "Qualitative feedback is useful context, but it doesn't answer whether the test was capable of measuring an effect. You still don't know if the null result means 'no effect' or 'insufficient data.'",
+          "divergenceCost": "Reached for qualitative color before diagnosing whether the quantitative test was even valid — a distraction from the core methodological question."
+        },
+        {
+          "id": "D",
+          "label": "Accept the result and propose a different feature idea",
+          "detail": "Trust the p-value, cut your losses, and redirect the team's energy.",
+          "flag": "weak",
+          "consequence": "You've implicitly endorsed a false equivalence between 'not proven' and 'proven false.' The team may kill a feature that genuinely works, simply because the test was too small to see it.",
+          "divergenceCost": "Anchored on the stakeholder's conclusion without checking whether the test had the power to support it."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You pull the test's numbers. Which view of the data actually tells you whether the test was capable of detecting a real effect?",
+      "artifact": {
+        "type": "bars",
+        "title": "Observed 7-day retention by arm",
+        "bars": [
+          {
+            "label": "Control (n=101)",
+            "value": 38.6
+          },
+          {
+            "label": "Treatment (n=99)",
+            "value": 41.4
+          }
+        ],
+        "caption": "Raw retention rates look almost identical. p = 0.31. But does this chart tell you whether a 5% lift is detectable at this sample size?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "The observed retention rates and p-value",
+          "detail": "Compare 38.6% vs 41.4% and conclude the 2.8 pp gap is noise because p = 0.31.",
+          "flag": "weak",
+          "consequence": "The raw rates and p-value tell you what the test observed — but not whether it was sensitive enough to confirm or deny a plausible effect. A 2.8 pp gap could be real signal buried in an underpowered test. Stopping here is the same mistake the PM made.",
+          "divergenceCost": "Took the p-value at face value without asking whether the test had enough power to rule out a meaningful effect."
+        },
+        {
+          "id": "B",
+          "label": "The minimum detectable effect (MDE) given the actual sample size",
+          "detail": "Calculate what effect size this test could reliably detect at 80% power, and compare it to a plausible business-relevant lift.",
+          "flag": "strong",
+          "consequence": "With ~200 users and a baseline retention of ~39%, an 80%-powered test at α = 0.05 requires detecting a lift of roughly 13–15 percentage points. A realistic 5% lift — which would be commercially meaningful — falls far below that threshold. The test was never equipped to see it.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "What this test could detect vs. what matters",
+            "bars": [
+              {
+                "label": "Plausible meaningful lift (5 pp)",
+                "value": 5
+              },
+              {
+                "label": "MDE at actual sample size (n≈200, 80% power)",
+                "value": 14,
+                "highlight": true
+              },
+              {
+                "label": "Observed difference (2.8 pp)",
+                "value": 2.8
+              }
+            ],
+            "caption": "The minimum detectable effect (14 pp) dwarfs the plausible lift we'd care about (5 pp). The test was blind to any realistic signal. A non-significant result here is uninformative."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The MDE analysis shows the test couldn't have detected a plausible 5% lift. What do you tell the PM?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The test was underpowered — the feature probably works, just run it on more users.\"",
+          "detail": "Tell the PM the feature is likely effective and just needs a bigger test.",
+          "flag": "weak",
+          "consequence": "You've overcorrected. Underpowered tests can't prove the null, but they also can't prove an effect exists. Telling the PM the feature 'probably works' is a claim you have no evidence for — you've just replaced one overstatement with another.",
+          "divergenceCost": "Flipped from 'definitely no effect' to 'probably works' — both unsupported claims from the same inconclusive data."
+        },
+        {
+          "id": "B",
+          "label": "\"p = 0.31 doesn't mean no effect — the test was too small to see one. Before deciding, let's run a properly powered test. Here's the sample size we'd need.\"",
+          "detail": "Explain the power gap, avoid claiming the feature works, and propose a conclusive next step.",
+          "flag": "strong",
+          "consequence": "You've protected the team from a false negative without overclaiming. The PM now understands that 'not significant' ≠ 'no effect,' and has a concrete path — a properly powered test — to get a real answer. That's the honest, actionable response.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The test didn't prove the feature failed — it proved the test was too small to see a plausible effect. With ~200 users, the minimum detectable effect was ~14 percentage points, making a realistic 5 pp lift completely invisible at standard power. The core lesson: absence of evidence is not evidence of absence. A sound analyst always checks statistical power and the minimum detectable effect before accepting a null result, and recommends a conclusive test rather than a premature kill decision."
+}

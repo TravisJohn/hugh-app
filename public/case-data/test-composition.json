@@ -1,0 +1,173 @@
+{
+  "id": "test-composition",
+  "title": "The Contaminated Arm",
+  "scenario": {
+    "role": "Experimentation Analyst",
+    "company": "Trademart",
+    "situation": "A four-week promo test concluded with treatment showing +14% revenue versus control. The team is ready to roll out the promo company-wide.",
+    "stakeholderBelief": "The Growth team calls the promo a winner and wants to schedule the full launch for next sprint.",
+    "question": "Is the +14% lift real, or is something else driving it?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The Growth team wants to confirm the win and move fast. How do you frame your investigation before signing off?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Validate the overall lift number",
+          "detail": "Re-run the top-line revenue comparison between treatment and control to confirm the +14% figure is statistically significant.",
+          "flag": "weak",
+          "consequence": "The +14% holds up statistically — but you've only confirmed the number exists, not that the promo caused it. You've answered the wrong question.",
+          "divergenceCost": "Anchored on confirming the team's conclusion instead of interrogating whether the test was clean."
+        },
+        {
+          "id": "B",
+          "label": "Audit arm balance and composition over time",
+          "detail": "Check whether treatment and control arms remained comparable throughout the test — including who was assigned to each arm and when.",
+          "flag": "strong",
+          "consequence": "You pull arm membership by week and immediately see that a high-volume partner was onboarded directly into the treatment arm at the start of week two. The arms were not equivalent — a thread the top-line number never surfaces.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Segment the lift by promo engagement",
+          "detail": "Compare revenue among users who actively engaged with the promo versus those who didn't.",
+          "flag": "weak",
+          "consequence": "Engaged users show even higher lift — but this is post-treatment self-selection. You've described what happened to people who used the promo, not whether the promo caused the aggregate gain.",
+          "divergenceCost": "Introduced post-treatment selection bias by segmenting on engagement behavior."
+        },
+        {
+          "id": "D",
+          "label": "Check if the test ran long enough for significance",
+          "detail": "Audit the runtime and sample size against the original power calculation.",
+          "flag": "weak",
+          "consequence": "The test was adequately powered and ran its planned duration — so the lift looks credible. But you've checked the clock when you should have checked the guest list.",
+          "divergenceCost": "Focused on test duration mechanics and missed the arm-contamination problem entirely."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You suspect the arms drifted. Which metric best reveals whether the lift is real or an artifact of who ended up in each arm?",
+      "artifact": {
+        "type": "bars",
+        "title": "Total revenue by arm — full test period",
+        "bars": [
+          {
+            "label": "Control",
+            "value": 4100000
+          },
+          {
+            "label": "Treatment",
+            "value": 4674000,
+            "highlight": true
+          }
+        ],
+        "caption": "Treatment outperforms control by +14% in aggregate. But does this reflect the promo's effect, or who was in each arm?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "End-of-test revenue lift (aggregate)",
+          "detail": "Use the final four-week revenue totals for treatment vs. control as the proof of lift.",
+          "flag": "weak",
+          "consequence": "The aggregate lift looks convincing, but it bundles together weeks before and after the new partner arrived. Any composition change is invisible inside this single number.",
+          "divergenceCost": "Collapsed time into a single aggregate and hid the mid-test composition shift."
+        },
+        {
+          "id": "B",
+          "label": "Week-over-week revenue per arm, with pre-period baseline",
+          "detail": "Plot average revenue per partner by arm for each week of the test, including the two pre-test weeks to confirm arms were balanced at the start.",
+          "flag": "strong",
+          "consequence": "The pre-period lines are nearly identical — arms were balanced at launch. Then in week two, treatment revenue jumps sharply while control stays flat. That's exactly when the high-volume partner was onboarded into treatment. The promo's own signal, stripped of that partner, is indistinguishable from zero.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Avg revenue per partner by arm — pre-period and weekly",
+            "bars": [
+              {
+                "label": "Pre-wk 2 (Control)",
+                "value": 18200
+              },
+              {
+                "label": "Pre-wk 2 (Treatment)",
+                "value": 18400
+              },
+              {
+                "label": "Test wk 1 (Control)",
+                "value": 18600
+              },
+              {
+                "label": "Test wk 1 (Treatment)",
+                "value": 18900
+              },
+              {
+                "label": "Test wk 2 (Control)",
+                "value": 18700
+              },
+              {
+                "label": "Test wk 2 (Treatment)",
+                "value": 31500,
+                "highlight": true
+              },
+              {
+                "label": "Test wk 3 (Control)",
+                "value": 18800
+              },
+              {
+                "label": "Test wk 3 (Treatment)",
+                "value": 31200,
+                "highlight": true
+              },
+              {
+                "label": "Test wk 4 (Control)",
+                "value": 19000
+              },
+              {
+                "label": "Test wk 4 (Treatment)",
+                "value": 31800,
+                "highlight": true
+              }
+            ],
+            "caption": "Arms track closely in pre-period and week 1. Treatment spikes in week 2 — the same week the high-volume partner was onboarded into treatment only. Stripped of that partner, treatment and control are flat."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The weekly view shows the lift traces to the new partner's arrival, not the promo timing. What do you tell the Growth team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The promo didn't work — the test was contaminated, cancel the launch.\"",
+          "detail": "Declare the test invalid and recommend against rollout.",
+          "flag": "weak",
+          "consequence": "You've correctly identified a problem but overstepped: the promo may still have an effect — you just can't measure it from this test. Killing the launch without a path forward leaves value on the table and erodes trust.",
+          "divergenceCost": "Overclaimed a null result from inconclusive data and offered no path to an answer."
+        },
+        {
+          "id": "B",
+          "label": "\"Arm composition changed mid-test, so we can't attribute the lift to the promo — we need a clean re-run with locked arm membership before launching.\"",
+          "detail": "Flag the contamination, explain what it means for the current result, and recommend a clean retest.",
+          "flag": "strong",
+          "consequence": "The Growth team understands why the current number is untrustworthy, and you've given them a concrete next step: re-run the test with arm membership frozen at launch. The promo's true effect remains an open, answerable question.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The +14% lift was real as a number but spurious as a signal — it traced entirely to a high-volume partner landing in the treatment arm mid-test, not to the promo itself. The pre-period and week-one parity proved the arms started clean; the week-two divergence revealed the contamination. The lesson: arm balance must be monitored across time, not just certified at launch, because composition shifts that happen during a test are invisible in any end-state aggregate."
+}

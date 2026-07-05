@@ -1,0 +1,163 @@
+{
+  "id": "cache-invalidation",
+  "title": "The Stale Dashboard",
+  "scenario": {
+    "role": "Data Engineer",
+    "company": "Snapmetrics",
+    "situation": "The cached metrics layer serves dashboards in ~80ms but occasionally surfaces stale numbers. Executives have started double-checking figures manually, eroding trust in the platform.",
+    "stakeholderBelief": "The engineering team wants to remove the cache entirely and query the warehouse directly on every request to guarantee correctness.",
+    "question": "Is removing the cache the right fix for the staleness problem?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team is ready to rip out the cache. How do you frame the investigation before any changes are made?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Plan the cache removal migration",
+          "detail": "Accept the team's diagnosis and focus on how to remove the cache with minimal downtime.",
+          "flag": "weak",
+          "consequence": "You start planning the migration and quickly find warehouse query costs and p95 latency projections are alarming — but you're already anchored on removal as the solution and the team resists backtracking.",
+          "divergenceCost": "Anchored on the team's proposed fix before diagnosing whether the fix matched the actual problem."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic counterfactual: model the no-cache world first",
+          "detail": "Before touching anything, simulate what removing the cache costs (latency, warehouse spend) AND audit which specific metrics are actually going stale and how often.",
+          "flag": "strong",
+          "consequence": "You map two things simultaneously: the staleness incidents cluster on a handful of high-volatility metrics, and the projected no-cache cost is 8–12x higher with p95 latency jumping to ~4 seconds. The removal path is now clearly disproportionate.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Survey executives about which numbers they distrust",
+          "detail": "Interview stakeholders to build a list of metrics they find unreliable.",
+          "flag": "weak",
+          "consequence": "Executives flag a long list of metrics — mostly because distrust is now general, not because all metrics are actually stale. You end up over-indexing on perception rather than measured staleness frequency.",
+          "divergenceCost": "Used a perception-biased instrument instead of measured staleness data, inflating the apparent scope of the problem."
+        },
+        {
+          "id": "D",
+          "label": "Set a universal shorter TTL on the cache",
+          "detail": "Halve the TTL for all cached metrics to reduce staleness windows across the board.",
+          "flag": "weak",
+          "consequence": "Staleness incidents drop modestly, but warehouse query volume doubles and costs spike. You've applied a blunt instrument without knowing which metrics actually need fresher data.",
+          "divergenceCost": "Jumped to a blanket parameter change without segmenting metrics by volatility — traded one problem for another."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You audit the last 90 days of staleness incidents. Which view of the data do you trust to identify where the real problem lives?",
+      "artifact": {
+        "type": "bars",
+        "title": "Staleness incidents by metric category — last 90 days (raw count)",
+        "bars": [
+          {
+            "label": "Revenue totals",
+            "value": 38
+          },
+          {
+            "label": "Active users (DAU/MAU)",
+            "value": 41
+          },
+          {
+            "label": "Pipeline / funnel",
+            "value": 12
+          },
+          {
+            "label": "Real-time event counts",
+            "value": 35
+          },
+          {
+            "label": "Cost & infra spend",
+            "value": 9
+          }
+        ],
+        "caption": "Raw incident counts look spread across several categories. But some categories contain far more individual metrics than others — is the risk actually uniform?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Raw staleness incident count per metric category",
+          "detail": "Use the absolute number of staleness incidents per category to rank problem areas.",
+          "flag": "weak",
+          "consequence": "Revenue and Active Users look equally problematic to Real-time event counts — but Revenue has 60 metrics in its category while Real-time event counts has only 4. You're reading category size, not per-metric staleness risk.",
+          "divergenceCost": "Compared raw counts across categories with different numbers of metrics — a denominator blind spot."
+        },
+        {
+          "id": "B",
+          "label": "Staleness rate per metric (incidents ÷ metrics in category), cross-referenced with update frequency",
+          "detail": "Normalize incidents by the number of metrics in each category, then tag each category by how frequently its underlying data actually changes.",
+          "flag": "strong",
+          "consequence": "Normalized and cross-referenced, the picture is unmistakable: Real-time event counts has a staleness rate 6x higher than any other category AND updates every few seconds — the current TTL is wildly mismatched. Revenue and cost metrics update daily and their normalized rate is near zero. The fix is targeted, not global.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Staleness rate per metric × update volatility (normalized)",
+            "unit": "incidents per metric",
+            "bars": [
+              {
+                "label": "Revenue totals",
+                "value": 0.6
+              },
+              {
+                "label": "Active users (DAU/MAU)",
+                "value": 1.4
+              },
+              {
+                "label": "Pipeline / funnel",
+                "value": 0.8
+              },
+              {
+                "label": "Real-time event counts",
+                "value": 8.8,
+                "highlight": true
+              },
+              {
+                "label": "Cost & infra spend",
+                "value": 0.5
+              }
+            ],
+            "caption": "Normalized to metrics-per-category, real-time event counts are an outlier — 8.8 incidents per metric vs. ≤1.4 everywhere else. These 4 metrics drive the majority of executive distrust and are the only ones needing event-driven invalidation."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The normalized data shows staleness is overwhelmingly concentrated in a small set of high-volatility metrics. What do you tell the engineering team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The cache is fine — just add event-driven invalidation for real-time metrics and close the ticket.\"",
+          "detail": "Make the prescriptive call directly and implement the fix.",
+          "flag": "weak",
+          "consequence": "You ship event-driven invalidation for the four outlier metrics and staleness incidents drop. But you haven't validated the TTL settings on the remaining categories or confirmed that the invalidation logic handles backpressure — a busy event stream could thrash the cache in production.",
+          "divergenceCost": "Overclaimed completeness of the fix without stress-testing the invalidation approach or reviewing TTLs on remaining categories."
+        },
+        {
+          "id": "B",
+          "label": "\"Removing the cache is disproportionate — staleness concentrates in ~4 high-volatility metrics. The evidence points to event-driven invalidation for those plus a TTL audit for the rest. We should validate in staging before rolling out.\"",
+          "detail": "Present the finding, flag what's still uncertain, and recommend a staged confirmation path.",
+          "flag": "strong",
+          "consequence": "The team sees the cost/latency counterfactual, understands the fix is surgical not global, and agrees to a staging validation. The TTL audit surfaces two more misconfigured categories. Trust in the dashboard recovers without a costly cache removal.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "Staleness was real but highly concentrated — four real-time event metrics accounted for the majority of incidents while dozens of low-volatility metrics had near-zero staleness rates. Removing the cache would have multiplied costs and latency by an order of magnitude to solve a problem that only required event-driven invalidation on a handful of metrics and a per-category TTL audit. The lesson: match cache freshness to each metric's actual update volatility, and always model the counterfactual cost before accepting a stakeholder's proposed fix as the frame for your investigation."
+}

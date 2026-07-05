@@ -611,6 +611,1400 @@
           "Great Expectations"
         ]
       }
+    },
+    {
+      "id": "store-remodel-regression",
+      "title": "The Remodel Bump",
+      "company": "Maple & Co",
+      "difficulty": "core",
+      "domain": "Retail Analytics",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Store performance",
+        "industry": "Retail",
+        "modelling": [
+          "Causal inference"
+        ],
+        "statistics": [
+          "Regression to the mean"
+        ]
+      }
+    },
+    {
+      "id": "referral-channel-selection",
+      "title": "The Golden Channel",
+      "company": "Flowspace",
+      "difficulty": "core",
+      "domain": "Growth Analytics",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Acquisition channels",
+        "industry": "SaaS",
+        "modelling": [
+          "Segmentation"
+        ],
+        "statistics": [
+          "Selection bias"
+        ]
+      }
+    },
+    {
+      "id": "support-target-goodhart",
+      "title": "The Ticket Target",
+      "company": "Helpwise",
+      "difficulty": "intro",
+      "domain": "CX Analytics",
+      "estMinutes": 5,
+      "facets": {
+        "about": "SLA & targets",
+        "industry": "Customer support",
+        "modelling": [
+          "Metric design"
+        ],
+        "statistics": [
+          "Goodhart / gaming"
+        ]
+      }
+    },
+    {
+      "id": "hiring-collider",
+      "title": "The Talented Jerk",
+      "company": "Nimbus Labs",
+      "difficulty": "hard",
+      "domain": "People Analytics",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Hiring analytics",
+        "industry": "Tech / HR",
+        "modelling": [
+          "Causal inference"
+        ],
+        "statistics": [
+          "Collider bias"
+        ]
+      }
+    },
+    {
+      "id": "region-ecological",
+      "title": "The Region Signal",
+      "company": "Brightreach",
+      "difficulty": "core",
+      "domain": "Marketing Analytics",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Media mix",
+        "industry": "Marketing",
+        "modelling": [
+          "Causal inference"
+        ],
+        "statistics": [
+          "Ecological fallacy"
+        ]
+      }
+    },
+    {
+      "id": "spam-precision",
+      "title": "The Aggressive Filter",
+      "company": "Postbox",
+      "difficulty": "core",
+      "domain": "Product Analytics",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Classification quality",
+        "industry": "Email / messaging",
+        "modelling": [
+          "Classification"
+        ],
+        "statistics": [
+          "Precision / base rate"
+        ]
+      }
+    },
+    {
+      "id": "call-length-bias",
+      "title": "The Long Calls",
+      "company": "Lineup Telecom",
+      "difficulty": "hard",
+      "domain": "Operations Analytics",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Call operations",
+        "industry": "Telecom",
+        "modelling": [
+          "Sampling design"
+        ],
+        "statistics": [
+          "Length bias"
+        ]
+      }
+    },
+    {
+      "id": "feature-novelty",
+      "title": "The Launch Spike",
+      "company": "Tunely",
+      "difficulty": "intro",
+      "domain": "Product Analytics",
+      "estMinutes": 5,
+      "facets": {
+        "about": "Feature adoption",
+        "industry": "Product / tech",
+        "modelling": [
+          "Cohort analysis"
+        ],
+        "statistics": [
+          "Novelty effect"
+        ]
+      }
+    },
+    {
+      "id": "yoy-seasonality",
+      "title": "The Summer Slump",
+      "company": "Cartwell",
+      "difficulty": "intro",
+      "domain": "E-commerce Analytics",
+      "estMinutes": 5,
+      "facets": {
+        "about": "Sales trends",
+        "industry": "E-commerce",
+        "modelling": [
+          "Time series"
+        ],
+        "statistics": [
+          "Seasonality"
+        ]
+      }
+    },
+    {
+      "id": "unicorn-survivorship",
+      "title": "The Founder Playbook",
+      "company": "Launchpad VC",
+      "difficulty": "core",
+      "domain": "Comparative Analytics",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Success factors",
+        "industry": "Startups / VC",
+        "modelling": [
+          "Comparative analysis"
+        ],
+        "statistics": [
+          "Survivorship bias"
+        ]
+      }
+    },
+    {
+      "id": "backtest-window",
+      "title": "The Perfect Window",
+      "company": "Northgate Capital",
+      "difficulty": "hard",
+      "domain": "Financial Analytics",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Backtesting",
+        "industry": "Finance / trading",
+        "modelling": [
+          "Backtesting"
+        ],
+        "statistics": [
+          "Overfitting / p-hacking"
+        ]
+      }
+    },
+    {
+      "id": "ratio-spurious",
+      "title": "The Efficiency Correlation",
+      "company": "Forgeworks",
+      "difficulty": "hard",
+      "domain": "Operations Analytics",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Plant efficiency",
+        "industry": "Manufacturing",
+        "modelling": [
+          "Diagnostic analysis"
+        ],
+        "statistics": [
+          "Spurious correlation"
+        ]
+      }
+    },
+    {
+      "id": "reverse-causation-notifs",
+      "title": "The Notification Effect",
+      "company": "Dailyloop",
+      "difficulty": "core",
+      "domain": "Product Analytics",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Retention drivers",
+        "industry": "Product / tech",
+        "modelling": [
+          "Causal inference"
+        ],
+        "statistics": [
+          "Reverse causation"
+        ]
+      }
+    },
+    {
+      "id": "loyalty-immortal-time",
+      "title": "The Loyalty Lift",
+      "company": "Greenbasket",
+      "difficulty": "hard",
+      "domain": "Retail Analytics",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Loyalty programs",
+        "industry": "Retail",
+        "modelling": [
+          "Survival analysis"
+        ],
+        "statistics": [
+          "Immortal time bias"
+        ]
+      }
+    },
+    {
+      "id": "course-attrition",
+      "title": "The Dropout Skew",
+      "company": "Studia",
+      "difficulty": "hard",
+      "domain": "EdTech Analytics",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Course experiments",
+        "industry": "EdTech",
+        "modelling": [
+          "Experimentation"
+        ],
+        "statistics": [
+          "Attrition bias"
+        ]
+      }
+    },
+    {
+      "id": "unweighted-average",
+      "title": "The Blended Rate",
+      "company": "Assurico",
+      "difficulty": "core",
+      "domain": "Sales Analytics",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Conversion metrics",
+        "industry": "Insurance",
+        "modelling": [
+          "Segmentation"
+        ],
+        "statistics": [
+          "Weighting / aggregation"
+        ]
+      }
+    },
+    {
+      "id": "ceiling-effect",
+      "title": "The Plateau",
+      "company": "Onboardly",
+      "difficulty": "core",
+      "domain": "Product Analytics",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Activation",
+        "industry": "Product / tech",
+        "modelling": [
+          "Segmentation"
+        ],
+        "statistics": [
+          "Ceiling effect"
+        ]
+      }
+    },
+    {
+      "id": "confounding-indication",
+      "title": "The Sicker Patients",
+      "company": "Ridgeway Health",
+      "difficulty": "hard",
+      "domain": "Healthcare Analytics",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Treatment outcomes",
+        "industry": "Healthcare",
+        "modelling": [
+          "Risk adjustment"
+        ],
+        "statistics": [
+          "Confounding by indication"
+        ]
+      }
+    },
+    {
+      "id": "leading-lagging",
+      "title": "The Pipeline Mirage",
+      "company": "Cloudmark",
+      "difficulty": "core",
+      "domain": "Sales Analytics",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Pipeline metrics",
+        "industry": "B2B SaaS",
+        "modelling": [
+          "Cohort analysis"
+        ],
+        "statistics": [
+          "Lag / time alignment"
+        ]
+      }
+    },
+    {
+      "id": "denominator-shift",
+      "title": "The Rising Rate",
+      "company": "Paywave",
+      "difficulty": "core",
+      "domain": "Risk Analytics",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Fraud metrics",
+        "industry": "Fintech",
+        "modelling": [
+          "Diagnostic analysis"
+        ],
+        "statistics": [
+          "Denominator shift"
+        ]
+      }
+    },
+    {
+      "id": "proxy-metric-drift",
+      "title": "The Proxy Metric",
+      "company": "Scrollhouse",
+      "difficulty": "core",
+      "domain": "Product Analytics",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Metric design",
+        "industry": "Product / tech",
+        "modelling": [
+          "Metric design"
+        ],
+        "statistics": [
+          "Proxy divergence"
+        ]
+      }
+    },
+    {
+      "id": "test-composition",
+      "title": "The Contaminated Arm",
+      "company": "Trademart",
+      "difficulty": "hard",
+      "domain": "Experimentation",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Experimentation",
+        "industry": "Marketplace",
+        "modelling": [
+          "Experimentation"
+        ],
+        "statistics": [
+          "Composition change"
+        ]
+      }
+    },
+    {
+      "id": "serving-cost-outliers",
+      "title": "The Cost Blowout",
+      "company": "Stackpoint",
+      "difficulty": "core",
+      "domain": "FinOps Analytics",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Unit economics",
+        "industry": "SaaS / cloud",
+        "modelling": [
+          "Distribution analysis"
+        ],
+        "statistics": [
+          "Outliers / mean vs median"
+        ]
+      }
+    },
+    {
+      "id": "heterogeneous-effects",
+      "title": "The Average That Hid Two Stories",
+      "company": "Farely",
+      "difficulty": "hard",
+      "domain": "Experimentation",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Pricing experiments",
+        "industry": "Product / tech",
+        "modelling": [
+          "Experimentation"
+        ],
+        "statistics": [
+          "Heterogeneous effects"
+        ]
+      }
+    },
+    {
+      "id": "underpowered-null",
+      "title": "The Failed Test",
+      "company": "Sproutly",
+      "difficulty": "core",
+      "domain": "Experimentation",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Experimentation",
+        "industry": "Startups / product",
+        "modelling": [
+          "Experimentation"
+        ],
+        "statistics": [
+          "Statistical power"
+        ]
+      }
+    },
+    {
+      "id": "network-spillover",
+      "title": "The Contaminated Control",
+      "company": "Circleback",
+      "difficulty": "hard",
+      "domain": "Experimentation",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Experimentation",
+        "industry": "Social media",
+        "modelling": [
+          "Experimentation"
+        ],
+        "statistics": [
+          "Interference / SUTVA"
+        ]
+      }
+    },
+    {
+      "id": "twymans-law",
+      "title": "The Too-Good Result",
+      "company": "Metricly",
+      "difficulty": "core",
+      "domain": "Analytics Engineering",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Data validation",
+        "industry": "Analytics",
+        "modelling": [
+          "Data validation"
+        ],
+        "statistics": [
+          "Instrumentation error"
+        ]
+      }
+    },
+    {
+      "id": "randomization-unit",
+      "title": "The Session Split",
+      "company": "Bytecart",
+      "difficulty": "hard",
+      "domain": "Experimentation",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Experimentation",
+        "industry": "E-commerce",
+        "modelling": [
+          "Experimentation"
+        ],
+        "statistics": [
+          "Unit of randomization"
+        ]
+      }
+    },
+    {
+      "id": "targeting-confound",
+      "title": "The Discount Addicts",
+      "company": "Shelfies",
+      "difficulty": "core",
+      "domain": "Retail Analytics",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Promotions",
+        "industry": "Retail",
+        "modelling": [
+          "Causal inference"
+        ],
+        "statistics": [
+          "Targeting confound"
+        ]
+      }
+    },
+    {
+      "id": "overlapping-cis",
+      "title": "The Overlapping Bars",
+      "company": "Gaugely",
+      "difficulty": "core",
+      "domain": "Experimentation",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Metric comparison",
+        "industry": "Product / tech",
+        "modelling": [
+          "Experimentation"
+        ],
+        "statistics": [
+          "Overlapping CIs"
+        ]
+      }
+    },
+    {
+      "id": "preprocessing-leakage",
+      "title": "The Scaled Truth",
+      "company": "Vantage AI",
+      "difficulty": "hard",
+      "domain": "Data Science",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Model validation",
+        "industry": "Data science",
+        "modelling": [
+          "Model validation"
+        ],
+        "statistics": [
+          "Preprocessing leakage"
+        ],
+        "stack": [
+          "scikit-learn"
+        ]
+      }
+    },
+    {
+      "id": "accuracy-paradox",
+      "title": "The 99% Model",
+      "company": "Sentrybank",
+      "difficulty": "core",
+      "domain": "Data Science",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Model evaluation",
+        "industry": "Fintech",
+        "modelling": [
+          "Classification"
+        ],
+        "statistics": [
+          "Class imbalance"
+        ],
+        "stack": [
+          "scikit-learn"
+        ]
+      }
+    },
+    {
+      "id": "concept-drift",
+      "title": "The Decaying Model",
+      "company": "Streamvault",
+      "difficulty": "core",
+      "domain": "Machine Learning",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Model monitoring",
+        "industry": "Media / streaming",
+        "modelling": [
+          "Model monitoring"
+        ],
+        "statistics": [
+          "Concept drift"
+        ],
+        "stack": [
+          "MLflow"
+        ]
+      }
+    },
+    {
+      "id": "threshold-cost",
+      "title": "The Default Threshold",
+      "company": "Churnguard",
+      "difficulty": "core",
+      "domain": "Data Science",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Decision thresholds",
+        "industry": "Telecom",
+        "modelling": [
+          "Classification"
+        ],
+        "statistics": [
+          "Threshold / cost tradeoff"
+        ],
+        "stack": [
+          "scikit-learn"
+        ]
+      }
+    },
+    {
+      "id": "tuning-on-test",
+      "title": "The Leaky Leaderboard",
+      "company": "Kaggleworks",
+      "difficulty": "hard",
+      "domain": "Data Science",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Model validation",
+        "industry": "Data science",
+        "modelling": [
+          "Model validation"
+        ],
+        "statistics": [
+          "Adaptive overfitting"
+        ],
+        "stack": [
+          "Optuna"
+        ]
+      }
+    },
+    {
+      "id": "importance-causation",
+      "title": "The Feature Blame",
+      "company": "Retainly",
+      "difficulty": "core",
+      "domain": "Data Science",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Model interpretation",
+        "industry": "SaaS",
+        "modelling": [
+          "Model interpretation"
+        ],
+        "statistics": [
+          "Importance vs causation"
+        ],
+        "stack": [
+          "SHAP"
+        ]
+      }
+    },
+    {
+      "id": "label-bias",
+      "title": "The Biased Ground Truth",
+      "company": "Talentgrid",
+      "difficulty": "hard",
+      "domain": "Machine Learning",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Fairness / bias",
+        "industry": "HR / tech",
+        "modelling": [
+          "Classification"
+        ],
+        "statistics": [
+          "Label bias"
+        ],
+        "stack": [
+          "scikit-learn"
+        ]
+      }
+    },
+    {
+      "id": "offline-online-gap",
+      "title": "The Recommender Bakeoff",
+      "company": "Shopnest",
+      "difficulty": "hard",
+      "domain": "Machine Learning",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Recommenders",
+        "industry": "E-commerce",
+        "modelling": [
+          "Recommenders"
+        ],
+        "statistics": [
+          "Offline / online gap"
+        ],
+        "stack": [
+          "TensorFlow"
+        ]
+      }
+    },
+    {
+      "id": "calibration",
+      "title": "The Confident Model",
+      "company": "Underwrite.ai",
+      "difficulty": "hard",
+      "domain": "Data Science",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Model calibration",
+        "industry": "Insurance",
+        "modelling": [
+          "Classification"
+        ],
+        "statistics": [
+          "Calibration"
+        ],
+        "stack": [
+          "scikit-learn"
+        ]
+      }
+    },
+    {
+      "id": "train-serve-skew",
+      "title": "The Feature Skew",
+      "company": "Modelworks",
+      "difficulty": "hard",
+      "domain": "Machine Learning",
+      "estMinutes": 7,
+      "facets": {
+        "about": "MLOps",
+        "industry": "Data science",
+        "modelling": [
+          "Feature engineering"
+        ],
+        "statistics": [
+          "Train-serve skew"
+        ],
+        "stack": [
+          "Feature store"
+        ]
+      }
+    },
+    {
+      "id": "reject-inference",
+      "title": "The Approved-Only Model",
+      "company": "Lendable",
+      "difficulty": "hard",
+      "domain": "Data Science",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Credit modeling",
+        "industry": "Fintech / lending",
+        "modelling": [
+          "Classification"
+        ],
+        "statistics": [
+          "Selection / reject inference"
+        ],
+        "stack": [
+          "XGBoost"
+        ]
+      }
+    },
+    {
+      "id": "shortcut-learning",
+      "title": "The Ruler Detector",
+      "company": "DermaScan",
+      "difficulty": "hard",
+      "domain": "Machine Learning",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Model robustness",
+        "industry": "Healthcare / ML",
+        "modelling": [
+          "Computer vision"
+        ],
+        "statistics": [
+          "Shortcut learning"
+        ],
+        "stack": [
+          "PyTorch"
+        ]
+      }
+    },
+    {
+      "id": "extrapolation-pricing",
+      "title": "The Out-of-Range Price",
+      "company": "Priceright",
+      "difficulty": "core",
+      "domain": "Data Science",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Price optimization",
+        "industry": "Retail",
+        "modelling": [
+          "Regression"
+        ],
+        "statistics": [
+          "Extrapolation"
+        ],
+        "stack": [
+          "scikit-learn"
+        ]
+      }
+    },
+    {
+      "id": "resample-prior-shift",
+      "title": "The Balanced Trap",
+      "company": "Flagpost",
+      "difficulty": "core",
+      "domain": "Data Science",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Model calibration",
+        "industry": "Data science",
+        "modelling": [
+          "Classification"
+        ],
+        "statistics": [
+          "Prior shift"
+        ],
+        "stack": [
+          "imbalanced-learn"
+        ]
+      }
+    },
+    {
+      "id": "metric-mismatch",
+      "title": "The Wrong Loss",
+      "company": "Dispatchly",
+      "difficulty": "core",
+      "domain": "Data Science",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Model evaluation",
+        "industry": "Logistics",
+        "modelling": [
+          "Regression"
+        ],
+        "statistics": [
+          "Metric selection"
+        ],
+        "stack": [
+          "LightGBM"
+        ]
+      }
+    },
+    {
+      "id": "temporal-cv",
+      "title": "The Shuffled Split",
+      "company": "Foreside",
+      "difficulty": "hard",
+      "domain": "Data Science",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Model validation",
+        "industry": "Retail / forecasting",
+        "modelling": [
+          "Time series"
+        ],
+        "statistics": [
+          "Temporal leakage"
+        ],
+        "stack": [
+          "scikit-learn"
+        ]
+      }
+    },
+    {
+      "id": "post-outcome-feature",
+      "title": "The Future Feature",
+      "company": "Coverly",
+      "difficulty": "hard",
+      "domain": "Data Science",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Model validation",
+        "industry": "Insurance",
+        "modelling": [
+          "Classification"
+        ],
+        "statistics": [
+          "Target leakage"
+        ],
+        "stack": [
+          "XGBoost"
+        ]
+      }
+    },
+    {
+      "id": "small-data-overfit",
+      "title": "The 12-Feature Wonder",
+      "company": "Biotrace",
+      "difficulty": "core",
+      "domain": "Data Science",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Model validation",
+        "industry": "Biotech",
+        "modelling": [
+          "Model validation"
+        ],
+        "statistics": [
+          "Overfitting (p>n)"
+        ],
+        "stack": [
+          "scikit-learn"
+        ]
+      }
+    },
+    {
+      "id": "prediction-feedback-loop",
+      "title": "The Self-Fulfilling Model",
+      "company": "Guardrail",
+      "difficulty": "hard",
+      "domain": "Machine Learning",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Model monitoring",
+        "industry": "Platform / ML",
+        "modelling": [
+          "Model monitoring"
+        ],
+        "statistics": [
+          "Feedback loop"
+        ],
+        "stack": [
+          "MLflow"
+        ]
+      }
+    },
+    {
+      "id": "group-leakage",
+      "title": "The Duplicated Split",
+      "company": "Visionary Labs",
+      "difficulty": "core",
+      "domain": "Machine Learning",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Model validation",
+        "industry": "ML / computer vision",
+        "modelling": [
+          "Computer vision"
+        ],
+        "statistics": [
+          "Group leakage"
+        ],
+        "stack": [
+          "PyTorch"
+        ]
+      }
+    },
+    {
+      "id": "small-files",
+      "title": "The Million Tiny Files",
+      "company": "Sensorframe",
+      "difficulty": "core",
+      "domain": "Data Engineering",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Storage layout",
+        "industry": "IoT / telemetry",
+        "modelling": [
+          "Lakehouse"
+        ],
+        "statistics": [
+          "File count / overhead"
+        ],
+        "stack": [
+          "Spark",
+          "S3"
+        ]
+      }
+    },
+    {
+      "id": "over-partitioning",
+      "title": "The Empty Partitions",
+      "company": "Gridpoint",
+      "difficulty": "core",
+      "domain": "Data Engineering",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Partitioning",
+        "industry": "SaaS",
+        "modelling": [
+          "Partitioning"
+        ],
+        "statistics": [
+          "Cardinality"
+        ],
+        "stack": [
+          "BigQuery"
+        ]
+      }
+    },
+    {
+      "id": "schema-evolution",
+      "title": "The Breaking Column",
+      "company": "Ledgerloop",
+      "difficulty": "core",
+      "domain": "Data Engineering",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Schema management",
+        "industry": "Fintech",
+        "modelling": [
+          "Data modeling"
+        ],
+        "statistics": [
+          "Schema compatibility"
+        ],
+        "stack": [
+          "Avro",
+          "Kafka"
+        ]
+      }
+    },
+    {
+      "id": "backfill-strategy",
+      "title": "The Blocking Backfill",
+      "company": "Chronoflow",
+      "difficulty": "core",
+      "domain": "Data Engineering",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Reprocessing",
+        "industry": "Analytics",
+        "modelling": [
+          "Batch processing"
+        ],
+        "statistics": [
+          "Backfill safety"
+        ],
+        "stack": [
+          "Airflow",
+          "BigQuery"
+        ]
+      }
+    },
+    {
+      "id": "batch-idempotency",
+      "title": "The Double-Counted Day",
+      "company": "Tallyhub",
+      "difficulty": "core",
+      "domain": "Data Engineering",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Pipeline reliability",
+        "industry": "E-commerce",
+        "modelling": [
+          "Batch processing"
+        ],
+        "statistics": [
+          "Idempotency"
+        ],
+        "stack": [
+          "Spark",
+          "Delta Lake"
+        ]
+      }
+    },
+    {
+      "id": "star-vs-obt",
+      "title": "The One Big Table",
+      "company": "Brightmetrics",
+      "difficulty": "core",
+      "domain": "Data Engineering",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Data modeling",
+        "industry": "Retail / BI",
+        "modelling": [
+          "Dimensional modeling"
+        ],
+        "statistics": [
+          "Schema design"
+        ],
+        "stack": [
+          "dbt",
+          "Snowflake"
+        ]
+      }
+    },
+    {
+      "id": "denormalization",
+      "title": "The Join Storm",
+      "company": "Feedly Core",
+      "difficulty": "core",
+      "domain": "Data Engineering",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Data modeling",
+        "industry": "Consumer app",
+        "modelling": [
+          "OLTP design"
+        ],
+        "statistics": [
+          "Read/write ratio"
+        ],
+        "stack": [
+          "PostgreSQL",
+          "Redis"
+        ]
+      }
+    },
+    {
+      "id": "olap-vs-oltp",
+      "title": "The Analytics on Prod",
+      "company": "Orderly",
+      "difficulty": "core",
+      "domain": "Data Engineering",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Workload separation",
+        "industry": "SaaS",
+        "modelling": [
+          "Warehouse"
+        ],
+        "statistics": [
+          "Workload fit"
+        ],
+        "stack": [
+          "PostgreSQL",
+          "BigQuery"
+        ]
+      }
+    },
+    {
+      "id": "materialized-views",
+      "title": "The Recomputed Dashboard",
+      "company": "Pulsegrid",
+      "difficulty": "core",
+      "domain": "Data Engineering",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Query optimization",
+        "industry": "Analytics",
+        "modelling": [
+          "Materialization"
+        ],
+        "statistics": [
+          "Recompute cost"
+        ],
+        "stack": [
+          "dbt",
+          "BigQuery"
+        ]
+      }
+    },
+    {
+      "id": "consumer-lag",
+      "title": "The Growing Lag",
+      "company": "Fleetstream",
+      "difficulty": "hard",
+      "domain": "Data Engineering",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Streaming ops",
+        "industry": "Logistics",
+        "modelling": [
+          "Streaming"
+        ],
+        "statistics": [
+          "Consumer lag"
+        ],
+        "stack": [
+          "Kafka",
+          "BigQuery"
+        ]
+      }
+    },
+    {
+      "id": "query-cost-governance",
+      "title": "The Runaway Bill",
+      "company": "Quantify",
+      "difficulty": "core",
+      "domain": "Data Engineering",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Cost governance",
+        "industry": "SaaS",
+        "modelling": [
+          "Cost optimization"
+        ],
+        "statistics": [
+          "Bytes scanned"
+        ],
+        "stack": [
+          "BigQuery"
+        ]
+      }
+    },
+    {
+      "id": "storage-tiering",
+      "title": "The Hot Archive",
+      "company": "Reelstore",
+      "difficulty": "intro",
+      "domain": "Data Engineering",
+      "estMinutes": 5,
+      "facets": {
+        "about": "Storage cost",
+        "industry": "Media",
+        "modelling": [
+          "Storage lifecycle"
+        ],
+        "statistics": [
+          "Access recency"
+        ],
+        "stack": [
+          "S3 Glacier"
+        ]
+      }
+    },
+    {
+      "id": "pii-at-ingestion",
+      "title": "The Leaky Pipeline",
+      "company": "Careledger",
+      "difficulty": "core",
+      "domain": "Data Engineering",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Data governance",
+        "industry": "Healthcare",
+        "modelling": [
+          "Data governance"
+        ],
+        "statistics": [
+          "PII handling"
+        ],
+        "stack": [
+          "dbt",
+          "Snowflake"
+        ]
+      }
+    },
+    {
+      "id": "proprietary-lockin",
+      "title": "The Convenient Format",
+      "company": "Corewarehouse",
+      "difficulty": "core",
+      "domain": "Data Engineering",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Storage architecture",
+        "industry": "Enterprise",
+        "modelling": [
+          "Lakehouse"
+        ],
+        "statistics": [
+          "Portability / lock-in"
+        ],
+        "stack": [
+          "Iceberg",
+          "Parquet"
+        ]
+      }
+    },
+    {
+      "id": "dag-blast-radius",
+      "title": "The Monolith Pipeline",
+      "company": "Settleworks",
+      "difficulty": "core",
+      "domain": "Data Engineering",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Pipeline design",
+        "industry": "Fintech",
+        "modelling": [
+          "Workflow orchestration"
+        ],
+        "statistics": [
+          "Blast radius"
+        ],
+        "stack": [
+          "Airflow"
+        ]
+      }
+    },
+    {
+      "id": "eventual-consistency",
+      "title": "The Missing Record",
+      "company": "Cartpath",
+      "difficulty": "hard",
+      "domain": "Data Engineering",
+      "estMinutes": 7,
+      "facets": {
+        "about": "Consistency",
+        "industry": "E-commerce",
+        "modelling": [
+          "Distributed systems"
+        ],
+        "statistics": [
+          "Consistency model"
+        ],
+        "stack": [
+          "DynamoDB"
+        ]
+      }
+    },
+    {
+      "id": "reverse-etl",
+      "title": "The Trapped Insight",
+      "company": "Outboundly",
+      "difficulty": "intro",
+      "domain": "Data Engineering",
+      "estMinutes": 5,
+      "facets": {
+        "about": "Operational analytics",
+        "industry": "B2B SaaS",
+        "modelling": [
+          "Reverse ETL"
+        ],
+        "statistics": [
+          "Sync pattern"
+        ],
+        "stack": [
+          "dbt",
+          "Hightouch"
+        ]
+      }
+    },
+    {
+      "id": "timezone-bug",
+      "title": "The Midnight Shift",
+      "company": "Daywise",
+      "difficulty": "core",
+      "domain": "Data Engineering",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Data quality",
+        "industry": "Consumer app",
+        "modelling": [
+          "Data validation"
+        ],
+        "statistics": [
+          "Timezone handling"
+        ],
+        "stack": [
+          "dbt"
+        ]
+      }
+    },
+    {
+      "id": "data-contract",
+      "title": "The Silent Upstream Change",
+      "company": "Marketgrid",
+      "difficulty": "core",
+      "domain": "Data Engineering",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Data contracts",
+        "industry": "Marketplace",
+        "modelling": [
+          "Data contracts"
+        ],
+        "statistics": [
+          "Contract enforcement"
+        ],
+        "stack": [
+          "dbt",
+          "Kafka"
+        ]
+      }
+    },
+    {
+      "id": "cache-invalidation",
+      "title": "The Stale Dashboard",
+      "company": "Snapmetrics",
+      "difficulty": "core",
+      "domain": "Data Engineering",
+      "estMinutes": 6,
+      "facets": {
+        "about": "Caching",
+        "industry": "Analytics",
+        "modelling": [
+          "Caching"
+        ],
+        "statistics": [
+          "Cache freshness"
+        ],
+        "stack": [
+          "Redis",
+          "BigQuery"
+        ]
+      }
     }
   ]
 }

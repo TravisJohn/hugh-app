@@ -1,0 +1,155 @@
+{
+  "id": "train-serve-skew",
+  "title": "The Feature Skew",
+  "scenario": {
+    "role": "ML Engineer",
+    "company": "Modelworks",
+    "situation": "A recommendation model passed offline validation with 0.87 AUC but is delivering a click-through rate 31% below the benchmark in production. The team flagged it yesterday and wants a root cause today.",
+    "stakeholderBelief": "The team is convinced recent user-behavior shifts caused input distribution drift — they're already drafting a retraining schedule.",
+    "question": "Is distribution drift really why the model is underperforming in production?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team wants to start retraining immediately. How do you frame your investigation before touching the model?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Trigger retraining on recent production data",
+          "detail": "Pull the last 30 days of production logs and kick off a new training run to adapt the model to current user behavior.",
+          "flag": "weak",
+          "consequence": "Retraining starts, but the new model also underperforms at the same rate. The bug travels with the pipeline because you never checked whether the pipeline itself was the problem.",
+          "divergenceCost": "Acted on the drift assumption before diagnosing — baked the bug into the retrained model too."
+        },
+        {
+          "id": "B",
+          "label": "Compare how each feature is computed end-to-end across both paths",
+          "detail": "Before assuming the data changed, audit whether the training pipeline and the serving pipeline compute every feature the same way — same units, same aggregation windows, same null handling.",
+          "flag": "strong",
+          "consequence": "You map every feature transformation from raw event to model input on both paths. Within an hour you find a candidate mismatch: one feature is computed differently in training vs. serving. This is a testable, fixable hypothesis that doesn't require new data.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Run a statistical drift test on raw input distributions",
+          "detail": "Apply a Population Stability Index (PSI) or KS test to compare the distribution of each input feature between training data and recent production traffic.",
+          "flag": "weak",
+          "consequence": "PSI scores come back mostly green. You report 'no significant drift' but still have no explanation for the performance gap — and the team is confused because this contradicts their intuition.",
+          "divergenceCost": "Anchored on the drift hypothesis and got a null result, leaving the real cause uninvestigated."
+        },
+        {
+          "id": "D",
+          "label": "Shadow-score a held-out validation batch and measure live AUC",
+          "detail": "Re-run the offline validation set through the production scoring endpoint to see if AUC has degraded.",
+          "flag": "weak",
+          "consequence": "Live AUC on the held-out set looks fine — because the held-out set goes through the training pipeline's feature logic, not the serving path's. The test doesn't expose a serving-path discrepancy.",
+          "divergenceCost": "Tested using the same pipeline that trained the model — the bug is invisible in this setup."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You've logged the feature values actually sent to the model at serving time and matched them to the same events recomputed by the training pipeline. Which view do you trust to confirm the mismatch?",
+      "artifact": {
+        "type": "bars",
+        "title": "Mean feature value — training pipeline vs. serving pipeline (raw)",
+        "bars": [
+          {
+            "label": "user_session_count",
+            "value": 14.2
+          },
+          {
+            "label": "item_popularity_score",
+            "value": 0.61
+          },
+          {
+            "label": "recency_score",
+            "value": 3.8
+          },
+          {
+            "label": "avg_dwell_seconds",
+            "value": 47.1
+          }
+        ],
+        "caption": "Absolute mean values from the training pipeline. Without a paired comparison to serving values, large or small numbers are uninterpretable."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Absolute mean feature values from the training pipeline alone",
+          "detail": "Look at the average value of each feature as the training pipeline computed it and check whether any look unreasonable.",
+          "flag": "weak",
+          "consequence": "The numbers all look plausible in isolation. Nothing jumps out as obviously wrong because you have no serving-side baseline to compare against.",
+          "divergenceCost": "Checked only one side of the pipeline — a mismatch is invisible without a paired comparison."
+        },
+        {
+          "id": "B",
+          "label": "Relative percentage difference between training and serving feature values for matched events",
+          "detail": "For the same raw events, compute each feature via the training pipeline AND via the serving pipeline, then calculate the % difference per feature.",
+          "flag": "strong",
+          "consequence": "The relative diff chart is unambiguous: avg_dwell_seconds shows a 6× discrepancy. The training pipeline aggregates dwell over a 7-day window in seconds; the serving pipeline uses a 1-day window in milliseconds — a units and window mismatch compounded. Every other feature is within 2%. This is the bug.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "% difference between training-pipeline and serving-pipeline feature values (same events)",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "user_session_count",
+                "value": 1.3
+              },
+              {
+                "label": "item_popularity_score",
+                "value": 0.8
+              },
+              {
+                "label": "recency_score",
+                "value": 2.1
+              },
+              {
+                "label": "avg_dwell_seconds",
+                "value": 598.4,
+                "highlight": true
+              }
+            ],
+            "caption": "All features within ~2% except avg_dwell_seconds, which diverges by ~600% — training uses a 7-day window in seconds; serving uses a 1-day window in milliseconds."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "avg_dwell_seconds shows a ~600% discrepancy between pipelines on matched events. What do you tell the team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"It's a feature computation bug — fix the serving pipeline and the model will recover.\"",
+          "detail": "Declare the root cause found and direct engineering to patch the serving feature logic immediately.",
+          "flag": "weak",
+          "consequence": "The fix ships, but performance improves only 60% of the way back to benchmark. There may be a second misconfigured feature or a deployment artifact you didn't check. You've overclaimed a complete diagnosis from one data point.",
+          "divergenceCost": "Overclaimed a complete fix from a single identified discrepancy — missed confirming no other features were also affected."
+        },
+        {
+          "id": "B",
+          "label": "\"avg_dwell_seconds is the strongest candidate — it's a ~600% discrepancy consistent with a units and window mismatch. I recommend fixing the serving logic and running a shadow A/B against the patched pipeline before full rollout to confirm this accounts for the gap.\"",
+          "detail": "Present the finding clearly, name the specific mismatch, and propose a controlled verification step before concluding.",
+          "flag": "strong",
+          "consequence": "The team patches the serving pipeline and runs a 48-hour shadow comparison. The corrected pipeline closes 94% of the performance gap. The remaining 6% prompts a second audit that surfaces a minor null-handling difference in another feature — caught because you built in the verification step.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The model wasn't stale — it was being fed the wrong numbers at inference time. The training pipeline computed avg_dwell_seconds over a 7-day window in seconds; the serving pipeline used a 1-day window in milliseconds, inflating the feature by roughly 600× and sending the model into a region of feature space it had never trained on. Distribution drift was a plausible story, but a pipeline audit revealed the real cause before any retraining was needed. The lesson: features must be computed identically on both paths, and logging the actual serving-side feature values — not just raw inputs — is the only way to catch training-serving skew reliably."
+}

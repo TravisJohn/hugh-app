@@ -1,0 +1,151 @@
+{
+  "id": "preprocessing-leakage",
+  "title": "The Scaled Truth",
+  "scenario": {
+    "role": "Data Scientist",
+    "company": "Vantage AI",
+    "situation": "A customer-churn model achieves 94% AUC in cross-validation but drops to 71% AUC in production, triggering a wave of missed interventions.",
+    "stakeholderBelief": "The team is convinced the model is sound and suspects production data drift — bad feature pipelines, schema changes, or a mismatch in the scoring environment.",
+    "question": "Why does the model fall apart in production when CV looked so strong?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team wants to chase down the production environment. How do you frame your investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Audit the production scoring pipeline",
+          "detail": "Compare feature distributions and schema between the training snapshot and the live scoring environment.",
+          "flag": "weak",
+          "consequence": "Feature distributions look broadly similar and no schema breaks surface. You've spent two days confirming the team's assumption without finding the gap. The real problem is upstream in how the model was trained, not downstream in how it's served.",
+          "divergenceCost": "Anchored on the team's hypothesis and looked for evidence downstream instead of inside the training procedure."
+        },
+        {
+          "id": "B",
+          "label": "Reproduce the CV pipeline step by step and look for where offline and production diverge",
+          "detail": "Re-run the exact training code, logging what data each step touches and when — before committing to any hypothesis.",
+          "flag": "strong",
+          "consequence": "Walking through the pipeline chronologically, you notice preprocessing (scaler fit, imputer fit) is called on the full dataset before the fold splits are applied. This is a suspicious step that could explain the gap without any production issue at all.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Collect more production labels and retrain",
+          "detail": "Assume distribution shift and retrain with recent data to close the gap.",
+          "flag": "weak",
+          "consequence": "Retraining with recent data nudges production AUC up slightly, but the gap persists. You've added data without fixing the procedure, so the new model is still leaked — and you've burned a sprint on a non-solution.",
+          "divergenceCost": "Jumped to remediation before diagnosing the root cause."
+        },
+        {
+          "id": "D",
+          "label": "Run a feature-importance analysis to find degraded features",
+          "detail": "Identify which features matter most in training and check whether those same features are behaving oddly in production.",
+          "flag": "weak",
+          "consequence": "No single feature stands out as broken. Importance rankings look plausible for the business domain. You've ruled out one narrow hypothesis but still have no explanation for the 23-point AUC drop.",
+          "divergenceCost": "Narrowed focus to individual features and missed the systemic procedural flaw."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You suspect preprocessing may have been fit before the splits. Which comparison gives you a trustworthy signal?",
+      "artifact": {
+        "type": "bars",
+        "title": "Model AUC — reported scores across evaluation contexts",
+        "bars": [
+          {
+            "label": "CV (global preprocessing)",
+            "value": 0.94,
+            "highlight": true
+          },
+          {
+            "label": "Held-out test (global preprocessing)",
+            "value": 0.92
+          },
+          {
+            "label": "Production (last 30 days)",
+            "value": 0.71
+          }
+        ],
+        "caption": "Offline scores look strong in both CV and the held-out test — yet production lags far behind. Is the gap real model performance, or an artifact of how evaluation was set up?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Trust the existing CV AUC (0.94) as the benchmark and call the gap 'drift'",
+          "detail": "Accept the reported cross-validation score as the true offline ceiling and attribute the production shortfall to distribution shift.",
+          "flag": "weak",
+          "consequence": "Labeling it drift sends you back to the production pipeline — where you already found nothing. The CV score is the artifact here, not a reliable benchmark, and anchoring to it conceals that fact.",
+          "divergenceCost": "Treated an inflated metric as ground truth and misattributed the gap to external causes."
+        },
+        {
+          "id": "B",
+          "label": "Re-run CV with preprocessing fit inside each fold and compare to the original CV score",
+          "detail": "Rebuild the cross-validation loop so the scaler and imputer are fit only on each fold's training subset, then record the corrected AUC.",
+          "flag": "strong",
+          "consequence": "With preprocessing contained inside each fold, CV AUC drops from 0.94 to 0.72 — nearly matching production. The original CV score was inflated by test-set statistics leaking into training. The model was never as good as reported.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Model AUC — corrected vs. original evaluation",
+            "bars": [
+              {
+                "label": "CV (global preprocessing — original)",
+                "value": 0.94
+              },
+              {
+                "label": "Held-out test (global preprocessing)",
+                "value": 0.92
+              },
+              {
+                "label": "CV (fold-local preprocessing — corrected)",
+                "value": 0.72,
+                "highlight": true
+              },
+              {
+                "label": "Production (last 30 days)",
+                "value": 0.71
+              }
+            ],
+            "caption": "Fold-local preprocessing collapses CV AUC from 0.94 to 0.72 — now aligned with production. The gap was never drift; it was an illusion created by global scaling."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Fold-local preprocessing drops CV AUC to 0.72, matching production. What do you tell the team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"It's preprocessing leakage — fix the pipeline and the model will be fine in production.\"",
+          "detail": "Declare leakage as the definitive cause and recommend deploying a retrained version with corrected preprocessing.",
+          "flag": "weak",
+          "consequence": "You're almost certainly right, but you've presented a correlation-based finding as a confirmed fix. If a second issue — real drift, a feature bug — also exists, deploying without a validation step could produce a second surprise. The team has no checkpoint to catch that.",
+          "divergenceCost": "Overclaimed a causal fix without recommending a confirmatory validation step."
+        },
+        {
+          "id": "B",
+          "label": "\"Global preprocessing inflated our offline score — corrected CV matches production, which strongly points to leakage. We should retrain with fold-local preprocessing and shadow-deploy to confirm before replacing the live model.\"",
+          "detail": "Present the finding, name the mechanism, and propose a shadow deployment as a causal checkpoint.",
+          "flag": "strong",
+          "consequence": "The team understands both what went wrong and why the fix should be verified. A shadow deployment runs the corrected model in parallel, lets you confirm production AUC improves to the corrected CV level, and catches any residual issues before full rollout.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The model was never as good as reported: fitting the scaler and imputer on the full dataset before splitting gave every fold's training data a statistical fingerprint of the test rows, inflating CV AUC by roughly 22 points. Containing preprocessing inside each fold immediately reproduced production performance, exposing the leakage rather than blaming the environment. The lesson is procedural, not mathematical — cross-validation only isolates generalization if every data-dependent transformation is fit exclusively on the training portion of each fold."
+}

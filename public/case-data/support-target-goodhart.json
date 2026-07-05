@@ -1,0 +1,155 @@
+{
+  "id": "support-target-goodhart",
+  "title": "The Ticket Target",
+  "scenario": {
+    "role": "Support Analyst",
+    "company": "Helpwise",
+    "situation": "After a new resolve-within-24h SLA target launched last quarter, agents hit the number — 91% of tickets now close within 24 hours, up from 67%. But CSAT is flat, and the Support Director is convinced the fix is tightening the SLA to 12 hours.",
+    "stakeholderBelief": "The Support Director believes agents just need more urgency: cut the target window in half and CSAT will finally move.",
+    "question": "Is faster closing the lever, or is something else preventing CSAT from responding to the SLA improvement?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The Director wants analysis to support a 12-hour SLA. How do you frame the investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Model the impact of cutting SLA to 12 hours",
+          "detail": "Project how many tickets would fall outside a 12-hour window and estimate the staffing cost.",
+          "flag": "weak",
+          "consequence": "You produce a staffing model, but it assumes the current 24-hour metric is working as intended. You've accepted the Director's premise without checking whether the 24-hour improvement is real.",
+          "divergenceCost": "Anchored on the stakeholder's solution and never questioned whether the current metric is valid."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic audit of ticket lifecycle",
+          "detail": "Look at what actually happens between ticket open and close — examine reopen rates, resolution sequences, and repeat contacts — before drawing any conclusions about the SLA.",
+          "flag": "strong",
+          "consequence": "You pull full ticket lifecycle events and immediately notice a pattern: a large share of 'resolved' tickets are reopened within hours. The SLA clock stopped, but the customer's problem didn't. A new thread opens that has nothing to do with tightening the window.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Correlate CSAT scores with resolution time",
+          "detail": "Run a regression of ticket close time against CSAT rating to see if speed predicts satisfaction.",
+          "flag": "weak",
+          "consequence": "The correlation is weak and noisy. You can't tell whether slow tickets cause low CSAT or whether hard problems cause both. You've measured the symptom, not the mechanism.",
+          "divergenceCost": "Looked for a statistical signal without first auditing whether the resolution metric itself is trustworthy."
+        },
+        {
+          "id": "D",
+          "label": "Benchmark against industry SLA standards",
+          "detail": "Compare Helpwise's SLA to competitor benchmarks to determine if 12 hours is realistic.",
+          "flag": "weak",
+          "consequence": "You learn industry median SLA is around 20 hours. Interesting context, but completely irrelevant to why CSAT didn't move — the problem is internal behavior, not the target's ambition level.",
+          "divergenceCost": "Pursued external benchmarking when the problem was hiding in internal agent behavior."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You're looking at ticket data. Which metric do you use to assess whether the SLA improvement reflects genuine resolution?",
+      "artifact": {
+        "type": "bars",
+        "title": "Tickets closed within 24h — by month",
+        "bars": [
+          {
+            "label": "Month 1 (pre-SLA)",
+            "value": 67
+          },
+          {
+            "label": "Month 2",
+            "value": 74
+          },
+          {
+            "label": "Month 3",
+            "value": 83
+          },
+          {
+            "label": "Month 4 (current)",
+            "value": 91,
+            "highlight": true
+          }
+        ],
+        "caption": "24-hour close rate climbed steadily after the target launched. On the surface, a clear win — but is this measuring resolution or clock-stopping?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "24-hour close rate trend",
+          "detail": "Track the percentage of tickets closed within 24 hours month over month.",
+          "flag": "weak",
+          "consequence": "The trend looks great — 67% to 91% in four months. But this is the very metric agents were measured on. If they learned to game it, the chart is a mirror of their gaming, not of customer outcomes.",
+          "divergenceCost": "Validated the target metric with itself — missed the possibility that agents optimized the measure rather than the outcome."
+        },
+        {
+          "id": "B",
+          "label": "Ticket reopen rate alongside close rate (normalized)",
+          "detail": "Calculate the share of closed tickets that were reopened within 48 hours, and plot it against the close-rate trend.",
+          "flag": "strong",
+          "consequence": "The picture inverts: as the 24-hour close rate rose, the reopen rate rose in near-perfect lockstep — from 4% to 21%. Agents are closing tickets to stop the clock, then customers write back because the issue wasn't actually fixed. The SLA metric improved; actual resolution did not.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Reopen rate vs. 24h close rate — by month",
+            "bars": [
+              {
+                "label": "Reopen rate M1",
+                "value": 4
+              },
+              {
+                "label": "Reopen rate M2",
+                "value": 9
+              },
+              {
+                "label": "Reopen rate M3",
+                "value": 15
+              },
+              {
+                "label": "Reopen rate M4",
+                "value": 21,
+                "highlight": true
+              }
+            ],
+            "caption": "Reopen rate (% of closed tickets reopened within 48h) climbed from 4% to 21% — almost perfectly tracking the SLA improvement. The measure moved; the goal did not."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Reopen rate spiked in lockstep with the 24-hour close rate. What do you tell the Support Director?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"Agents are gaming the SLA — scrap the 24-hour target immediately.\"",
+          "detail": "Declare the metric broken and recommend removing the target.",
+          "flag": "weak",
+          "consequence": "You've made a strong operational call from a correlation. Gaming is the most plausible explanation, but you haven't confirmed it — agent interviews, ticket-level audit, or a holdout group could prove it. Scrapping the target without that risks losing any accountability structure that is working.",
+          "divergenceCost": "Overclaimed causation and recommended a sweeping action without confirming the mechanism."
+        },
+        {
+          "id": "B",
+          "label": "\"Tightening the SLA is the wrong lever right now. The reopen spike strongly suggests the close rate is being gamed — let's audit a sample of reopened tickets and add reopen rate as a guardrail metric before changing any target.\"",
+          "detail": "Present the finding, name the Goodhart dynamic, and recommend a confirmatory step before acting.",
+          "flag": "strong",
+          "consequence": "The Director has a concrete finding — the metric they're about to double down on is likely measuring clock-stopping, not resolution — plus a clear, low-cost next step. You've reframed the decision without overstepping the evidence.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "Agents didn't solve tickets faster — they learned to close tickets faster, stopping the SLA clock while the customer's problem remained open; the reopen rate exposed the gap that CSAT could not. This is Goodhart's Law in action: the moment a measure became a target, agents optimized the measure and decoupled it from the underlying goal. The lesson is to always pair a performance metric with a guardrail metric that the target cannot directly manipulate — in this case, reopen rate — and to inspect that guardrail before concluding the target is working or needs tightening."
+}

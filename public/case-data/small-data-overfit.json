@@ -1,0 +1,156 @@
+{
+  "id": "small-data-overfit",
+  "title": "The 40-Feature Wonder",
+  "scenario": {
+    "role": "Data Scientist",
+    "company": "Biotrace",
+    "situation": "The team has built a classification model on an 80-row biomarker dataset with 40 features. Training accuracy is 100% and the team is presenting it to leadership next week as a breakthrough.",
+    "stakeholderBelief": "The lead researcher argues that the model's strong cross-validated AUC on the training folds confirms the biological signal is real and the model is ready for clinical piloting.",
+    "question": "Is the model as powerful as the team believes, or is something else going on?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "Leadership wants you to validate the model before the presentation. How do you frame your investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Audit the ratio of parameters to observations",
+          "detail": "Examine whether the dataset has enough rows to support 40 features — flag the structural conditions that would make memorization inevitable regardless of apparent performance.",
+          "flag": "strong",
+          "consequence": "You immediately see that 40 features on 80 rows gives a parameters-to-observations ratio near 1:2. Even a random noise dataset would produce near-perfect fits at this ratio. This structural diagnosis sets up the right metric question — not whether performance looks good, but whether the dataset size can support any model of this complexity.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "B",
+          "label": "Confirm the signal with feature importance",
+          "detail": "Rank features by importance scores to identify which biomarkers the model is relying on.",
+          "flag": "weak",
+          "consequence": "Feature importances look plausible and some align with domain knowledge — but you've only confirmed what the model memorized, not whether it can generalize. The structural overfitting problem remains invisible.",
+          "divergenceCost": "Validated the model's internal logic without diagnosing whether the dataset can support any model of this complexity."
+        },
+        {
+          "id": "C",
+          "label": "Benchmark against a simpler baseline on training data",
+          "detail": "Compare the 40-feature model's training accuracy to a logistic regression with 3 features.",
+          "flag": "weak",
+          "consequence": "The complex model wins on training accuracy by a wide margin — of course it does. Training comparisons tell you nothing about generalization; you've reinforced the illusion while appearing rigorous.",
+          "divergenceCost": "Compared models on the metric that always rewards complexity, bypassing the real structural question."
+        },
+        {
+          "id": "D",
+          "label": "Expand the feature set with interaction terms",
+          "detail": "Add interaction terms and derived features to capture more biological complexity before evaluating.",
+          "flag": "weak",
+          "consequence": "Training accuracy stays at 100% — naturally, with even more parameters than rows. You've deepened the overfitting hole while appearing to be thorough.",
+          "divergenceCost": "Added complexity to an already over-parameterized model, making the core structural problem worse."
+        }
+      ],
+      "gold": "A"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "The structural audit raises a red flag. Now you need to choose a metric to surface whether the model is memorizing or learning. Which do you use?",
+      "artifact": {
+        "type": "bars",
+        "title": "Training accuracy by model complexity",
+        "bars": [
+          {
+            "label": "2 features",
+            "value": 71
+          },
+          {
+            "label": "5 features",
+            "value": 84
+          },
+          {
+            "label": "15 features",
+            "value": 96
+          },
+          {
+            "label": "40 features (full)",
+            "value": 100,
+            "highlight": true
+          }
+        ],
+        "caption": "Training accuracy climbs steadily with complexity and hits 100% at 40 features. Is this the right lens?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Training accuracy across complexity levels",
+          "detail": "Plot training accuracy as features are added to the model.",
+          "flag": "weak",
+          "consequence": "Training accuracy rises monotonically to 100% — exactly what you'd expect whether the model is learning or memorizing. This metric is structurally blind to overfitting and cannot distinguish the two cases.",
+          "divergenceCost": "Chose a metric that always rewards adding features, making the diagnosis impossible from the start."
+        },
+        {
+          "id": "B",
+          "label": "Held-out test accuracy across complexity levels",
+          "detail": "Reserve 20% of the data before any modeling; plot test-set accuracy at each complexity level.",
+          "flag": "strong",
+          "consequence": "The held-out curve peaks early — around 5 features — and then collapses to near 50% at 40 features. The gap between training and test accuracy is the unmistakable fingerprint of memorization, not learning, and it cannot be argued away.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Test accuracy by model complexity (held-out set)",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "2 features",
+                "value": 68
+              },
+              {
+                "label": "5 features",
+                "value": 73,
+                "highlight": true
+              },
+              {
+                "label": "15 features",
+                "value": 59
+              },
+              {
+                "label": "40 features (full)",
+                "value": 51
+              }
+            ],
+            "caption": "Generalization peaks at 5 features and degrades to near-random at full complexity — confirming memorization, not biological signal."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Held-out accuracy collapses at high complexity. What do you tell the lead researcher before the presentation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The model is overfit and the biological signal doesn't exist — this dataset can't support any meaningful model.\"",
+          "detail": "Declare the underlying signal invalid and advise cancelling the research line.",
+          "flag": "weak",
+          "consequence": "The overfitting diagnosis is correct, but you've conflated 'this model failed' with 'no signal exists.' The 5-feature model showed a genuine, if modest, test accuracy lift. Writing off the research direction goes beyond what the evidence supports and may shut down a tractable path.",
+          "divergenceCost": "Treated a modeling failure as evidence that the underlying biology is uninformative — a logical leap the data doesn't support."
+        },
+        {
+          "id": "B",
+          "label": "\"The 100% training accuracy is a memorization artifact — but the 5-feature model shows a real, modest test-set lift. Let's present that as a promising early signal and recommend a targeted data-collection plan before any clinical use.\"",
+          "detail": "Report the finding, name the structural mechanism, and propose a confirmatory path.",
+          "flag": "strong",
+          "consequence": "You've separated the modeling failure from the question of whether a biological signal exists, given leadership an honest interim finding, and charted a concrete next step. The presentation becomes a credible candidate hypothesis rather than either a premature breakthrough or a dead end.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "A",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The 100% training accuracy was a structural inevitability, not a discovery: with 40 features and only 80 rows, the model had nearly one parameter per observation and could memorize any label assignment. The lead researcher's cross-validated AUC was a credible-sounding red herring — internal validation on the same toxic ratio still disguises memorization. The held-out test curve exposed the real picture: generalization peaked at 5 features and fell to near-random at full complexity. The lesson is that model validity must be diagnosed from data geometry first, and that even rigorous-sounding validation metrics can fail when the parameters-to-observations ratio is structurally broken."
+}

@@ -1391,3 +1391,10 @@ scarce skill (judgment) only. Named surface: "The Case Room".
     messages + suggestions; Airflow, dbt, SQL, ML, Power BI, analytics-for-
     accounting → allowed); `/api/dashboard/classify-topic` compiles and is
     auth-gated (401 unauth).
+- **Deployed to production (2026-07-05):** pushed `d955903` to `main` → Vercel
+  auto-deploy. Prod was 5 commits behind, so this release brought the **entire
+  Case Room** (engine + 30 cases + collapsible filter) and the `/code` Pyodide
+  playground live for the first time, alongside the strict topic domain gate.
+  Migration 023 already applied to prod Supabase; no new env vars (domain gate
+  reuses `ANTHROPIC_API_KEY`). Pre-flight: clean prod build, tsc/eslint/tests
+  green. Scratch files (`LEARNING_POINTS.md`, `case-analysis.html`) gitignored.

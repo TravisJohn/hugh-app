@@ -1,0 +1,156 @@
+{
+  "id": "shortcut-learning",
+  "title": "The Ruler Detector",
+  "scenario": {
+    "role": "ML Engineer",
+    "company": "DermaScan",
+    "situation": "A skin-lesion classifier achieves 94% AUC on the held-out test set but malignant-detection accuracy drops sharply when deployed to partner clinics.",
+    "stakeholderBelief": "The team believes the model learned genuine pathological features — asymmetry, irregular borders, color variation — and that the clinic drop is due to lower image quality or different patient demographics.",
+    "question": "Why does a high-AUC model fail in deployment, and what did it actually learn?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team wants to close the gap between lab and clinic. How do you frame the investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Audit clinic image quality",
+          "detail": "Compare resolution, lighting, and camera specs between training images and clinic images.",
+          "flag": "weak",
+          "consequence": "You find minor resolution differences, but equalizing them doesn't recover performance. Image quality wasn't the gap — you've spent time on a distraction and still have no explanation.",
+          "divergenceCost": "Anchored on the team's demographic/quality hypothesis and missed the actual signal in the training data."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic slice analysis — split performance by image metadata",
+          "detail": "Segment model performance by image-level metadata attributes (presence of artifacts, imaging context, collection site) to see where accuracy concentrates or collapses.",
+          "flag": "strong",
+          "consequence": "Slicing by metadata immediately surfaces a striking pattern: performance diverges sharply along an attribute that has nothing to do with lesion pathology. A real investigative thread opens that the quality hypothesis never would have found.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Collect more clinic data and retrain",
+          "detail": "Gather a larger sample from clinic deployments and fine-tune the model on it.",
+          "flag": "weak",
+          "consequence": "Performance recovers slightly on the new clinic set, but you've patched a symptom without diagnosing the cause. The shortcut may persist, and the next deployment site could fail again.",
+          "divergenceCost": "Treated the symptom instead of diagnosing the root cause — the model's learned representation is still unknown."
+        },
+        {
+          "id": "D",
+          "label": "Run a benchmark against published dermatology models",
+          "detail": "Compare DermaScan's model AUC to state-of-the-art models on a public dataset.",
+          "flag": "weak",
+          "consequence": "DermaScan's model competes well on the public benchmark — which shares the same data distribution problems. The comparison is flattering but tells you nothing about why it fails in clinics.",
+          "divergenceCost": "Benchmarked on data with the same bias, confirming nothing meaningful about generalization."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "Your metadata slice reveals that ruler presence varies systematically across classes. Which metric do you use to confirm it's driving predictions?",
+      "artifact": {
+        "type": "bars",
+        "title": "Malignant predictions by image attribute — raw counts",
+        "bars": [
+          {
+            "label": "No artifact present",
+            "value": 212
+          },
+          {
+            "label": "Hair / shadow artifact",
+            "value": 198
+          },
+          {
+            "label": "Ruler present",
+            "value": 541,
+            "highlight": false
+          },
+          {
+            "label": "Color calibration card",
+            "value": 187
+          }
+        ],
+        "caption": "Raw counts of malignant predictions per attribute group. Ruler images produce the most predictions — but ruler images are also far more common in the malignant training class. Is this risk or just volume?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Raw malignant-prediction counts by artifact group",
+          "detail": "Count how many malignant predictions fall in each artifact category.",
+          "flag": "weak",
+          "consequence": "Ruler images produce the most malignant predictions — but ruler images are disproportionately represented in the malignant class to begin with. You're reading class imbalance, not model behavior.",
+          "divergenceCost": "Compared raw prediction counts across unequal base rates — mistook class frequency for model bias."
+        },
+        {
+          "id": "B",
+          "label": "Malignant prediction rate within each artifact group (normalized)",
+          "detail": "Compute the fraction of images predicted malignant within each artifact group, controlling for true-label distribution.",
+          "flag": "strong",
+          "consequence": "Normalized, the signal is unmistakable: benign lesions photographed with a ruler are classified malignant at nearly the same rate as truly malignant lesions — while benign images without a ruler are classified correctly. The model is keying on the ruler, not the lesion.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Malignant prediction RATE by artifact group — benign images only (%)",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "No artifact",
+                "value": 6.1
+              },
+              {
+                "label": "Hair / shadow",
+                "value": 8.4
+              },
+              {
+                "label": "Color card",
+                "value": 7.9
+              },
+              {
+                "label": "Ruler present",
+                "value": 64.3,
+                "highlight": true
+              }
+            ],
+            "caption": "Among ground-truth benign images, ruler presence drives a 64% malignant prediction rate — nearly matching the true malignant base rate. The model learned ruler = malignant."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Ruler presence in benign images drives false-positive malignant predictions at 64%. What do you tell the team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The model learned rulers, not lesions — retrain without ruler images.\"",
+          "detail": "Make the causal call and prescribe the fix.",
+          "flag": "weak",
+          "consequence": "Removing ruler images may reduce this specific shortcut, but you've prescribed a fix based on one identified artifact without checking whether other spurious correlates exist. The model could still be exploiting unreported shortcuts in the cleaned data.",
+          "divergenceCost": "Overclaimed a complete causal explanation and prescribed a fix without ruling out other shortcuts."
+        },
+        {
+          "id": "B",
+          "label": "\"Ruler presence is the strongest spurious correlate we've found — this is consistent with shortcut learning, not pathology. Before retraining, we should apply attribution methods to verify what the model attends to, and test on a ruler-free holdout to confirm the shortcut is the dominant failure mode.\"",
+          "detail": "Report the finding, name the mechanism, and recommend a causal confirmation step before acting.",
+          "flag": "strong",
+          "consequence": "The team now understands the mechanism, not just the symptom. Gradient attribution maps confirm the model highlights ruler pixels, not lesion regions. The ruler-free holdout collapses AUC from 0.94 to 0.61, cementing the diagnosis. Retraining is now targeted and justified.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The classifier never learned dermatology — it learned that rulers appear in clinical photos taken of suspicious lesions, and exploited that artifact as a near-perfect proxy for malignancy. The lab test set had the same bias, so AUC looked excellent right up until deployment in ruler-free clinics. The lesson is that high held-out accuracy guarantees nothing about what a model actually learned; segmenting performance by image metadata and normalizing for base rates is what surfaces spurious shortcuts, and attribution methods plus distribution-shifted holdouts are the only way to confirm the fix."
+}

@@ -1,0 +1,159 @@
+{
+  "id": "backtest-window",
+  "title": "The Perfect Window",
+  "scenario": {
+    "role": "Quantitative Analyst",
+    "company": "Northgate Capital",
+    "situation": "A strategy shows outsized returns over a chosen 18-month backtest window.",
+    "stakeholderBelief": "The desk wants to deploy capital immediately, citing the strong backtest as proof the strategy works.",
+    "question": "Is the 18-month backtest sufficient evidence to deploy capital?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The desk is eager to deploy. How do you structure the investigation before signing off?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Verify the backtest calculations",
+          "detail": "Re-run the same 18-month window to confirm the numbers are correct.",
+          "flag": "weak",
+          "consequence": "The numbers check out — the backtest is arithmetically accurate. But you've only confirmed what the desk already showed you. You haven't learned whether the window is representative or cherry-picked.",
+          "divergenceCost": "Anchored entirely on the chosen window and confirmed the desk's framing instead of challenging it."
+        },
+        {
+          "id": "B",
+          "label": "Rolling-window and out-of-sample diagnostic",
+          "detail": "Run the strategy across ALL available historical windows and hold out a recent period untouched during development.",
+          "flag": "strong",
+          "consequence": "Expanding the frame immediately reveals that the 18-month window is an outlier — most rolling windows show near-zero or negative returns, and the out-of-sample period confirms the pattern doesn't persist.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Stress-test the chosen window",
+          "detail": "Apply scenario shocks (e.g., vol spikes) to the 18-month period to see how returns behave under stress.",
+          "flag": "weak",
+          "consequence": "Stress tests within the same window show the strategy is somewhat robust to simulated shocks — but you're still inside the charmed period. Window selection bias is invisible from inside the window.",
+          "divergenceCost": "Stress-tested inside the cherry-picked window, missing the selection bias entirely."
+        },
+        {
+          "id": "D",
+          "label": "Benchmark the Sharpe ratio against peers",
+          "detail": "Compare the strategy's Sharpe ratio over the 18-month window to industry benchmarks.",
+          "flag": "weak",
+          "consequence": "The Sharpe looks impressive versus benchmarks — but both the strategy and the benchmark are evaluated over the same hand-picked favorable period. Relative ranking doesn't expose absolute window bias.",
+          "divergenceCost": "Compared within the same biased window, letting the cherry-pick contaminate the benchmark comparison too."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You've run the strategy across multiple windows. Which metric do you trust to assess true performance?",
+      "artifact": {
+        "type": "bars",
+        "title": "Annualized return by selected favorable windows",
+        "bars": [
+          {
+            "label": "Window A (18-mo chosen)",
+            "value": 31.2,
+            "highlight": true
+          },
+          {
+            "label": "Window B (prior 18-mo)",
+            "value": 14.8
+          },
+          {
+            "label": "Window C (2-yr peak)",
+            "value": 22.4
+          },
+          {
+            "label": "Window D (3-yr rolling)",
+            "value": 18.1
+          }
+        ],
+        "caption": "Returns look strong when you pick windows that worked. Is this representative performance, or performance that was selected because it looked good?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Best-window annualized return",
+          "detail": "Report the annualized return from the strongest-performing backtest window.",
+          "flag": "weak",
+          "consequence": "The headline number looks compelling — but picking the best window is precisely the bias you're trying to detect. Reporting it gives the desk the number they want, not the number they need.",
+          "divergenceCost": "Selected the best-performing window as the evidence — maximizing the bias instead of diagnosing it."
+        },
+        {
+          "id": "B",
+          "label": "Return distribution across all rolling windows plus out-of-sample return",
+          "detail": "Summarize mean, median, and spread of returns across every rolling window, and separately report the out-of-sample holdout return.",
+          "flag": "strong",
+          "consequence": "The distribution exposes the truth: the 18-month window sits in the far right tail, the median rolling return is near zero, and the out-of-sample period shows negative performance. The strategy's edge evaporates outside the chosen window.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Annualized return across ALL rolling 18-month windows + out-of-sample",
+            "bars": [
+              {
+                "label": "Chosen window",
+                "value": 31.2
+              },
+              {
+                "label": "Rolling median (all windows)",
+                "value": 1.4
+              },
+              {
+                "label": "Rolling 25th pct",
+                "value": -6.8
+              },
+              {
+                "label": "Rolling 75th pct",
+                "value": 8.1
+              },
+              {
+                "label": "Out-of-sample holdout",
+                "value": -4.3,
+                "highlight": true
+              }
+            ],
+            "caption": "The chosen window is an outlier in the right tail. The out-of-sample period — never touched during development — confirms the strategy has no persistent edge."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Rolling windows show near-zero median returns and the out-of-sample period is negative. What do you tell the desk?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"This strategy doesn't work — kill it.\"",
+          "detail": "Declare the strategy without merit and recommend abandoning it.",
+          "flag": "weak",
+          "consequence": "Blunt and defensible — but you've made an overconfident negative call. It's possible the strategy has a real but narrow regime; you've foreclosed that inquiry and given the desk no path forward, reducing the chance they engage with the findings constructively.",
+          "divergenceCost": "Overclaimed a negative conclusion with the same certainty the desk overclaimed a positive one."
+        },
+        {
+          "id": "B",
+          "label": "\"The chosen window is a right-tail outlier; rolling and out-of-sample results show no persistent edge — we need regime-conditioned testing and a live paper-trade period before committing capital.\"",
+          "detail": "Present the distributional finding, flag the window selection problem, and propose a structured path to genuine validation.",
+          "flag": "strong",
+          "consequence": "The desk sees the full distribution, understands why the 18-month number is misleading, and has a concrete next step. You've protected the firm from premature deployment while keeping the door open if the strategy survives rigorous testing.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The strategy's impressive backtest was an artifact of window selection — the 18-month period happened to capture a favorable regime, and the researcher implicitly searched for it. The real signal emerged only when returns were measured across every rolling window and an untouched out-of-sample holdout: median performance was near zero, and out-of-sample was negative. The lesson is researcher degrees of freedom: the more a window can be chosen after observing results, the less the backtest means — and the only credible evidence is performance on data that was never seen during development."
+}

@@ -1,0 +1,156 @@
+{
+  "id": "batch-idempotency",
+  "title": "The Double-Counted Day",
+  "scenario": {
+    "role": "Data Engineer",
+    "company": "Tallyhub",
+    "situation": "A retried batch job appended a day's rows twice, inflating downstream metrics by roughly 2×. The incident was caught by an analyst who noticed a one-day spike in the events table.",
+    "stakeholderBelief": "The engineering team wants to bolt on a nightly dedup cleanup job to catch and remove duplicates before they reach dashboards.",
+    "question": "Is a dedup cleanup job the right fix, or is there a more fundamental problem to solve?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team is ready to build the dedup job. How do you frame your investigation before any code is written?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Spec out the dedup cleanup job",
+          "detail": "Start designing the nightly dedup logic — define the dedup key, scheduling cadence, and alerting.",
+          "flag": "weak",
+          "consequence": "You're designing a solution before understanding the failure mode. If the root cause is how the job writes data, dedup is treating the symptom and the bug can recur in other jobs or pipelines you haven't thought of yet.",
+          "divergenceCost": "Anchored on the team's proposed solution instead of diagnosing the failure mode first."
+        },
+        {
+          "id": "B",
+          "label": "Diagnose the write behavior of the batch job",
+          "detail": "Examine how the batch job writes to the target table — specifically whether it appends, overwrites, or merges — and trace what happens on a retry.",
+          "flag": "strong",
+          "consequence": "You discover the job uses a bare INSERT/append with no partition overwrite or MERGE guard. Any retry replays the full dataset into the same partition. The dedup proposal would clean up after every retry indefinitely, masking an architectural flaw in every batch job built the same way.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Audit the alerting pipeline",
+          "detail": "Focus on why nobody caught the spike in real time — review monitoring thresholds and on-call coverage.",
+          "flag": "weak",
+          "consequence": "Better alerting would have shortened detection time, but the data is already wrong by then. This frames the problem as a detection gap rather than a prevention gap.",
+          "divergenceCost": "Optimized for faster detection of corruption rather than preventing corruption entirely."
+        },
+        {
+          "id": "D",
+          "label": "Survey all downstream consumers to scope impact",
+          "detail": "Enumerate every dashboard and model that read from the events table during the incident window.",
+          "flag": "weak",
+          "consequence": "Knowing the blast radius is useful for incident comms, but it tells you nothing about the root cause. You've mapped damage without finding what broke the wall.",
+          "divergenceCost": "Focused on impact scoping rather than identifying the failure mode that caused it."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You pull the write-pattern history for all active batch jobs. Which view of the data best exposes the real risk?",
+      "artifact": {
+        "type": "bars",
+        "title": "Batch jobs with at least one retry in the last 30 days — raw retry count",
+        "bars": [
+          {
+            "label": "events_daily",
+            "value": 4
+          },
+          {
+            "label": "sessions_rollup",
+            "value": 2
+          },
+          {
+            "label": "revenue_summary",
+            "value": 1
+          },
+          {
+            "label": "user_properties",
+            "value": 6
+          }
+        ],
+        "caption": "Raw retry counts per job. Higher retries look riskier — but does retry frequency actually tell you which jobs corrupt data when retried?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Retry frequency per job",
+          "detail": "Rank jobs by how often they retried in the last 30 days.",
+          "flag": "weak",
+          "consequence": "user_properties retried the most, so it looks like the biggest risk — but if its write mode is idempotent, those retries are completely safe. Retry count measures operational noise, not data-integrity risk.",
+          "divergenceCost": "Conflated operational instability with data-corruption risk — a job can retry safely if its write is idempotent."
+        },
+        {
+          "id": "B",
+          "label": "Retry count cross-referenced with write mode (append vs. idempotent)",
+          "detail": "For each job, check the write mode (bare append, partition overwrite, or MERGE) and multiply exposure by retry frequency.",
+          "flag": "strong",
+          "consequence": "Normalized by write mode, the picture flips: events_daily and sessions_rollup both use bare appends and retried multiple times — each retry silently doubled a partition. user_properties retried most but uses a keyed MERGE, so its data is clean. The real risk surface is write mode, not retry count.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Corruption exposure score = retries × (1 if append, 0 if idempotent write)",
+            "bars": [
+              {
+                "label": "events_daily (append)",
+                "value": 4,
+                "highlight": true
+              },
+              {
+                "label": "sessions_rollup (append)",
+                "value": 2,
+                "highlight": true
+              },
+              {
+                "label": "revenue_summary (append)",
+                "value": 1,
+                "highlight": true
+              },
+              {
+                "label": "user_properties (MERGE)",
+                "value": 0
+              }
+            ],
+            "caption": "Jobs using bare appends carry full retry-exposure risk; idempotent jobs score zero regardless of retry count. The write mode is the decisive variable."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The evidence shows append-mode jobs are the corruption surface, not retry frequency. What do you recommend to the team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"Dedup is the wrong fix — rewrite all batch jobs to use partition overwrites immediately.\"",
+          "detail": "Make the causal call and prescribe the migration.",
+          "flag": "weak",
+          "consequence": "The diagnosis is sound, but mandating an immediate rewrite of all jobs without a phased plan or validation step is an overclaim on scope and risk. Some jobs may have dependencies or constraints that make a direct overwrite unsafe without testing.",
+          "divergenceCost": "Overclaimed the remediation path without accounting for migration risk or phased validation."
+        },
+        {
+          "id": "B",
+          "label": "\"Dedup treats the symptom; the real correlate is append-mode writes — let's pilot partition overwrite or MERGE on one job and validate before rolling out broadly.\"",
+          "detail": "Reframe the team's assumption with evidence and recommend a verified path forward.",
+          "flag": "strong",
+          "consequence": "You've shifted the team's mental model from 'clean up after bad writes' to 'make writes safe to retry.' Recommending a pilot preserves caution: if the overwrite pattern causes an unexpected issue in one job, you find it before it affects all pipelines. This is the finding + appropriate caution + path to certainty.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The double-count wasn't a data-quality gap to patch downstream — it was an architectural guarantee missing at the write layer. Any batch job that appends rather than overwrites or merges will corrupt a partition on every retry, silently and indefinitely. A dedup job would have run forever as a tax on a fixable design flaw. The real lesson is that idempotency must be baked into the write operation itself: partition overwrite or MERGE on a natural key ensures retries are safe by construction, making the entire class of corruption impossible rather than merely detectable."
+}

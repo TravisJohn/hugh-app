@@ -1,0 +1,167 @@
+{
+  "id": "referral-channel-selection",
+  "title": "The Golden Channel",
+  "scenario": {
+    "role": "Growth Analyst",
+    "company": "Flowspace",
+    "situation": "Customers acquired through the referral channel show by far the highest LTV across all acquisition channels.",
+    "stakeholderBelief": "The CMO wants to pour budget into scaling the referral program — if referrals produce the best customers, we should get more of them.",
+    "question": "Is the referral channel actually producing high-LTV customers, or is something else going on?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The CMO wants a plan to scale referrals. How do you frame your investigation before recommending anything?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Benchmark referral LTV against other channels",
+          "detail": "Pull average LTV by acquisition channel and rank them to confirm referrals are on top.",
+          "flag": "weak",
+          "consequence": "Referrals do top the chart — and you've confirmed what everyone already believed. But you haven't asked why, or whether the customers arriving through referrals were already predisposed to high value before they ever heard of Flowspace.",
+          "divergenceCost": "Confirmed the CMO's hypothesis without questioning its premise."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic segmentation of who is being referred",
+          "detail": "Ask whether the referral population is comparable to cold-channel audiences, or whether it's pre-selected in ways that would predict high LTV regardless of channel.",
+          "flag": "strong",
+          "consequence": "You immediately surface that referrals come almost exclusively from Flowspace's happiest existing customers (high NPS), who tend to refer people in similar professional roles and industries. The population is warm and pre-filtered — a fact that channel comparison alone would never reveal.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Project ROI of doubling the referral budget",
+          "detail": "Model what LTV would look like if referral volume doubled with current incentive spend.",
+          "flag": "weak",
+          "consequence": "You produce a compelling ROI model — but it assumes the next wave of referrals will look like the current wave. If the current wave is special because of who referred them, the model is extrapolating fiction.",
+          "divergenceCost": "Jumped to sizing a solution before understanding whether the signal is real or manufactured by selection."
+        },
+        {
+          "id": "D",
+          "label": "Survey high-LTV referral customers",
+          "detail": "Ask referred customers what made them convert and stay.",
+          "flag": "weak",
+          "consequence": "You gather qualitative color — most say they trusted the friend who referred them. Useful, but it still doesn't tell you whether cold-scaled referrals (from less-enthusiastic referrers, to less-warm prospects) would behave the same way.",
+          "divergenceCost": "Collected anecdotal evidence that reinforces the narrative without testing its generalizability."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "Segmentation shows referrals come from high-NPS customers. Which metric cut do you use to test whether the channel itself drives LTV, or whether the audience does?",
+      "artifact": {
+        "type": "bars",
+        "title": "Average LTV by acquisition channel",
+        "bars": [
+          {
+            "label": "Referral",
+            "value": 4800,
+            "highlight": true
+          },
+          {
+            "label": "Paid Search",
+            "value": 2100
+          },
+          {
+            "label": "Paid Social",
+            "value": 1900
+          },
+          {
+            "label": "Organic / SEO",
+            "value": 2400
+          },
+          {
+            "label": "Events",
+            "value": 2600
+          }
+        ],
+        "caption": "Raw average LTV per acquired customer by channel. Referral leads by a wide margin — but all referral customers came from warm, high-NPS advocates."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Average LTV by channel (unadjusted)",
+          "detail": "Use the headline LTV-per-channel number to make the case.",
+          "flag": "weak",
+          "consequence": "Referral LTV is highest, full stop. But you are comparing a pre-screened warm audience against cold audiences. The channel difference you're seeing is really an audience difference — and that gap won't survive cold scaling.",
+          "divergenceCost": "Compared incomparable populations and mistook audience quality for channel quality."
+        },
+        {
+          "id": "B",
+          "label": "LTV by channel, split by referrer NPS tier",
+          "detail": "Separate referrals made by high-NPS advocates from those made by average-NPS customers, and compare both to cold-channel customers with similar firmographic profiles.",
+          "flag": "strong",
+          "consequence": "The signal dissolves under the split: referrals from average-NPS customers land at LTV levels nearly identical to comparable cold-channel customers. Only referrals from high-NPS advocates retain the premium. The channel isn't special — the referrer pool is.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "LTV by channel and referrer NPS tier (firmographic-matched)",
+            "bars": [
+              {
+                "label": "Referral — High NPS referrer",
+                "value": 4750,
+                "highlight": true
+              },
+              {
+                "label": "Referral — Mid/Low NPS referrer",
+                "value": 2350
+              },
+              {
+                "label": "Paid Search (matched)",
+                "value": 2150
+              },
+              {
+                "label": "Paid Social (matched)",
+                "value": 1950
+              },
+              {
+                "label": "Organic / SEO (matched)",
+                "value": 2400
+              },
+              {
+                "label": "Events (matched)",
+                "value": 2550
+              }
+            ],
+            "caption": "Once referrals are split by referrer NPS, only high-NPS-sourced referrals carry the LTV premium. Mid/low-NPS referrals are indistinguishable from cold channels — exposing the selection effect."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The NPS-split shows the LTV premium lives in high-NPS-referrer cohorts, not in the referral mechanic itself. What do you tell the CMO?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"Referrals don't work — the LTV is a mirage. Reallocate budget to organic.\"",
+          "detail": "Make the causal call and redirect spend.",
+          "flag": "weak",
+          "consequence": "You've overcorrected. High-NPS referrals are still real and valuable — the insight is about scalability and selection, not that the program is worthless. Killing it would sacrifice a genuine source of good customers while missing the real question: can you grow the high-NPS referrer base itself?",
+          "divergenceCost": "Overcorrected from one causal claim into another without a tested path forward."
+        },
+        {
+          "id": "B",
+          "label": "\"The LTV premium lives in who's referring, not the channel itself — scaling cold referrals likely won't replicate it. Let's pilot a cold-referral cohort before committing budget.\"",
+          "detail": "Name the selection effect, preserve the nuance, and recommend a controlled test.",
+          "flag": "strong",
+          "consequence": "You've reframed the CMO's assumption with specific evidence: the referral mechanic selects for good customers, it doesn't manufacture them. You've flagged that cold-scaling will dilute the referrer pool and likely regress LTV — and you've proposed a pilot to confirm before the budget moves.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "Referrals showed the highest LTV not because the channel is inherently powerful, but because it was gated to a pre-selected warm population — friends of Flowspace's happiest customers. Once referrals from average-NPS sources are isolated and matched to comparable cold-channel audiences, the LTV premium vanishes. The channel was filtering for good customers, not creating them. The lesson is selection bias in channel analysis: whenever a channel has a structural filter on who enters it, raw performance metrics measure the filter, not the channel — and you must control for audience comparability before you scale."
+}

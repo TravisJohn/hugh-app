@@ -1,0 +1,155 @@
+{
+  "id": "proxy-metric-drift",
+  "title": "The Proxy Metric",
+  "scenario": {
+    "role": "Product Analyst",
+    "company": "Scrollhouse",
+    "situation": "After a homepage redesign, average time-on-site rose 22% — but paid subscriptions fell 8% over the same four weeks.",
+    "stakeholderBelief": "The product team reads the time-on-site lift as proof the redesign is working and wants to double down on the new layout.",
+    "question": "Is rising time-on-site a genuine signal of value, or is something else going on?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The product team is celebrating the time-on-site lift. How do you frame your investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Validate the time-on-site increase",
+          "detail": "Confirm the 22% lift is real and statistically significant across user cohorts.",
+          "flag": "weak",
+          "consequence": "You confirm the lift is real — but you've only answered whether the proxy moved, not whether it means what the team thinks it means. The subscription drop remains unexplained.",
+          "divergenceCost": "Anchored on validating the team's metric instead of questioning whether it reflects the real goal."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic check: does the proxy still track the goal?",
+          "detail": "Ask whether time-on-site and subscriptions are moving together or apart, then segment behavior to find where they diverge.",
+          "flag": "strong",
+          "consequence": "You immediately surface a divergence: the proxy and the real outcome are pointing in opposite directions. Segmenting session behavior reveals that the extra time is concentrated in navigation and search — not content consumption — suggesting friction, not value.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "A/B re-test the redesign",
+          "detail": "Run a fresh A/B test pitting the old layout against the new one.",
+          "flag": "weak",
+          "consequence": "You'll get clean data eventually, but the test takes weeks and the team is already shipping follow-on changes. You've also sidestepped understanding why subscriptions fell in the first place.",
+          "divergenceCost": "Jumped to experimentation before diagnosing — slow and skips the root-cause question."
+        },
+        {
+          "id": "D",
+          "label": "Attribute the subscription drop to seasonality",
+          "detail": "Check whether subscription numbers always dip in this calendar period.",
+          "flag": "weak",
+          "consequence": "Historical data shows no consistent seasonal dip in this window, so you've spent time ruling out a factor that wasn't the culprit — and the team's confidence in the redesign is unshaken.",
+          "divergenceCost": "Chased an alternative explanation without first testing whether the proxy itself had drifted."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You decide to segment session behavior to understand where the extra time is going. Which metric do you trust to confirm the real story?",
+      "artifact": {
+        "type": "bars",
+        "title": "Average time-on-site by activity type — post-redesign vs. pre-redesign (seconds)",
+        "bars": [
+          {
+            "label": "Content reading",
+            "value": 142
+          },
+          {
+            "label": "Video watching",
+            "value": 98
+          },
+          {
+            "label": "Navigation / menu browsing",
+            "value": 201
+          },
+          {
+            "label": "Search & filter use",
+            "value": 187
+          }
+        ],
+        "caption": "Raw average seconds per session in each activity type after the redesign. The biggest bars look like deep engagement — but are they?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Raw average time per activity type",
+          "detail": "Compare how many seconds users spend in each activity category after the redesign.",
+          "flag": "weak",
+          "consequence": "Navigation and search look like engagement hotspots — but raw time doesn't tell you whether users chose to be there or got stuck. You might recommend leaning into navigation features that are actually friction points.",
+          "divergenceCost": "Treated all time as equal engagement — couldn't distinguish value-seeking from floundering."
+        },
+        {
+          "id": "B",
+          "label": "Subscription conversion rate by dominant session activity",
+          "detail": "For each activity type, calculate the % of sessions dominated by that activity that ended in a subscription.",
+          "flag": "strong",
+          "consequence": "The picture flips: sessions dominated by content reading convert at 14%, but sessions dominated by navigation or search convert at under 2%. The redesign is routing users into high-time, low-value loops — the proxy has fully decoupled from the goal.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Subscription conversion rate by dominant session activity (%)",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "Content reading",
+                "value": 14.1,
+                "highlight": true
+              },
+              {
+                "label": "Video watching",
+                "value": 11.6
+              },
+              {
+                "label": "Navigation / menu browsing",
+                "value": 1.8
+              },
+              {
+                "label": "Search & filter use",
+                "value": 2.3
+              }
+            ],
+            "caption": "Sessions where users spent most time navigating or searching barely convert. The redesign inflated time in the two lowest-converting activity types."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Sessions heavy in navigation and search convert at under 2%, while content-reading sessions convert at 14%. What do you tell the product team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The redesign broke discovery — revert it immediately.\"",
+          "detail": "Make the causal call and recommend a rollback.",
+          "flag": "weak",
+          "consequence": "You sound decisive, but you've made a causal claim from observational data. Users who navigate a lot may differ from content readers in ways unrelated to the redesign. If the team reverts without a controlled test, they may fix nothing — and lose the goodwill of the design org.",
+          "divergenceCost": "Overclaimed causation and recommended action without a causal test."
+        },
+        {
+          "id": "B",
+          "label": "\"Time-on-site is no longer tracking subscriptions — the extra time is correlating with low-conversion behavior. We should treat time-on-site as a flawed proxy going forward and run a holdout or A/B against the old layout before any further rollout.\"",
+          "detail": "Report the proxy divergence, flag the causal gap, and recommend a controlled test.",
+          "flag": "strong",
+          "consequence": "You've reframed the team's success metric with evidence, named the proxy drift explicitly, and given them a concrete next step that doesn't require overclaiming. The team can act — and they understand what they're testing for.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The redesign inflated time-on-site by making users hunt through menus and search filters — high-time, low-value behavior that looks like engagement but predicts churn. The lesson is not that time-on-site is always a bad metric, but that proxy metrics require periodic validation against the real goal they stand in for; when the two diverge, the proxy has stopped working. A sound analyst asks 'does this proxy still track the outcome?' before celebrating the proxy's rise."
+}

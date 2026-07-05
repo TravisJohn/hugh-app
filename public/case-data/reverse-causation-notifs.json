@@ -1,0 +1,156 @@
+{
+  "id": "reverse-causation-notifs",
+  "title": "The Notification Effect",
+  "scenario": {
+    "role": "Product Analyst",
+    "company": "Dailyloop",
+    "situation": "An internal dashboard shows users who have notifications enabled retain at 2.4× the rate of users who don't.",
+    "stakeholderBelief": "The PM wants to auto-enable notifications for all new users, convinced the feature itself is driving the retention lift.",
+    "question": "Does enabling notifications cause better retention, or is something else going on?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The PM is ready to ship auto-enable to 100% of new users. How do you frame the investigation before that decision?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Measure retention lift after notification delivery",
+          "detail": "Track whether users who receive a notification in week 1 are still active in week 4.",
+          "flag": "weak",
+          "consequence": "You confirm that users who receive notifications are more retained — but this only holds for users who were already engaged enough to trigger a notification event. You've measured engagement predicting engagement.",
+          "divergenceCost": "Anchored on the PM's hypothesis and selected on an endogenous condition."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic segmentation by engagement level at opt-in time",
+          "detail": "Segment users by their activity level at the moment they enabled (or never enabled) notifications, then compare retention within each activity tier.",
+          "flag": "strong",
+          "consequence": "Slicing by pre-opt-in engagement reveals that notification-enablers were already highly active before they ever turned the feature on. The retention gap largely disappears within matched activity tiers — the arrow may be running the other way.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "A/B test notification copy and cadence",
+          "detail": "Experiment with different notification messages to see which drives the most click-throughs.",
+          "flag": "weak",
+          "consequence": "You learn which copy performs best among users who opted in — but this never tests whether forcing opt-in on disengaged users improves their retention at all.",
+          "divergenceCost": "Optimized the treatment before validating that the treatment works on the target population."
+        },
+        {
+          "id": "D",
+          "label": "Build a retention prediction model using notification status as a feature",
+          "detail": "Include notification-enabled as an input variable and report its coefficient as the effect.",
+          "flag": "weak",
+          "consequence": "The model confirms notification status is a strong predictor — because it is, as a proxy for engagement. Feature importance in an observational model cannot distinguish cause from correlation.",
+          "divergenceCost": "Mistook predictive signal in an observational model for a causal lever."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You've segmented by pre-opt-in activity. Which metric do you use to judge whether notifications themselves drive retention?",
+      "artifact": {
+        "type": "bars",
+        "title": "30-day retention by notification status — all new users",
+        "bars": [
+          {
+            "label": "Notifs enabled",
+            "value": 61
+          },
+          {
+            "label": "Notifs disabled",
+            "value": 25
+          }
+        ],
+        "caption": "Raw retention rates look dramatic — but enabled and disabled users differ in activity level before the opt-in decision was ever made."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Overall 30-day retention rate split by notification status",
+          "detail": "Compare the aggregate retention of enabled vs. disabled users.",
+          "flag": "weak",
+          "consequence": "The 2.4× gap looks convincing, but enabled users were far more active before opt-in. You're comparing two fundamentally different populations and attributing the gap to the feature.",
+          "divergenceCost": "Compared unadjusted groups that differ on the very thing driving the outcome."
+        },
+        {
+          "id": "B",
+          "label": "30-day retention rate by notification status, within matched pre-opt-in activity tiers",
+          "detail": "Hold prior engagement constant — compare enabled vs. disabled users who had the same activity level in their first 48 hours.",
+          "flag": "strong",
+          "consequence": "Within each activity tier the retention gap shrinks dramatically. High-activity users retain well regardless of notification status; low-activity users retain poorly regardless. The feature explains almost none of the gap once prior engagement is controlled.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "30-day retention by notification status, within activity tier",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "High activity — notifs on",
+                "value": 68
+              },
+              {
+                "label": "High activity — notifs off",
+                "value": 63
+              },
+              {
+                "label": "Mid activity — notifs on",
+                "value": 38
+              },
+              {
+                "label": "Mid activity — notifs off",
+                "value": 34
+              },
+              {
+                "label": "Low activity — notifs on",
+                "value": 14,
+                "highlight": true
+              },
+              {
+                "label": "Low activity — notifs off",
+                "value": 11,
+                "highlight": true
+              }
+            ],
+            "caption": "Within matched tiers the gap collapses to 3–5 points. Low-activity users — the auto-enable target — show almost no lift, and that small gap may still reflect residual selection."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Within activity-matched tiers, the notification retention gap nearly disappears. What do you tell the PM?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"Notifications don't drive retention — it's reverse causation. Don't ship auto-enable.\"",
+          "detail": "Make the causal call and recommend killing the project.",
+          "flag": "weak",
+          "consequence": "You've made a confident causal claim from observational data. Matching controls for observed activity, but unmeasured factors could still confound the result. Killing the project without a randomized test leaves real value potentially on the table.",
+          "divergenceCost": "Overclaimed causation from an observational analysis, even if the direction of reasoning improved."
+        },
+        {
+          "id": "B",
+          "label": "\"Engagement predicts opt-in, not the other way around — the raw gap is likely reverse causation. Run a randomized opt-in nudge experiment on low-activity users to measure the true effect before shipping to everyone.\"",
+          "detail": "Present the finding, name the causal risk, and propose a randomized test to settle the direction.",
+          "flag": "strong",
+          "consequence": "You've reframed the PM's assumption with matched evidence, named the reverse-causation risk explicitly, and handed them a concrete next step — a randomized nudge experiment — that will produce a defensible causal answer before a costly rollout.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The 2.4× retention gap was real but the causal arrow was backwards: already-engaged users self-select into enabling notifications, so notification status was a symptom of engagement, not its cause. Matching on pre-opt-in activity collapsed the gap to near zero for the very users the PM wanted to target. The lesson is reverse causation — when a behavior correlates with an outcome, ask whether the outcome is actually selecting for the behavior — and the only clean resolution is a randomized experiment that forces the variation independently of the underlying engagement."
+}

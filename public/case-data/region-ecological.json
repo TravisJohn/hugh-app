@@ -1,0 +1,156 @@
+{
+  "id": "region-ecological",
+  "title": "The Region Signal",
+  "scenario": {
+    "role": "Marketing Analyst",
+    "company": "Brightreach",
+    "situation": "Regional ad budgets are set based on a strong positive correlation between regional ad spend and regional sales. Leadership believes more spending drives more sales.",
+    "stakeholderBelief": "The team assumes individuals exposed to more ads buy more — and that the regional pattern proves it.",
+    "question": "Is the regional ad-spend-to-sales link actually evidence that ads move individual purchase behavior?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "Leadership wants to double down on high-spend regions. How do you frame the investigation before endorsing that plan?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Trend analysis on regional spend vs. sales",
+          "detail": "Pull regional ad spend and sales over time and confirm the correlation holds historically.",
+          "flag": "weak",
+          "consequence": "The correlation does hold — regions with more spend have higher sales quarter after quarter. But you've only confirmed the aggregate pattern that everyone already believed. You still have no idea whether it's the ads or something else about those regions.",
+          "divergenceCost": "Re-confirmed the aggregate correlation without questioning what's behind it."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic segmentation at the individual level",
+          "detail": "Cross-reference ad-exposure data with individual purchase records to see whether people exposed to more ads actually buy more than matched peers in the same region.",
+          "flag": "strong",
+          "consequence": "Shifting to the individual level immediately exposes a mismatch: the regional pattern doesn't hold within regions. High-spend regions are also wealthier and more populous — the correlation may be describing those regions, not the ads' effect on people.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Increase spend in a low-performing region as a test",
+          "detail": "Boost ad spend in one lagging region and watch whether sales follow.",
+          "flag": "weak",
+          "consequence": "You've run a single-region test with no control, during a quarter with seasonal noise. Any sales change is uninterpretable — and you've committed budget before understanding the underlying mechanism.",
+          "divergenceCost": "Ran an uncontrolled field test before diagnosing the real driver."
+        },
+        {
+          "id": "D",
+          "label": "Build a regional spend-optimization model",
+          "detail": "Use past regional data to model optimal budget allocation across regions.",
+          "flag": "weak",
+          "consequence": "The model looks clean and recommends concentrating spend in already-wealthy, already-high-sales regions. You've formalized the confounded relationship into a prescription, making the ecological fallacy harder to see.",
+          "divergenceCost": "Encoded a confounded aggregate correlation into a model before validating individual-level effects."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You have both regional and individual-level data. Which metric do you use to evaluate whether ad exposure actually drives purchases?",
+      "artifact": {
+        "type": "bars",
+        "title": "Average sales per region vs. average ad impressions per region",
+        "bars": [
+          {
+            "label": "Region A (low spend)",
+            "value": 112
+          },
+          {
+            "label": "Region B (mid spend)",
+            "value": 198
+          },
+          {
+            "label": "Region C (high spend)",
+            "value": 334,
+            "highlight": true
+          },
+          {
+            "label": "Region D (highest spend)",
+            "value": 401
+          }
+        ],
+        "caption": "Regional averages look compelling — more spend, more sales. But each region differs in population size and median household income. Is this ads or demographics?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Average regional sales vs. average regional ad spend",
+          "detail": "Compare mean sales to mean ad spend across the four regions.",
+          "flag": "weak",
+          "consequence": "The bars climb neatly with spend and look convincing. But Region D is also the wealthiest and most populated. You cannot tell whether ads are working or whether you're just measuring where rich people live.",
+          "divergenceCost": "Relied on aggregate regional averages that conflate ad effects with population and wealth."
+        },
+        {
+          "id": "B",
+          "label": "Individual purchase rate by ad-exposure tier, controlling for region",
+          "detail": "Within each region, compare purchase rates of low-exposure vs. high-exposure individuals, holding region constant to strip out the regional confounders.",
+          "flag": "strong",
+          "consequence": "Within regions, purchase rates are nearly flat across ad-exposure tiers. The individual-level signal almost vanishes once you hold region constant — confirming the aggregate pattern was driven by regional characteristics, not by the ads themselves.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Purchase rate by individual ad-exposure tier (within-region, all regions pooled)",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "0–2 impressions",
+                "value": 8.1
+              },
+              {
+                "label": "3–6 impressions",
+                "value": 8.6
+              },
+              {
+                "label": "7–12 impressions",
+                "value": 9
+              },
+              {
+                "label": "13+ impressions",
+                "value": 9.3,
+                "highlight": true
+              }
+            ],
+            "caption": "Within the same region, moving from no exposure to heavy exposure shifts purchase rate by barely 1 percentage point — the massive regional gap was demographics, not ad impact."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Individual-level purchase rates are nearly flat across ad-exposure tiers within regions. What do you tell the team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"Ads don't work — regional spend is wasted. Cut the budget.\"",
+          "detail": "Make the causal call that ads have no individual-level effect.",
+          "flag": "weak",
+          "consequence": "You've swung from one overclaim to another. The individual correlation is weak, but a correlation of near-zero doesn't prove ads have zero causal effect — there could be brand-building effects, awareness lag, or the within-region analysis still has unmeasured confounders. Recommending a budget cut on this alone is premature.",
+          "divergenceCost": "Overclaimed in the opposite direction — treated a weak correlation as proof of zero causal effect."
+        },
+        {
+          "id": "B",
+          "label": "\"The regional pattern appears to reflect population and wealth, not ad impact — individual exposure barely moves purchase. We should run a randomized geo holdout before reallocating budget.\"",
+          "detail": "Report the finding, name the fallacy, and recommend a causal test.",
+          "flag": "strong",
+          "consequence": "You've reframed the team's core assumption with evidence, named the aggregation problem clearly, and proposed a path — a randomized holdout experiment — that can actually establish individual-level causation. Leadership now has a finding, a risk, and an actionable next step.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "Regions with more ad spend had higher sales — but those regions were also wealthier and more populated. Once individual-level data was examined within regions, ad exposure barely moved purchase rates. The aggregate correlation was describing regional demographics, not ad effectiveness. This is the ecological fallacy: a pattern that holds at the group level need not hold at the individual level, and building strategy on it can misallocate substantial budget."
+}

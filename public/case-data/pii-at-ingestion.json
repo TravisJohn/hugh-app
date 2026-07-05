@@ -1,0 +1,156 @@
+{
+  "id": "pii-at-ingestion",
+  "title": "The Leaky Pipeline",
+  "scenario": {
+    "role": "Data Engineer",
+    "company": "Careledger",
+    "situation": "An internal audit flagged that analysts have direct access to raw PII — names, SSNs, and diagnosis codes — sitting unmasked in the data warehouse. Leadership wants an urgent fix before the next compliance review.",
+    "stakeholderBelief": "The team is convinced the solution is to lock down the BI dashboards so only approved roles can view sensitive reports.",
+    "question": "Is dashboard access restriction enough to close the PII exposure risk?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "Leadership wants a fix fast. How do you frame your investigation before recommending a control?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Audit current dashboard permissions",
+          "detail": "Pull the list of who has access to which dashboards and tighten role assignments.",
+          "flag": "weak",
+          "consequence": "You produce a cleaner permission matrix for dashboards — but the raw tables in the warehouse are untouched. Any analyst, ETL job, or rogue query can still SELECT * from the PII columns directly. The audit finding isn't resolved.",
+          "divergenceCost": "Anchored on the team's assumption and audited the last mile instead of the exposure surface."
+        },
+        {
+          "id": "B",
+          "label": "Trace PII across the full data lifecycle",
+          "detail": "Map every stage where PII travels — source system, ingestion pipeline, raw layer, transformed layer, serving layer — and mark where it is masked vs. unmasked.",
+          "flag": "strong",
+          "consequence": "The lifecycle map shows PII arrives unmasked at ingestion and persists in raw and transformed tables. Dashboard locks would only block one exit point while dozens of others remain open. The real control point becomes unmistakable.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Survey analysts on how they use PII",
+          "detail": "Ask the analyst team whether they actually need to see raw PII in their day-to-day work.",
+          "flag": "weak",
+          "consequence": "You learn that most analysts say they don't need raw SSNs — useful context, but it doesn't tell you where PII is exposed today or how to close the gap technically. The compliance clock is still ticking.",
+          "divergenceCost": "Chose a slow, self-reported instrument when the exposure was already visible in the pipeline metadata."
+        },
+        {
+          "id": "D",
+          "label": "Implement column-level security on warehouse tables immediately",
+          "detail": "Jump straight to applying column-level access policies on the known PII columns in the warehouse.",
+          "flag": "weak",
+          "consequence": "You block some direct reads — but because you skipped the lifecycle audit, you miss three downstream copies of the same PII in staging and backup tables. You've applied a partial fix that creates false confidence.",
+          "divergenceCost": "Jumped to implementation before mapping all exposure points — premature remediation."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "The lifecycle map is done. Which view of the data best exposes where the real PII risk lives?",
+      "artifact": {
+        "type": "bars",
+        "title": "PII exposure incidents by control layer — last 90 days",
+        "bars": [
+          {
+            "label": "Dashboard views",
+            "value": 14
+          },
+          {
+            "label": "Scheduled reports",
+            "value": 9
+          },
+          {
+            "label": "Direct warehouse queries",
+            "value": 61,
+            "highlight": false
+          },
+          {
+            "label": "Data exports / downloads",
+            "value": 22
+          }
+        ],
+        "caption": "Raw incident counts by layer. Dashboard views look manageable — but does count alone tell you where control is weakest?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Raw PII incident counts by control layer",
+          "detail": "Count the number of PII exposure incidents logged at each layer over the last 90 days.",
+          "flag": "weak",
+          "consequence": "Dashboard incidents look low (14) compared to direct warehouse queries (61) — but dashboards serve hundreds of users while direct queries are run by a handful of engineers. You're reading volume, not normalized risk per access pathway.",
+          "divergenceCost": "Compared raw counts across pathways with very different user populations — a classic confound."
+        },
+        {
+          "id": "B",
+          "label": "PII exposure rate per access pathway (normalized by users on that pathway)",
+          "detail": "Divide incidents by the number of users or sessions on each pathway to get a per-capita exposure rate.",
+          "flag": "strong",
+          "consequence": "Normalized, the ingestion/raw-layer pathway has an exposure rate of 94% — nearly every session touches unmasked PII — dwarfing every downstream layer. Masking at ingestion would eliminate the root source; dashboard locks address only 6% of the risk surface.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "PII exposure RATE by control layer (% of sessions exposing raw PII)",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "Dashboard views",
+                "value": 3.1
+              },
+              {
+                "label": "Scheduled reports",
+                "value": 4.7
+              },
+              {
+                "label": "Raw layer / direct queries",
+                "value": 94.2,
+                "highlight": true
+              },
+              {
+                "label": "Data exports / downloads",
+                "value": 18.5
+              }
+            ],
+            "caption": "Normalized to sessions per pathway, the raw ingestion layer overwhelms every other risk surface. Dashboard locks would leave 94% of exposure intact."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The normalized data shows raw-layer exposure dwarfs dashboard exposure. What do you tell leadership?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"Dashboard locks are useless — we must mask at ingestion immediately.\"",
+          "detail": "Make the definitive call and direct all remediation effort to ingestion.",
+          "flag": "weak",
+          "consequence": "You're likely right about the priority, but 'useless' is an overclaim — dashboard controls are still a valid defence-in-depth layer. Dismissing them entirely may leave a legitimate control gap and erode leadership's trust in your recommendation.",
+          "divergenceCost": "Overclaimed the finding and dismissed a valid secondary control."
+        },
+        {
+          "id": "B",
+          "label": "\"The data shows raw-layer exposure is the dominant risk; masking at ingestion should be the primary control — and we should validate coverage with a data-lineage audit before closing the compliance finding.\"",
+          "detail": "Present the finding, name ingestion as the priority, and recommend a lineage audit to confirm no masked copies were missed.",
+          "flag": "strong",
+          "consequence": "Leadership gets a clear priority (ingestion masking), an honest picture of why dashboard locks alone are insufficient, and a concrete next step that closes the loop with the auditors. You've reframed the problem with evidence and flagged what still needs verification.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The dashboard-lock instinct is a last-mile control applied to a source-entry problem: PII entered the lake unmasked at ingestion and persisted across every downstream layer, so access restrictions on dashboards left 94% of the exposure surface untouched. The real fix — tokenizing or masking PII at the ingestion boundary with column-level policies on raw tables — governs the data where it first lands, making every downstream layer safer by default. The lesson is architectural: govern PII where it enters the system, not only where humans happen to look at it."
+}

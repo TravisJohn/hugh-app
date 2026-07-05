@@ -1,0 +1,180 @@
+{
+  "id": "twymans-law",
+  "title": "The Too-Good Result",
+  "scenario": {
+    "role": "Analytics Engineer",
+    "company": "Metricly",
+    "situation": "The conversion dashboard lit up overnight — a 10x spike that has the whole team celebrating and the CEO drafting a company-wide email.",
+    "stakeholderBelief": "Everyone assumes a product change or a viral moment caused a genuine surge in user conversions.",
+    "question": "Is this real, or is something else going on?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team wants to know what drove the spike. How do you frame the investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Attribute the spike to recent product changes",
+          "detail": "Compare conversion rates before and after each feature shipped this sprint.",
+          "flag": "weak",
+          "consequence": "You find a deploy that correlates with the timing — and the team doubles down on the celebration. But you've assumed the signal is real before checking whether the measurement itself is trustworthy.",
+          "divergenceCost": "Anchored on the team's optimistic hypothesis before validating the data pipeline."
+        },
+        {
+          "id": "B",
+          "label": "Instrument-first diagnostic",
+          "detail": "Before attributing the spike to anything, audit whether the tracking layer is firing correctly — check for duplicate events, deploy logs, and SDK changes alongside the metric movement.",
+          "flag": "strong",
+          "consequence": "You pull the event log and immediately see each conversion session is logging two identical events with milliseconds apart — a double-fire pattern. The investigation thread the team's hypothesis never would have opened.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Identify the traffic source driving the surge",
+          "detail": "Slice conversions by acquisition channel to find which source sent the wave.",
+          "flag": "weak",
+          "consequence": "Every channel shows a proportional lift — which feels like validation. In fact, a tracking bug inflates all channels equally, so the channel view gives you no signal and false confidence.",
+          "divergenceCost": "Looked for a traffic explanation when the fault was in the instrumentation, not the traffic."
+        },
+        {
+          "id": "D",
+          "label": "Announce the win and move to capitalizing on it",
+          "detail": "Accept the number at face value and start planning how to repeat the result.",
+          "flag": "weak",
+          "consequence": "Plans get made, emails get sent — and when the bug is discovered later, credibility takes a serious hit. Celebrating an artifact erodes trust in the entire analytics function.",
+          "divergenceCost": "Skipped verification entirely, confusing a measurement error for a business outcome."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You suspect something is wrong with the tracking. Which metric do you use to test that hypothesis?",
+      "artifact": {
+        "type": "bars",
+        "title": "Conversion events logged — last 7 days",
+        "bars": [
+          {
+            "label": "Mon",
+            "value": 420
+          },
+          {
+            "label": "Tue",
+            "value": 435
+          },
+          {
+            "label": "Wed",
+            "value": 418
+          },
+          {
+            "label": "Thu",
+            "value": 441
+          },
+          {
+            "label": "Fri",
+            "value": 429
+          },
+          {
+            "label": "Sat",
+            "value": 437
+          },
+          {
+            "label": "Sun (deploy)",
+            "value": 4390,
+            "highlight": true
+          }
+        ],
+        "caption": "Raw conversion event count. Sunday's bar is ~10x. Does that mean 10x more users converted, or 10x more events per user?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Raw conversion event count",
+          "detail": "Use the total number of conversion events logged in the dashboard.",
+          "flag": "weak",
+          "consequence": "The Sunday bar is enormous and looks decisive — but a double-fire bug produces exactly this shape. Raw event counts can't distinguish 'more users converted' from 'each conversion fired twice'. You're reading noise as signal.",
+          "divergenceCost": "Trusted raw event volume, which a firing bug inflates just as much as real growth."
+        },
+        {
+          "id": "B",
+          "label": "Unique converting users (deduplicated by session)",
+          "detail": "Count distinct user sessions that contain at least one conversion event, removing duplicate event fires within the same session.",
+          "flag": "strong",
+          "consequence": "Deduplicated, Sunday's unique converting users are completely flat — indistinguishable from the prior six days. The 10x spike vanishes. The raw count was double-counting every session after the deploy.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Unique converting users (deduplicated by session) — last 7 days",
+            "unit": "users",
+            "bars": [
+              {
+                "label": "Mon",
+                "value": 418
+              },
+              {
+                "label": "Tue",
+                "value": 431
+              },
+              {
+                "label": "Wed",
+                "value": 415
+              },
+              {
+                "label": "Thu",
+                "value": 439
+              },
+              {
+                "label": "Fri",
+                "value": 427
+              },
+              {
+                "label": "Sat",
+                "value": 433
+              },
+              {
+                "label": "Sun (deploy)",
+                "value": 441,
+                "highlight": true
+              }
+            ],
+            "caption": "Once deduplicated, Sunday is entirely normal. The 10x spike was each session firing the conversion event twice after the deploy."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Deduplication flattens the spike completely. What do you tell the team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"It's a tracking bug — the win is fake, stop celebrating.\"",
+          "detail": "Make the definitive call and shut down the excitement.",
+          "flag": "weak",
+          "consequence": "You're almost certainly right, but you've made a hard causal claim from one cut of the data without confirming the deploy changelog or getting the bug patched and verified. If there's any nuance, you've burned credibility unnecessarily.",
+          "divergenceCost": "Overclaimed certainty before confirming the bug in the deploy log and verifying a fix."
+        },
+        {
+          "id": "B",
+          "label": "\"The deduplicated data shows no real lift — the spike is consistent with a double-fire after Sunday's deploy. Let's hold the announcement, confirm the bug in the event log, and patch before drawing any conclusions.\"",
+          "detail": "Present the finding, name the likely cause, and recommend a confirmatory step before acting.",
+          "flag": "strong",
+          "consequence": "You've reframed the team's assumption with hard evidence, named the probable mechanism, and given a clear next step — without either killing morale unnecessarily or letting a false win propagate. The deploy log confirms the double-fire within the hour.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The 10x conversion spike was a tracking double-fire introduced by a deploy — not a real business event. The data was engineered so the team's instinct (celebrate first, explain later) was the natural trap. The core skill wasn't statistical; it was epistemic: Twyman's Law holds that any figure that looks surprisingly good is almost always an error, so the first move on an extraordinary number is to audit the instrument, not explain the result. Deduplicating by session — the normalized, valid metric — made the artifact disappear completely and pointed straight at the bug."
+}

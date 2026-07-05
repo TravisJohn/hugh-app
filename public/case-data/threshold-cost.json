@@ -1,0 +1,167 @@
+{
+  "id": "threshold-cost",
+  "title": "The Default Threshold",
+  "scenario": {
+    "role": "Data Scientist",
+    "company": "Churnguard",
+    "situation": "The churn model ships with a 0.5 decision threshold. Retention spend feels wasted — too many customers offered discounts end up staying anyway, and churners still slip through.",
+    "stakeholderBelief": "The team concludes the model isn't accurate enough and wants to retrain on more data or try a more complex architecture.",
+    "question": "Is low model accuracy really the problem, or is something else driving the poor business outcomes?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team wants a better model. How do you frame the investigation before touching any training data?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Benchmark the model with additional accuracy metrics",
+          "detail": "Run precision, recall, and F1 at 0.5 to confirm whether the model is truly underperforming.",
+          "flag": "weak",
+          "consequence": "The model scores reasonably well on F1 at 0.5. This looks like vindication, but you haven't asked whether 0.5 is the right operating point for this business — so the real problem stays hidden.",
+          "divergenceCost": "Accepted the 0.5 default as given and evaluated performance around the wrong operating point."
+        },
+        {
+          "id": "B",
+          "label": "Audit the cost structure before touching the model",
+          "detail": "Map the business cost of a missed churner versus a false alarm, then ask whether the threshold was ever set to reflect those costs.",
+          "flag": "strong",
+          "consequence": "You discover the threshold was never calibrated to cost — it was left at 0.5 by default. This opens the real thread: the model's outputs may be fine, but the decision rule is misaligned with the economics.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Collect more labeled training data",
+          "detail": "Assume the issue is data volume and scope a labeling effort to retrain.",
+          "flag": "weak",
+          "consequence": "Weeks of labeling work produce a marginally better model — but retention spend is still wasted because the threshold is still 0.5. The root cause was never touched.",
+          "divergenceCost": "Jumped to a solution before diagnosing the actual failure mode."
+        },
+        {
+          "id": "D",
+          "label": "Switch to a more complex model architecture",
+          "detail": "Replace the current model with a gradient-boosted ensemble or a neural net.",
+          "flag": "weak",
+          "consequence": "A new model is trained and deployed. AUC nudges up slightly, but false-alarm rates and missed churners barely change in production — because the decision rule is still 0.5.",
+          "divergenceCost": "Applied complexity to a calibration problem, not a modeling problem."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You've learned a missed churner costs ~$200 in lost revenue while a false alarm costs ~$20 in wasted retention spend. Which view of model performance do you trust to find the right threshold?",
+      "artifact": {
+        "type": "bars",
+        "title": "Model performance at threshold = 0.5",
+        "bars": [
+          {
+            "label": "Accuracy",
+            "value": 84
+          },
+          {
+            "label": "Precision",
+            "value": 79
+          },
+          {
+            "label": "Recall",
+            "value": 61
+          },
+          {
+            "label": "F1 Score",
+            "value": 69
+          }
+        ],
+        "caption": "Standard classification metrics at the 0.5 default. Accuracy and precision look acceptable — but recall is 61%, meaning 39% of churners are missed entirely."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Standard classification metrics at 0.5 (accuracy, precision, F1)",
+          "detail": "Use the model's existing evaluation report to judge whether performance is sufficient.",
+          "flag": "weak",
+          "consequence": "Accuracy is 84% and F1 is 69% — the team argues the model looks fine, which confirms their bias. But these metrics treat every error equally and say nothing about what threshold minimizes business cost.",
+          "divergenceCost": "Used cost-blind metrics to answer a cost-sensitive question."
+        },
+        {
+          "id": "B",
+          "label": "Expected cost curve across thresholds (cost-weighted)",
+          "detail": "Compute total expected business cost (missed churners × $200 + false alarms × $20) at every threshold from 0.1 to 0.9 and find the minimum.",
+          "flag": "strong",
+          "consequence": "The cost curve bottoms out near 0.2, not 0.5. At 0.5 the model misses too many high-cost churners; at 0.2 false alarms rise modestly but the expensive misses collapse. The model is fine — the operating point was wrong.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Expected business cost by decision threshold",
+            "unit": "$K",
+            "bars": [
+              {
+                "label": "Threshold 0.1",
+                "value": 48
+              },
+              {
+                "label": "Threshold 0.2",
+                "value": 31,
+                "highlight": true
+              },
+              {
+                "label": "Threshold 0.3",
+                "value": 37
+              },
+              {
+                "label": "Threshold 0.4",
+                "value": 44
+              },
+              {
+                "label": "Threshold 0.5",
+                "value": 58
+              },
+              {
+                "label": "Threshold 0.6",
+                "value": 71
+              },
+              {
+                "label": "Threshold 0.7",
+                "value": 89
+              }
+            ],
+            "caption": "Cost-weighted total (missed churners × $200 + false alarms × $20) per 1,000 predictions. Minimum sits at 0.2 — the 0.5 default nearly doubles the avoidable cost."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The cost curve shows 0.2 is the cheaper operating point by a wide margin. What do you tell the team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The model is fine — just lower the threshold to 0.2 and redeploy tonight.\"",
+          "detail": "Make the prescriptive call and move straight to deployment.",
+          "flag": "weak",
+          "consequence": "The team lowers the threshold and flags far more customers for outreach. But the cost estimates were rough, and the retention team's capacity wasn't checked — the surge of interventions overwhelms the team and the actual cost ratio shifts. The fix was right in direction but skipped validation.",
+          "divergenceCost": "Acted on estimated costs without validating assumptions or running a controlled test first."
+        },
+        {
+          "id": "B",
+          "label": "\"The model's discrimination is sound; the 0.5 threshold was never calibrated to our cost structure. A threshold near 0.2 looks optimal given current cost estimates — let's validate those estimates and run a shadow deployment before a full rollout.\"",
+          "detail": "Surface the finding, flag the cost-estimate uncertainty, and propose a controlled validation step.",
+          "flag": "strong",
+          "consequence": "The team audits the cost estimates with the finance team (the true ratio holds up) and runs a two-week shadow deployment at 0.2 alongside the live 0.5 model. The shadow path catches 34% more churners at only 12% more retention spend. The redeployment is now evidence-backed.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The model was never broken — it was operating at the wrong point on its own output curve. Because a missed churner costs roughly 10× a false alarm, the cost-minimizing threshold is near 0.2, not the default 0.5. The lesson is that a decision threshold is a business parameter, not a statistical default: it belongs in the cost matrix, not the model config file. Strong analysts audit the decision rule before they question the model."
+}

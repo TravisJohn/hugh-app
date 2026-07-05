@@ -1,0 +1,159 @@
+{
+  "id": "importance-causation",
+  "title": "The Feature Blame",
+  "scenario": {
+    "role": "Data Scientist",
+    "company": "Retainly",
+    "situation": "The churn model flags support-ticket count as the single most important feature. Leadership wants to reduce ticket volume — by simplifying the help portal, limiting ticket categories, and auto-closing old tickets — to drive churn down.",
+    "stakeholderBelief": "The Head of Product is convinced that support tickets cause churn, so suppressing ticket volume will reduce it.",
+    "question": "Is feature importance the right signal to act on here?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The Head of Product wants an action plan by end of week. How do you frame your investigation before recommending anything?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Optimize the help portal to reduce inbound tickets",
+          "detail": "Accept the model's signal at face value and design A/B tests around reducing ticket volume.",
+          "flag": "weak",
+          "consequence": "You've taken the model's importance score as a causal recipe and skipped diagnosis entirely. If tickets are a symptom, suppressing them leaves the root cause intact — and you won't know until churn fails to improve.",
+          "divergenceCost": "Anchored on the stakeholder's intervention before understanding what tickets represent."
+        },
+        {
+          "id": "B",
+          "label": "Segment churners by ticket behavior to find what they actually have in common",
+          "detail": "Before acting, slice churned users by ticket volume, ticket topic, and product-usage patterns to see whether tickets are the problem or a signal of something deeper.",
+          "flag": "strong",
+          "consequence": "Segmenting reveals that high-ticket churners share specific product-area complaints — the tickets are a trace of friction, not its cause. Now you have a thread worth pulling.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Re-run the model with ticket count removed to see if churn predictions degrade",
+          "detail": "Drop the feature and check how much model accuracy drops.",
+          "flag": "weak",
+          "consequence": "Accuracy barely drops — the model redistributes importance to correlated proxies. This tells you nothing about whether intervening on tickets changes churn behavior.",
+          "divergenceCost": "Confused feature redundancy with causal irrelevance — the wrong test for this question."
+        },
+        {
+          "id": "D",
+          "label": "Survey high-ticket users and ask if support frustration made them consider leaving",
+          "detail": "Run a quick NPS/exit survey targeting users who submitted many tickets.",
+          "flag": "weak",
+          "consequence": "Users say support was frustrating — but they also mention product bugs and missing features. The survey conflates the symptom with the cause and can't isolate which to fix first.",
+          "divergenceCost": "Chose a self-report instrument that can't separate symptom from cause."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You've segmented churners by ticket volume. Which metric do you use to judge whether tickets are the real problem?",
+      "artifact": {
+        "type": "bars",
+        "title": "Churned users by ticket-volume bucket — last quarter",
+        "bars": [
+          {
+            "label": "0 tickets",
+            "value": 410
+          },
+          {
+            "label": "1–2 tickets",
+            "value": 530
+          },
+          {
+            "label": "3–5 tickets",
+            "value": 490
+          },
+          {
+            "label": "6+ tickets",
+            "value": 380
+          }
+        ],
+        "caption": "Raw counts of churned users per ticket bucket. The 1–2 bucket looks biggest — but these buckets are very different sizes in the overall user base."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Raw count of churned users in each ticket bucket",
+          "detail": "Count how many churned users fall into each ticket-volume group.",
+          "flag": "weak",
+          "consequence": "The 1–2 ticket bucket has the most churned users — so it looks like even modest ticket use is the danger zone. But this bucket is also by far the largest in the user base. You're reading population size, not churn risk.",
+          "divergenceCost": "Read raw counts across unequal cohorts — mistook group size for elevated risk."
+        },
+        {
+          "id": "B",
+          "label": "Churn rate within each ticket bucket, broken out by ticket topic",
+          "detail": "Compute churn as a % within each bucket, then break the high-churn bucket down by what users were actually complaining about.",
+          "flag": "strong",
+          "consequence": "Normalized, the 6+ ticket group has a dramatically higher churn rate — but only when those tickets concern a specific product area (data-sync errors). Users with 6+ tickets about billing or onboarding churn at near-average rates. Tickets aren't the driver; a broken product feature is.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Churn RATE by ticket bucket and topic (% within group)",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "0 tickets",
+                "value": 3.8
+              },
+              {
+                "label": "1–2 tickets",
+                "value": 4.1
+              },
+              {
+                "label": "3–5 tickets (non-sync)",
+                "value": 5.2
+              },
+              {
+                "label": "6+ tickets (billing/onboarding)",
+                "value": 5.9
+              },
+              {
+                "label": "6+ tickets (data-sync errors)",
+                "value": 31.4,
+                "highlight": true
+              }
+            ],
+            "caption": "Only the data-sync complaint cluster shows extreme churn. High ticket count alone is not the driver — the underlying product failure is."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Data-sync error tickets correlate strongly with churn. What do you tell the Head of Product?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"Tickets cause churn — fix the data-sync bug and churn will drop.\"",
+          "detail": "Make the causal call and recommend engineering prioritize the bug immediately.",
+          "flag": "weak",
+          "consequence": "You've turned a correlation into a prescription. The bug may be one factor among several — or users who hit sync errors may differ in other ways (plan type, integration complexity). If the fix ships and churn barely moves, credibility is lost.",
+          "divergenceCost": "Overclaimed causation from correlation — skipped the step that earns confidence."
+        },
+        {
+          "id": "B",
+          "label": "\"Suppressing tickets isn't the lever — feature importance predicts, it doesn't prescribe. Data-sync errors are the strongest correlate of churn; let's run a targeted holdout to confirm before re-routing engineering resources.\"",
+          "detail": "Reframe the importance-as-cause mistake, present the segmentation finding, and propose a confirmatory test.",
+          "flag": "strong",
+          "consequence": "You've corrected the mental model (importance ≠ causation), surfaced a sharper hypothesis (the sync bug), and proposed a path to certainty before committing engineering. The Head of Product now has a better question — and so does the team.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "Support-ticket count is a powerful predictor precisely because it is a reliable symptom of product pain — not because contacting support makes users leave. Feature importance measures a variable's ability to discriminate outcomes in historical data; it says nothing about what happens when you intervene on that variable. The real driver here was a broken data-sync feature, visible only after normalizing churn rates and breaking out ticket topics. The lesson: before acting on a model's top feature, ask whether you can suppress it independently of its cause — and if you can't, you're looking at a proxy, not a lever."
+}

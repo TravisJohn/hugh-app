@@ -1,0 +1,154 @@
+{
+  "id": "leading-lagging",
+  "title": "The Pipeline Mirage",
+  "scenario": {
+    "role": "Revenue Analyst",
+    "company": "Cloudmark",
+    "situation": "Qualified leads are up 40% this quarter, but revenue is flat — and leadership is pointing fingers at the sales team.",
+    "stakeholderBelief": "The VP of Sales believes the SDR team is finally delivering quality leads, and that account executives are fumbling the handoff and losing deals.",
+    "question": "Is the sales team really underperforming, or is something else going on?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "Leadership wants answers fast. How do you structure the investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Audit AE activity on the new leads",
+          "detail": "Pull call logs, email cadences, and CRM touchpoints for AEs handling leads from this quarter.",
+          "flag": "weak",
+          "consequence": "You find normal activity levels — AEs look fine. But you've spent a week investigating the symptom leadership pointed at, not the actual data structure. The real question was never asked.",
+          "divergenceCost": "Anchored on the blame narrative and investigated people instead of the pipeline mechanics."
+        },
+        {
+          "id": "B",
+          "label": "Map the full revenue lifecycle",
+          "detail": "Trace a cohort of leads from entry through close, measuring how long each stage takes and which input period actually feeds this quarter's revenue.",
+          "flag": "strong",
+          "consequence": "You discover the median lead-to-close time is roughly six months. This quarter's revenue can't possibly reflect this quarter's leads — they haven't had time to close. The whole comparison is a time-window mismatch.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Compare win rates this quarter vs. last",
+          "detail": "Calculate the percentage of leads that converted to closed-won deals in each quarter.",
+          "flag": "weak",
+          "consequence": "Win rates look roughly unchanged, but the calculation quietly mixes lead cohorts from different periods with revenue from the current period. You've measured the mismatch without noticing it.",
+          "divergenceCost": "Used a metric that inherited the time-window mismatch rather than diagnosing it."
+        },
+        {
+          "id": "D",
+          "label": "Segment leads by source to find quality issues",
+          "detail": "Break down the 40% lead increase by channel to check if new leads are lower quality.",
+          "flag": "weak",
+          "consequence": "Lead quality looks acceptable across channels. You've ruled out one hypothesis but still haven't explained why flat revenue and rising leads coexist — the core question is unanswered.",
+          "divergenceCost": "Chased a quality hypothesis and left the timing structure unexamined."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You suspect timing is the issue. Which metric do you use to test it?",
+      "artifact": {
+        "type": "bars",
+        "title": "Leads generated vs. Revenue closed — by current quarter",
+        "bars": [
+          {
+            "label": "Leads generated (this Q)",
+            "value": 420
+          },
+          {
+            "label": "Revenue closed (this Q, $K)",
+            "value": 310
+          },
+          {
+            "label": "Leads generated (last Q)",
+            "value": 300
+          },
+          {
+            "label": "Revenue closed (last Q, $K)",
+            "value": 305
+          }
+        ],
+        "caption": "Raw leads and revenue plotted in the same quarter. The gap this quarter looks damning — but is the comparison valid?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Leads generated vs. revenue closed in the same quarter",
+          "detail": "Plot this quarter's lead volume against this quarter's closed revenue, as leadership has been doing.",
+          "flag": "weak",
+          "consequence": "The chart makes it look like the sales team is leaving money on the table — lots of leads, flat revenue. But you're comparing inputs from today to outputs that were seeded six months ago. The metric is measuring nothing real.",
+          "divergenceCost": "Reproduced the exact apples-to-oranges comparison that created the false alarm."
+        },
+        {
+          "id": "B",
+          "label": "Revenue closed in a quarter vs. leads generated two quarters prior (lag-adjusted)",
+          "detail": "Shift the lead series back by the observed ~6-month median sales cycle and replot the relationship.",
+          "flag": "strong",
+          "consequence": "Once you align the series by the lag, the relationship snaps into place: this quarter's revenue tracks cleanly with leads from two quarters ago — which were lower. The sales team's close rate is normal. The pipeline is healthy; it just hasn't matured yet.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Revenue closed (this Q) vs. Leads generated 2 quarters prior (lag-adjusted)",
+            "bars": [
+              {
+                "label": "Leads gen. Q-2 (fed this Q revenue)",
+                "value": 298,
+                "highlight": true
+              },
+              {
+                "label": "Revenue closed this Q ($K)",
+                "value": 310
+              },
+              {
+                "label": "Leads gen. this Q (will feed Q+2)",
+                "value": 420
+              },
+              {
+                "label": "Projected Q+2 revenue ($K, implied)",
+                "value": 430
+              }
+            ],
+            "caption": "Lag-adjusted view: current revenue aligns tightly with the smaller lead cohort from two quarters ago. The 40% lead surge will show up in revenue — in two quarters."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The lag-adjusted view shows the pipeline is healthy and a revenue lift is likely in two quarters. What do you tell leadership?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"Sales is fine — revenue will jump 40% in two quarters. Stand down.\"",
+          "detail": "Declare the problem solved and project the outcome confidently.",
+          "flag": "weak",
+          "consequence": "You've made a precise forward forecast from a single observed lag, assuming nothing else changes — close rate, deal size, or churn in the pipeline. If any of those shift, you've overcredentialed a projection and eroded your credibility.",
+          "divergenceCost": "Overclaimed a precise future outcome from a structural observation alone."
+        },
+        {
+          "id": "B",
+          "label": "\"The comparison was misaligned by ~6 months; the lag-adjusted view shows normal close rates. We should track the current lead cohort through the pipeline before drawing conclusions about performance.\"",
+          "detail": "Present the finding, flag the time-window error, and recommend monitoring the cohort forward.",
+          "flag": "strong",
+          "consequence": "Leadership updates their mental model of how leading and lagging indicators connect. The sales team is no longer under a false spotlight. You've proposed a concrete next step — cohort tracking — that will surface real performance signals as the new leads mature.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The 'pipeline mirage' wasn't a sales execution problem — it was a time-window mismatch. Today's revenue reflects leads from two quarters ago, not today's, because the sales cycle is ~six months long. Plotting a leading indicator and a lagging indicator in the same time window creates a spurious gap that looks like underperformance. The core lesson: before comparing any two metrics, ask whether their reference periods are actually aligned to the same underlying cohort."
+}

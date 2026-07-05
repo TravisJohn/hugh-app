@@ -1,0 +1,155 @@
+{
+  "id": "over-partitioning",
+  "title": "The Empty Partitions",
+  "scenario": {
+    "role": "Data Engineer",
+    "company": "Gridpoint",
+    "situation": "A production analytics table partitioned by user_id is slow to query and billing costs have spiked 40% this month. Engineers are complaining that simple date-range aggregations take minutes instead of seconds.",
+    "stakeholderBelief": "The team lead believes the table needs even more granular partitioning — maybe also by region or event_type — to speed things up further.",
+    "question": "Why is the partitioned table underperforming, and what layout actually fixes it?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team lead wants you to investigate the slow table. How do you frame the investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Add more partition columns and benchmark",
+          "detail": "Follow the team lead's suggestion and test adding region and event_type as additional partition keys.",
+          "flag": "weak",
+          "consequence": "Adding more high-cardinality columns multiplies the partition count further. Query times don't improve and billing climbs another 15%. You've validated the team lead's direction without questioning its premise.",
+          "divergenceCost": "Anchored on the stakeholder's hypothesis and compounded the root problem."
+        },
+        {
+          "id": "B",
+          "label": "Profile the partition layout before touching anything",
+          "detail": "Inspect partition metadata — count partitions, measure average partition size, and compare actual query scan patterns against the current partition key.",
+          "flag": "strong",
+          "consequence": "You immediately surface that the table has 4.2 million partitions averaging 11 KB each. The query planner is spending more time resolving partition metadata than reading data. This diagnostic opens the real thread without any assumption about the fix.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Tune query-level optimizations",
+          "detail": "Add query hints, adjust parallelism settings, and rewrite the slowest queries with explicit filters.",
+          "flag": "weak",
+          "consequence": "A few queries get marginally faster, but the root layout is unchanged. Costs remain high and new queries written by other engineers stay slow. You've treated a symptom.",
+          "divergenceCost": "Optimized around the problem instead of diagnosing it — a surface fix that doesn't scale."
+        },
+        {
+          "id": "D",
+          "label": "Compare this table's schema against a similar fast table",
+          "detail": "Find another large table in the warehouse that performs well and diff the two schemas.",
+          "flag": "weak",
+          "consequence": "The fast table happens to use a composite key for different business reasons, so the diff produces ambiguous signals. You get a partial hint but no clear diagnosis of what user_id partitioning is actually doing.",
+          "divergenceCost": "Used an anecdotal comparison that obscured rather than isolated the real variable."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "The partition profile is back. Which metric do you use to confirm what's driving the cost and latency?",
+      "artifact": {
+        "type": "bars",
+        "title": "Total data scanned per query (GB) — by partition strategy observed",
+        "bars": [
+          {
+            "label": "Partitioned by user_id (current)",
+            "value": 94
+          },
+          {
+            "label": "Partitioned by region",
+            "value": 81
+          },
+          {
+            "label": "Partitioned by event_type",
+            "value": 76
+          },
+          {
+            "label": "Partitioned by date + clustered by user_id",
+            "value": 58
+          }
+        ],
+        "caption": "Raw GB scanned per typical date-range aggregation query. Lower looks better — but does scan volume alone explain the latency and metadata overhead?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Total GB scanned per query",
+          "detail": "Compare raw data scanned across partition strategies as the primary signal.",
+          "flag": "weak",
+          "consequence": "Scan volume is lower for date-based layouts, but the current user_id layout shows high scan AND high latency disproportionate to its scan size. Scan volume alone doesn't explain why 94 GB takes 6× longer than 58 GB; you're missing the metadata overhead signal entirely.",
+          "divergenceCost": "Tracked scan volume but missed the metadata cost that is the actual bottleneck."
+        },
+        {
+          "id": "B",
+          "label": "Partition count vs. average partition size, cross-referenced with query planning time",
+          "detail": "For each strategy, measure: number of partitions, average partition size in MB, and the share of total query time spent in partition pruning / metadata resolution.",
+          "flag": "strong",
+          "consequence": "The normalized view is definitive: user_id partitioning produced 4.2M partitions at 11 KB average — well below the 256 MB optimum. The query planner spends 73% of elapsed time on metadata, not I/O. Date partitioning with user_id clustering collapses partition count to 1,095 at 890 MB average, and metadata overhead drops to 4% of query time.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Metadata resolution as % of total query time — by partition strategy",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "Partitioned by user_id (current)",
+                "value": 73
+              },
+              {
+                "label": "Partitioned by region",
+                "value": 41
+              },
+              {
+                "label": "Partitioned by event_type",
+                "value": 38
+              },
+              {
+                "label": "Partitioned by date + clustered by user_id",
+                "value": 4,
+                "highlight": true
+              }
+            ],
+            "caption": "When normalized to metadata overhead, the date-partition + user_id-cluster layout is unmistakably the real fix — not finer partitioning."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The metadata overhead data points clearly at date-partitioning + clustering. What do you tell the team lead?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"More partitions made it worse — repartition by date immediately.\"",
+          "detail": "Tell the team lead the diagnosis is definitive and push to repartition the production table now.",
+          "flag": "weak",
+          "consequence": "Repartitioning a production table without a staged test risks a multi-hour migration with unknown downstream breakage. And while the metadata evidence is strong, you haven't confirmed that query patterns across all teams align with date-range filtering — a hidden team doing user-centric point lookups could see regression.",
+          "divergenceCost": "Overclaimed certainty and skipped a validation step before a high-risk production change."
+        },
+        {
+          "id": "B",
+          "label": "\"High-cardinality partitioning is the likely culprit — metadata overhead explains the latency. Let's validate on a cloned table before migrating production.\"",
+          "detail": "Present the finding, name the mechanism, flag that query-pattern diversity needs confirming, and propose a low-risk validation path.",
+          "flag": "strong",
+          "consequence": "The team lead sees a clear explanation backed by the metadata metric, understands why adding more partition keys would have worsened things, and approves a clone-and-benchmark test. You've reframed the team's mental model and given them a safe path to certainty before touching production.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The slowdown wasn't caused by insufficient partitioning — it was caused by partitioning on user_id, a high-cardinality column that created millions of tiny partitions and buried the query planner in metadata resolution. The fix is to partition on a low-cardinality, filter-aligned key (date) and push user_id down to a clustering key. The lesson: partition cardinality must match query filter patterns, and more partitions on the wrong key is strictly worse than fewer partitions on the right one."
+}

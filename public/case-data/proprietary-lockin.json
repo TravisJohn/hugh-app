@@ -1,0 +1,164 @@
+{
+  "id": "proprietary-lockin",
+  "title": "The Convenient Format",
+  "scenario": {
+    "role": "Data Architect",
+    "company": "Corewarehouse",
+    "situation": "The analytics engineering team has standardized every dataset on a proprietary warehouse-native format because benchmarks show it queries 30–40% faster than alternatives.",
+    "stakeholderBelief": "The lead architect assumes that because the format wins on query speed inside the warehouse, it is the right default for all datasets company-wide.",
+    "question": "Is fastest-here really the right criterion for choosing a storage standard?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The lead wants you to validate the format choice. How do you frame the investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Reproduce the benchmark",
+          "detail": "Re-run the query-speed benchmarks yourself to confirm or challenge the 30–40% claim.",
+          "flag": "weak",
+          "consequence": "You confirm the benchmark is accurate. The format is indeed faster inside the warehouse — but you've only answered the question that was already answered, and haven't touched whether speed is the right criterion.",
+          "divergenceCost": "Anchored entirely on the lead's criterion and validated the assumption rather than interrogating it."
+        },
+        {
+          "id": "B",
+          "label": "Counterfactual access audit",
+          "detail": "Map every current and roadmap use case against the format: which engines, pipelines, and teams can actually read it, and what does switching cost later?",
+          "flag": "strong",
+          "consequence": "You immediately surface that several roadmap workloads — a new Spark-based ML pipeline, a partner data-share, and a planned migration — cannot read the proprietary format at all. Speed inside one engine is only part of the picture.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Cost analysis of storage",
+          "detail": "Compare raw storage costs for the proprietary format versus open alternatives.",
+          "flag": "weak",
+          "consequence": "Storage costs turn out nearly equivalent. You've produced a true but irrelevant finding — the real risk isn't the bill, it's whether the data is accessible at all.",
+          "divergenceCost": "Optimized for the wrong dimension and left the lock-in risk entirely invisible."
+        },
+        {
+          "id": "D",
+          "label": "Vendor best-practice review",
+          "detail": "Check the warehouse vendor's own documentation for recommended format usage.",
+          "flag": "weak",
+          "consequence": "Unsurprisingly, the vendor recommends its own format. This is circular — the vendor's incentive is retention, not your portability. You've outsourced the framing to the most biased source.",
+          "divergenceCost": "Deferred the framing to a conflicted source and introduced vendor bias into the investigation."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "The access audit surfaces a range of datasets. Which metric do you use to evaluate the format decision across them?",
+      "artifact": {
+        "type": "bars",
+        "title": "Query speed improvement vs. open formats — by dataset (seconds saved per query)",
+        "bars": [
+          {
+            "label": "Dashboard aggregates",
+            "value": 4.2
+          },
+          {
+            "label": "Ad-hoc analyst queries",
+            "value": 3.1
+          },
+          {
+            "label": "ML feature store",
+            "value": 2.8
+          },
+          {
+            "label": "Partner data share",
+            "value": 1.9
+          },
+          {
+            "label": "Archive / compliance",
+            "value": 0.6
+          }
+        ],
+        "caption": "Raw seconds saved by using the proprietary format. Looks uniformly positive — but does speed matter equally for every use case?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Query speed delta (seconds saved) per dataset",
+          "detail": "Rank datasets by how much faster the proprietary format is.",
+          "flag": "weak",
+          "consequence": "Every dataset shows some speed gain, so the format looks like a universal win. But you're measuring only the benefit and not the cost — engine compatibility and migration risk are completely off the chart.",
+          "divergenceCost": "Measured only the upside of one criterion, making an asymmetric trade-off invisible."
+        },
+        {
+          "id": "B",
+          "label": "Portability-weighted access score per dataset",
+          "detail": "For each dataset, combine: (1) speed gain, (2) number of engines/tools that can read it natively, and (3) estimated switching cost if the format must change later.",
+          "flag": "strong",
+          "consequence": "Normalized across all three dimensions, the picture flips: dashboard aggregates justify the proprietary format, but the ML feature store, partner share, and archive datasets score far better on open formats — the switching-cost penalty overwhelms the speed gain for anything that must leave the warehouse.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Portability-weighted access score by dataset (higher = open format wins)",
+            "bars": [
+              {
+                "label": "Dashboard aggregates",
+                "value": -12
+              },
+              {
+                "label": "Ad-hoc analyst queries",
+                "value": 3
+              },
+              {
+                "label": "ML feature store",
+                "value": 41,
+                "highlight": true
+              },
+              {
+                "label": "Partner data share",
+                "value": 38,
+                "highlight": true
+              },
+              {
+                "label": "Archive / compliance",
+                "value": 29,
+                "highlight": true
+              }
+            ],
+            "caption": "Negative = proprietary format wins; positive = open format wins after weighting speed, engine compatibility, and switching cost. Three of five dataset classes favor open formats decisively."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The weighted analysis shows open formats win for most roadmap-critical datasets. What do you tell the lead architect?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The proprietary format is the wrong choice — migrate everything to Parquet/Iceberg now.\"",
+          "detail": "Make the full causal call and recommend an immediate blanket migration.",
+          "flag": "weak",
+          "consequence": "You've overcorrected: the proprietary format genuinely is optimal for pure-warehouse workloads like dashboard aggregates. A blanket migration would degrade those with no benefit, and you've presented a correlation-based scoring model as a certainty.",
+          "divergenceCost": "Overclaimed the analysis as definitive and recommended a blanket action that ignores legitimate use cases."
+        },
+        {
+          "id": "B",
+          "label": "\"Speed isn't the only criterion — portability scores suggest open formats for roadmap-critical datasets, but let's pilot on one before setting a new standard.\"",
+          "detail": "Present the finding, flag the scoring model's assumptions, and recommend a bounded pilot to validate.",
+          "flag": "strong",
+          "consequence": "You reframe the decision from 'which format is fastest?' to 'which format fits each workload?' The lead sees that the current standard optimizes for a real but narrow criterion. A pilot on the ML feature store will surface real switching costs before the team commits to a new standard.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The proprietary format's speed advantage is real but local — it only holds inside a single engine. When roadmap workloads require Spark, external partners, or future portability, the switching cost dwarfs the query-time savings. The lesson is that foundational storage decisions must be evaluated on a multi-dimensional scorecard — speed, engine reach, and lock-in cost — not on the benchmark that was convenient to run. A sound architect doesn't challenge the measurement; they challenge whether the right thing was measured."
+}

@@ -1,0 +1,162 @@
+{
+  "id": "prediction-feedback-loop",
+  "title": "The Self-Fulfilling Model",
+  "scenario": {
+    "role": "ML Engineer",
+    "company": "Guardrail",
+    "situation": "Guardrail's fraud-targeting model scores merchants and routes high-scorers to human review. Month over month, precision on flagged cases has climbed from 61% to 79% over six months, and the team is growing confident the model has improved.",
+    "stakeholderBelief": "The Head of Risk believes rising precision proves the model is learning well from feedback — and wants to increase the model's autonomy by raising the auto-block threshold.",
+    "question": "Is the model genuinely improving, or is something else driving the precision gain?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The Head of Risk wants a quick validation before expanding the model's autonomy. How do you structure your investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Confirm the accuracy trend",
+          "detail": "Pull precision and recall over the last six months and plot the trend line.",
+          "flag": "weak",
+          "consequence": "The precision trend looks great. But you've only measured performance on cases the model chose to flag — you have no visibility into what the model declined to send to review. You've confirmed the symptom, not the cause.",
+          "divergenceCost": "Anchored on the team's belief and measured only the visible slice of outcomes."
+        },
+        {
+          "id": "B",
+          "label": "Audit data provenance — trace where training labels come from",
+          "detail": "Map the pipeline: which cases generate labels, and does the model's own routing decision determine which cases ever receive a label?",
+          "flag": "strong",
+          "consequence": "You find that fraud labels only exist for merchants routed to human review — which are exactly the merchants the model flagged. Cases scored low and never reviewed never receive a label, so they never enter training. The model's routing decisions are shaping its own ground truth.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Retrain on the freshest data and compare held-out test-set scores",
+          "detail": "Use the most recent six months of labeled data to retrain and evaluate on a held-out split.",
+          "flag": "weak",
+          "consequence": "Your held-out test set was drawn from the same label-generating pipeline, so it carries the same selection bias. Scores improve, but you've validated the loop, not escaped it.",
+          "divergenceCost": "Evaluated on biased holdout data drawn from the same pipeline — the test set has the same flaw."
+        },
+        {
+          "id": "D",
+          "label": "Interview the review team to check for labeling consistency",
+          "detail": "Ask human reviewers whether their judgment criteria have shifted over time.",
+          "flag": "weak",
+          "consequence": "Reviewers report no major policy changes. Useful to rule out one confound, but this doesn't touch the structural question of which cases reach reviewers in the first place.",
+          "divergenceCost": "Ruled out one minor confound while missing the structural pipeline issue entirely."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You suspect the model's routing shapes its labels. Which metric cut do you examine to test whether the precision gain is real?",
+      "artifact": {
+        "type": "bars",
+        "title": "Model precision by month — flagged cases only",
+        "bars": [
+          {
+            "label": "Month 1",
+            "value": 61
+          },
+          {
+            "label": "Month 2",
+            "value": 65
+          },
+          {
+            "label": "Month 3",
+            "value": 68
+          },
+          {
+            "label": "Month 4",
+            "value": 72
+          },
+          {
+            "label": "Month 5",
+            "value": 76
+          },
+          {
+            "label": "Month 6",
+            "value": 79
+          }
+        ],
+        "caption": "Precision on flagged cases has risen steadily. But precision is measured only on cases the model chose to flag — is this trend tracking truth or tracking the model's own prior?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Precision on flagged cases (the existing metric)",
+          "detail": "Continue tracking precision on the set of merchants the model routed to review.",
+          "flag": "weak",
+          "consequence": "Precision keeps climbing. But this metric can only rise as the model narrows its flags to merchants that look like past confirmed fraud — which are the exact cases it already sent for review. You're measuring the model's self-consistency, not its accuracy against ground truth.",
+          "divergenceCost": "Trusted a metric computed on a selection the model itself made — measured self-consistency, not true accuracy."
+        },
+        {
+          "id": "B",
+          "label": "Fraud rate in a randomly sampled holdout that bypassed the model",
+          "detail": "Pull a random 5% sample of merchants that were routed to review regardless of model score (an exploration bucket), and compare their confirmed-fraud rate against the model's flagged set over the same months.",
+          "flag": "strong",
+          "consequence": "The random holdout reveals that the confirmed-fraud rate in un-scored merchants has stayed flat at roughly 14% across all six months — while the model's flagged set shows the rising precision trend. The divergence is the fingerprint of a feedback loop: the model is getting better at finding merchants that look like its prior training cases, not better at finding fraud overall.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Fraud rate: model-flagged vs. random holdout (Month 6)",
+            "bars": [
+              {
+                "label": "Model-flagged (Month 1)",
+                "value": 61
+              },
+              {
+                "label": "Model-flagged (Month 6)",
+                "value": 79
+              },
+              {
+                "label": "Random holdout (Month 1)",
+                "value": 14
+              },
+              {
+                "label": "Random holdout (Month 6)",
+                "value": 14,
+                "highlight": true
+              }
+            ],
+            "caption": "The holdout fraud rate is flat at 14% across six months. The model's precision rise is not tracking a rise in detectable fraud — it is tracking its own reinforced priors."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The holdout data shows the model's precision gains aren't matched by any rise in true fraud prevalence. What do you tell the Head of Risk?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The model isn't improving — it's in a feedback loop. Don't raise the threshold.\"",
+          "detail": "State the finding as a confirmed conclusion and recommend halting the autonomy expansion.",
+          "flag": "weak",
+          "consequence": "You've correctly identified the likely mechanism, but you've stated it as certainty from one holdout comparison. If the holdout bucket was too small or not truly random, the finding could be noisy. Overstating confidence here could be as damaging as the original overconfidence.",
+          "divergenceCost": "Overclaimed certainty from limited holdout evidence — replaced one overconfident narrative with another."
+        },
+        {
+          "id": "B",
+          "label": "\"The precision trend may be self-fulfilling — holdout data shows no corresponding rise in true fraud rate. Pause the threshold change and run a structured exploration experiment to separate real improvement from loop reinforcement before expanding autonomy.\"",
+          "detail": "Present the finding as a strong signal warranting caution, name the mechanism, and propose a randomized exploration bucket as the path to a real answer.",
+          "flag": "strong",
+          "consequence": "You've reframed the team's assumption with concrete evidence, named the feedback-loop mechanism, and proposed an actionable path — a randomized holdout or epsilon-greedy exploration policy — to distinguish genuine model improvement from self-fulfilling accuracy. The Head of Risk can make a decision with eyes open.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The model's precision was rising not because it was learning to detect fraud better, but because it controlled which merchants ever received a fraud label — cases it ignored stayed permanently unlabeled and fell out of training. The flat holdout fraud rate was the tell: true fraud prevalence hadn't changed, only the model's self-reinforcing confidence. The lesson is structural: when a model's outputs determine its future training data, accuracy metrics become mirrors of the model's priors, not measures of truth. The fix is always some form of forced exploration — randomized routing, epsilon-greedy sampling, or holdout buckets that break the loop."
+}

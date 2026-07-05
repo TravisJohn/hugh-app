@@ -1,0 +1,152 @@
+{
+  "id": "star-vs-obt",
+  "title": "The One Big Table",
+  "scenario": {
+    "role": "Analytics Engineer",
+    "company": "Brightmetrics",
+    "situation": "The company's core BI layer is built on a single 400-column denormalized table. Dashboard queries are slow, and three different teams calculate 'monthly active users' differently because dimension attributes are duplicated across columns that have drifted out of sync.",
+    "stakeholderBelief": "The data engineering team lead is convinced the fix is upgrading to a larger warehouse cluster — more compute will overpower the slow queries.",
+    "question": "Is raw compute the real bottleneck, or is the data model the root cause?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team lead wants to approve a compute upgrade by end of week. How do you frame your investigation before any decision is made?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Benchmark the cluster under load",
+          "detail": "Run the slowest dashboards against the current cluster, then simulate a larger tier to project the speedup.",
+          "flag": "weak",
+          "consequence": "You confirm a bigger cluster would be faster — but you've assumed the model is fine and benchmarked your way to a forgone conclusion. The metric-inconsistency problem is entirely invisible in this framing.",
+          "divergenceCost": "Anchored on the team's compute hypothesis and never looked at the data model."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic query profiling + model audit",
+          "detail": "Profile slow queries to see what they actually scan, and audit how dimension attributes are defined across teams.",
+          "flag": "strong",
+          "consequence": "Query profiles reveal full-table scans caused by repeated joins against duplicated columns, not CPU saturation. The model audit surfaces three divergent 'MAU' definitions — compute can't fix that.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Survey dashboard owners about pain points",
+          "detail": "Ask each team what's slow and what metric discrepancies they've noticed.",
+          "flag": "weak",
+          "consequence": "You collect a useful list of complaints but no structural evidence. Without query profiles you can't tell whether the pain is compute, model design, or something else — and the team lead dismisses qualitative feedback.",
+          "divergenceCost": "Chose anecdotal discovery when diagnostic data was already available in query logs."
+        },
+        {
+          "id": "D",
+          "label": "Prototype a star schema immediately",
+          "detail": "Skip diagnosis and rebuild the model as a star schema to prove the concept.",
+          "flag": "weak",
+          "consequence": "You've built a solution before confirming the diagnosis. If adoption fails or the schema doesn't match real query patterns, you've spent weeks on an unevidenced refactor.",
+          "divergenceCost": "Jumped to solution before establishing what the problem actually was."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "Query logs are in. Which metric do you present to make the case about where cost and inconsistency actually live?",
+      "artifact": {
+        "type": "bars",
+        "title": "Total query execution time by dashboard (seconds)",
+        "bars": [
+          {
+            "label": "Revenue Overview",
+            "value": 142
+          },
+          {
+            "label": "MAU Dashboard",
+            "value": 198
+          },
+          {
+            "label": "Funnel Report",
+            "value": 87
+          },
+          {
+            "label": "Retention Cohorts",
+            "value": 231,
+            "highlight": true
+          }
+        ],
+        "caption": "Raw execution times. Retention Cohorts looks worst — but is total time the right lens, or does it just run more often?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Total query execution time per dashboard",
+          "detail": "Sum all query seconds consumed by each dashboard over the past 30 days.",
+          "flag": "weak",
+          "consequence": "Retention Cohorts looks like the culprit because it has the most total time — but it also runs on a scheduled refresh every 15 minutes. You're reading run frequency, not query efficiency.",
+          "divergenceCost": "Conflated high run frequency with inefficient query design — a volume confound."
+        },
+        {
+          "id": "B",
+          "label": "Bytes scanned per query run, broken down by column group",
+          "detail": "Normalize by number of runs; then attribute scanned bytes to dimension columns vs. fact columns.",
+          "flag": "strong",
+          "consequence": "Normalized, the signal is clear: duplicated dimension columns — region, plan_tier, and customer_segment stored redundantly across 40+ variants — account for 67% of bytes scanned on every run. Compute can't outrun a schema that re-reads the same data under different names.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Avg bytes scanned per run — dimension vs. fact columns (GB)",
+            "unit": "GB",
+            "bars": [
+              {
+                "label": "Fact columns",
+                "value": 1.2
+              },
+              {
+                "label": "Conformed dims (proposed)",
+                "value": 0.4
+              },
+              {
+                "label": "Duplicated dim columns (current)",
+                "value": 2.7,
+                "highlight": true
+              }
+            ],
+            "caption": "Duplicated dimension columns drive the majority of scan cost per run. Conforming them in a star schema would cut per-query scan volume by ~63%."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Duplicated dimension columns drive 67% of scan bytes and are the source of metric drift. What do you tell the team lead?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"More compute won't fix this — migrate to a star schema now.\"",
+          "detail": "Make the directional call and recommend immediate migration.",
+          "flag": "weak",
+          "consequence": "You've made the right structural diagnosis but overstepped into a mandate. Without a proof-of-concept query comparison, stakeholders can reasonably push back — and if any unmeasured factor (e.g., ETL complexity) is missed, the confident call backfires.",
+          "divergenceCost": "Overclaimed certainty and skipped the validation step that would have secured buy-in."
+        },
+        {
+          "id": "B",
+          "label": "\"Duplicated dimensions are the stronger driver of scan cost and metric drift — compute alone won't resolve either. I recommend a star-schema pilot on one subject area to confirm the scan reduction before full migration.\"",
+          "detail": "Present the finding, flag what's still correlational, and propose a bounded proof of concept.",
+          "flag": "strong",
+          "consequence": "You've reframed the compute assumption with concrete scan data, identified the metric-consistency problem as a modeling issue, and proposed a low-risk pilot that will close the remaining causal gap. The team lead has a clear, evidenced path forward.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The slowness and metric inconsistency were both symptoms of the same root cause: one wide denormalized table that duplicated dimension attributes across dozens of columns, forcing full scans and letting definitions drift independently per team. More compute would have hidden the cost but left metric disagreements intact. The real lesson is that data modeling is a query-pattern decision — a star schema with conformed dimensions prunes what gets scanned and enforces a single definition of every dimension, solving both problems at once."
+}

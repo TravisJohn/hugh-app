@@ -1,0 +1,203 @@
+{
+  "id": "reject-inference",
+  "title": "The Approved-Only Model",
+  "scenario": {
+    "role": "Credit Data Scientist",
+    "company": "Lendable",
+    "situation": "The risk team trained a default prediction model on 18 months of approved-loan outcomes. Backtest AUC is 0.82 and the team is ready to deploy it as the new application scorecard.",
+    "stakeholderBelief": "The team assumes the model generalizes to all applicants — approved and would-be-rejected alike — because its backtest accuracy looks strong.",
+    "question": "Is the model actually ready to score the full applicant population?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team is eager to deploy. How do you frame your investigation before signing off?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Re-run the backtest on a held-out approved-loan sample",
+          "detail": "Split the approved-loan data 80/20 and validate AUC on the holdout.",
+          "flag": "weak",
+          "consequence": "The holdout AUC is still 0.82 — reassuring, but the holdout was drawn from the same approved population. You've confirmed the model describes past approvals, not that it generalizes to rejections.",
+          "divergenceCost": "Validated within the same biased sample — confirmed the bubble, not the blind spot."
+        },
+        {
+          "id": "B",
+          "label": "Audit the training population against the full applicant population",
+          "detail": "Compare the distribution of approved-loan borrowers to the broader applicant pool to check for selection bias.",
+          "flag": "strong",
+          "consequence": "You immediately see that approved borrowers occupy only the lower-risk tail of the applicant distribution. The model has never seen outcomes for higher-risk applicants, so its score surface is blind to that region.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Check model calibration on recent approvals",
+          "detail": "Plot predicted vs. actual default rates on the most recent quarter of approved loans.",
+          "flag": "weak",
+          "consequence": "Calibration looks fine on approved loans — of course it does. You've checked the model on the only population it was trained on, leaving the survivorship gap completely unexamined.",
+          "divergenceCost": "Checked calibration inside the survivors-only window and missed the unobserved population entirely."
+        },
+        {
+          "id": "D",
+          "label": "Feature-importance audit for regulatory fairness",
+          "detail": "Review which features drive scores to flag any proxies for protected classes.",
+          "flag": "weak",
+          "consequence": "Important for compliance, but this audit won't surface survivorship bias — a model can be feature-fair and still catastrophically wrong on the rejected population.",
+          "divergenceCost": "Solved a real but separate problem while leaving the core generalization failure untouched."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You compare approved borrowers to the full applicant pool. Which metric best exposes the survivorship gap?",
+      "artifact": {
+        "type": "bars",
+        "title": "Applicant volume by model score decile — approved loans only",
+        "bars": [
+          {
+            "label": "Decile 1 (lowest score)",
+            "value": 12
+          },
+          {
+            "label": "Decile 2",
+            "value": 18
+          },
+          {
+            "label": "Decile 3",
+            "value": 35
+          },
+          {
+            "label": "Decile 4",
+            "value": 80
+          },
+          {
+            "label": "Decile 5",
+            "value": 210
+          },
+          {
+            "label": "Decile 6",
+            "value": 390
+          },
+          {
+            "label": "Decile 7",
+            "value": 480
+          },
+          {
+            "label": "Decile 8",
+            "value": 510
+          },
+          {
+            "label": "Decile 9",
+            "value": 490
+          },
+          {
+            "label": "Decile 10 (highest score)",
+            "value": 475
+          }
+        ],
+        "caption": "Training records by score decile. Looks populated — but is this the full applicant picture?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Model AUC on approved-loan backtest",
+          "detail": "Use the 0.82 AUC figure from the standard backtest as the performance benchmark.",
+          "flag": "weak",
+          "consequence": "AUC of 0.82 only measures rank-ordering within approved borrowers — people the old policy already filtered. It says nothing about how the model ranks applicants who would have been rejected.",
+          "divergenceCost": "Accepted an AUC that measures discrimination inside the survivors, not across all applicants."
+        },
+        {
+          "id": "B",
+          "label": "Approval rate (labelled outcomes) vs. total applicant volume by score decile",
+          "detail": "For each score decile, compare how many total applicants applied versus how many have an observed outcome label.",
+          "flag": "strong",
+          "consequence": "The normalized view is stark: low-score deciles have near-zero label coverage — up to 94% of applicants in those deciles were rejected and carry no outcome. The model was never trained on the population it now has to score.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Label coverage rate by score decile (labelled approvals ÷ total applicants)",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "Decile 1 (lowest score)",
+                "value": 6,
+                "highlight": true
+              },
+              {
+                "label": "Decile 2",
+                "value": 11
+              },
+              {
+                "label": "Decile 3",
+                "value": 22
+              },
+              {
+                "label": "Decile 4",
+                "value": 41
+              },
+              {
+                "label": "Decile 5",
+                "value": 63
+              },
+              {
+                "label": "Decile 6",
+                "value": 78
+              },
+              {
+                "label": "Decile 7",
+                "value": 88
+              },
+              {
+                "label": "Decile 8",
+                "value": 93
+              },
+              {
+                "label": "Decile 9",
+                "value": 96
+              },
+              {
+                "label": "Decile 10 (highest score)",
+                "value": 97
+              }
+            ],
+            "caption": "In the lowest-score decile, only 6% of applicants have an observed outcome. The model has almost no signal about this population — yet deployment would score them."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Low-score deciles have near-zero label coverage, confirming the survivorship gap. What do you tell the team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The model is biased — reject it and retrain from scratch.\"",
+          "detail": "Call the model unfit and block deployment.",
+          "flag": "weak",
+          "consequence": "You've correctly identified survivorship bias but overstepped into a prescriptive call without a validated fix. Reject inference techniques may recover the model; scrapping it entirely could waste 18 months of work and delay lending unnecessarily.",
+          "divergenceCost": "Overclaimed the remedy — blocking deployment without evaluating whether reject inference could rehabilitate the model."
+        },
+        {
+          "id": "B",
+          "label": "\"The backtest flatters the model — it was trained only on survivors. Before deploying on all applicants, we need reject inference or a shadow period to estimate outcomes for the unobserved population.\"",
+          "detail": "Present the survivorship finding and recommend a concrete path to a valid model.",
+          "flag": "strong",
+          "consequence": "The team now understands why 0.82 AUC does not mean 'ready to deploy everywhere.' You've reframed the problem, quantified the gap, and handed them a concrete remediation path — reject inference augmentation or a controlled shadow deployment — without overclaiming what the data can prove.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "A model trained only on approved loans achieves high backtest AUC because it is evaluated on the very population it learned from — the low-risk survivors of a prior acceptance policy. When deployed as a full applicant scorecard, it scores a large unobserved population (historic rejects) with almost no calibrating signal, systematically mis-ranking them. The lesson is survivorship bias in supervised learning: the label you can observe is not a random sample of the label you need, and AUC within the observed set is not evidence of generalization across the full input space. The fix — reject inference — imputes or estimates outcomes for the unlabelled population before retraining."
+}

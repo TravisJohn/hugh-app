@@ -1,0 +1,159 @@
+{
+  "id": "label-bias",
+  "title": "The Biased Ground Truth",
+  "scenario": {
+    "role": "ML Engineer",
+    "company": "Talentgrid",
+    "situation": "A hiring model trained on past successful hires systematically scores candidates from certain schools 20–30 points lower than comparable candidates from other schools.",
+    "stakeholderBelief": "The team assumes the model discovered a real signal — that graduates from those schools genuinely perform worse on the job.",
+    "question": "Did the model find real signal, or is something else going on?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team wants to know if the school penalty is justified. How do you frame the investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Audit feature importance for school variable",
+          "detail": "Check how much weight the model places on school and whether removing it improves performance metrics.",
+          "flag": "weak",
+          "consequence": "You confirm school is a high-weight feature, but this only tells you the model learned it — not whether the underlying label was valid to begin with. You've described the symptom without touching the disease.",
+          "divergenceCost": "Focused on the model's internals while leaving the training labels unexamined."
+        },
+        {
+          "id": "B",
+          "label": "Audit the ground-truth labels for systematic bias",
+          "detail": "Examine whether 'successful hire' labels are assigned consistently across school groups, controlling for observable performance outcomes.",
+          "flag": "strong",
+          "consequence": "You pull post-hire performance ratings and find that employees from the penalized schools received similar objective performance scores — but lower manager approval ratings. The label was contaminated before the model ever saw it.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Run a fairness benchmark on model outputs",
+          "detail": "Apply a standard fairness toolkit to measure disparate impact in the model's scores.",
+          "flag": "weak",
+          "consequence": "The fairness report confirms a disparity exists — which you already knew. It doesn't explain whether the disparity is encoded in the labels or the features, so you still can't recommend a fix.",
+          "divergenceCost": "Measured the gap without diagnosing its source."
+        },
+        {
+          "id": "D",
+          "label": "Collect more training data from underrepresented schools",
+          "detail": "Expand the training set to include more candidates from the penalized schools.",
+          "flag": "weak",
+          "consequence": "More data is added, but if the labeling process is biased, new labels carry the same contamination. The model retrains and the penalty persists — more data, same bias.",
+          "divergenceCost": "Scaled a biased labeling process instead of fixing it."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You've pulled data connecting training labels to post-hire outcomes. Which metric do you use to judge whether the labels were valid?",
+      "artifact": {
+        "type": "bars",
+        "title": "Manager approval rate at time of labeling — by school tier",
+        "bars": [
+          {
+            "label": "Tier 1 schools",
+            "value": 84
+          },
+          {
+            "label": "Tier 2 schools",
+            "value": 79
+          },
+          {
+            "label": "Penalized schools",
+            "value": 51
+          }
+        ],
+        "caption": "Raw manager approval rates used as the 'successful hire' label. Penalized schools look clearly worse — but is manager approval the right proxy for job success?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Manager approval rate used as the training label",
+          "detail": "Compare manager approval rates across school groups — this is what the model was trained on.",
+          "flag": "weak",
+          "consequence": "Penalized schools do show lower approval rates, which seems to validate the model's signal. But manager approval is a subjective rating by the same managers whose past decisions created the training set — you're measuring the bias, not performance.",
+          "divergenceCost": "Validated the label using the label itself — circular reasoning."
+        },
+        {
+          "id": "B",
+          "label": "Objective performance outcomes vs. manager approval, by school group",
+          "detail": "Compare an objective measure (quota attainment, promotion rate, or tenure) against manager approval ratings, segmented by school group.",
+          "flag": "strong",
+          "consequence": "The gap is unmistakable: employees from penalized schools match Tier 1 on objective outcomes but receive manager approval scores 30+ points lower. The label does not track actual job performance — it tracks manager perception, which varies systematically by school.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Objective performance score vs. manager approval label — by school tier",
+            "bars": [
+              {
+                "label": "Tier 1 — objective",
+                "value": 81
+              },
+              {
+                "label": "Tier 1 — manager approval",
+                "value": 84
+              },
+              {
+                "label": "Tier 2 — objective",
+                "value": 79
+              },
+              {
+                "label": "Tier 2 — manager approval",
+                "value": 79
+              },
+              {
+                "label": "Penalized — objective",
+                "value": 78,
+                "highlight": true
+              },
+              {
+                "label": "Penalized — manager approval",
+                "value": 51,
+                "highlight": true
+              }
+            ],
+            "caption": "Penalized-school employees perform comparably on objective measures but receive drastically lower manager approval — the metric used as the training label. The gap is the bias."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Objective outcomes are comparable across school groups, but manager approval scores diverge sharply for penalized schools. What do you tell the team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The labels are biased — retrain with a fair label immediately.\"",
+          "detail": "Declare the label invalid and push for an immediate model replacement.",
+          "flag": "weak",
+          "consequence": "Decisive, but you've prescribed a solution before confirming what a fair label should be. If the new label is also poorly defined, you'll swap one problem for another — and the team has no framework for preventing it next time.",
+          "divergenceCost": "Skipped the step of defining and validating the replacement label."
+        },
+        {
+          "id": "B",
+          "label": "\"Manager approval doesn't track objective performance for this group — the model learned that gap, not real signal. We should pause deployment, define a validated outcome metric, and retrain before using scores in decisions.\"",
+          "detail": "Reframe the finding as a label validity problem, flag the causal gap, and propose a concrete path to a trustworthy model.",
+          "flag": "strong",
+          "consequence": "The team understands why the model behaved this way, what needs to change at the data level, and what evidence would confirm the new label is sound. Deployment is paused before the bias causes downstream hiring harm.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The model wasn't broken — it was accurate. It faithfully reproduced a pattern in the training labels, where manager approval scores for penalized-school employees were systematically lower despite comparable objective performance. The real driver was label contamination: historical manager bias was encoded as ground truth before the first line of model code was written. The lesson is that auditing a model's features or outputs is not enough; you must audit the validity of the labels themselves, because biased labels produce biased models no matter how clean the pipeline."
+}

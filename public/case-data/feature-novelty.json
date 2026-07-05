@@ -1,0 +1,157 @@
+{
+  "id": "feature-novelty",
+  "title": "The Launch Spike",
+  "scenario": {
+    "role": "Product Analyst",
+    "company": "Tunely",
+    "situation": "A new collaborative playlist feature launched last week and drove a 30% jump in in-app engagement.",
+    "stakeholderBelief": "The PM wants to multiply that week-one lift by 52 and announce a projected annual engagement increase of 30% to leadership.",
+    "question": "Is the week-one spike a reliable signal for long-term impact?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The PM is excited and wants your blessing on the annual projection. How do you frame your investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Validate the 30% lift as real",
+          "detail": "Confirm the week-one engagement increase is statistically significant and report it to leadership.",
+          "flag": "weak",
+          "consequence": "The lift is real and significant — but you've only confirmed what the PM already believes. You've answered the wrong question: whether the spike happened, not whether it will persist.",
+          "divergenceCost": "Anchored on the PM's framing and confirmed the obvious rather than testing durability."
+        },
+        {
+          "id": "B",
+          "label": "Engagement decay analysis",
+          "detail": "Track how engagement behaves week-over-week since launch, and compare to how similar past feature launches trended over time.",
+          "flag": "strong",
+          "consequence": "Plotting week-over-week engagement for this feature — and overlaying past launches — immediately reveals a familiar decay curve. The spike is real but week one is a poor predictor of steady state.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Segment by power users",
+          "detail": "Check whether the engagement lift is driven by your most active users.",
+          "flag": "weak",
+          "consequence": "Power users did engage early, but this slicing doesn't reveal whether the lift is temporary or permanent. You've described who adopted first, not what happens next.",
+          "divergenceCost": "Described early adopter composition instead of investigating whether the effect persists."
+        },
+        {
+          "id": "D",
+          "label": "Build a projection model from week-one data",
+          "detail": "Use the week-one numbers as the baseline input for a long-term engagement forecast model.",
+          "flag": "weak",
+          "consequence": "You produce a polished forecast — but it inherits the week-one spike as a permanent floor, which is exactly the assumption that needs testing. A precise model built on a shaky premise is still a shaky model.",
+          "divergenceCost": "Jumped to modeling before verifying the input assumption — laundered the PM's error in a spreadsheet."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You pull engagement data by week since launch. Which metric do you trust to assess the feature's true impact?",
+      "artifact": {
+        "type": "bars",
+        "title": "Total feature sessions — weeks 1–4 post-launch",
+        "bars": [
+          {
+            "label": "Week 1",
+            "value": 186000,
+            "highlight": false
+          },
+          {
+            "label": "Week 2",
+            "value": 171000
+          },
+          {
+            "label": "Week 3",
+            "value": 148000
+          },
+          {
+            "label": "Week 4",
+            "value": 131000
+          }
+        ],
+        "caption": "Raw session counts look healthy every week — the feature is still being used. But total sessions conflate user base growth with per-user behavior change."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Total feature sessions per week",
+          "detail": "Count all sessions on the new feature each week since launch.",
+          "flag": "weak",
+          "consequence": "Sessions stay in the six-figure range every week, which looks encouraging — but Tunely's active user base also grew during this period. You can't tell whether individual users are sticking with the feature or the numbers are being propped up by new installs.",
+          "divergenceCost": "Used an unnormalized count that conflates user-base growth with genuine retention of the feature."
+        },
+        {
+          "id": "B",
+          "label": "Weekly feature adoption rate among active users (normalized)",
+          "detail": "Feature sessions divided by weekly active users — the share of the existing base actually using the feature each week.",
+          "flag": "strong",
+          "consequence": "Normalized, the decay is unmistakable: 38% of active users tried the feature in week one, dropping to 28%, 19%, and 14% by week four — converging back toward the pre-launch engagement baseline. The spike was novelty, not habit.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Feature adoption rate among weekly active users — weeks 1–4",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "Week 1",
+                "value": 38,
+                "highlight": false
+              },
+              {
+                "label": "Week 2",
+                "value": 28
+              },
+              {
+                "label": "Week 3",
+                "value": 19
+              },
+              {
+                "label": "Week 4",
+                "value": 14,
+                "highlight": true
+              }
+            ],
+            "caption": "Adoption rate halves by week four, settling near the pre-launch engagement baseline of ~12%. Week one is a novelty peak, not a steady-state signal."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The normalized data shows adoption decaying sharply toward baseline by week four. What do you tell the PM?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The feature didn't work — the lift is gone. Scrap the annual projection entirely.\"",
+          "detail": "Declare the feature a failure based on the decay curve.",
+          "flag": "weak",
+          "consequence": "This overcorrects. The feature may still have a small but genuine long-term effect above the pre-launch baseline — you just can't tell yet at four weeks. Declaring failure early is as unfounded as the PM's optimism.",
+          "divergenceCost": "Swapped one overclaim for another — dismissed potential real lift before steady state was confirmed."
+        },
+        {
+          "id": "B",
+          "label": "\"Week one is a novelty spike — adoption is decaying toward baseline. We should measure at weeks six to eight before projecting, and use that steady-state rate, not week one, as our forecast input.\"",
+          "detail": "Reframe the PM's assumption with evidence and propose a path to a valid projection.",
+          "flag": "strong",
+          "consequence": "You've given the PM something actionable: the week-one number is not the right input, the decay pattern is a known phenomenon, and a credible projection requires waiting for steady state. Leadership gets a more honest — and ultimately more trustworthy — number.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The 30% week-one lift was real but misleading: novelty drove a curiosity spike that decayed to near-baseline by week four, making the PM's annualized projection a roughly 3x overestimate. The key analytical move was normalizing sessions by active users to see through user-base growth, and tracking the decay curve rather than anchoring on the launch peak. The lesson is the novelty effect: launch spikes are not steady-state signals, and projections built on them should always wait for the curve to flatten."
+}

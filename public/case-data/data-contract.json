@@ -1,0 +1,156 @@
+{
+  "id": "data-contract",
+  "title": "The Silent Upstream Change",
+  "scenario": {
+    "role": "Data Engineer",
+    "company": "Marketgrid",
+    "situation": "A campaign-performance metric called 'conversion rate' dropped 34% overnight with no deployment on your side. Upstream CRM team recently refactored their lead-status enum — but sent no notification.",
+    "stakeholderBelief": "The VP of Data wants to add a downstream monitoring alert so the team catches silent breakages faster next time.",
+    "question": "Is faster downstream detection the right fix, or is there a better place to stop this class of breakage?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The VP wants a monitoring solution in place by Friday. How do you frame your investigation first?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Design a downstream metric monitor",
+          "detail": "Spec out threshold alerts on the conversion-rate metric so the team is paged when it moves unexpectedly.",
+          "flag": "weak",
+          "consequence": "You've built a pager for the symptom. The next silent enum change will still corrupt data for hours or days before the alert fires — and you've added operational noise without closing the root cause.",
+          "divergenceCost": "Anchored on the VP's solution and treated detection speed as the root problem."
+        },
+        {
+          "id": "B",
+          "label": "Counterfactual gap analysis — where in the pipeline could this have been stopped?",
+          "detail": "Map the full data flow and ask: at each stage, what check, if present, would have caught this change before it reached production?",
+          "flag": "strong",
+          "consequence": "Walking the pipeline, you find a critical gap: there is no formal agreement on what values the enum is allowed to take, and no automated check on the producer side. This reframes the problem from 'detect faster' to 'prevent at source'.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Post-mortem interview with the upstream team",
+          "detail": "Ask the CRM engineers why they didn't notify you of the enum change.",
+          "flag": "weak",
+          "consequence": "The team says they 'didn't know anyone depended on those values.' Useful context, but the real fix isn't a social nudge — it's a structural check that doesn't rely on human memory to send a Slack message.",
+          "divergenceCost": "Chose a people-process fix for a structural engineering gap."
+        },
+        {
+          "id": "D",
+          "label": "Audit all downstream dashboards for data-freshness lag",
+          "detail": "Review how stale each downstream metric can get before anyone notices.",
+          "flag": "weak",
+          "consequence": "You improve freshness visibility, but freshness lag is not the issue here — the data arrived on time, it just arrived with corrupted semantics. You've diagnosed the wrong dimension.",
+          "divergenceCost": "Confused a latency problem for a semantic-correctness problem."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You pull pipeline logs for the week surrounding the drop. Which view gives you the most valid signal about where the breakage actually lives?",
+      "artifact": {
+        "type": "bars",
+        "title": "Alerts fired by pipeline stage — last 7 days",
+        "bars": [
+          {
+            "label": "Ingestion",
+            "value": 2
+          },
+          {
+            "label": "Transformation",
+            "value": 1
+          },
+          {
+            "label": "Dashboard refresh",
+            "value": 0
+          },
+          {
+            "label": "Downstream monitors",
+            "value": 9,
+            "highlight": false
+          }
+        ],
+        "caption": "Raw alert counts by stage. Downstream monitors fired the most — but does that mean that's where the problem originates?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Alert counts by pipeline stage",
+          "detail": "Count how many alerts fired at each stage after the metric dropped.",
+          "flag": "weak",
+          "consequence": "Downstream monitors dominate the count — which makes them look like the action area. But alerts fired there because the bad data arrived there. The upstream ingestion stage shows almost no alerts precisely because nothing exists to check schema validity at source.",
+          "divergenceCost": "Treated alert volume as a proxy for problem origin — conflating detection point with failure point."
+        },
+        {
+          "id": "B",
+          "label": "Stage-by-stage schema-validation coverage rate",
+          "detail": "For each pipeline stage, calculate what percentage of fields and enum values have a formal validity check.",
+          "flag": "strong",
+          "consequence": "The coverage view is unambiguous: ingestion — where the upstream enum lands — has 0% enum-value validation. Every downstream stage is reacting to an already-corrupted record. The gap is not in detection sensitivity; it is in the complete absence of a contract at the producer boundary.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Schema-validation coverage by pipeline stage (%)",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "Ingestion (producer boundary)",
+                "value": 0,
+                "highlight": true
+              },
+              {
+                "label": "Transformation",
+                "value": 41
+              },
+              {
+                "label": "Aggregation",
+                "value": 67
+              },
+              {
+                "label": "Dashboard layer",
+                "value": 72
+              }
+            ],
+            "caption": "Coverage is zero at the one place where a contract check would stop breakage before it propagates. Downstream stages react — they cannot prevent."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Validation coverage at the producer boundary is zero. What do you tell the VP?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"Monitoring failed us — we need to replace it with data contracts entirely.\"",
+          "detail": "Make the causal call and recommend eliminating downstream monitoring.",
+          "flag": "weak",
+          "consequence": "You've overcorrected. Contracts and monitoring serve different purposes — contracts prevent semantic breakage at source; monitors catch unexpected volume, latency, and runtime failures that contracts don't cover. Eliminating monitoring creates new blind spots.",
+          "divergenceCost": "Overclaimed a single root cause and proposed a solution that discards a complementary control."
+        },
+        {
+          "id": "B",
+          "label": "\"Monitoring detects after the fact; the stronger fix is a data contract with a producer-side CI check — but we should keep monitors as a second line. Here's how to validate that claim before we build.\"",
+          "detail": "Present the finding, distinguish prevention from detection, and propose a proof-of-concept contract check on the CRM enum to confirm it would have blocked this specific change.",
+          "flag": "strong",
+          "consequence": "You've reframed the VP's assumption with concrete evidence, drawn the right boundary between what contracts prevent and what monitors catch, and offered a falsifiable next step. The VP now has a prioritized recommendation rather than just a faster alarm.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The metric drop wasn't a monitoring gap — it was a missing data contract. Because no formal schema agreement existed at the producer boundary, the upstream team's enum refactor was invisible to any downstream check until real data was already corrupted. The schema-validation coverage view made this structural absence unmistakable: zero coverage exactly where breakage entered. The lesson is directional: monitoring is reactive by design and belongs downstream; data contracts with CI enforcement are preventive and belong at the producer. Adding monitors faster would have shortened the blast radius but left the root cause intact."
+}

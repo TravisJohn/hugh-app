@@ -1,0 +1,150 @@
+{
+  "id": "metric-mismatch",
+  "title": "The Wrong Loss",
+  "scenario": {
+    "role": "Data Scientist",
+    "company": "Dispatchly",
+    "situation": "The delivery-time prediction model has an RMSE of 4.2 minutes — down from 6.8 last quarter — but dispatchers insist the model is useless for deciding which jobs to send drivers to first.",
+    "stakeholderBelief": "The engineering team believes the dispatchers just need time to trust the model, and that pushing RMSE below 3.5 minutes will make the complaints go away.",
+    "question": "Is RMSE the right thing to optimize, or is the model failing the dispatchers for a different reason?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The engineering team wants a plan to cut RMSE further. How do you frame your investigation before agreeing to that roadmap?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Profile the worst-error predictions",
+          "detail": "Find the jobs where predicted vs actual delivery time diverges most and investigate those cases.",
+          "flag": "weak",
+          "consequence": "You identify a cluster of high-error edge cases and reduce them, trimming RMSE slightly. But dispatchers still complain — the model's ranking of jobs hasn't improved at all.",
+          "divergenceCost": "Chased error reduction without questioning whether error was the right thing to chase."
+        },
+        {
+          "id": "B",
+          "label": "Map the model's output to the actual dispatcher workflow",
+          "detail": "Interview dispatchers and trace exactly how model predictions feed into job-prioritization decisions — then check whether RMSE captures that usage.",
+          "flag": "strong",
+          "consequence": "You discover dispatchers never look at the raw minute estimates — they use the model to rank jobs by urgency. RMSE measures point accuracy, not ordering quality. A completely different metric is needed.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "A/B test the current model against a simple baseline",
+          "detail": "Compare RMSE of the model against a naive heuristic (e.g., historical average by zone) to establish whether the model adds value.",
+          "flag": "weak",
+          "consequence": "The model beats the baseline on RMSE, confirming it's technically better — but still doesn't answer why dispatchers find it useless for prioritization.",
+          "divergenceCost": "Validated the wrong dimension of performance and missed the workflow mismatch."
+        },
+        {
+          "id": "D",
+          "label": "Collect more dispatcher feedback via survey",
+          "detail": "Send a structured survey asking dispatchers to rate the model's usefulness and describe pain points.",
+          "flag": "weak",
+          "consequence": "Feedback is slow and qualitative. Dispatchers say 'the order feels wrong' but you lack the quantitative framing to act on it before the next sprint planning meeting.",
+          "divergenceCost": "Chose a slow qualitative instrument when the mismatch was already measurable in the data."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You suspect the model's ranking of jobs is the real problem. Which metric do you use to evaluate whether that's true?",
+      "artifact": {
+        "type": "bars",
+        "title": "Model evaluation by metric — current model vs baseline",
+        "bars": [
+          {
+            "label": "RMSE (min) — Model",
+            "value": 4.2
+          },
+          {
+            "label": "RMSE (min) — Baseline",
+            "value": 6.8
+          },
+          {
+            "label": "MAE (min) — Model",
+            "value": 3.1
+          },
+          {
+            "label": "MAE (min) — Baseline",
+            "value": 5.2
+          }
+        ],
+        "caption": "Both point-error metrics show the model beats the baseline comfortably. Yet dispatchers still report wrong prioritization. Is the problem even visible here?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Mean Absolute Error (MAE) by job type",
+          "detail": "Break MAE down across job categories to find where point-prediction error is largest.",
+          "flag": "weak",
+          "consequence": "MAE varies somewhat by job type, but even fixing the worst category won't change how jobs are ordered relative to each other. The ranking problem is invisible to any point-error metric.",
+          "divergenceCost": "Sliced a metric that still can't capture whether jobs are ordered correctly."
+        },
+        {
+          "id": "B",
+          "label": "Kendall's Tau (rank correlation) between predicted and actual job urgency order",
+          "detail": "Measure how well the model's predicted delivery times rank jobs in the same order as their true urgency.",
+          "flag": "strong",
+          "consequence": "Kendall's Tau is 0.41 for the current model — barely better than random ordering. The baseline heuristic scores 0.39. Despite a 38% RMSE improvement, ranking quality is essentially unchanged. The metric mismatch is now quantified and undeniable.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Ranking quality: Kendall's Tau (predicted vs actual urgency order)",
+            "bars": [
+              {
+                "label": "RMSE-optimized model",
+                "value": 0.41
+              },
+              {
+                "label": "Naive baseline",
+                "value": 0.39
+              },
+              {
+                "label": "Ranking-optimized model (prototype)",
+                "value": 0.74,
+                "highlight": true
+              }
+            ],
+            "caption": "A prototype retrained on a ranking loss (LambdaRank) nearly doubles Tau. The RMSE model offers almost no ranking advantage over guessing."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The ranking metric reveals that RMSE optimization has delivered near-zero improvement in job ordering. What do you tell the engineering team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"RMSE is the wrong loss function — switch to a ranking objective immediately.\"",
+          "detail": "Make the full causal and prescriptive call based on the prototype result.",
+          "flag": "weak",
+          "consequence": "The team retrains on a ranking loss and deploys quickly. Tau improves in offline tests, but without a prospective evaluation you can't confirm the prototype's gains hold on live traffic or that dispatcher workflow actually improves.",
+          "divergenceCost": "Overclaimed from a prototype — skipped the validation step needed to confirm gains in production."
+        },
+        {
+          "id": "B",
+          "label": "\"RMSE optimization isn't improving what dispatchers need — ranking quality is flat. A prototype suggests a ranking loss helps, but we should run a prospective pilot before retraining the production model.\"",
+          "detail": "Present the finding, name the metric gap, and recommend a controlled pilot as the path to certainty.",
+          "flag": "strong",
+          "consequence": "The team understands why further RMSE investment would be wasted and has a credible, low-risk path forward. You've reframed the roadmap with evidence and flagged what still needs validation — exactly what's needed before a production decision.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The model's RMSE had improved by 38% yet delivered almost zero improvement in the thing dispatchers actually needed: correct job ordering. The real driver was a metric-to-decision mismatch — RMSE penalizes large point errors, but prioritization only requires knowing which job is more urgent than another, a ranking problem. Kendall's Tau made the mismatch quantifiable and undeniable. The lesson: before optimizing further, verify that your loss function is aligned to how the model's output is actually used — a better score on the wrong metric is wasted work."
+}

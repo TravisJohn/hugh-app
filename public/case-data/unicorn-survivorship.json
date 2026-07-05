@@ -1,0 +1,140 @@
+{
+  "id": "unicorn-survivorship",
+  "title": "The Founder Playbook",
+  "scenario": {
+    "role": "Investment Analyst",
+    "company": "Launchpad VC",
+    "situation": "A new internal study analyzed 40 unicorns and found nearly all of them moved fast, skipped formal processes, and iterated without structured planning. The accelerator's curriculum team wants to codify this as the definitive founder playbook.",
+    "stakeholderBelief": "The accelerator director believes the study proves that speed and process-skipping are the distinguishing habits of successful founders, and wants to teach it as gospel to every cohort.",
+    "question": "Does the unicorn study actually identify what distinguishes successful founders from unsuccessful ones?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The director wants a quick validation so the curriculum team can move forward. How do you frame your investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Validate the pattern in the unicorn sample",
+          "detail": "Dig deeper into the 40 unicorns to confirm how consistently they show speed and process-skipping.",
+          "flag": "weak",
+          "consequence": "You confirm the pattern is consistent across unicorns — but you've only looked at winners. You have no way to know whether the same behaviors appear in failed startups, so you still can't say what distinguishes success.",
+          "divergenceCost": "Anchored entirely on the winner sample and confirmed a pattern that can't distinguish cause from coincidence."
+        },
+        {
+          "id": "B",
+          "label": "Counterfactual diagnostic: compare winners to a failure sample",
+          "detail": "Ask what the base rate of these behaviors looks like among startups that didn't succeed, so you can test whether the behaviors actually discriminate.",
+          "flag": "strong",
+          "consequence": "Framing the question as a comparison immediately exposes the gap: the study has no failure group. Without a counterfactual, the pattern in the winners is uninterpretable — you've found the right thread to pull.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Survey current cohort founders on their process habits",
+          "detail": "Ask founders in the current accelerator cohort whether they move fast and skip process.",
+          "flag": "weak",
+          "consequence": "You get self-reported behavior data, but it's disconnected from outcomes and subject to social-desirability bias. You still can't say whether these habits drive success.",
+          "divergenceCost": "Collected new data that doesn't address the comparison problem already embedded in the original study."
+        },
+        {
+          "id": "D",
+          "label": "Build a scoring model from the unicorn attributes",
+          "detail": "Quantify how strongly each unicorn exhibits the identified behaviors and fit a predictive model.",
+          "flag": "weak",
+          "consequence": "A model trained only on unicorns can only predict which unicorns are most unicorn-like. It has no signal on what separates winners from losers.",
+          "divergenceCost": "Jumped to modeling on a one-sided sample — sophisticated technique applied to a fundamentally biased dataset."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You pull data from a startup post-mortem database and can now compare behavior rates across outcomes. The database has 160 documented failed startups alongside your 40 unicorns. Which metric do you use to evaluate the 'move fast, skip process' signal?",
+      "artifact": {
+        "type": "bars",
+        "title": "Startups exhibiting 'move fast, skip process' behaviors — raw counts",
+        "bars": [
+          {
+            "label": "Unicorns (n=40)",
+            "value": 36,
+            "highlight": true
+          },
+          {
+            "label": "Failed startups (n=160)",
+            "value": 121
+          }
+        ],
+        "caption": "Raw counts of startups showing the target behaviors. The failure group shows far more cases in absolute terms — but the two groups are very different sizes. What does this actually tell you?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Raw count of startups showing the behaviors",
+          "detail": "Compare how many startups in each group exhibit speed and process-skipping in absolute terms.",
+          "flag": "weak",
+          "consequence": "The failure group shows 121 cases versus 36 among unicorns — which looks like failures are more reckless. But the failure sample is four times larger, so you're comparing volumes, not rates. The raw count is driven entirely by sample size, not by the behavior's prevalence.",
+          "divergenceCost": "Compared raw counts across unequal-sized groups — the difference in volume reflects sample size, not behavioral prevalence."
+        },
+        {
+          "id": "B",
+          "label": "Behavior prevalence rate within each outcome group (normalized %)",
+          "detail": "Calculate what percentage of unicorns vs. failed startups exhibited each behavior.",
+          "flag": "strong",
+          "consequence": "Normalized, the signal collapses: 90% of unicorns showed the behaviors — but so did 76% of failed startups. The behaviors are common across both outcomes. The pattern is not a discriminator; it's a noise artifact of only studying winners.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Prevalence rate of 'move fast, skip process' behaviors by outcome group (%)",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "Unicorns (n=40)",
+                "value": 90
+              },
+              {
+                "label": "Failed startups (n=160)",
+                "value": 76,
+                "highlight": true
+              }
+            ],
+            "caption": "Normalized to group size, failed startups show nearly the same behavior rate as unicorns. The 'playbook' behaviors are not predictive of success — they're just common."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The behavior prevalence rate among failed startups (76%) is nearly as high as among unicorns (90%). What do you tell the accelerator director?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"Speed and process-skipping cause failure — we should actively discourage them.\"",
+          "detail": "Flip the finding: since failures show these behaviors too, reframe them as harmful habits and recommend the curriculum warn against them.",
+          "flag": "weak",
+          "consequence": "You've overcorrected into a new causal claim the data doesn't support. Low discrimination means the behaviors don't reliably separate winners from losers — not that they cause failure. You've replaced one overconfident story with another.",
+          "divergenceCost": "Claimed causation in the opposite direction — low discrimination is not evidence of harm."
+        },
+        {
+          "id": "B",
+          "label": "\"The study can't support a causal playbook — the behaviors appear in failures nearly as often. We should run a properly controlled comparison before teaching this as doctrine.\"",
+          "detail": "Reframe the finding as a survivorship problem and recommend a controlled study before any curriculum decision.",
+          "flag": "strong",
+          "consequence": "You've named the bias, shown the evidence, and given the director a constructive path forward: a controlled comparison study or a cohort experiment that tracks both behaviors and outcomes. The curriculum decision is paused on solid analytical grounds.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The unicorn study was a survivorship trap: by examining only winners, any behavior common among winners looks like a winning behavior — even if failures show it just as often. The normalized comparison across unequal-sized outcome groups makes this unmistakable: the 'playbook' behaviors appear in 76–90% of startups regardless of outcome, so they carry almost no discriminating power. The non-obvious lesson is that the raw-count artifact actively deceives in the opposite direction — failures appear to show more of the behavior in absolute terms — making normalization essential, not merely tidy."
+}

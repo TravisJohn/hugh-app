@@ -1,0 +1,156 @@
+{
+  "id": "small-files",
+  "title": "The Million Tiny Files",
+  "scenario": {
+    "role": "Data Engineer",
+    "company": "Sensorframe",
+    "situation": "A streaming pipeline writes one file per sensor event to the data lake. Over the past month, query latency on the lake has climbed from 4 seconds to 90 seconds. The lead wants to scale up the query cluster.",
+    "stakeholderBelief": "The lead is convinced the query cluster is undersized — the data volume has tripled and the nodes must be saturated.",
+    "question": "Is the cluster actually the bottleneck, or is something else throttling query performance?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The lead wants you to justify a cluster upgrade. How do you frame your investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Benchmark the cluster under load",
+          "detail": "Run heavy queries and watch CPU and memory utilization to see if nodes are saturated.",
+          "flag": "weak",
+          "consequence": "CPU and memory look high during queries — but high resource use during a slow query doesn't mean the cluster is too small. It might just mean the query itself is doing something pathological. You've confirmed the symptom, not the cause.",
+          "divergenceCost": "Anchored on the lead's hypothesis and mistook a symptom for a root cause."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic decomposition of query execution",
+          "detail": "Break a slow query into its phases — planning, file listing, metadata fetch, scan, shuffle — and measure time spent in each phase.",
+          "flag": "strong",
+          "consequence": "The query plan shows almost all latency sits in the metadata and file-open phases, not in data scanning or shuffling. This points away from cluster size entirely and opens a structural thread worth following.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Compare performance across query types",
+          "detail": "Run a mix of aggregations, joins, and point lookups to see which are slowest.",
+          "flag": "weak",
+          "consequence": "All query types are slow, not just complex ones. That's a clue, but without knowing why, you've added data points without a direction. You're still not sure if it's the cluster or something else.",
+          "divergenceCost": "Gathered broad symptoms without a framework to interpret them."
+        },
+        {
+          "id": "D",
+          "label": "Scale up the cluster as a test",
+          "detail": "Double the node count and see if latency drops.",
+          "flag": "weak",
+          "consequence": "Latency barely moves after scaling. The team has spent real money on an experiment that didn't isolate the variable — and the lead is confused rather than convinced.",
+          "divergenceCost": "Treated infrastructure spend as a diagnostic instrument — expensive and inconclusive."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "Query-phase decomposition shows file-open overhead dominates. Which metric do you examine to confirm the structural problem?",
+      "artifact": {
+        "type": "bars",
+        "title": "Data lake storage — total size by table (TB)",
+        "bars": [
+          {
+            "label": "sensor_events (streaming)",
+            "value": 4.8,
+            "highlight": true
+          },
+          {
+            "label": "device_registry",
+            "value": 0.6
+          },
+          {
+            "label": "aggregated_hourly",
+            "value": 0.9
+          },
+          {
+            "label": "reference_lookup",
+            "value": 0.2
+          }
+        ],
+        "caption": "sensor_events is the largest table by raw size — but is data volume really the problem?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Total data volume per table (TB)",
+          "detail": "Compare how many terabytes each table occupies to find the heaviest one.",
+          "flag": "weak",
+          "consequence": "sensor_events is the biggest table — which seems to confirm the cluster is overwhelmed by data volume. But the aggregated_hourly table holds similar logical content in far fewer files and queries in under 3 seconds. Volume alone doesn't explain the gap.",
+          "divergenceCost": "Measured data size when the bottleneck was file count — the wrong unit entirely."
+        },
+        {
+          "id": "B",
+          "label": "File count and median file size per table",
+          "detail": "Count how many physical files exist per table and compute median file size.",
+          "flag": "strong",
+          "consequence": "The picture is stark: sensor_events holds 14 million files at a median size of 12 KB each. aggregated_hourly holds 900 files averaging 420 MB each — and queries it in seconds. The engine is paying per-file metadata overhead 14 million times per query, not struggling with data volume.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Median file size by table (MB)",
+            "unit": "MB",
+            "bars": [
+              {
+                "label": "sensor_events (streaming)",
+                "value": 0.012,
+                "highlight": true
+              },
+              {
+                "label": "device_registry",
+                "value": 185
+              },
+              {
+                "label": "aggregated_hourly",
+                "value": 420
+              },
+              {
+                "label": "reference_lookup",
+                "value": 310
+              }
+            ],
+            "caption": "sensor_events median file is 0.012 MB — 35,000× smaller than a right-sized file. 14 million open/close operations per query explain the crawl."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "File count, not data volume, correlates with the latency spike. What do you tell the lead?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"It's the small-files problem — skip the upgrade and compact the table.\"",
+          "detail": "Make the causal call and recommend compaction as the fix.",
+          "flag": "weak",
+          "consequence": "You may well be right, but you've asserted causation from a correlation without a controlled validation. If something else is also degrading performance, compaction alone won't fully recover latency and your credibility takes a hit.",
+          "divergenceCost": "Overclaimed causation before a controlled validation — risked credibility on a single correlate."
+        },
+        {
+          "id": "B",
+          "label": "\"File count is the dominant correlate, not data volume — compaction is the highest-probability fix. Let's run a controlled compaction on one partition and measure latency before we re-architect or spend on compute.\"",
+          "detail": "Present the finding, acknowledge the causal gap, and propose a low-cost validation step.",
+          "flag": "strong",
+          "consequence": "The lead sees the evidence clearly, understands why the cluster upgrade hypothesis doesn't hold up, and agrees to a single-partition compaction test. It's cheap, fast, and will confirm or falsify the diagnosis before any major investment.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The cluster wasn't undersized — the query engine was paying a per-file metadata and open overhead across 14 million tiny files, each written by a one-event-per-file streaming pattern. Data volume had tripled but file count had grown far faster, and those are different bottlenecks entirely. The lesson is the small-files problem: in distributed lake engines, file count throttles performance more than data size does, because planning and metadata overhead scales with files, not bytes. Compacting to right-sized files (hundreds of MB) dissolves the bottleneck without touching the cluster."
+}

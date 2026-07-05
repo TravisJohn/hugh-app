@@ -1,0 +1,146 @@
+{
+  "id": "targeting-confound",
+  "title": "The Discount Addicts",
+  "scenario": {
+    "role": "Pricing Analyst",
+    "company": "Shelfies (e-commerce retailer)",
+    "situation": "Customers who redeem discounts have margins 22 points lower than non-discount customers. The pricing team wants to cut the discount program to protect margin.",
+    "stakeholderBelief": "Leadership believes discounts are actively destroying margin — that shoppers who would have paid full price are instead using coupons.",
+    "question": "Are discounts the cause of low margin, or is something else going on?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "Leadership wants you to build the case for cutting discounts. How do you frame the investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Measure margin loss attributable to discounts",
+          "detail": "Quantify how much margin is surrendered on every discounted transaction.",
+          "flag": "weak",
+          "consequence": "You confirm that discounted orders have lower margin — but this is just arithmetic. You've measured the discount itself, not whether the shopper would have bought at full price. The framing assumed guilt and found it.",
+          "divergenceCost": "Anchored on leadership's hypothesis and measured the symptom, not the cause."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic segmentation on who receives discounts",
+          "detail": "Examine the price-sensitivity profile and purchase behavior of discount users vs. non-users before any discount is applied.",
+          "flag": "strong",
+          "consequence": "You immediately see that discount users are drawn from a systematically different population — lower willingness-to-pay, higher cart abandonment at full price. The treatment and the recipient are confounded, which changes the whole question.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "A/B test: send discounts to a random sample",
+          "detail": "Randomly assign discounts to customers regardless of segment and compare margins.",
+          "flag": "weak",
+          "consequence": "A good long-run design, but you don't have the data yet and it takes weeks. More critically, you'd be randomizing a targeted treatment that was never designed for universal use — the test answers a different question than the one leadership is acting on right now.",
+          "divergenceCost": "Jumped to experimentation before diagnosing the existing targeting mechanism."
+        },
+        {
+          "id": "D",
+          "label": "Benchmark discount rates against industry comps",
+          "detail": "Compare Shelfies' discount frequency and depth to competitor data.",
+          "flag": "weak",
+          "consequence": "You learn that Shelfies discounts more than average — but benchmarks say nothing about which customers receive them or what happens if you stop. External comps can't tell you your own targeting logic.",
+          "divergenceCost": "Sought external validation when the critical signal was in internal customer data."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "Segmentation shows discount users look different before the discount is applied. Which metric do you use to confirm the real driver?",
+      "artifact": {
+        "type": "bars",
+        "title": "Average order margin by customer type — last quarter",
+        "bars": [
+          {
+            "label": "Full-price buyers",
+            "value": 38
+          },
+          {
+            "label": "Discount users",
+            "value": 16
+          },
+          {
+            "label": "Lapsed (no purchase)",
+            "value": 0
+          }
+        ],
+        "caption": "Raw average margins. Discount users look far worse — but does this reflect the discount, the shopper, or both?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Average margin per order: discount vs. non-discount",
+          "detail": "Compare mean order margin for customers who used a discount against those who did not.",
+          "flag": "weak",
+          "consequence": "The gap looks damning — 16% vs. 38%. But you're comparing two inherently different populations. Discount users were targeted precisely because they wouldn't buy at full price. The metric mixes the targeting rule with the outcome, so the gap overstates how much margin the discount itself destroys.",
+          "divergenceCost": "Compared groups that were never equivalent — the targeting rule is baked into the metric."
+        },
+        {
+          "id": "B",
+          "label": "Estimated margin if discount users paid full price (counterfactual conversion rate)",
+          "detail": "Use cart-abandonment and browse-without-buy rates for discount users at full price to estimate what revenue — if any — Shelfies would actually capture without the discount.",
+          "flag": "strong",
+          "consequence": "The picture flips. Discount users abandon at full price 74% of the time. Cutting discounts doesn't convert them to full-price buyers — it loses the sale entirely. The true counterfactual margin for most of these customers is zero, not 38%.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Projected margin per discount-user cohort under cut-discount scenario",
+            "bars": [
+              {
+                "label": "Retains & pays full price",
+                "value": 5
+              },
+              {
+                "label": "Buys anyway (low sensitivity)",
+                "value": 3
+              },
+              {
+                "label": "Abandons — $0 margin",
+                "value": 74,
+                "highlight": true
+              }
+            ],
+            "caption": "74% of discount users are projected to abandon entirely if discounts are removed. The recoverable margin gain is marginal; the lost revenue dominates."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The counterfactual analysis suggests cutting discounts loses more revenue than it saves. What do you tell leadership?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"Discounts aren't the problem — cutting them will tank revenue. Keep the program.\"",
+          "detail": "Make the causal call and recommend no change.",
+          "flag": "weak",
+          "consequence": "You've used a modeled counterfactual as if it were a controlled experiment. Abandonment rates at full price were measured in a world where discounts existed — customer behavior could shift if the program changes. A confident recommendation built on an observational estimate could still be wrong.",
+          "divergenceCost": "Treated a modeled estimate as causal proof and made a definitive recommendation."
+        },
+        {
+          "id": "B",
+          "label": "\"The margin gap reflects who gets discounts, not just the discount itself — cutting them likely loses the sale. We should validate with a controlled holdout before acting.\"",
+          "detail": "Reframe the finding, flag the targeting confound, and recommend a causal test.",
+          "flag": "strong",
+          "consequence": "You've reframed leadership's assumption with evidence, named the targeting confound explicitly, and proposed a holdout test on a subset of discount-eligible customers to measure true causal impact. This protects Shelfies from a costly mistake while charting a path to a defensible answer.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The low margin of discount users wasn't caused by discounts — discounts were targeted at shoppers who were already price-sensitive and would not buy at full price. Comparing discount users to full-price buyers confounds the targeting rule with the treatment effect, making the discount look destructive when it may actually be capturing revenue that would otherwise be zero. The lesson: whenever a treatment is selectively assigned, the group receiving it is never a fair comparison to the group that doesn't — you must reason about the counterfactual, not just the observed outcome."
+}

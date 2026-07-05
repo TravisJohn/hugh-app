@@ -1,0 +1,151 @@
+{
+  "id": "group-leakage",
+  "title": "The Duplicated Split",
+  "scenario": {
+    "role": "ML Engineer",
+    "company": "Visionary Labs",
+    "situation": "An image classifier hits 97% accuracy on the offline test set but only 70% on live production traffic, and the discrepancy was discovered after deployment.",
+    "stakeholderBelief": "The Head of ML is convinced the gap is caused by distribution shift — production images look different from training images due to new camera hardware rolled out last month.",
+    "question": "Is distribution shift really responsible for the 27-point accuracy gap?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The Head of ML wants you to investigate the distribution shift hypothesis. How do you frame your investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Measure covariate shift between train and production",
+          "detail": "Compute feature distribution statistics (pixel statistics, embedding distances) between training data and live production samples.",
+          "flag": "weak",
+          "consequence": "You find modest distributional differences consistent with new camera hardware. This confirms the hypothesis on the surface — but you've only looked where you were told to look. The offline test set was never interrogated at all.",
+          "divergenceCost": "Anchored on the stakeholder's hypothesis and never questioned whether the offline benchmark was valid in the first place."
+        },
+        {
+          "id": "B",
+          "label": "Audit the train/test split construction before accepting the 97% benchmark",
+          "detail": "Step back and ask whether the offline metric is trustworthy: inspect how the split was built, what the unit of observation is, and whether any shared structure exists across splits.",
+          "flag": "strong",
+          "consequence": "You immediately find that the dataset contains multiple augmented crops from the same subjects, and the split was done at the image level — not the subject level. This opens a contamination thread the distribution-shift hypothesis would never have surfaced.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Collect more production samples and retrain the model",
+          "detail": "Gather recent production images, add them to training data, and fine-tune the model to close the gap.",
+          "flag": "weak",
+          "consequence": "Retraining on production samples nudges accuracy up slightly, but the fundamental benchmark inflation is never caught. The new model will still be evaluated on a leaky split and will appear to 'work' offline again.",
+          "divergenceCost": "Jumped to remediation before diagnosing the root cause — the leaky evaluation persists."
+        },
+        {
+          "id": "D",
+          "label": "Run error analysis on production misclassifications",
+          "detail": "Sample and manually label production images the model got wrong to characterize the failure mode.",
+          "flag": "weak",
+          "consequence": "You catalog interesting failure patterns, but they look like edge cases on unfamiliar subjects — consistent with both drift AND leakage. Error analysis alone can't distinguish between the two explanations.",
+          "divergenceCost": "Gathered useful color but couldn't distinguish leakage from drift — the root cause remains ambiguous."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "Auditing the split reveals the dataset has 4,200 images of 420 distinct subjects, each with ~10 augmented variants. Which metric do you use to assess the model's true generalization?",
+      "artifact": {
+        "type": "bars",
+        "title": "Model accuracy across evaluation cuts — raw image-level split",
+        "bars": [
+          {
+            "label": "Offline test (image split)",
+            "value": 97,
+            "highlight": false
+          },
+          {
+            "label": "Production (live)",
+            "value": 70
+          },
+          {
+            "label": "New-camera subset",
+            "value": 68
+          },
+          {
+            "label": "Old-camera subset",
+            "value": 72
+          }
+        ],
+        "caption": "Image-level offline accuracy looks strong. Camera-era subsets are both far below it, suggesting shift — but the camera subsets track each other closely, which is suspicious if shift were the real driver."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Accuracy on the existing image-level test set",
+          "detail": "Use the 97% figure already computed on the held-out images from the original random split.",
+          "flag": "weak",
+          "consequence": "The 97% benchmark stands — but it was computed on images whose subject-twins live in the training set. The model memorized identities rather than learning generalizable features, and this metric can't reveal that.",
+          "divergenceCost": "Trusted a metric built on a contaminated split — the leakage stays invisible."
+        },
+        {
+          "id": "B",
+          "label": "Accuracy on a subject-grouped holdout (no subject appears in both train and test)",
+          "detail": "Regroup data by subject ID, perform a group-aware split so all images of a given subject are exclusively in train or test, and re-evaluate.",
+          "flag": "strong",
+          "consequence": "With subjects properly isolated, offline accuracy drops to 71% — almost exactly matching production. The 97% was entirely an artifact of near-duplicate leakage across the original split, not a signal of real model quality.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Model accuracy — subject-grouped split vs. original image split",
+            "bars": [
+              {
+                "label": "Offline (image split, leaky)",
+                "value": 97
+              },
+              {
+                "label": "Offline (subject-grouped, clean)",
+                "value": 71,
+                "highlight": true
+              },
+              {
+                "label": "Production (live)",
+                "value": 70
+              }
+            ],
+            "caption": "Once subjects are grouped before splitting, offline accuracy collapses to 71% — nearly identical to production. The gap was the benchmark, not the world."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The subject-grouped split yields 71% offline, matching production almost exactly. What do you tell the Head of ML?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"There's no distribution shift — it's purely group leakage. Rebuild the split and the problem is solved.\"",
+          "detail": "Make the definitive causal call and close the investigation.",
+          "flag": "weak",
+          "consequence": "You've correctly identified leakage, but overstated certainty. A modest residual gap could still include some real drift. Closing the investigation now risks missing a compounding factor, and the team rebuilds the split without validating on a truly independent production holdout.",
+          "divergenceCost": "Overclaimed a complete explanation and skipped the validation step that would confirm it."
+        },
+        {
+          "id": "B",
+          "label": "\"Distribution shift is not the primary driver — group leakage inflated the benchmark by ~27 points. We should rebuild the split grouped by subject and validate the new benchmark against a curated production holdout before drawing final conclusions.\"",
+          "detail": "Report the finding, name the mechanism, and recommend a confirmatory step.",
+          "flag": "strong",
+          "consequence": "You've reframed the team's mental model with concrete evidence — the gap was in the ruler, not the model's environment — and you've proposed a clean path to a trustworthy benchmark. The Head of ML can now prioritize model improvement with accurate baselines rather than chasing phantom drift.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The 97% accuracy was never real — augmented crops of the same subjects leaked across the image-level train/test boundary, letting the model 'recognize' near-duplicates it had already memorized. Grouping by subject before splitting collapsed offline accuracy to 71%, perfectly matching production and eliminating the apparent distribution shift. The lesson is architectural: whenever a dataset has a natural grouping entity (subject, patient, session, document), the split must be performed at that entity level or the benchmark measures memorization, not generalization."
+}

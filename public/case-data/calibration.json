@@ -1,0 +1,203 @@
+{
+  "id": "calibration",
+  "title": "The Confident Model",
+  "scenario": {
+    "role": "Data Scientist",
+    "company": "Underwrite.ai",
+    "situation": "The risk model scores loan applicants 0–1, achieves AUC 0.91 on the holdout set, and the pricing team treats a score of 0.8 as an 80% default probability. Actual default rates on high-score buckets are running well below 80%, and the business suspects the model is too pessimistic — leading to over-priced loans and lost customers.",
+    "stakeholderBelief": "The Head of Pricing is convinced the model is trustworthy because AUC 0.91 is 'excellent', and blames the mis-pricing on a bad rate table built by Finance.",
+    "question": "Is the model's output actually reliable as a default probability, or is something else causing the mis-pricing?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The Head of Pricing wants a quick fix to the rate table. How do you frame your investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Audit the Finance rate table",
+          "detail": "Pull the rate table and check whether the bands map correctly to model scores.",
+          "flag": "weak",
+          "consequence": "The rate table math checks out fine. You've confirmed Finance didn't make an error, but you still have no idea why the charged rates diverge from realized defaults. You've chased the red herring.",
+          "divergenceCost": "Anchored on the stakeholder's blame target instead of questioning the model output itself."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic calibration check",
+          "detail": "Compare the model's predicted probabilities against observed default rates across score buckets to see whether the scores behave like true probabilities.",
+          "flag": "strong",
+          "consequence": "Binning applicants by score decile and overlaying actual default rates immediately reveals a systematic gap: the model's scores are far more extreme than reality. The investigation now has a concrete, testable thread.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Re-train with more recent data",
+          "detail": "Assume the model has drifted and kick off a full re-training cycle.",
+          "flag": "weak",
+          "consequence": "Re-training takes three weeks and yields AUC 0.92 — but the new model has the same calibration problem. You've improved ranking marginally while leaving the root cause untouched.",
+          "divergenceCost": "Jumped to re-training before diagnosing whether the current model's problem was rank order or probability accuracy."
+        },
+        {
+          "id": "D",
+          "label": "Check for data leakage in the training set",
+          "detail": "Review feature engineering pipelines to rule out leakage inflating AUC.",
+          "flag": "weak",
+          "consequence": "No leakage is found; AUC 0.91 is real. But the mis-pricing persists and you've spent time on a clean pipeline that isn't the problem.",
+          "divergenceCost": "Investigated model validity on the wrong axis — leakage rather than probability reliability."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You've decided to examine how the model's scores relate to real outcomes. Which metric do you use to judge whether the model is trustworthy for pricing?",
+      "artifact": {
+        "type": "bars",
+        "title": "Model AUC by score decile — holdout set",
+        "bars": [
+          {
+            "label": "Decile 1 (lowest)",
+            "value": 0.91
+          },
+          {
+            "label": "Decile 2",
+            "value": 0.91
+          },
+          {
+            "label": "Decile 3",
+            "value": 0.9
+          },
+          {
+            "label": "Decile 4",
+            "value": 0.91
+          },
+          {
+            "label": "Decile 5",
+            "value": 0.92
+          },
+          {
+            "label": "Decile 6",
+            "value": 0.91
+          },
+          {
+            "label": "Decile 7",
+            "value": 0.9
+          },
+          {
+            "label": "Decile 8",
+            "value": 0.91
+          },
+          {
+            "label": "Decile 9",
+            "value": 0.91
+          },
+          {
+            "label": "Decile 10 (highest)",
+            "value": 0.91
+          }
+        ],
+        "caption": "AUC is stable and high across all deciles — ranking looks excellent everywhere. But does this tell you whether a score of 0.8 means 80% default probability?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "AUC across score deciles",
+          "detail": "Confirm the model ranks applicants correctly by checking AUC within each score band.",
+          "flag": "weak",
+          "consequence": "AUC is uniformly 0.91 across every decile — the model is an excellent ranker. But you still don't know whether a score of 0.8 corresponds to an 80% default rate. AUC measures ordering, not probability accuracy; this chart is silent on the real problem.",
+          "divergenceCost": "Confirmed ranking quality while ignoring whether the scores are valid probabilities — the exact question the business needs answered."
+        },
+        {
+          "id": "B",
+          "label": "Calibration curve (predicted probability vs. observed default rate)",
+          "detail": "Bin applicants by model score, then plot mean predicted probability against actual observed default rate per bin.",
+          "flag": "strong",
+          "consequence": "The calibration curve bends sharply away from the diagonal: the model predicts 70–80% default for a bucket that actually defaults at 30–35%. The scores are systematically overconfident at the high end. The mis-pricing cause is now unmistakable.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Calibration: predicted probability vs. observed default rate by score bucket",
+            "bars": [
+              {
+                "label": "Score 0.0–0.2 (pred)",
+                "value": 8
+              },
+              {
+                "label": "Score 0.0–0.2 (actual)",
+                "value": 7
+              },
+              {
+                "label": "Score 0.2–0.4 (pred)",
+                "value": 28
+              },
+              {
+                "label": "Score 0.2–0.4 (actual)",
+                "value": 22
+              },
+              {
+                "label": "Score 0.4–0.6 (pred)",
+                "value": 48
+              },
+              {
+                "label": "Score 0.4–0.6 (actual)",
+                "value": 33
+              },
+              {
+                "label": "Score 0.6–0.8 (pred)",
+                "value": 68
+              },
+              {
+                "label": "Score 0.6–0.8 (actual)",
+                "value": 41
+              },
+              {
+                "label": "Score 0.8–1.0 (pred)",
+                "value": 83,
+                "highlight": true
+              },
+              {
+                "label": "Score 0.8–1.0 (actual)",
+                "value": 34,
+                "highlight": true
+              }
+            ],
+            "caption": "Predicted vs. actual default rate (%) per score bucket. The highest-score bucket predicts 83% default but observes only 34% — the model is dramatically overconfident, and the gap grows with score."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The calibration curve shows the model is badly overconfident at high scores. What do you tell the Head of Pricing?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"AUC is meaningless — replace the model immediately.\"",
+          "detail": "Declare the model unfit and recommend a rebuild.",
+          "flag": "weak",
+          "consequence": "The Pricing Head pushes back hard: the model ranks applicants superbly and took 18 months to build. Discarding it was an overclaim — calibration is a post-processing fix, not a signal the model is wrong about ordering.",
+          "divergenceCost": "Overclaimed the severity of the flaw — AUC and calibration are separate properties, and a well-ranking model with poor calibration is fixable, not replaceable."
+        },
+        {
+          "id": "B",
+          "label": "\"The model ranks risk well (AUC 0.91), but its scores are not valid probabilities — they're systematically overconfident. We should apply Platt scaling or isotonic regression to recalibrate, then validate the corrected probabilities on a holdout before repricing.\"",
+          "detail": "Report the finding, explain the distinction, and propose a calibration step.",
+          "flag": "strong",
+          "consequence": "The Pricing Head understands the distinction: the ranker is sound, but the probability layer needs a fix. You're greenlighted to apply isotonic calibration on a validation fold, confirm the curve straightens, and hand corrected probabilities to Finance for a rate table update — all without discarding the model.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "A high AUC confirms the model orders applicants correctly — it says nothing about whether the raw scores are valid probabilities. The model was overconfident at the high end: scores near 0.8 corresponded to observed default rates near 0.34. The fix is not a rebuild but a calibration layer (Platt scaling or isotonic regression) applied after training and validated on a holdout. The lesson: AUC and calibration are orthogonal — always plot a calibration curve before treating model scores as probabilities in any downstream business calculation."
+}

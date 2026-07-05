@@ -1,0 +1,171 @@
+{
+  "id": "extrapolation-pricing",
+  "title": "The Out-of-Range Price",
+  "scenario": {
+    "role": "Data Scientist",
+    "company": "Priceright",
+    "situation": "The demand model recommends a price 40% above anything seen in training data, projecting a 28% revenue lift. The optimizer says go.",
+    "stakeholderBelief": "The product team wants to trust the optimizer — it's the most sophisticated model the company has ever built, and the revenue projection looks compelling.",
+    "question": "Should Priceright act on the optimizer's recommended price?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The product team is ready to ship the new price. How do you frame your investigation before signing off?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Validate the model's accuracy on held-out data",
+          "detail": "Run standard holdout metrics (RMSE, R²) to confirm the model performs well.",
+          "flag": "weak",
+          "consequence": "The model scores well on held-out data — but that data came from the same observed price range as training. Good in-sample accuracy says nothing about what the model does outside that range. You've confirmed the wrong thing.",
+          "divergenceCost": "Validated performance inside the training range, which doesn't speak to extrapolation risk."
+        },
+        {
+          "id": "B",
+          "label": "Examine the model's predictions across the full price range, including unobserved territory",
+          "detail": "Plot predicted demand vs. price from the lowest observed price through the recommended price — and flag where observed data ends.",
+          "flag": "strong",
+          "consequence": "You immediately see that the model's predicted demand curve continues near-linearly into a price region where Priceright has zero historical transactions. The recommendation lives entirely outside the training support. This is the thread everything else follows.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Benchmark the recommended price against competitors",
+          "detail": "Check whether the new price is in line with market rates.",
+          "flag": "weak",
+          "consequence": "Competitor prices give context but don't tell you whether your model's demand curve is trustworthy at that price. You've added business color without touching the core reliability question.",
+          "divergenceCost": "Shifted focus to external benchmarking and bypassed the model's structural limitation."
+        },
+        {
+          "id": "D",
+          "label": "Ask the optimizer to generate a confidence interval around the projection",
+          "detail": "Request uncertainty bands on the 28% revenue lift estimate.",
+          "flag": "weak",
+          "consequence": "The model produces confidence intervals — but they're computed from in-range variance and don't widen to reflect the total absence of data at the recommended price. The bands look reassuringly narrow and are structurally misleading.",
+          "divergenceCost": "Relied on confidence intervals that don't account for out-of-support extrapolation."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You've plotted the model's predictions across the price range. Which metric best exposes whether the recommendation is trustworthy?",
+      "artifact": {
+        "type": "bars",
+        "title": "Predicted revenue lift by price point (model output)",
+        "bars": [
+          {
+            "label": "$80 (–20% vs. current)",
+            "value": 8
+          },
+          {
+            "label": "$95 (–5% vs. current)",
+            "value": 14
+          },
+          {
+            "label": "$100 (current)",
+            "value": 18
+          },
+          {
+            "label": "$120 (+20%)",
+            "value": 23
+          },
+          {
+            "label": "$140 (+40% — recommended)",
+            "value": 28,
+            "highlight": true
+          }
+        ],
+        "caption": "Projected revenue lift (%) climbs smoothly to the recommended price — but this is raw model output with no indication of where observed data ends."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Projected revenue lift from the model",
+          "detail": "Use the optimizer's own revenue lift projections as the evidence of record.",
+          "flag": "weak",
+          "consequence": "The projections look smooth and compelling — they rise monotonically to the recommended price. But the model is generating these numbers by extrapolating a linear-ish trend, not from any observed demand signal. The chart is a picture of the model's assumptions, not reality.",
+          "divergenceCost": "Treated model output as evidence without checking whether that output was grounded in data."
+        },
+        {
+          "id": "B",
+          "label": "Density of observed transactions per price band",
+          "detail": "Count how many real historical transactions fall within each $10 price band up to and including the recommended price.",
+          "flag": "strong",
+          "consequence": "The data density chart is stark: transaction counts are healthy through the current price range, drop sharply above $115, and hit zero by $125. The recommended price of $140 sits in a region with no observed support whatsoever. The model's confident projection is built on nothing.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Observed transaction density by price band",
+            "bars": [
+              {
+                "label": "$70–$80",
+                "value": 4200
+              },
+              {
+                "label": "$81–$90",
+                "value": 3850
+              },
+              {
+                "label": "$91–$100",
+                "value": 3100
+              },
+              {
+                "label": "$101–$110",
+                "value": 1540
+              },
+              {
+                "label": "$111–$120",
+                "value": 310
+              },
+              {
+                "label": "$121–$130",
+                "value": 42
+              },
+              {
+                "label": "$131–$140 (recommended)",
+                "value": 0,
+                "highlight": true
+              }
+            ],
+            "caption": "Transaction count per price band. The recommended price falls in a band with zero observed transactions — the model has no real demand signal there."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The data shows the recommended price is entirely outside the model's training support. What do you tell the product team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The model is extrapolating — this price will collapse demand. Don't ship it.\"",
+          "detail": "Make the definitive call that the recommended price is wrong.",
+          "flag": "weak",
+          "consequence": "You've correctly identified the extrapolation problem, but asserting that demand will collapse is itself an out-of-support claim — you don't actually have data there. The team may push back, and you have no empirical ground to stand on for the specific magnitude of harm.",
+          "divergenceCost": "Overclaimed the outcome in the unobserved region rather than recommending a way to observe it."
+        },
+        {
+          "id": "B",
+          "label": "\"The projected lift is based on extrapolation with zero transaction support at that price — the model can't be trusted here. Let's constrain optimization to the observed range and run a limited price test to explore higher bands safely.\"",
+          "detail": "Reframe the finding, flag the structural limit, and propose a path to real evidence.",
+          "flag": "strong",
+          "consequence": "You've shown the product team exactly where the model's knowledge ends, given them a safe interim recommendation (optimize within observed support), and proposed a price experiment that would generate real data — turning a risky ship into a structured learning opportunity.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The optimizer's revenue projection was technically coherent — it was doing exactly what it was trained to do, fitting a curve and following it. The problem is that the curve ran off the edge of the data. Strong in-sample accuracy and smooth model output can mask the fact that a recommendation lives in a region the model has never seen. The lesson is structural: before acting on any model-driven optimum, check whether that optimum falls inside the observed support — and if it doesn't, the right move is a constrained recommendation plus an experiment, not a confident ship."
+}

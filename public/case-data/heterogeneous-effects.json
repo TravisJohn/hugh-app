@@ -1,0 +1,156 @@
+{
+  "id": "heterogeneous-effects",
+  "title": "The Average That Hid Two Stories",
+  "scenario": {
+    "role": "Experimentation Analyst",
+    "company": "Farely",
+    "situation": "A pricing experiment concluded last week. The average revenue-per-user difference between treatment and control is essentially zero (+0.3%, p=0.71), so the team has filed it as a neutral result and is preparing to roll back.",
+    "stakeholderBelief": "The product team concludes the pricing change had no impact and plans to deprioritize pricing work entirely this quarter.",
+    "question": "Is the null result real, or is something hiding inside the average?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team is ready to move on. How do you frame your investigation before signing off?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Recheck the p-value with a larger sample",
+          "detail": "Request an extended run of the experiment to get more statistical power on the aggregate metric.",
+          "flag": "weak",
+          "consequence": "You get a longer run and the aggregate effect is still near zero. More power on the wrong question just gives you a more precise answer to the wrong question.",
+          "divergenceCost": "Anchored on the aggregate metric and wasted time gaining precision on a misleading summary."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic segmentation of the treatment effect",
+          "detail": "Before accepting the null, slice the treatment effect across user segments to check whether the average conceals opposing subgroup responses.",
+          "flag": "strong",
+          "consequence": "You find the aggregate is a graveyard average: a large positive lift in one segment and an equally large negative effect in another are canceling each other out. The null was an artifact of aggregation.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Survey users about price sensitivity",
+          "detail": "Run a post-experiment survey asking users how they felt about the new pricing.",
+          "flag": "weak",
+          "consequence": "You collect qualitative sentiment, but it can't be linked back to the revenue signal with confidence. The answer was already in the behavioral data.",
+          "divergenceCost": "Chose a slow, self-report instrument when the behavioral data already contained the answer."
+        },
+        {
+          "id": "D",
+          "label": "Accept the null and write the post-mortem",
+          "detail": "The test was properly powered and the result is clear — document it and move on.",
+          "flag": "weak",
+          "consequence": "The post-mortem goes out and the rollback happens. Two large business opportunities — targeting high-intent users and protecting price-sensitive ones — are buried under the words 'no effect.'",
+          "divergenceCost": "Accepted a statistically convenient summary without checking whether heterogeneity invalidated it."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You decide to segment. The experiment platform gives you a breakdown by user segment. Which cut do you trust to confirm or deny the real story?",
+      "artifact": {
+        "type": "bars",
+        "title": "Average revenue-per-user change by segment — treatment vs. control (raw $)",
+        "bars": [
+          {
+            "label": "High-intent users",
+            "value": 4.1
+          },
+          {
+            "label": "Casual browsers",
+            "value": -0.2
+          },
+          {
+            "label": "Price-sensitive users",
+            "value": -3.9
+          },
+          {
+            "label": "All users (average)",
+            "value": 0.3
+          }
+        ],
+        "caption": "Raw dollar differences look small in aggregate. But is the all-users average the right lens, or does segment size distort the picture?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Raw revenue-per-user delta across segments",
+          "detail": "Compare the absolute dollar change in revenue-per-user for each segment as reported.",
+          "flag": "weak",
+          "consequence": "The dollar deltas look moderate and partially offset. Because segment sizes differ, you can't tell whether the +$4.10 and -$3.90 represent similarly large proportional swings or whether one is a small relative blip. The story is still blurry.",
+          "divergenceCost": "Compared absolute dollar deltas across unequally sized segments — segment size differences still confound the magnitude of each effect."
+        },
+        {
+          "id": "B",
+          "label": "Relative lift (% change in revenue-per-user) by segment",
+          "detail": "Express each segment's treatment effect as a percentage change from its own control baseline, then compare.",
+          "flag": "strong",
+          "consequence": "Normalized to each segment's own baseline, the signal is unmistakable: high-intent users saw a +19% lift while price-sensitive users saw a -22% drop — both large and in opposite directions. Casual browsers were genuinely unaffected. The null average was entirely an artifact of two big effects canceling.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Relative lift in revenue-per-user by segment (% vs. own control baseline)",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "High-intent users",
+                "value": 19.2,
+                "highlight": true
+              },
+              {
+                "label": "Casual browsers",
+                "value": -1.1
+              },
+              {
+                "label": "Price-sensitive users",
+                "value": -21.8,
+                "highlight": true
+              },
+              {
+                "label": "All users (average)",
+                "value": 0.3
+              }
+            ],
+            "caption": "Relative to each segment's own baseline, two large opposing effects emerge clearly. The aggregate masks both — casual browsers are the only segment truly unaffected."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The relative-lift view shows +19% for high-intent users and -22% for price-sensitive users, canceling in aggregate. What do you tell the product team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The null was wrong — roll out to high-intent users now and exclude price-sensitive ones.\"",
+          "detail": "Declare the heterogeneous effects confirmed and recommend the targeted rollout immediately.",
+          "flag": "weak",
+          "consequence": "You've made a causal targeting recommendation from a single observational segmentation cut. If the segment labels are noisy or the segments differ on confounders beyond intent, the targeted rollout may not replicate the lift — and could actively harm the price-sensitive group at scale.",
+          "divergenceCost": "Jumped from a correlational segment finding directly to a causal deployment decision."
+        },
+        {
+          "id": "B",
+          "label": "\"The aggregate masks two large opposing effects — this isn't neutral. We should validate with a targeted experiment before acting.\"",
+          "detail": "Present the heterogeneous-effects finding as evidence against the null conclusion, and recommend a pre-registered follow-up experiment that explicitly randomizes within identified segments.",
+          "flag": "strong",
+          "consequence": "The product team now sees a genuinely interesting signal rather than a dead end. You've reframed the experiment's outcome correctly, flagged the inferential gap between a post-hoc segmentation and a causal claim, and given a clear next step — a targeted A/B — to confirm before any rollout decision.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The pricing change wasn't neutral — it produced a +19% lift for high-intent users and a -22% drop for price-sensitive ones, two effects large enough to be commercially significant but arithmetically designed to cancel in the average. The team's mistake wasn't bad statistics; it was stopping at the aggregate. The core lesson: a null average result is a hypothesis about homogeneity, not a finding — always interrogate it with segment-level relative lifts before concluding nothing happened."
+}

@@ -1,0 +1,156 @@
+{
+  "id": "serving-cost-outliers",
+  "title": "The Cost Blowout",
+  "scenario": {
+    "role": "FinOps Analyst",
+    "company": "Stackpoint",
+    "situation": "Mean cost-to-serve per customer jumped 34% last quarter, and finance is drafting an across-the-board price increase to recover margin.",
+    "stakeholderBelief": "Leadership assumes serving costs rose broadly across the customer base — a platform-wide efficiency problem.",
+    "question": "Did costs actually rise for most customers, or is something else distorting the mean?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "Finance wants the price increase justified with data. How do you frame the investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Confirm the mean cost increase over time",
+          "detail": "Pull mean cost-to-serve per customer each quarter and show the trend.",
+          "flag": "weak",
+          "consequence": "The trend line confirms the mean rose — exactly as leadership believed. But you've only verified the symptom they reported, not diagnosed its cause. The question of *who* drove it remains invisible.",
+          "divergenceCost": "Anchored on leadership's framing and produced a chart that confirms bias without adding insight."
+        },
+        {
+          "id": "B",
+          "label": "Examine the full cost distribution across customers",
+          "detail": "Plot the distribution of per-customer costs and compare summary statistics — mean, median, and tail — to see where the change is concentrated.",
+          "flag": "strong",
+          "consequence": "The distribution reveals something the mean hid entirely: a long right tail of high-cost customers that inflates the average, while the bulk of the base is flat. You now have a real question to answer.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Benchmark Stackpoint's cost against industry peers",
+          "detail": "Source SaaS infrastructure cost benchmarks and see if Stackpoint is out of line.",
+          "flag": "weak",
+          "consequence": "External benchmarks take weeks to source and compare apples to oranges. You learn nothing about which customers drove the spike or whether the mean is even representative.",
+          "divergenceCost": "Reached outside when the signal was already in internal data — slow and off-target."
+        },
+        {
+          "id": "D",
+          "label": "Audit infrastructure unit costs for price increases",
+          "detail": "Check whether cloud provider rates, egress fees, or compute prices rose this quarter.",
+          "flag": "weak",
+          "consequence": "Unit costs were flat. You've ruled out one hypothesis but still can't explain the spike — you've spent time on the wrong variable and haven't looked at customer-level heterogeneity at all.",
+          "divergenceCost": "Investigated input costs while ignoring the customer-level demand pattern that drove the change."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You segment cost by customer and see the distribution is skewed. Which metric do you use to characterize how widespread the cost increase really is?",
+      "artifact": {
+        "type": "bars",
+        "title": "Mean cost-to-serve per customer segment — this quarter vs. last",
+        "bars": [
+          {
+            "label": "Segment A (SMB)",
+            "value": 41
+          },
+          {
+            "label": "Segment B (Mid-market)",
+            "value": 58
+          },
+          {
+            "label": "Segment C (Enterprise)",
+            "value": 74
+          },
+          {
+            "label": "Segment D (Power users)",
+            "value": 310,
+            "highlight": true
+          }
+        ],
+        "caption": "Mean cost per customer by segment. Segment D looks alarming — but means are sensitive to outliers within each segment. Is this a segment-wide problem or a handful of accounts?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Mean cost-to-serve across all customers",
+          "detail": "Use the company-wide average cost per customer as the primary metric.",
+          "flag": "weak",
+          "consequence": "The mean is $187 — up 34%. This validates the finance narrative perfectly. But a handful of extreme spenders can move the mean dramatically while 90% of customers are unchanged. You've measured the outliers, not the base.",
+          "divergenceCost": "Used a mean that outliers dominate — mistook a tail event for a broad trend."
+        },
+        {
+          "id": "B",
+          "label": "Median cost alongside the 95th-percentile cost",
+          "detail": "Report the median (typical customer) and the 95th percentile (tail behavior) separately.",
+          "flag": "strong",
+          "consequence": "The median is $48 — nearly identical to last quarter. The 95th percentile exploded from $190 to $1,840. The cost blowout is entirely a tail phenomenon: a small number of customers running pathological queries, not a platform-wide shift.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Cost distribution summary — this quarter vs. last quarter",
+            "unit": "$",
+            "bars": [
+              {
+                "label": "Median (last Qtr)",
+                "value": 46
+              },
+              {
+                "label": "Median (this Qtr)",
+                "value": 48
+              },
+              {
+                "label": "95th pct (last Qtr)",
+                "value": 190
+              },
+              {
+                "label": "95th pct (this Qtr)",
+                "value": 1840,
+                "highlight": true
+              }
+            ],
+            "caption": "Median cost is flat — typical customers are unaffected. The 95th percentile nearly 10x'd: the mean was being pulled by a small, extreme tail."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The median is flat but the tail exploded. A small cluster of customers appears to be running extremely expensive queries. What do you tell leadership?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"It's a handful of power users abusing the platform — cap their query resources immediately.\"",
+          "detail": "Name the tail as the cause and prescribe a technical fix.",
+          "flag": "weak",
+          "consequence": "Confident and action-oriented — but you've called a correlation a cause. Those customers may be on enterprise contracts with legitimate high-volume use cases, or the queries may indicate a missing feature driving inefficient workarounds. Hard caps without investigation could churn high-value accounts.",
+          "divergenceCost": "Prescribed a fix from a correlation without confirming what the tail behavior actually represents."
+        },
+        {
+          "id": "B",
+          "label": "\"The mean is misleading — median cost is flat, and the spike is concentrated in a small tail. An across-the-board price rise would penalize 95% of customers for a problem they didn't cause. We should identify those accounts, understand whether this is legitimate usage or a bug, and address it at the source before making pricing decisions.\"",
+          "detail": "Present the distribution finding, challenge the proposed action, and recommend a targeted investigation.",
+          "flag": "strong",
+          "consequence": "Leadership now understands why the mean was a bad summary statistic for this decision. You've redirected a blunt policy instrument toward a surgical fix, and flagged that the tail's root cause still needs confirmation — protecting both margin and customer relationships.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The mean cost-to-serve spiked because a tiny cohort of customers running pathological queries dominated the average — median cost was flat, meaning most customers were unaffected. An across-the-board price increase would have been a blunt, unfair instrument aimed at a problem that didn't exist for 95% of the base. The lesson: means are distorted by outliers; always read the distribution and locate where a change actually lives before prescribing a remedy."
+}

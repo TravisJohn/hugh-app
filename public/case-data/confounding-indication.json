@@ -1,0 +1,155 @@
+{
+  "id": "confounding-indication",
+  "title": "The Sicker Patients",
+  "scenario": {
+    "role": "Clinical Analyst",
+    "company": "Ridgeway Health",
+    "situation": "A post-launch review shows patients prescribed the new drug Velorin have a 30-day readmission rate nearly double that of untreated patients.",
+    "stakeholderBelief": "The medical director fears Velorin is causing harm and wants to suspend prescribing pending a safety review.",
+    "question": "Is Velorin actually hurting patients, or is something else explaining the outcome gap?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The medical director wants a fast answer. How do you frame the investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Adverse-event audit on Velorin patients",
+          "detail": "Pull all reported adverse events and readmissions for patients who received Velorin.",
+          "flag": "weak",
+          "consequence": "You find a long list of complications in Velorin patients — but you have no comparator. You've only described the treated group without asking who they were before treatment started.",
+          "divergenceCost": "Anchored on the safety hypothesis and ignored the baseline composition of the treated group."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic segmentation by baseline severity",
+          "detail": "Compare patient characteristics — disease severity, comorbidities — between treated and untreated groups before looking at outcomes.",
+          "flag": "strong",
+          "consequence": "You immediately see the treated and untreated groups are not alike: Velorin patients entered care far sicker. The outcome gap now has a candidate explanation that has nothing to do with the drug's safety profile.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Time-series of readmissions since launch",
+          "detail": "Plot system-wide readmission rates month by month and mark the Velorin launch date.",
+          "flag": "weak",
+          "consequence": "Readmissions did tick up after launch — but Velorin was introduced at the same time as a winter respiratory surge. The temporal correlation is completely confounded.",
+          "divergenceCost": "Used a before/after design that conflated the drug launch with an unrelated seasonal trend."
+        },
+        {
+          "id": "D",
+          "label": "Survey prescribing physicians",
+          "detail": "Ask physicians why they chose Velorin for certain patients.",
+          "flag": "weak",
+          "consequence": "Physicians say they prescribe it for 'complex cases' — useful context, but qualitative and slow. It doesn't quantify the severity gap or rule out harm with the data already on hand.",
+          "divergenceCost": "Chose a slow qualitative instrument when the severity signal was already in the structured patient records."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "Segmenting by severity reveals the groups differ. Which metric do you use to fairly compare outcomes?",
+      "artifact": {
+        "type": "bars",
+        "title": "30-day readmission rate — Velorin vs. untreated (unadjusted)",
+        "bars": [
+          {
+            "label": "Untreated",
+            "value": 9.2
+          },
+          {
+            "label": "Velorin (all)",
+            "value": 21.4,
+            "highlight": true
+          }
+        ],
+        "caption": "Raw readmission rates look damning for Velorin — but treated patients were systematically sicker at baseline. Are we comparing like with like?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Raw 30-day readmission rate by treatment group",
+          "detail": "Compare unadjusted readmission rates between Velorin and untreated patients.",
+          "flag": "weak",
+          "consequence": "The treated group still looks far worse — but you now know they were sicker going in. Reading the raw rate as a drug effect is like blaming the ICU for high mortality. You're measuring case mix, not treatment impact.",
+          "divergenceCost": "Compared outcomes across groups with fundamentally different baseline risk — the difference is confounded by indication."
+        },
+        {
+          "id": "B",
+          "label": "Severity-adjusted readmission rate (within matched severity tiers)",
+          "detail": "Stratify patients into severity tiers and compare readmission rates within each tier between treated and untreated patients.",
+          "flag": "strong",
+          "consequence": "Within every severity tier, Velorin patients actually readmit at a lower rate than untreated patients of the same severity. The drug appears beneficial once you control for who received it.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "30-day readmission rate by severity tier — Velorin vs. untreated",
+            "bars": [
+              {
+                "label": "Mild — Untreated",
+                "value": 5.1
+              },
+              {
+                "label": "Mild — Velorin",
+                "value": 4.3
+              },
+              {
+                "label": "Moderate — Untreated",
+                "value": 11.8
+              },
+              {
+                "label": "Moderate — Velorin",
+                "value": 9.2
+              },
+              {
+                "label": "Severe — Untreated",
+                "value": 28.4
+              },
+              {
+                "label": "Severe — Velorin",
+                "value": 22.1,
+                "highlight": true
+              }
+            ],
+            "caption": "Within every severity tier, Velorin patients readmit less. The drug was being prescribed to the sickest patients — their worse raw outcomes reflected their disease, not the drug."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "After severity adjustment, Velorin is associated with lower readmissions in every tier. What do you tell the medical director?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"Velorin is beneficial — the safety concern is unfounded, keep prescribing as-is.\"",
+          "detail": "Declare the drug safe and effective based on the adjusted analysis.",
+          "flag": "weak",
+          "consequence": "You've cleared the drug on observational data that still can't rule out unmeasured confounders — other severity proxies you didn't capture may still be driving the residual gap. Acting on this without flagging the limitation risks a false sense of certainty.",
+          "divergenceCost": "Overclaimed a causal benefit from a severity-adjusted observational study — unmeasured confounders remain."
+        },
+        {
+          "id": "B",
+          "label": "\"The raw signal is explained by confounding by indication — adjusted, Velorin looks beneficial, but we need a quasi-experiment or prospective controlled comparison before changing policy.\"",
+          "detail": "Present the finding, name the confounding mechanism, and recommend a causal confirmation step.",
+          "flag": "strong",
+          "consequence": "You've defused a premature suspension decision with evidence, named exactly why the raw comparison was misleading, and handed the team a concrete next step — a propensity-matched cohort study or an instrumental variable analysis — to nail down the causal effect.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "Velorin looked harmful only because physicians rationally prescribed it to the sickest patients — a textbook case of confounding by indication. Once outcomes were compared within severity tiers, the drug showed a consistent protective association in every stratum. The lesson is that when treatment assignment is driven by the very factor that predicts bad outcomes, raw comparisons are structurally biased; you must adjust for baseline severity, match on propensity, or use a quasi-experimental design before any safety or efficacy claim holds."
+}

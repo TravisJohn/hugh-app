@@ -1,0 +1,148 @@
+{
+  "id": "offline-online-gap",
+  "title": "The Recommender Bakeoff",
+  "scenario": {
+    "role": "ML Engineer",
+    "company": "Shopnest",
+    "situation": "The team trained a new recommendation model that outperforms the current model on every offline ranking metric — NDCG, MRR, precision@10. It ships. Engagement drops.",
+    "stakeholderBelief": "The team is convinced the offline win proves the new model is better and suspects the drop is a fluke, a bug, or a bad holdout window — not a fundamental problem with how the model was evaluated.",
+    "question": "Why did a model that won offline lose online, and how should you investigate?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team wants answers fast. How do you frame the investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Audit the offline evaluation pipeline for bugs",
+          "detail": "Comb through data splits, feature leakage, and metric implementation to find a coding error.",
+          "flag": "weak",
+          "consequence": "You find no bugs. The pipeline is correct — the metrics genuinely say what the team thought they said. This framing assumed the evaluation approach was sound and only looked for execution errors, so you're back where you started.",
+          "divergenceCost": "Assumed the evaluation method was valid and only hunted for implementation errors."
+        },
+        {
+          "id": "B",
+          "label": "Extend offline testing to a longer holdout window",
+          "detail": "Rerun the offline eval on a more recent slice of data to see if the ranking advantage holds.",
+          "flag": "weak",
+          "consequence": "The new model still wins offline on the extended window. You've confirmed the offline advantage is robust — but engagement is still down in production. The framing never questioned whether offline metrics can measure what matters here.",
+          "divergenceCost": "Doubled down on the flawed metric rather than questioning the measurement approach itself."
+        },
+        {
+          "id": "C",
+          "label": "Examine the overlap between items scored offline and items recommended online",
+          "detail": "Ask whether the items the offline eval rewards the model for recommending are the same items it actually recommends in production.",
+          "flag": "strong",
+          "consequence": "You immediately see the gap: offline evaluation only scores items that appeared in historical logs — items users had a chance to interact with under the old policy. The new model frequently recommends items outside that set, so it gets zero offline credit for its best recommendations. The evaluation is structurally biased against it, and you now have a concrete, testable hypothesis.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "D",
+          "label": "A/B test dozens of model variants to find one that wins both offline and online",
+          "detail": "Launch a broad experimentation sprint across hyperparameter and architecture variants.",
+          "flag": "weak",
+          "consequence": "You ship many variants and accumulate noisy results. Without understanding why offline and online diverge, you can't know which knob to turn. You've optimized before diagnosing.",
+          "divergenceCost": "Jumped to experimentation before understanding the root cause — premature optimization."
+        }
+      ],
+      "gold": "C"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You suspect the offline evaluation is biased by the logging policy. Which metric do you use to confirm the structural gap?",
+      "artifact": {
+        "type": "bars",
+        "title": "Offline NDCG@10 — new model vs. baseline",
+        "bars": [
+          {
+            "label": "Baseline model",
+            "value": 0.31
+          },
+          {
+            "label": "New model",
+            "value": 0.41,
+            "highlight": true
+          }
+        ],
+        "caption": "The new model scores +32% on NDCG@10 in replay evaluation. But NDCG can only reward items present in the historical interaction logs."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Offline NDCG@10 across all logged test users",
+          "detail": "Re-examine the headline ranking metric on the held-out test set.",
+          "flag": "weak",
+          "consequence": "NDCG still favors the new model by a wide margin. The metric looks decisive — but it's measuring how well each model ranks items users already saw under the old policy. Items the new model uniquely surfaces are invisible to this score, so the advantage may be entirely an artifact of the logging distribution.",
+          "divergenceCost": "Reused the biased metric that created the problem in the first place."
+        },
+        {
+          "id": "B",
+          "label": "Coverage-adjusted online CTR from a live A/B test",
+          "detail": "Run a time-boxed online experiment and measure click-through rate on recommended items, including items the old model never surfaced.",
+          "flag": "strong",
+          "consequence": "Online CTR tells the full story: the new model's novel recommendations perform well for users who receive them, but its overall CTR is dragged down because it serves unfamiliar item types that need impression volume to convert. Critically, the offline metric never penalized the baseline for never recommending these items — it simply couldn't see them. The structural bias is now quantified and undeniable.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Online CTR by recommendation source — A/B test",
+            "unit": "%",
+            "bars": [
+              {
+                "label": "Baseline — catalog overlap",
+                "value": 6.1
+              },
+              {
+                "label": "New model — catalog overlap",
+                "value": 6.3
+              },
+              {
+                "label": "Baseline — novel items",
+                "value": 0.4
+              },
+              {
+                "label": "New model — novel items",
+                "value": 5.8,
+                "highlight": true
+              }
+            ],
+            "caption": "On items both models share, CTR is nearly identical. The new model's novel recommendations convert well — but the offline eval never saw these items, so it assigned them zero reward."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The online test shows the new model's novel recommendations do convert. What do you tell the team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The offline eval was wrong — ship the new model fully and retire the baseline.\"",
+          "detail": "Declare the offline framework broken and move forward with the new model.",
+          "flag": "weak",
+          "consequence": "You've made a strong operational call from a single, short A/B test. Novel items may need longer exposure windows to show their full effect, and you haven't ruled out novelty bias inflating early CTR. Acting without a confirmatory run risks a repeat of the original engagement drop.",
+          "divergenceCost": "Overclaimed from one test and skipped confirmatory validation before a full rollout."
+        },
+        {
+          "id": "B",
+          "label": "\"Offline replay is biased by our logging policy and can't score novel recommendations — the new model looks promising online, but we should confirm with a longer holdout A/B and update our evaluation framework before full rollout.\"",
+          "detail": "Report the finding, name the structural flaw, and propose a path to certainty.",
+          "flag": "strong",
+          "consequence": "The team now understands why offline and online diverged — not a bug, not bad luck, but a fundamental property of replay evaluation on logged data. You've given them a finding, a causal explanation, appropriate uncertainty about the single-test result, and a concrete next step: a longer A/B and a counterfactual-corrected offline evaluator going forward.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "C",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The new recommender didn't fail — the measurement did. Offline replay evaluation can only reward items that appeared in historical logs, so any model bold enough to recommend outside the old policy's support is systematically underscored offline and unscored for its best moves. The real lesson is that logged data carries the fingerprint of the policy that generated it; offline metrics feel rigorous but measure conformity to the past, not quality in the future. Validating online — and eventually adopting counterfactual correction or bandit-style logging — is the only way to fairly evaluate a model that explores."
+}

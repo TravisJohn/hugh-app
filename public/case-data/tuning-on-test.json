@@ -1,0 +1,186 @@
+{
+  "id": "tuning-on-test",
+  "title": "The Leaky Leaderboard",
+  "scenario": {
+    "role": "Data Scientist",
+    "company": "Kaggleworks",
+    "situation": "After 200 hyperparameter-tuning trials all selected by test-set score, your model sits at the top of the internal leaderboard. But when it ships to production, live accuracy is noticeably worse than the test score promised.",
+    "stakeholderBelief": "The team is convinced this is simply the best model they have ever built — the leaderboard score proves it.",
+    "question": "Why is live performance so much worse, and can the leaderboard score be trusted?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team insists the leaderboard score is solid. How do you frame your investigation into the production gap?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Diagnose the production pipeline for data drift",
+          "detail": "Audit feature distributions and preprocessing steps between training and serving to look for a pipeline bug.",
+          "flag": "weak",
+          "consequence": "You find minor distribution shifts but nothing that explains a gap of this magnitude. The pipeline audit was a reasonable first step but it anchors on an implementation problem rather than an evaluation problem, so the real cause stays hidden.",
+          "divergenceCost": "Anchored on a deployment explanation and missed the evaluation flaw entirely."
+        },
+        {
+          "id": "B",
+          "label": "Counterfactual holdout audit — score the model on data the tuning loop never touched",
+          "detail": "Set aside the tuning history and evaluate the final model on a completely locked partition that was never used to pick any trial.",
+          "flag": "strong",
+          "consequence": "You now have two numbers side by side: the score from the test set the tuner saw hundreds of times, and a score from data it never saw. If they diverge sharply, the evaluation process itself is the bug — not the model, not the pipeline.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Collect more training data and retrain",
+          "detail": "Assume the model is underfitted to real-world variance; gather more labeled examples and run another tuning sweep.",
+          "flag": "weak",
+          "consequence": "More data helps marginally, but the new sweep is evaluated on the same test set — the core problem recurrs and the gap persists. You've burned time and budget without touching the root cause.",
+          "divergenceCost": "Jumped to a solution before diagnosing the evaluation flaw."
+        },
+        {
+          "id": "D",
+          "label": "Benchmark the winning model against a simpler baseline on the same test set",
+          "detail": "Compare the tuned model to a logistic regression using the existing leaderboard metric.",
+          "flag": "weak",
+          "consequence": "The complex model still beats the baseline on the test set — which confirms the team's belief and reinforces the wrong conclusion. The contaminated metric validates both models equally poorly.",
+          "divergenceCost": "Used a contaminated metric as the judge, making it impossible to see the real problem."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You pull the score history for all 200 trials. Which metric view do you trust to confirm what happened?",
+      "artifact": {
+        "type": "bars",
+        "title": "Model accuracy by trial milestone — test-set score (the tuner's objective)",
+        "bars": [
+          {
+            "label": "Trial 1 (baseline)",
+            "value": 0.791
+          },
+          {
+            "label": "Trial 50",
+            "value": 0.823
+          },
+          {
+            "label": "Trial 100",
+            "value": 0.847
+          },
+          {
+            "label": "Trial 150",
+            "value": 0.861
+          },
+          {
+            "label": "Trial 200 (winner)",
+            "value": 0.884
+          },
+          {
+            "label": "Live (production)",
+            "value": 0.814
+          }
+        ],
+        "caption": "Test-set score climbs steadily with each tuning round. Live performance tells a very different story — but is the climb real learning or test-set memorization?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Test-set accuracy across the 200 tuning trials",
+          "detail": "Plot the winning test-set score at each trial milestone to confirm the model improved over time.",
+          "flag": "weak",
+          "consequence": "The chart shows a clean upward curve — compelling evidence of progress. But every data point in this chart was also a vote that shaped which trial 'won.' The metric is both the judge and the defendant; it cannot convict itself.",
+          "divergenceCost": "Relied on the same contaminated signal the tuner was already optimizing — circular validation."
+        },
+        {
+          "id": "B",
+          "label": "Locked holdout accuracy vs. test-set accuracy, aligned by trial",
+          "detail": "Evaluate every trial checkpoint on the locked holdout the tuner never saw, then plot both curves together.",
+          "flag": "strong",
+          "consequence": "The two curves start together, then diverge sharply: test-set accuracy keeps climbing while holdout accuracy plateaus around trial 40 and drifts back down. The model didn't keep getting better — it kept getting better at the test set specifically. The gap is adaptive overfitting made visible.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Accuracy by trial milestone — test-set score vs. locked holdout score",
+            "bars": [
+              {
+                "label": "Trial 1 · test set",
+                "value": 0.791
+              },
+              {
+                "label": "Trial 1 · holdout",
+                "value": 0.788
+              },
+              {
+                "label": "Trial 50 · test set",
+                "value": 0.823
+              },
+              {
+                "label": "Trial 50 · holdout",
+                "value": 0.819
+              },
+              {
+                "label": "Trial 100 · test set",
+                "value": 0.847
+              },
+              {
+                "label": "Trial 100 · holdout",
+                "value": 0.821
+              },
+              {
+                "label": "Trial 150 · test set",
+                "value": 0.861
+              },
+              {
+                "label": "Trial 150 · holdout",
+                "value": 0.816
+              },
+              {
+                "label": "Trial 200 · test set",
+                "value": 0.884
+              },
+              {
+                "label": "Trial 200 · holdout",
+                "value": 0.812,
+                "highlight": true
+              }
+            ],
+            "caption": "After ~trial 50 the curves diverge. Holdout accuracy peaks early and erodes while test-set score keeps climbing — the signature of adaptive overfitting to the evaluation set."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The holdout curve diverges from the test-set curve after ~50 trials. What do you tell the team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The tuning loop overfitted to the test set — discard this model and retrain with a proper holdout.\"",
+          "detail": "Make the causal call and prescribe an immediate fix.",
+          "flag": "weak",
+          "consequence": "You're probably right about the mechanism, but declaring the model worthless overstates what you've proven. The team may dismiss the finding as too aggressive. You've also skipped recommending a process change, so the same mistake can recur on the next project.",
+          "divergenceCost": "Overclaimed certainty and prescribed action without a verification step or process safeguard."
+        },
+        {
+          "id": "B",
+          "label": "\"The test-set score inflated with each tuning round while the locked holdout plateaued — a pattern consistent with adaptive overfitting. Before we act, let's confirm with a fresh labeled sample, then adopt a locked final holdout as standard practice going forward.\"",
+          "detail": "Present the finding, name the likely mechanism, flag the remaining uncertainty, and recommend both a verification step and a structural process fix.",
+          "flag": "strong",
+          "consequence": "You've given the team a falsifiable explanation, a concrete next step to verify it, and a process change that prevents recurrence. The finding lands without overreach, and the team has a clear path to a trustworthy leaderboard.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The model never truly improved after the first ~50 trials — it learned the test set's idiosyncrasies one selection at a time, a process called adaptive overfitting. The leaderboard score was real arithmetic applied to a compromised evaluation protocol. The lesson is structural: a test set that participates in model selection stops being a test set; only a locked holdout the search never sees can give an honest estimate of generalization."
+}

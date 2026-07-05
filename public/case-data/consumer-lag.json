@@ -1,0 +1,156 @@
+{
+  "id": "consumer-lag",
+  "title": "The Growing Lag",
+  "scenario": {
+    "role": "Streaming Data Engineer",
+    "company": "Fleetstream",
+    "situation": "The Kafka consumer group processing inbound telemetry events has accumulated 2–3 million messages of lag every peak window for the past two weeks, triggering on-call alerts and SLA warnings.",
+    "stakeholderBelief": "The team lead is convinced the Kafka broker cluster is undersized and wants to provision two additional broker nodes before next week's peak.",
+    "question": "Is the broker actually the bottleneck, or is something else throttling the consumer?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team lead wants broker nodes ordered today. How do you frame your investigation before any money is spent?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Benchmark broker throughput under peak load",
+          "detail": "Spin up a load test against the brokers and measure max throughput to confirm they are saturated.",
+          "flag": "weak",
+          "consequence": "The brokers handle the load test fine — they aren't saturated. But because you started from the broker hypothesis, you have no view of what is actually slow. You've spent two days confirming a negative.",
+          "divergenceCost": "Anchored on the team's assumption and wasted time proving a non-problem."
+        },
+        {
+          "id": "B",
+          "label": "Diagnostic pipeline decomposition",
+          "detail": "Break the end-to-end pipeline into stages — broker, consumer, and sink — and measure latency and throughput independently at each boundary.",
+          "flag": "strong",
+          "consequence": "You immediately see broker network I/O is calm and consumer poll rates are healthy, but the sink write latency is spiking during the same windows the lag grows. The bottleneck is now a specific, testable stage.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Check broker disk and CPU dashboards",
+          "detail": "Pull broker-level infrastructure metrics and look for resource saturation signals.",
+          "flag": "weak",
+          "consequence": "Disk and CPU look fine at peak. Nothing conclusively rules brokers in or out, and you still have no idea where in the pipeline lag is generated.",
+          "divergenceCost": "Stayed inside the broker frame and missed the sink stage entirely."
+        },
+        {
+          "id": "D",
+          "label": "Increase consumer group instances immediately",
+          "detail": "Scale the consumer group horizontally now and see if lag clears.",
+          "flag": "weak",
+          "consequence": "Each additional consumer hits the same slow synchronous sink. Lag distributes across more consumers but does not shrink — and you now have more competing writers hammering the sink.",
+          "divergenceCost": "Jumped to a remediation before diagnosing, compounding the real problem."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "Pipeline decomposition flags the sink as a suspect. Which metric do you use to confirm the bottleneck?",
+      "artifact": {
+        "type": "bars",
+        "title": "Average processing time per stage — peak window (ms)",
+        "bars": [
+          {
+            "label": "Broker fetch latency",
+            "value": 4
+          },
+          {
+            "label": "Consumer deserialize",
+            "value": 6
+          },
+          {
+            "label": "Consumer poll cycle",
+            "value": 9
+          },
+          {
+            "label": "Sink write (per-record)",
+            "value": 87,
+            "highlight": false
+          }
+        ],
+        "caption": "Raw average latencies. The sink bar is tall — but averages can hide whether this is a rate issue or a volume issue."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Average sink write latency (ms)",
+          "detail": "Use the mean write duration across all sink calls during the peak window.",
+          "flag": "weak",
+          "consequence": "The average looks elevated but not catastrophic. At low traffic it is similar. You can't tell whether the sink is the constraint or just reflecting normal variance — the average obscures the cumulative back-pressure effect.",
+          "divergenceCost": "Used an average that hid the back-pressure signal — a classic metric aggregation trap."
+        },
+        {
+          "id": "B",
+          "label": "Sink write throughput vs. consumer poll rate (records/sec, normalized)",
+          "detail": "Compare the rate at which the consumer polls records against the rate at which the sink successfully commits them, normalized to the same time window.",
+          "flag": "strong",
+          "consequence": "The gap is unmistakable: the consumer polls 12,000 records/sec at peak but the sink commits only 1,100 records/sec — a 10× mismatch driven entirely by synchronous per-record inserts. The broker's produce rate is unaffected throughout.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Throughput rate by pipeline stage — peak window (records/sec)",
+            "unit": "rec/s",
+            "bars": [
+              {
+                "label": "Broker produce rate",
+                "value": 12400
+              },
+              {
+                "label": "Consumer poll rate",
+                "value": 12000
+              },
+              {
+                "label": "Consumer deserialize rate",
+                "value": 11800
+              },
+              {
+                "label": "Sink commit rate",
+                "value": 1100,
+                "highlight": true
+              }
+            ],
+            "caption": "Normalized to the same window, the sink commit rate is ~10× slower than every upstream stage. The broker is not the constraint."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The sink commit rate is 10× slower than the consumer poll rate during peak. What do you tell the team lead?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The broker is fine — it's the synchronous sink writes. Switch to batched inserts and add partitions, problem solved.\"",
+          "detail": "Make the full causal call and prescribe the fix.",
+          "flag": "weak",
+          "consequence": "You're likely right about the sink, but you've made a definitive causal claim from profiling data alone. If the sink slowness is itself caused by a downstream DB lock or network issue that recurs, batching may only mask it temporarily.",
+          "divergenceCost": "Overclaimed causation without a controlled validation step."
+        },
+        {
+          "id": "B",
+          "label": "\"The throughput data points strongly to the sink, not the broker — batching writes and adding partitions is the hypothesis to test. Let's validate with a controlled off-peak trial before committing to either fix or new broker nodes.\"",
+          "detail": "Present the finding, name the mechanism, and recommend a confirmatory trial.",
+          "flag": "strong",
+          "consequence": "The team lead gets a clear reframing backed by data, a concrete next step, and an honest scope boundary. The controlled trial confirms batching raises sink throughput to 11,200 records/sec and lag stays flat at peak — and no broker nodes are purchased.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The broker was never the bottleneck — synchronous per-record inserts into the downstream sink created a 10× throughput gap that back-pressured the entire consumer group. The team's instinct to scale brokers was plausible but untested; a pipeline decomposition and a normalized throughput comparison exposed the real constraint in hours. The lesson is that Kafka consumer lag is almost always a consumer-side or sink-side problem first: check write throughput and partition parallelism before touching the broker."
+}

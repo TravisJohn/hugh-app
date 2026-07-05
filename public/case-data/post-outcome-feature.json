@@ -1,0 +1,154 @@
+{
+  "id": "post-outcome-feature",
+  "title": "The Future Feature",
+  "scenario": {
+    "role": "Data Scientist",
+    "company": "Coverly",
+    "situation": "A cancellation model uses a refund_issued field and scores AUC 0.98. The team is excited and wants to ship it to production immediately.",
+    "stakeholderBelief": "The team believes the model is genuinely excellent and that refund_issued is a strong early signal of customer intent to cancel.",
+    "question": "Is this model actually deployable, or is something artificially inflating its performance?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The team wants to move fast. How do you investigate before signing off on deployment?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Validate on a held-out test set",
+          "detail": "Split off a random 20% test set and confirm AUC holds there too.",
+          "flag": "weak",
+          "consequence": "AUC is 0.97 on the holdout — still looks great. The data leak travels with the split because refund_issued is populated the same way everywhere; a random split cannot expose a temporal integrity problem.",
+          "divergenceCost": "Validated the artifact of the leak, not the model's real predictive power."
+        },
+        {
+          "id": "B",
+          "label": "Audit feature temporality",
+          "detail": "For each feature, check whether its value could be known at the moment a prediction would be made in production — before any outcome is recorded.",
+          "flag": "strong",
+          "consequence": "The audit immediately flags refund_issued: it is only written to the database after a cancellation is confirmed. In production the field would be NULL at prediction time. You've found the real problem before a single bad prediction ships.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Run SHAP feature importances",
+          "detail": "Compute SHAP values to understand which features drive the predictions.",
+          "flag": "weak",
+          "consequence": "SHAP correctly shows refund_issued as the dominant driver — but the output is framed as 'the model relies on a strong signal,' not as a red flag. Without a temporality lens, SHAP confirms the leak rather than exposing it.",
+          "divergenceCost": "Interpreted a leak's dominance as a feature strength rather than a warning."
+        },
+        {
+          "id": "D",
+          "label": "Compare AUC to industry benchmarks",
+          "detail": "Research published cancellation model AUCs to see if 0.98 is unusual.",
+          "flag": "weak",
+          "consequence": "You note 0.98 is suspiciously high, but benchmarks alone give no diagnostic path. The team dismisses it as Coverly having 'richer data,' and the deployment conversation restarts.",
+          "divergenceCost": "Raised a flag without a mechanism to trace and confirm the root cause."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You suspect refund_issued may be leaking the label. Which comparison makes the case most clearly to the team?",
+      "artifact": {
+        "type": "bars",
+        "title": "Model AUC by feature set — full training data",
+        "bars": [
+          {
+            "label": "All features (incl. refund_issued)",
+            "value": 0.98
+          },
+          {
+            "label": "Behavioral features only",
+            "value": 0.71
+          },
+          {
+            "label": "Demographic features only",
+            "value": 0.61
+          },
+          {
+            "label": "refund_issued alone",
+            "value": 0.97
+          }
+        ],
+        "caption": "AUC scores across feature subsets. The single field refund_issued nearly matches the full model — but is that signal or a shortcut?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "AUC on the full feature set vs. behavioral-only subset",
+          "detail": "Compare overall model AUC to a version trained without refund_issued but still on the same historical data.",
+          "flag": "weak",
+          "consequence": "AUC drops from 0.98 to 0.71 when refund_issued is removed — a dramatic gap — but the team argues the field is simply 'predictive' and proposes engineering a proxy for it. The temporal problem isn't obviously visible in this comparison alone.",
+          "divergenceCost": "Showed the performance gap without proving the field is unavailable at prediction time."
+        },
+        {
+          "id": "B",
+          "label": "AUC on a point-in-time holdout where refund_issued is NULL for all rows",
+          "detail": "Reconstruct a validation set using only feature values that existed before the cancellation event timestamp, forcing refund_issued to its true production state (NULL).",
+          "flag": "strong",
+          "consequence": "With refund_issued forced to NULL — its real production value — AUC collapses to 0.72 and matches behavioral-only performance. The chart makes the mechanism undeniable: the model was memorizing the outcome label disguised as a feature.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Model AUC under point-in-time correctness (refund_issued = NULL at prediction time)",
+            "bars": [
+              {
+                "label": "All features (incl. refund_issued)",
+                "value": 0.98
+              },
+              {
+                "label": "Point-in-time holdout (refund_issued = NULL)",
+                "value": 0.72,
+                "highlight": true
+              },
+              {
+                "label": "Behavioral features only",
+                "value": 0.71
+              },
+              {
+                "label": "refund_issued alone (NULL)",
+                "value": 0.5
+              }
+            ],
+            "caption": "When refund_issued is forced to its true production state, AUC falls to 0.72 — indistinguishable from behavioral features alone. The 0.98 was the outcome masquerading as a predictor."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Point-in-time validation collapses AUC to 0.72. What do you tell the team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The model is broken — refund_issued is the label. Scrap it and start over.\"",
+          "detail": "Declare the model invalid and halt the project.",
+          "flag": "weak",
+          "consequence": "The team hears 'six weeks of work is worthless' and pushes back hard. Without a constructive path forward, the conversation stalls — and a manager may override you to ship anyway, rationalizing that '0.72 is still decent.'",
+          "divergenceCost": "Delivered the finding without a remediation path, inviting stakeholder resistance."
+        },
+        {
+          "id": "B",
+          "label": "\"refund_issued is populated post-cancellation, so it leaks the label. The real AUC is ~0.72. Let's retrain on point-in-time features and benchmark that honestly before any deployment decision.\"",
+          "detail": "Name the mechanism, show the corrected metric, and propose the next step.",
+          "flag": "strong",
+          "consequence": "You've named the exact mechanism (post-outcome population), quantified the real performance, and given the team a concrete remediation — retrain with a point-in-time feature set and re-evaluate. The project continues on honest footing.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "A 0.98 AUC was not model excellence — it was the outcome label recycled as an input feature. refund_issued is only written to the database after a cancellation is recorded, so the model learned to read the answer key. The lesson is point-in-time correctness: every feature value used in training must reflect what was knowable at the moment a real prediction would fire, not what was recorded afterward. Enforcing this discipline — and validating on a temporally reconstructed holdout — is the only way to distinguish genuine signal from future leakage."
+}

@@ -1,0 +1,146 @@
+{
+  "id": "backfill-strategy",
+  "title": "The Blocking Backfill",
+  "scenario": {
+    "role": "Data Engineer",
+    "company": "Chronoflow",
+    "situation": "A logic fix needs reprocessing two years of event data, and the current plan halts the daily pipeline for several days while the backfill runs in place.",
+    "stakeholderBelief": "The engineering lead is confident that pausing production and backfilling directly into the live table is the safest, most straightforward approach — no extra infrastructure needed.",
+    "question": "Is pausing production and backfilling in place actually the lowest-risk path?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The engineering lead wants to kick off the backfill tonight. How do you frame your investigation before committing?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Estimate how long the in-place backfill will take",
+          "detail": "Calculate row counts and throughput to project the downtime window.",
+          "flag": "weak",
+          "consequence": "You get a precise downtime estimate — say, 3.2 days — but you've only optimized the plan that was already on the table. You haven't questioned whether blocking the live table is the right approach at all.",
+          "divergenceCost": "Anchored on the existing plan and optimized a constraint that should have been challenged."
+        },
+        {
+          "id": "B",
+          "label": "Map all failure modes across both the backfill and the live pipeline",
+          "detail": "List what can go wrong for each layer — live ingestion, the backfill job, and the table state — independently.",
+          "flag": "strong",
+          "consequence": "You surface two distinct risk categories: downtime risk (pipeline halted) and data-integrity risk (partial state if the backfill crashes mid-run while fresh rows are also landing). This counterfactual framing reveals that the live table is the shared point of failure — something the original plan never addressed.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Check whether the logic fix can be applied incrementally going forward",
+          "detail": "See if you can fix new data without touching historical records.",
+          "flag": "weak",
+          "consequence": "You learn the fix can't be applied forward-only — historical rows must be corrected for downstream aggregates to be accurate. The investigation dead-ends without addressing the backfill strategy.",
+          "divergenceCost": "Investigated an escape hatch that doesn't exist, burning time before the real question."
+        },
+        {
+          "id": "D",
+          "label": "Audit past backfills to see how the team handled them before",
+          "detail": "Pull runbooks and incident logs from previous reprocessing events.",
+          "flag": "weak",
+          "consequence": "Past backfills were all smaller — under a week of data — so the team always blocked the pipeline and it was fine. This precedent makes the current plan look safe, but the two-year scale is qualitatively different and the audit doesn't flag that.",
+          "divergenceCost": "Used historical precedent that doesn't transfer to the current scale of the problem."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "Your failure-mode map points to the live table as the shared risk surface. Which metric cut do you use to make the case concrete?",
+      "artifact": {
+        "type": "bars",
+        "title": "Estimated downtime by backfill approach — raw hours",
+        "bars": [
+          {
+            "label": "In-place backfill (pause pipeline)",
+            "value": 78
+          },
+          {
+            "label": "Side-table backfill + swap",
+            "value": 4
+          },
+          {
+            "label": "Incremental forward-only",
+            "value": 0
+          }
+        ],
+        "caption": "Raw projected downtime hours. The in-place approach looks bad, but downtime alone doesn't capture what happens if the job fails mid-run."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Projected pipeline downtime hours per approach",
+          "detail": "Compare how many hours production is paused under each strategy.",
+          "flag": "weak",
+          "consequence": "In-place backfill shows 78 hours of downtime versus 4 for a side-table approach — a compelling gap. But downtime is only half the story. If the in-place job crashes at hour 40, you now have a table in partial state with some rows corrected and fresh daily rows mixed in. The downtime metric doesn't capture that compounding risk.",
+          "divergenceCost": "Focused on a single dimension of risk and missed the data-integrity exposure that makes partial failure catastrophic."
+        },
+        {
+          "id": "B",
+          "label": "Blast radius score: downtime × partial-state recovery cost per approach",
+          "detail": "Combine downtime hours with the estimated engineering hours to recover from a mid-run crash at each approach's midpoint.",
+          "flag": "strong",
+          "consequence": "The composite score exposes the real driver: in-place backfill has both long downtime AND an enormous recovery cost if it crashes mid-run — because fresh rows and half-corrected historical rows would be interleaved in the live table, requiring manual triage. The side-table approach has near-zero partial-state recovery cost; a failed run leaves the live table completely untouched.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Blast radius score by approach (downtime hrs + partial-state recovery hrs)",
+            "bars": [
+              {
+                "label": "In-place backfill (pause pipeline)",
+                "value": 142,
+                "highlight": true
+              },
+              {
+                "label": "Side-table backfill + atomic swap",
+                "value": 6
+              },
+              {
+                "label": "Incremental forward-only (n/a)",
+                "value": 0
+              }
+            ],
+            "caption": "Composite risk score. In-place backfill's true cost is dominated by partial-state recovery if the job fails mid-run — not just the planned downtime."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The blast radius analysis shows the side-table approach is dramatically lower risk. What do you tell the engineering lead?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"In-place is too risky — we must use a side table. Pause tonight's backfill.\"",
+          "detail": "Make the definitive call and halt the current plan.",
+          "flag": "weak",
+          "consequence": "You've correctly identified the better approach, but the atomic swap strategy has its own prerequisites — the side table needs to be provisioned, the swap needs to be tested in staging, and cutover timing needs to be coordinated with downstream consumers. Issuing a hard stop without a validated alternative plan could delay the fix longer than the original approach would have.",
+          "divergenceCost": "Overclaimed certainty about the solution before confirming the alternative is ready to execute."
+        },
+        {
+          "id": "B",
+          "label": "\"In-place backfill carries compounding risk at this scale — the side-table approach looks much safer, but let's validate the atomic swap in staging before we commit to either path.\"",
+          "detail": "Present the finding, flag residual uncertainty, and propose a staging validation step.",
+          "flag": "strong",
+          "consequence": "You've reframed the engineering lead's assumption with quantified evidence, named the specific risk (partial state on mid-run failure), and prescribed a concrete next step that de-risks the recommendation itself. The team can validate the swap procedure in staging within hours before committing — a path to certainty rather than a leap of faith.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The instinct to backfill in place feels safe because it requires no extra infrastructure, but at scale the live table becomes a shared failure surface: a mid-run crash leaves corrected and uncorrected rows interleaved with fresh production data, making recovery far more expensive than the original downtime. The real lesson is that backfill risk isn't measured in downtime hours alone — it's measured by what a failure at the midpoint would cost. Building out-of-band into a side table and swapping atomically decouples reprocessing from production entirely, so any failure leaves the live table in a known-good state."
+}

@@ -1,0 +1,143 @@
+{
+  "id": "network-spillover",
+  "title": "The Contaminated Control",
+  "scenario": {
+    "role": "Experimentation Analyst",
+    "company": "Circleback (social productivity app)",
+    "situation": "A referral-incentive experiment ran for four weeks. Treatment users received a bonus for inviting friends. Post-test, control users also showed a meaningful activity bump — nearly half the lift seen in treatment — and the team is questioning whether the test is valid at all.",
+    "stakeholderBelief": "The PM believes the experiment is broken or inconclusive and wants to scrap the results and rerun.",
+    "question": "Is the test really broken, or is something explainable happening?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The PM wants to declare the test invalid and rerun it. How do you frame your investigation before agreeing?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Audit the randomization pipeline",
+          "detail": "Check whether users were accidentally assigned to the wrong group due to a bug.",
+          "flag": "weak",
+          "consequence": "The randomization code checks out — users were correctly assigned. You've ruled out a bug, but you still have no explanation for the control lift. The PM is no more convinced the test is salvageable.",
+          "divergenceCost": "Assumed a technical failure and spent effort ruling out the wrong cause."
+        },
+        {
+          "id": "B",
+          "label": "Segment by social connection to treatment users",
+          "detail": "Ask: did control users who are direct friends of treatment users behave differently from control users with no treatment connections?",
+          "flag": "strong",
+          "consequence": "Splitting control users by whether they were invited or connected to a treatment user reveals that the lift is concentrated among socially adjacent controls. The test isn't broken — treatment leaked across the network boundary.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Extend the test duration and rerun",
+          "detail": "Accept the PM's framing and relaunch the experiment with a longer window.",
+          "flag": "weak",
+          "consequence": "A rerun with the same individual-level randomization scheme produces the same spillover pattern. You've lost four more weeks and still have no clean read.",
+          "divergenceCost": "Accepted the stakeholder's conclusion without diagnosing the root cause first."
+        },
+        {
+          "id": "D",
+          "label": "Compare control-group time series to a pre-experiment baseline",
+          "detail": "Check if control activity was already trending up before the experiment launched.",
+          "flag": "weak",
+          "consequence": "The pre-experiment trend is flat for control users, so a secular trend isn't the culprit. You've eliminated one alternative but still can't explain where the control lift came from.",
+          "divergenceCost": "Investigated a plausible but ultimately unrelated alternative explanation, making no progress on the real driver."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You split the control group by social proximity to treatment users. Which metric best confirms whether interference is the driver?",
+      "artifact": {
+        "type": "bars",
+        "title": "Average weekly activity change — all control users vs. treatment users",
+        "bars": [
+          {
+            "label": "Treatment",
+            "value": 42
+          },
+          {
+            "label": "Control (all)",
+            "value": 19
+          }
+        ],
+        "caption": "Raw average lift. Control shows nearly half the treatment lift — suspicious, but pooling all control users hides what matters."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Raw average activity lift: treatment vs. all control users",
+          "detail": "Use the aggregate averages already in the experiment dashboard.",
+          "flag": "weak",
+          "consequence": "The aggregate view confirms control lifted, but it can't tell you why. You still can't distinguish a real spillover from a seasonal effect or a platform-wide nudge. The PM's 'inconclusive' verdict stands.",
+          "divergenceCost": "Used an aggregate metric that pools clean and contaminated controls, masking the interference signal."
+        },
+        {
+          "id": "B",
+          "label": "Activity lift by control-user exposure tier (connected vs. unconnected to treatment)",
+          "detail": "Compute the lift separately for (1) control users who received an invite from a treatment user and (2) control users with zero treatment connections.",
+          "flag": "strong",
+          "consequence": "The segmented view is unambiguous: unexposed control users show near-zero lift, while control users connected to a treatment user show a lift nearly matching the treatment group itself. The interference pathway is visible and measurable.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Activity lift by group and exposure tier",
+            "unit": "avg weekly actions vs. pre-period",
+            "bars": [
+              {
+                "label": "Treatment",
+                "value": 42
+              },
+              {
+                "label": "Control — connected to treatment",
+                "value": 38,
+                "highlight": true
+              },
+              {
+                "label": "Control — no treatment connection",
+                "value": 3
+              }
+            ],
+            "caption": "Unexposed controls barely moved. The 'control lift' was entirely driven by users who crossed the network boundary — classic interference."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Connected control users show nearly the same lift as treatment users, while unconnected controls show almost none. What do you tell the PM?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The incentive works — contaminated controls prove it spreads organically. Ship the feature.\"",
+          "detail": "Use the spillover itself as evidence of a positive network effect and recommend launch.",
+          "flag": "weak",
+          "consequence": "You've made a causal leap: the measured treatment effect is almost certainly underestimated (because some 'control' users already got the benefit), and the true incremental lift is unknown. Shipping based on a diluted effect size could mean over- or under-investing in the incentive.",
+          "divergenceCost": "Overclaimed a clean causal estimate from a contaminated experiment."
+        },
+        {
+          "id": "B",
+          "label": "\"The test isn't broken — it has network interference. The true effect is underestimated; rerun with cluster randomization to get a clean read before deciding on rollout.\"",
+          "detail": "Name the interference mechanism, explain the implication for the effect size, and prescribe cluster-level randomization.",
+          "flag": "strong",
+          "consequence": "The PM now understands why control lifted, why the current effect estimate is a lower bound, and what a valid rerun looks like. You've saved the learning from being discarded and given a clear, actionable path to a trustworthy answer.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The control group lifted because treatment users invited their friends who happened to be in the control group — a textbook violation of the Stable Unit Treatment Value Assumption (SUTVA). The experiment wasn't broken; it was randomized at the wrong level. The fix is cluster randomization (e.g., by friend group or geographic community) so that treatment and control users don't share a social boundary. The lesson: on social or referral products, individual-level A/B tests almost always underestimate true effects because the network transmits the treatment."
+}

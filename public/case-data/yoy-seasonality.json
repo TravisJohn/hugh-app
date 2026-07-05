@@ -1,0 +1,143 @@
+{
+  "id": "yoy-seasonality",
+  "title": "The Summer Slump",
+  "scenario": {
+    "role": "E-commerce Analyst",
+    "company": "Cartwell",
+    "situation": "July sales came in 15% below June. The business review deck goes out tomorrow.",
+    "stakeholderBelief": "The VP of Commerce reads the month-over-month drop as evidence the business is contracting and wants to trigger a promo-spend response immediately.",
+    "question": "Is Cartwell actually shrinking, or is something else going on?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The VP wants a quick answer before the deck goes out. How do you frame the investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Confirm the MoM decline",
+          "detail": "Accept the 15% drop as the key fact and look for which channels or SKUs drove it down from June.",
+          "flag": "weak",
+          "consequence": "You find the decline is broad-based across channels — which makes it look even more alarming. But you've never asked whether June-to-July is normally negative, so you have no baseline to judge against.",
+          "divergenceCost": "Anchored on the VP's frame and never questioned whether the comparison period was appropriate."
+        },
+        {
+          "id": "B",
+          "label": "Benchmark this July against a seasonal baseline",
+          "detail": "Before reading the MoM move as a trend, check whether July routinely underperforms June and compare this July to last July.",
+          "flag": "strong",
+          "consequence": "You immediately see that July always trails June at Cartwell. The real question shifts to whether this July is better or worse than last July — which is the comparison that removes seasonal noise.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Survey recent buyers for sentiment",
+          "detail": "Run a quick NPS pulse to see if customer satisfaction dropped in July.",
+          "flag": "weak",
+          "consequence": "Sentiment is stable — customers aren't unhappy. But this doesn't explain the sales number, and you've spent time on an instrument that wasn't calibrated to diagnose a revenue move.",
+          "divergenceCost": "Chose a slow, indirect instrument when the answer was already in historical sales data."
+        },
+        {
+          "id": "D",
+          "label": "Build a revenue forecast model",
+          "detail": "Fit a trend model to the last 12 months of sales and project whether the business is declining.",
+          "flag": "weak",
+          "consequence": "The model flags a downward inflection — because you fed it raw monthly data without seasonal adjustment. The model has learned the seasonal pattern as a structural decline.",
+          "divergenceCost": "Jumped to modeling before diagnosing — the model inherited the same flawed comparison."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You pull monthly revenue data. Which metric do you put in front of the VP?",
+      "artifact": {
+        "type": "bars",
+        "title": "Cartwell monthly revenue — last 3 months (MoM view)",
+        "bars": [
+          {
+            "label": "May",
+            "value": 4100000
+          },
+          {
+            "label": "June",
+            "value": 4600000
+          },
+          {
+            "label": "July",
+            "value": 3910000,
+            "highlight": true
+          }
+        ],
+        "caption": "Raw monthly revenue. July looks like a sharp drop — but this view contains no seasonal context."
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Month-over-month change (July vs. June)",
+          "detail": "Report the 15% decline from June to July as the primary performance signal.",
+          "flag": "weak",
+          "consequence": "The chart shows a falling bar, which reinforces the VP's fear. But June is Cartwell's seasonal peak — comparing July to June is like comparing December retail sales to January and calling it a crisis.",
+          "divergenceCost": "Reported a metric that conflates seasonal swing with business trend."
+        },
+        {
+          "id": "B",
+          "label": "Year-over-year change (July this year vs. July last year)",
+          "detail": "Compare this July to the same month last year to hold seasonality constant.",
+          "flag": "strong",
+          "consequence": "Normalized for season, the picture flips: this July is up 8% versus last July. The business isn't shrinking — it's growing, but the MoM lens was hiding it under a predictable seasonal trough.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Cartwell July revenue — year-over-year comparison",
+            "bars": [
+              {
+                "label": "July (last year)",
+                "value": 3620000
+              },
+              {
+                "label": "July (this year)",
+                "value": 3910000,
+                "highlight": true
+              }
+            ],
+            "caption": "Same month, consecutive years. July this year is up 8% YoY — the seasonal trough is normal; the underlying trend is positive."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The YoY view shows +8% growth in July. What do you tell the VP before the deck goes out?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"The business is growing 8% — no action needed.\"",
+          "detail": "Declare the business healthy and close the conversation.",
+          "flag": "weak",
+          "consequence": "You've corrected the VP's frame, but overclaimed certainty. One YoY data point doesn't rule out a genuine slowdown hiding inside the seasonal lift, and you've given no path to monitor it going forward.",
+          "divergenceCost": "Overclaimed from a single corrected data point and gave the VP no way to track the real trend."
+        },
+        {
+          "id": "B",
+          "label": "\"MoM overstates the drop because July is seasonally soft — YoY is the cleaner signal and it shows +8%. I'd recommend we track YoY weekly for the next four weeks before deciding on promo spend.\"",
+          "detail": "Reframe the metric, share the finding, and propose a monitoring path before acting.",
+          "flag": "strong",
+          "consequence": "The VP understands why the original read was misleading, sees the corrected signal, and has a concrete next step. You've added analytical value without overclaiming — and you've protected the promo budget from a false alarm.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "July's 15% month-over-month drop was a seasonal pattern, not a business contraction — comparing to the same month last year revealed +8% growth. The exec's instinct was a plausible but flawed read because month-over-month mixes seasonal swing with underlying trend. The core lesson: always ask whether your comparison period is like-for-like before declaring direction, and hold the causal claim loosely until you have enough YoY observations to confirm the trend."
+}

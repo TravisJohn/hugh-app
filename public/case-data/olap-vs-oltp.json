@@ -1,0 +1,157 @@
+{
+  "id": "olap-vs-oltp",
+  "title": "The Analytics on Prod",
+  "scenario": {
+    "role": "Data Engineer",
+    "company": "Orderly",
+    "situation": "Customer-facing app latency has spiked. Engineering traces it to the production PostgreSQL database being hammered by long-running analytics queries from the BI team.",
+    "stakeholderBelief": "The engineering lead believes the fix is to rewrite the slowest queries and add more read replicas to the primary database.",
+    "question": "Is query tuning and scaling the primary database the right solution — or is something more fundamental wrong?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "The engineering lead wants an answer fast. How do you frame the investigation?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Profile and rewrite the slowest queries",
+          "detail": "Pull EXPLAIN ANALYZE on the top-10 slowest queries and look for missing indexes or bad query plans.",
+          "flag": "weak",
+          "consequence": "You find a few missing indexes and shave some time off individual queries. But the underlying full-table scans still lock rows and compete with OLTP writes. The app is still slow under any reporting load.",
+          "divergenceCost": "Anchored on the symptom (slow queries) rather than diagnosing why those queries are structurally expensive on this engine."
+        },
+        {
+          "id": "B",
+          "label": "Workload characterization across query types",
+          "detail": "Classify all database queries by workload type — transactional (point reads/writes) vs analytical (aggregations, full scans) — and measure their resource footprints separately.",
+          "flag": "strong",
+          "consequence": "You immediately see two completely different access patterns sharing one engine. Analytical queries touch millions of rows; transactional queries touch a handful. That mismatch — not any single query — is what saturates I/O and blocks OLTP.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Benchmark vertical scaling options",
+          "detail": "Model how much latency improves if you double CPU and RAM on the primary database instance.",
+          "flag": "weak",
+          "consequence": "A bigger instance reduces contention temporarily, but analytics scans grow with data volume. You've bought months, not a fix. Costs rise; the problem returns.",
+          "divergenceCost": "Jumped to a capacity solution before confirming whether the architecture — not the hardware — is the root cause."
+        },
+        {
+          "id": "D",
+          "label": "Add read replicas and route BI traffic there",
+          "detail": "Spin up PostgreSQL read replicas and point the BI tool at them instead of primary.",
+          "flag": "weak",
+          "consequence": "Replication lag causes BI reports to reflect stale data, and full-table scans on a row-store replica are still slow — the workload mismatch is unchanged. You've moved the problem, not solved it.",
+          "divergenceCost": "Treated a row-store replica as an analytics tier without questioning whether row-store is the right engine for the workload."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "Workload classification is done. Which metric do you use to show where the contention really lives?",
+      "artifact": {
+        "type": "bars",
+        "title": "Total query execution time by query type — last 7 days (hours)",
+        "bars": [
+          {
+            "label": "OLTP point reads",
+            "value": 1.2
+          },
+          {
+            "label": "OLTP writes",
+            "value": 0.9
+          },
+          {
+            "label": "BI aggregations",
+            "value": 38.4,
+            "highlight": true
+          },
+          {
+            "label": "BI full-table scans",
+            "value": 51.7,
+            "highlight": true
+          }
+        ],
+        "caption": "Raw cumulative execution hours. BI queries dominate total time — but is that because there are more of them, or because each one is intrinsically expensive on a row-store?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Total cumulative execution time per query type",
+          "detail": "Sum all execution hours for each query class over the past week.",
+          "flag": "weak",
+          "consequence": "BI queries look catastrophic — but there are far fewer of them than OLTP queries. You might conclude BI is simply more popular, missing the structural cost per query entirely.",
+          "divergenceCost": "Compared raw totals across query classes with wildly different volumes — size confounds the signal."
+        },
+        {
+          "id": "B",
+          "label": "Median execution time per query, by type and rows scanned",
+          "detail": "Normalize by query count and plot median latency against rows touched for each query class.",
+          "flag": "strong",
+          "consequence": "Normalized, the picture is stark: a single BI aggregation touching 5M rows takes 40× longer than a thousand OLTP point reads combined. The cost isn't frequency — it's that sequential row-by-row scans are the worst-case workload for a row-store engine.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Median query latency by type (seconds per query)",
+            "unit": "s",
+            "bars": [
+              {
+                "label": "OLTP point read",
+                "value": 0.003
+              },
+              {
+                "label": "OLTP write",
+                "value": 0.005
+              },
+              {
+                "label": "BI aggregation",
+                "value": 4.2
+              },
+              {
+                "label": "BI full-table scan",
+                "value": 12.8,
+                "highlight": true
+              }
+            ],
+            "caption": "Per-query, BI full-table scans are 2,500× slower than OLTP reads — a mismatch that no index or replica can fully paper over on a row-store engine."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "Per-query latency shows BI scans are structurally expensive on the row-store. What do you tell the engineering lead?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"Query tuning won't fix this — move all analytics to a columnar store immediately.\"",
+          "detail": "Make the architectural call and push for immediate migration.",
+          "flag": "weak",
+          "consequence": "The recommendation is directionally right, but without a proof-of-concept you can't rule out that ETL latency, schema translation costs, or BI tool compatibility introduce new problems. Acting without a validation step risks a costly migration that trades one set of issues for another.",
+          "divergenceCost": "Overclaimed certainty and skipped the validation step that would de-risk the architectural change."
+        },
+        {
+          "id": "B",
+          "label": "\"The data shows a fundamental workload mismatch, not a query quality problem — columnar OLAP is the structural fix, but let's run a focused pilot before full migration.\"",
+          "detail": "Present the workload evidence, name the architectural solution, and recommend a time-boxed pilot on a columnar store with a representative query sample before committing.",
+          "flag": "strong",
+          "consequence": "The engineering lead sees the evidence, understands why tuning is a local fix to a global problem, and greenlights a pilot. The pilot confirms the columnar store reduces BI query latency by over 90% with zero impact on OLTP — making the migration decision defensible and low-risk.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "The app slowdown wasn't caused by poorly written queries — it was caused by running an analytical workload on an engine designed for transactional point access. Row-store engines sequentially scan every column in every row even when only one column is needed, making full-table aggregations structurally expensive regardless of indexing. The lesson is architectural: OLTP and OLAP are different workloads that belong on different engines, and no amount of query tuning or hardware scaling changes the fundamental mismatch."
+}

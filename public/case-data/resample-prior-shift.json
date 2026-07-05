@@ -1,0 +1,162 @@
+{
+  "id": "resample-prior-shift",
+  "title": "The Balanced Trap",
+  "scenario": {
+    "role": "Data Scientist",
+    "company": "Flagpost",
+    "situation": "A fraud-detection model trained on a 50/50 rebalanced dataset is flagging roughly 30% of production transactions as fraudulent. The true fraud rate in production is about 2%.",
+    "stakeholderBelief": "The team assumes the model is basically sound and the fix is simple: nudge the classification threshold upward until the flag rate looks reasonable.",
+    "question": "Why is the model over-predicting positives in production, and what is the right fix?"
+  },
+  "decisions": [
+    {
+      "id": "framing",
+      "flag": "framing_quality",
+      "prompt": "Your team wants to ship a threshold fix by end of week. How do you frame your investigation before touching anything?",
+      "options": [
+        {
+          "id": "A",
+          "label": "Grid-search the threshold",
+          "detail": "Try thresholds from 0.3 to 0.9 and pick the one that brings the flag rate closest to 2%.",
+          "flag": "weak",
+          "consequence": "You find a threshold that suppresses the flag rate — but the underlying probabilities are still inflated and miscalibrated. You've hidden the symptom without treating the cause; precision and recall will drift as the production distribution shifts.",
+          "divergenceCost": "Anchored on the team's hypothesis and masked the miscalibration rather than diagnosing it."
+        },
+        {
+          "id": "B",
+          "label": "Calibration diagnostic",
+          "detail": "Check whether the model's predicted probabilities match observed fraud rates across score bins — a reliability diagram / calibration curve on held-out production data.",
+          "flag": "strong",
+          "consequence": "The calibration plot reveals a systematic upward shift: bins the model scores at 0.5 have an actual fraud rate near 0.02. This is a uniform inflation pattern, not random noise — a strong signal that the prior was changed at training time and never corrected.",
+          "divergenceCost": ""
+        },
+        {
+          "id": "C",
+          "label": "Feature drift audit",
+          "detail": "Compare training feature distributions to production feature distributions to look for covariate shift.",
+          "flag": "weak",
+          "consequence": "Feature distributions look similar — no obvious covariate shift. You've ruled out one cause but spent time on the wrong thread; the problem was never in the features.",
+          "divergenceCost": "Chased covariate shift when the mismatch was in the label prior, not the features."
+        },
+        {
+          "id": "D",
+          "label": "Collect more labeled production data and retrain",
+          "detail": "Label a fresh production sample and retrain without rebalancing.",
+          "flag": "weak",
+          "consequence": "Retraining will eventually help, but it takes weeks and doesn't explain *why* the current model is miscalibrated. You've bypassed diagnosis entirely and will repeat the mistake on the next model.",
+          "divergenceCost": "Jumped to retraining before understanding the mechanism — the same mistake will recur."
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "evidence",
+      "flag": "metric_validity",
+      "prompt": "You pull model scores for 10,000 production transactions alongside their true labels. Which metric do you use to confirm what's wrong?",
+      "artifact": {
+        "type": "bars",
+        "title": "Raw positive predictions by score bucket — production sample",
+        "bars": [
+          {
+            "label": "Score 0.0–0.2",
+            "value": 420
+          },
+          {
+            "label": "Score 0.2–0.4",
+            "value": 890
+          },
+          {
+            "label": "Score 0.4–0.6",
+            "value": 2150
+          },
+          {
+            "label": "Score 0.6–0.8",
+            "value": 3810
+          },
+          {
+            "label": "Score 0.8–1.0",
+            "value": 2730
+          }
+        ],
+        "caption": "Most predictions pile up in the 0.4–0.8 range. Does this mean fraud is really that common, or is something else going on?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "label": "Flag rate (share of transactions scored above 0.5)",
+          "detail": "Count what fraction of production transactions the model calls positive.",
+          "flag": "weak",
+          "consequence": "The flag rate is 34% — obviously too high. But this only confirms the problem exists; it says nothing about whether the scores themselves are valid probabilities or systematically inflated. Threshold-tuning looks like the obvious next step.",
+          "divergenceCost": "Measured the symptom, not the mechanism — leaves the root cause invisible."
+        },
+        {
+          "id": "B",
+          "label": "Observed fraud rate vs. mean predicted probability per score bin (calibration curve)",
+          "detail": "For each score decile, compute actual fraud rate among those transactions and plot it against the model's mean predicted score.",
+          "flag": "strong",
+          "consequence": "The calibration curve shows every bin is inflated by roughly the same multiplicative factor: transactions scored 0.50 have a true fraud rate of only 0.019. The inflation ratio (~25×) matches almost exactly what prior-adjustment theory predicts when a 2% base rate is rebalanced to 50%. The fix is algebraic, not empirical.",
+          "divergenceCost": "",
+          "artifact": {
+            "type": "bars",
+            "title": "Observed fraud rate vs. model score bin — production sample",
+            "bars": [
+              {
+                "label": "Score 0.0–0.2 (predicted ~0.10)",
+                "value": 0.4
+              },
+              {
+                "label": "Score 0.2–0.4 (predicted ~0.30)",
+                "value": 1.1
+              },
+              {
+                "label": "Score 0.4–0.6 (predicted ~0.50)",
+                "value": 1.9,
+                "highlight": true
+              },
+              {
+                "label": "Score 0.6–0.8 (predicted ~0.70)",
+                "value": 3.8
+              },
+              {
+                "label": "Score 0.8–1.0 (predicted ~0.90)",
+                "value": 7.2
+              }
+            ],
+            "caption": "Observed fraud rates (%) per bin. A model predicting 50% probability sees only ~2% actual fraud — a ~25× inflation consistent with a prior shift from 2% to 50% at training time."
+          }
+        }
+      ],
+      "gold": "B"
+    },
+    {
+      "id": "interpretation",
+      "flag": "causal_caution",
+      "prompt": "The calibration curve shows uniform score inflation matching the rebalancing ratio. What do you tell the team?",
+      "options": [
+        {
+          "id": "A",
+          "label": "\"Resampling caused this — apply the prior-adjustment formula and ship it.\"",
+          "detail": "State the cause with confidence and push the algebraic correction directly to production.",
+          "flag": "weak",
+          "consequence": "The formula is almost certainly right, but shipping a probability correction to a live fraud system without a shadow-mode validation is a real operational risk. If any other factor is also inflating scores, the correction will be wrong in an invisible way.",
+          "divergenceCost": "Overclaimed certainty and skipped the validation step before a production change."
+        },
+        {
+          "id": "B",
+          "label": "\"The calibration pattern matches prior-shift theory almost exactly — resampling is the most likely cause. Let's apply the prior-adjustment correction in shadow mode and validate on a held-out week before promoting it.\"",
+          "detail": "Name the mechanism, recommend the algebraic fix, and require a shadow-mode holdout before going live.",
+          "flag": "strong",
+          "consequence": "You've given the team a precise, theoretically grounded explanation that reframes the 'threshold nudge' framing entirely, while protecting production with a validation gate. Shadow results confirm the correction brings calibration error near zero — and the team now understands why rebalancing requires a corresponding serving-time correction.",
+          "divergenceCost": ""
+        }
+      ],
+      "gold": "B"
+    }
+  ],
+  "goldPath": {
+    "framing": "B",
+    "evidence": "B",
+    "interpretation": "B"
+  },
+  "insight": "When you oversample to balance classes, you implicitly change the prior the model learns — from the true 2% base rate to 50%. Served in production without correction, every predicted probability is inflated by a factor of roughly (p_train / p_true) × ((1 − p_true) / (1 − p_train)), making the model look wildly over-confident. A threshold adjustment hides this but does not fix it; the correct remedy is prior adjustment (or Platt/isotonic calibration) applied at serving time. The lesson: resampling is a training convenience, not a free lunch — the serving environment still has the original prior, and your model must be corrected to match it."
+}
