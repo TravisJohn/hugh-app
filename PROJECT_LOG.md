@@ -1472,3 +1472,20 @@ scarce skill (judgment) only. Named surface: "The Case Room".
     manifest+case JSON parse; declared columns == CSV header; in-page preview rows
     == actual CSV rows. Authenticated visual render pending (routes are auth-gated —
     open in a logged-in browser). **Uncommitted on `feat/case-lab`.**
+- **Case Lab v1 — 10-case pilot COMPLETE (branch `feat/case-lab`, 2026-07-05):**
+  authored cases #2–10 to finish the pilot, plus two UX tweaks (a non-spoiling
+  **Suggested approach** section; the teaching note is now **collapsible**). Every
+  case = seeded numpy/pandas DGP (`scripts/case-lab-src/<id>/dgp.py`) → validated
+  numbers → `public/case-lab/<id>/{case.json,data.csv}`. The 10 traps: confounding/
+  selection (campaign-retention), confounding/reverse-causality (support-churn),
+  Simpson's ×2 (checkout-redesign, sales-team-winrate), regression-to-mean ×2
+  (sales-coaching, store-refresh), survivorship (power-users), survivorship/self-
+  selection (referral-ltv), seasonality ×2 (loyalty-launch, sitespeed-deploy). Each
+  DGP plants a clear gap between the naive and honest reads (e.g. campaign +31.7→
+  +1.9 pts; sitespeed +7.7 pts naive → −0.2 pts Dec-over-Dec). Seasonality cases
+  ship 2 years of order/session data in natural export order (#10 = 40k rows). All
+  10 pass JSON parse + column/CSV-header match + preview↔CSV consistency; tsc clean;
+  CSVs serve 200; feed compiles. Committed in 4 batches (`7ab9416`, `41166f7`,
+  `b104474`, `9054aac`); branch not pushed / no PR yet. **Next:** logged-in visual
+  pass → push + PR; the AI generate→validate pipeline (`author-longform.mjs`) is the
+  scaling play for future monthly batches.
