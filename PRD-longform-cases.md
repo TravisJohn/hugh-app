@@ -1,76 +1,82 @@
 # PRD — Long-Form Data Cases ("The Case Lab", working title)
-**Version**: 0.1
+**Version**: 0.2
 **Status**: Draft — awaiting approval (no code yet)
-**Builds on**: The Case Room (Phase 26) — this is a *sibling* engine, not an extension
-**Focus**: A second, long-form mode inside `/cases`: a real business problem + a
-synthetic dataset the learner actually analyses, graded deterministically.
+**Builds on**: The Case Room (Phase 26) — **v1 rides its static-artifact rails**
+**Focus**: A second, long-form mode inside `/cases`. The learner gets a real
+business problem + a synthetic dataset they **take away and work in their own
+tools / their favourite AI**, then compare their thinking against an expert
+teaching note. **Zero runtime AI.**
+
+> **Changelog — v0.1 → v0.2:** Dropped in-app grading *and* the in-browser
+> workbench from v1. v1 is now an **ungraded "takeaway" case** (case + dataset +
+> teaching-note reveal) that the learner works with their own AI/tools. This
+> collapses the architecture back onto the Case Room's all-public, zero-AI
+> pattern. Gap-score grading, the memo rubric, the in-app Pyodide workbench, and
+> the sealed answer key all move to a documented **v2** (§13).
 
 ---
 
 ## 1. Problem / Goal
 
-The Case Room's multiple-choice cases are excellent for *quick* judgment reps
-(10–15 min, zero data work). They can't test the thing that actually breaks in
-the field: **can you take a messy dataset, resist the obvious-but-wrong reading,
-and defend a real recommendation?**
+The Case Room's multiple-choice cases test *quick* judgment (10–15 min, no data
+work). They can't hand a learner the thing that actually builds skill: **a messy,
+realistic dataset and a real business question to wrestle with.**
 
-**Goal:** a long-form case mode where the learner is handed a business question
-and a 10,000+ row dataset, does genuine analysis in-browser, is guided through
-checkpoints, and submits a written recommendation — all graded deterministically
-against a *known* ground truth, with AI used only for a final memo critique and
-optional hints.
+**Goal (v1):** give the learner a strong *starting point* — a believable business
+problem + a 10,000+ row synthetic dataset — that they take away and analyse in
+whatever they like (a notebook, Excel, or their favourite AI). When they're done,
+they reveal an **expert teaching note** and self-assess. No grading, no in-app
+analysis, no runtime AI — just a high-quality, reusable case they can keep.
 
 ---
 
 ## 2. Users
 
 The existing Hugh learner (data / analytics skill prep). Same auth gate, same
-"data & analytics only" domain. Long-form suits the learner who has done a few
-MC cases and wants to *apply* judgment on real data, not just recognise it.
+"data & analytics only" domain. Suits the learner who wants to *apply* judgment
+on real data at their own pace, in their own environment.
 
 ---
 
-## 3. Core concept — one case, end to end
+## 3. Core concept — one case, v1 loop
 
 1. **Brief** — a business scenario + the stakeholder's confident (wrong) belief +
    the question. E.g. *"Marketing swears the Q3 win-back email lifted retention.
    Fund it next quarter?"*
-2. **Dataset** — a 10k+ row CSV, pre-loaded into a pandas DataFrame in the
-   in-browser **Pyodide** workbench. The learner explores freely in Python.
-3. **Guided checkpoints** — a fixed spine of prompts that walk the analysis
-   (compute the naive effect → notice who was treated → identify the confounder →
-   estimate the adjusted effect). Each checkpoint is graded the instant it's
-   submitted.
-4. **Written recommendation** — a short analyst memo to the stakeholder.
-5. **Result** — a **gap score** (how far the learner's outputs sit from the band
-   of correct outputs — like strokes over par) + a **memo score** (LLM rubric),
-   with qualitative feedback and the planted insight revealed.
+2. **Guiding questions** — a short list of prompts that scaffold the analysis
+   (compute the naive effect → who was actually treated → what confounds it →
+   estimate the honest effect). **Prompts to think about, not graded steps.**
+3. **The dataset** — a **downloadable CSV** (10k+ rows). The learner works it in
+   their own tools / their favourite AI. Hugh does not analyse it for them.
+4. **Reveal the teaching note** — when ready, the learner opens the expert
+   worked solution + the planted lesson ("the naive read says X; here's the
+   confounder we planted; here's the honest answer") and **self-assesses**.
 
-**Why "both" (checkpoints + memo):** the gap score grades *"did you get the right
-answer,"* the memo grades *"do you understand why."* Each covers the other's
-failure mode (fluking a close number; writing a lovely memo around a wrong one).
+The mechanic is **self-directed case study + a revealed teaching note** — exactly
+how business-school cases and textbook exercises work. The takeaway artifact (the
+CSV + brief) is the learner's to keep, revisit, or put in a portfolio.
 
 ---
 
-## 4. The keystone idea: the LLM never emits 10,000 rows
+## 4. The keystone idea: the LLM never emits 10,000 rows (unchanged)
 
 The LLM authors a small **data-generating process (DGP) script** (numpy/pandas)
 that *plants the lesson* — a confounder, a Simpson's split, a survivorship gate.
-Code runs the script to emit the CSV. This buys us, deterministically:
+Code runs it to emit the CSV. This is what makes the data **genuinely teach
+something defensible** rather than being random noise, and it produces the known
+ground truth that the **teaching note** is written against.
 
-- **10k+ reproducible rows** from a seed, cheaply;
-- a **known ground truth** (the true parameter is a DGP input), which is what
-  makes an open-ended case gradeable **without an LLM judge** on the analysis.
+Even with no grading, the DGP matters: it's the difference between "here's some
+fake data" and "here's data with a real, expert-verifiable lesson baked in."
 
 ---
 
-## 5. Scope — the pilot (5 inference cases)
+## 5. Scope — the v1 pilot (5 inference cases)
 
 Inference-first (causal-caution) — the highest-judgment territory, and a
 non-arbitrary set: the five classic ways a confident wrong conclusion gets made.
-Each is a distinct DGP archetype, so the pilot **also seeds the reusable template
-library**. In every one, the naive answer is inflated and the honest answer is
-small.
+Each is a distinct DGP archetype (seeding the reusable template library). In every
+one, the naive answer is inflated and the honest answer is small.
 
 | # | Trap | Case (the confident wrong belief) | Planted structure |
 |---|---|---|---|
@@ -80,197 +86,184 @@ small.
 | 4 | Survivorship bias | "Feature-X users churn less — push everyone to X." | Only long-survived accounts *can* use X |
 | 5 | Seasonality confound | "Revenue jumped after the Nov loyalty launch." | November always spikes; incremental effect tiny |
 
-### Worked example — Case #1 checkpoint spine (canonical)
-
-Dataset columns (illustrative): `user_id, signup_date, plan_tier, region,
-engagement_score, got_campaign, retained_90d`.
-
-| CP | Prompt | Kind | Graded against (from sealed key) |
-|----|--------|------|----------------------------------|
-| 1 | "Naive 90-day retention: campaigned vs not?" | numeric | band from DGP resample of the raw difference |
-| 2 | "Before concluding — who actually got the campaign?" | mcq | correct = "already-engaged users" |
-| 3 | "Which variable confounds the comparison?" | mcq | correct = `engagement_score` |
-| 4 | "Estimate the *adjusted* retention effect." | numeric | band = sampling CI of the true planted effect (~small) |
-| 5 | Memo: "Write your recommendation to the VP." | memo | LLM rubric (see §7.4) |
+Each case ships as: **brief + CSV + guiding questions + teaching note.**
 
 ---
 
-## 6. Out of scope (pilot)
+## 6. Out of scope (v1 — all moved to v2, §13)
 
-- **Prediction / Kaggle-style cases** (held-out-metric grading) — planned v2.
-- **Leaderboards, streaks, daily-commit mechanics** — the feed will *feel* daily
-  but we do **not** lock a daily SLA in the pilot (see §7.7).
-- **Multiplayer / sharing / public profiles.**
-- **Mobile layout** (consistent with existing Hugh deferral).
-- More than the 5 archetypes above.
+- **Grading of any kind** — no gap-score, no memo rubric, no correctness signal.
+- **In-app analysis** — no Pyodide workbench; the learner uses their own tools/AI.
+- **Sealed answer key** — nothing to game, so the teaching note is just a *reveal*
+  (public, like the Case Room's counterfactual).
+- **Per-learner scoring / attempts.** (A minimal "completed" flag is optional —
+  §7.5.)
+- **Prediction / Kaggle-style cases**, **leaderboards / streaks**, **mobile**.
 
 ---
 
-## 7. Architecture
+## 7. Architecture — v1 rides the Case Room rails
 
-### 7.1 A sibling engine, not an extension
-Do **not** reuse the Case Room's `Decision`/`CaseOption` multiple-choice model —
-wrong shape for open-ended analysis. New types, new player, new routes, its own
-manifest. It sits behind a **second tab in `/cases`**.
+### 7.1 Same static-artifact pattern, all-public, zero runtime AI
+No divergence from the Case Room's model: everything is a static file under
+`public/case-lab/`, read server-side via a loader mirroring `lib/cases/loader.ts`
+(the same **GCS swap seam**). **No sealed tier** — with no grading, there's
+nothing to hide, so the teaching note ships in the public case file. **No grading
+API, no nudge API, no AI at request time.**
 
-### 7.2 Two-tier data model (the one real divergence from the Case Room)
-The Case Room is *all-public* (everything under `public/case-data/`, graded
-client-side, zero AI). Long-form **cannot** be — a public answer key is a
-fetchable answer key. Every case therefore has two visibility tiers:
+### 7.2 Data model (all public)
+Per case: `case.json` (brief, data schema, guiding questions, **teaching note**) +
+`data.csv` (the rows). The teaching note is revealed client-side on demand —
+exactly like the Case Room reveals its counterfactual after a commit.
 
-- **Public** (shipped to the learner): `case.json` (scenario, data schema,
-  checkpoint *prompts*, memo task) + `data.csv` (the rows). CDN-able.
-- **Sealed** (server-side only, never sent to the client): `key.json` (checkpoint
-  answer bands, MCQ correct answers, memo rubric), plus the `dgp.py` and
-  `solution.py` authoring artifacts. Private bucket / repo — never CDN.
+### 7.3 Case page (viewport-fit where it can be; scroll is a documented exception)
+- Brief + guiding questions.
+- **Schema + a static sample preview** (first ~10 rows rendered from a small
+  sample baked into `case.json` — no Pyodide, just a table) so the learner can
+  eyeball the data before downloading.
+- **Download CSV** button (the takeaway).
+- **Reveal teaching note** (the payoff).
+- *Nicety (optional):* a "copy brief for your AI" action / downloadable bundle so
+  pasting the case into ChatGPT/Claude is one click.
 
-Consequences:
-1. **Grading is an API route** (`/api/cases/lab/grade`) that reads the sealed key
-   server-side. No client-side deterministic grading for these.
-2. **The GCS swap seam splits**: public artifacts follow the existing
-   `lib/cases/loader.ts` seam; the sealed tier gets its own private loader.
-
-### 7.3 Workbench — Pyodide (already in the repo)
-Reuse the existing Pyodide worker (`lib/code/pyodide.worker.ts`,
-`app/code/page.tsx`). The CSV is pre-loaded into a DataFrame; the learner writes
-pandas/numpy. **Zero backend compute** — it's the learner's own CPU. A 10k-row
-CSV is ~1 MB and loads fine.
-
-### 7.4 Grading contract
-**Checkpoints (deterministic, server-side, no AI):**
-- `mcq` → exact match to the sealed correct id.
-- `numeric` → inside the sealed **band** (derived from a DGP resample, so any
-  *valid method* lands in-band; a naive/confounded answer falls far outside).
-- `direction` → sign / rough-magnitude bucket (most method-robust).
-- Design rule: **lean on `mcq`/`direction`; reserve exact `numeric` for
-  quantities with one answer regardless of method** (e.g. group sizes). This is
-  the mitigation for the "multiple valid methods" grading risk.
-- The per-case **gap score** aggregates checkpoint distances into one number
-  (strokes-over-par), mirroring the Case Room's "counterfactual diff vs gold."
-
-**Memo (LLM rubric — the only guaranteed runtime AI):**
-- One Sonnet call. Rubric in the sealed key: weighted criteria + `mustMention`
-  (e.g. names the confounder; caveats causality; states a decision). Returns a
-  score + short feedback.
-
-**Result** = gap score + memo score → overall, plus feedback + planted insight.
-
-### 7.5 Guided instruction
-Deterministic checkpoint spine drives the case. An **optional** "I'm stuck" nudge
-calls a cached AI hint (`/api/cases/lab/nudge`) — the brief + schema sit in a
-cached prefix, so hints are cheap and only fire on demand. Haiku-class.
-
-### 7.6 Runtime cost (bounded, flat per-session)
-Pyodide free · checkpoint grading free · **1 Sonnet memo call per completion** ·
-optional cached hints. Cost does **not** scale with user count in any scary way.
-This breaks the Case Room's zero-runtime-AI property but stays small and capped.
-
-### 7.7 Delivery — a dated "file-explorer" feed
+### 7.4 Delivery — a dated "file-explorer" feed
 A new landing for long-form: a **dated feed** (date · problem · trap/difficulty ·
-your gap-score · done/attempted), suited to long-form (you do one at a time, you
-don't browse 100). The manifest gains a `releaseDate`.
+done/attempted), suited to long-form. The manifest gains a `releaseDate`. Release
+cadence **decoupled from authoring**: batch-author + validate → queue → drip one
+per day; a bad generation never reaches the queue. Daily *feel*, no daily SLA in
+the pilot. Whole archive stays browsable. **Pilot: release the 5 over the first
+week or two, then decide cadence.**
 
-**Cadence: decouple release from authoring.** Batch-author + validate into a
-**queue**, then **drip one per day**. A generation that fails the validator never
-reaches the queue, so a bad case can't ship on a Tuesday; a buffer covers gaps.
-The learner feels a daily rhythm; the pipeline runs in reliable batches. Whole
-archive stays browsable — never rate-limit a keen learner. **Pilot: release the 5
-over the first week or two to test the feed, then decide cadence.**
+### 7.5 Progress (minimal or none)
+v1 needs no scoring. Optional: a lightweight `case_lab_progress` (per learner:
+`viewed` / `revealed` booleans) purely so the feed can show a "done" badge —
+tolerant of the table being absent, exactly like the Case Room's `case_attempts`.
+Can be deferred entirely if we want the smallest possible v1.
 
-### 7.8 Authoring pipeline (offline, mirrors `author-cases.mjs`)
+### 7.6 Authoring pipeline (offline, mirrors `author-cases.mjs`)
 `scripts/author-longform.mjs` (Node orchestrator) per case:
 1. **Brief** — human writes (or AI drafts) the scenario + intended trap.
-2. **Generate** — Sonnet writes `dgp.py` (+ checkpoint prompts, memo rubric).
+2. **Generate** — Sonnet writes `dgp.py` + guiding questions + a draft teaching note.
 3. **Run** — shell out to **Python** (numpy/pandas) → emit `data.csv` + the true
    parameters.
-4. **Validate** — run `solution.py` (a reference analysis) against the emitted
-   CSV and confirm it **recovers the planted answer**, and that the naive path is
-   wrong. Derive numeric **bands** from resampling. A case is valid only if the
-   DGP and the reference solution agree.
-5. **Critic** — Sonnet rubric pass on realism/fairness; revise loop.
-6. **Emit** public `case.json` + `data.csv`; sealed `key.json`; commit `dgp.py` +
-   `solution.py` for reproducibility; rebuild the manifest.
+4. **Validate** — run a reference solution against the emitted CSV and confirm it
+   **recovers the planted answer** (and that the naive path is wrong). *This step
+   stays even though there's no grading* — a broken DGP would ship a **wrong
+   teaching note**, which is worse than no case. **The validated reference
+   solution becomes the teaching note** (it does double duty).
+5. **Critic** — Sonnet rubric pass on realism/fairness of brief + teaching note.
+6. **Emit** public `case.json` (brief, schema, sample rows, guiding questions,
+   teaching note) + `data.csv`; commit `dgp.py` + `solution.py` for
+   reproducibility; rebuild the manifest.
 
 **New toolchain dependency:** offline Python (numpy/pandas) on the authoring
 machine. Never in production.
 
 ---
 
-## 8. On-disk layout (proposed)
+## 8. On-disk layout (proposed) — public only
 
 ```
-public/case-lab/                     # PUBLIC tier (CDN-able)
+public/case-lab/                     # ALL PUBLIC (CDN-able) — no sealed tier in v1
   manifest.json                      # feed index: id, title, trap, releaseDate, estMinutes
   <id>/
-    case.json                        # scenario, data schema, checkpoint PROMPTS, memo task
-    data.csv                         # 10k+ rows
+    case.json                        # brief, data schema, sample rows, guiding questions, TEACHING NOTE
+    data.csv                         # 10k+ rows (the takeaway)
 
-case-lab-sealed/                     # SEALED tier (private — NEVER shipped to client)
-  <id>/
-    key.json                         # checkpoint bands + mcq answers + memo rubric
-    dgp.py                           # data-generating process (reproducibility)
-    solution.py                      # reference analysis (validator)
+# authoring-only, committed for reproducibility (not served):
+scripts/case-lab-src/<id>/dgp.py     # data-generating process
+scripts/case-lab-src/<id>/solution.py# reference analysis → became the teaching note
 ```
 
 ---
 
-## 9. New surfaces
+## 9. New surfaces (v1)
 
-- **Routes**: `/cases` gains a tab → long-form feed; `/cases/lab/[id]` the player
-  (brief + Pyodide workbench + checkpoints + memo).
-- **API**: `POST /api/cases/lab/grade` (server-side, reads sealed key) ·
-  `POST /api/cases/lab/nudge` (cached hint).
-- **Types**: `types/case-lab.ts` (new — Case, Checkpoint, Key, Attempt).
-- **Loader**: `lib/case-lab/loader.ts` (public) + a sealed-key loader.
-- **Migration**: `024_case_lab.sql` — `case_lab_attempts` (per learner: gap
-  score, memo score, checkpoint results) + RLS.
+- **Routes**: `/cases` gains a tab → long-form feed; `/cases/lab/[id]` the case
+  page (brief + guiding questions + sample preview + CSV download + teaching-note
+  reveal). **No API routes.**
+- **Types**: `types/case-lab.ts` (Case, Manifest, optional Progress).
+- **Loader**: `lib/case-lab/loader.ts` (public; mirrors `lib/cases/loader.ts`).
+- **Migration** *(optional)*: `024_case_lab_progress.sql` — a minimal
+  `case_lab_progress` + RLS, or skip for the smallest v1.
 - **Script**: `scripts/author-longform.mjs`.
 
 ---
 
-## 10. Risks & mitigations
+## 10. Cost (v1)
+
+- **Runtime: $0.** Zero AI at request time — same property as the Case Room.
+- **Authoring: offline, one-time** — ~4 Sonnet calls/case (generate → validate →
+  teaching note → critic) ≈ **$0.25–0.75 per case**; the **5-case pilot ≈ $1.50–4,
+  once**. (Prices confirmed: Sonnet 4.6 $3/$15 per MTok.)
+- **Storage: negligible** — ~1 MB CSV/case; 100 cases ≈ 100 MB on the GCS seam.
+
+**Money is not the constraint.** The real investment is the authoring pipeline +
+DGP archetypes and getting believable cases with correct teaching notes.
+
+---
+
+## 11. Risks & mitigations
 
 | Risk | Mitigation |
 |---|---|
-| Fair numeric grading across valid methods | Bands from DGP resampling; lean on mcq/direction; exact-numeric only for one-answer facts |
-| Sealed key leakage | Key never under `public/`; grading server-side only |
-| Daily cadence vs. authoring reality (5–20/mo) | Decouple: batch → validate → queue → drip; buffer + fallback |
-| Breaks zero-runtime-AI | Cost bounded (1 memo call + optional cached hints); cap it |
-| No-scroll rule | Long-form player is a **documented exception** (like the library) |
-| Pyodide / CSV load latency | ~1 MB CSV; lazy-load worker; explicit loading state |
-| Python in authoring toolchain | Offline only; document setup in the script README |
+| A wrong teaching note (broken DGP) | Keep the offline **validate** step — the reference solution must recover the planted answer before the note ships |
+| Self-directed → some learners won't do the work | Accepted; it's a *resource*, not a test. The takeaway artifact has standalone value |
+| Believable business scenario + fair planted trap is hard | Authoring effort, front-loaded into ~15–25 DGP archetypes; re-skin thereafter |
+| No-scroll rule | The case page is a **documented exception** (like the library) |
+| "Bring your own AI" = we don't control that experience | Fine by design — v1 is a starting point, not a graded environment |
+| Daily cadence vs. authoring reality | Decouple: batch → validate → queue → drip; buffer + fallback |
 
 ---
 
-## 11. Success criteria (pilot)
+## 12. Success criteria (v1)
 
 - 5 inference cases, each **validated** (reference solution recovers the planted
   answer; naive path provably wrong) and shipped.
-- A learner can: read the brief → analyse the CSV in-browser → pass checkpoints →
-  submit a memo → receive a gap score + memo feedback + the planted insight.
-- Grading is deterministic and **method-fair** (a correct-but-different analysis
-  scores in-band).
-- Runtime cost per completion ≤ ~1 Sonnet memo call + optional cached hints.
-- Feed UX validated on the 5 before committing to a release cadence.
+- A learner can: read the brief → preview the schema/sample → **download the CSV**
+  → work it in their own tools → **reveal the teaching note** → self-assess.
+- Every teaching note provably matches its dataset (the validation gate).
+- The dated feed works; the archive is browsable.
+- **Zero runtime AI.**
 
 ---
 
-## 12. Proposed build sequence (for approval — still no code)
+## 13. v2 (deferred, documented) — grading + in-app analysis, layered on top
 
-1. **Authoring pipeline + Case #1 validated** — prove DGP → run → validate → key
-   on the campaign case (the riskiest, most novel piece; de-risk first).
-2. **Player + Pyodide workbench + checkpoint grading API** — Case #1 end to end.
-3. **Memo rubric grading.**
-4. **Feed / file-explorer + manifest + `024` migration.**
-5. **Author the remaining 4 cases; wire batch → queue.**
-6. **Verify + ship behind a flag.**
+Because the DGP, guiding questions, and reference solution already exist, v2 is
+**layering, not a rewrite**:
+
+- **In-browser Pyodide workbench** — analyse the CSV without leaving Hugh (reuse
+  `lib/code/pyodide.worker.ts`).
+- **Gap-score grading** — checkpoint answers graded against a **band of correct
+  outputs** derived from DGP resampling (method-fair); lean on MCQ/direction
+  checkpoints, reserve exact-numeric for one-answer facts.
+- **Written-recommendation memo** — one Sonnet rubric call (~1.5¢/completion).
+- **Two-tier data** — *seal* the answer key (`key.json`) once there's a score to
+  game; grading moves to a server-side API route (`/api/cases/lab/grade`).
+- **Optional cached AI nudges** (`/api/cases/lab/nudge`, Haiku).
+- **Prediction / Kaggle-style cases** (held-out-metric grading).
+- **Streak / leaderboard** mechanics.
 
 ---
 
-## 13. Open questions (deferred, not blocking)
+## 14. Proposed build sequence (for approval — still no code)
+
+1. **Authoring pipeline + Case #1** — DGP → run → validate → the reference
+   solution becomes the teaching note. (Riskiest/most novel; de-risk first.)
+2. **Case page** — brief + guiding questions + static sample preview + CSV
+   download + teaching-note reveal.
+3. **Feed / file-explorer + manifest** (+ optional minimal `024` progress table).
+4. **Author the remaining 4 cases; wire batch → queue.**
+5. **Verify + ship behind a flag.**
+
+---
+
+## 15. Open questions (deferred, not blocking)
 
 - **Name** of the mode ("The Case Lab" is a placeholder).
+- Include the minimal `case_lab_progress` "done" badge in v1, or ship with no
+  progress at all?
+- The "copy brief / download bundle for your AI" nicety — v1 or later?
 - Daily-cadence *commitment* (decide after the pilot feed test).
-- Memo grading model + exact cost cap.
-- When prediction-flavor cases enter (v2).
-- Streak / leaderboard mechanics (v2+).
+- When grading + in-app analysis (v2) get built.
