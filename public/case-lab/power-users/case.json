@@ -1,0 +1,69 @@
+{
+  "id": "power-users",
+  "title": "Users who run 50+ workflows never churn — should we push everyone to 50?",
+  "trap": "Survivorship bias",
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the growth analyst at Cadence",
+    "company": "Cadence — a workflow-automation tool with a free tier",
+    "situation": "The Head of Product has a striking chart: users who've run 50 or more workflows churn at about 1%, while everyone under 50 churns at 92%. He wants to make '50 workflows' the North Star and push every new user toward it — onboarding nudges, email drips, in-app prompts — on the theory that hitting 50 makes users stick. He'd like you to validate the '50-workflow' target from the data before it goes into the roadmap.",
+    "stakeholderBelief": "\"Users with 50+ workflows basically never churn. If we get every new user to 50 workflows, we'll crush churn.\"",
+    "question": "Does running 50+ workflows actually cause users to stay? Assess whether '50 workflows' is a real lever or a mirage, and recommend what to target instead."
+  },
+  "dataset": {
+    "file": "/case-lab/power-users/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "user_id", "type": "int", "description": "Unique user identifier" },
+      { "name": "plan", "type": "string", "description": "Plan: free, pro, or team" },
+      { "name": "engagement_score", "type": "float", "description": "Underlying engagement propensity (0-100), measured from early behaviour" },
+      { "name": "workflows_first_month", "type": "int", "description": "Workflows the user ran in their FIRST 30 days — available to every user regardless of tenure" },
+      { "name": "workflows_total", "type": "int", "description": "Total workflows the user has run to date (accumulates with tenure)" },
+      { "name": "tenure_months", "type": "int", "description": "Months since signup" },
+      { "name": "churned", "type": "int", "description": "1 if the user has churned, else 0" }
+    ],
+    "sample": [
+      { "user_id": 1, "plan": "pro", "engagement_score": 11.6, "workflows_first_month": 6, "workflows_total": 9, "tenure_months": 1, "churned": 1 },
+      { "user_id": 2, "plan": "team", "engagement_score": 30.3, "workflows_first_month": 5, "workflows_total": 13, "tenure_months": 2, "churned": 1 },
+      { "user_id": 3, "plan": "free", "engagement_score": 46.3, "workflows_first_month": 6, "workflows_total": 24, "tenure_months": 4, "churned": 1 },
+      { "user_id": 4, "plan": "free", "engagement_score": 42.3, "workflows_first_month": 8, "workflows_total": 9, "tenure_months": 1, "churned": 1 },
+      { "user_id": 5, "plan": "free", "engagement_score": 79.7, "workflows_first_month": 7, "workflows_total": 224, "tenure_months": 25, "churned": 0 },
+      { "user_id": 6, "plan": "pro", "engagement_score": 64.7, "workflows_first_month": 12, "workflows_total": 96, "tenure_months": 13, "churned": 0 },
+      { "user_id": 7, "plan": "pro", "engagement_score": 49.9, "workflows_first_month": 11, "workflows_total": 64, "tenure_months": 10, "churned": 0 },
+      { "user_id": 8, "plan": "free", "engagement_score": 30.9, "workflows_first_month": 5, "workflows_total": 9, "tenure_months": 1, "churned": 1 }
+    ]
+  },
+  "guidingQuestions": [
+    "Confirm the headline: churn rate for users with workflows_total ≥ 50 vs < 50.",
+    "How long have the 50+ users been around? Compare mean tenure_months for the two groups. Could a brand-new user even reach 50 workflows?",
+    "Is workflows_total a cause of retention, or a by-product of it? Which way does the arrow run between 'stayed a long time' and 'ran a lot of workflows'?",
+    "Look at workflows_first_month — a signal every user can produce in their first 30 days. How strongly does THAT predict churn, compared with the 50+ total?",
+    "What do you tell the Head of Product — is '50 workflows' a lever you can pull on new users, and what's a fairer target?"
+  ],
+  "suggestedApproach": [
+    "Reproduce the 1%-vs-92% churn split so you know the exact claim.",
+    "Ask what it takes to be in the 50+ group. If reaching 50 workflows requires months of use, then churned and new users are excluded by construction — the group is defined by survival.",
+    "Separate cause from consequence: total workflows accrue because a user stayed, so 'high total → low churn' is close to circular.",
+    "Find a fair signal — one every user can generate early, before tenure differs. Compare how well workflows_first_month predicts churn versus the survivor-defined total.",
+    "Recommend a target based on the early, equally-available signal, and note that engagement still confounds even that — the honest test is an experiment."
+  ],
+  "teachingNote": {
+    "naiveRead": "Users with 50+ total workflows churn at ~1%, versus ~92% for everyone else — a 91-point gap. It looks like the single most powerful retention lever imaginable: get users to 50 workflows and churn all but disappears.",
+    "theTrap": "Total workflow count is something you can only accumulate by sticking around. The 50+ group has been a customer for ~17 months on average; the under-50 group, ~2.7 months. A user who churns in week two literally cannot run 50 workflows, and a brand-new user hasn't had time to. So 'ran 50+ workflows' is essentially a restatement of 'survived a long time' — the comparison is close to circular. You're not discovering that workflows cause retention; you're measuring the outcome (retention) on the input (workflows) and finding they agree, because one produces the other.",
+    "honestAnswer": "Use a signal every user can generate on a level playing field: activity in the first 30 days, which doesn't depend on tenure. First-month activity does predict churn — high vs low first-month users churn at ~45% vs ~79% — but that gap (33 points) is a fraction of the survivor-defined 91-point gap, and even it largely reflects underlying engagement rather than a causal effect of the activity itself. '50 total workflows' is not a lever you can pull on a new user: you can't manufacture the total without the months of retention that create it. Target early activation and engagement, and prove any 'do X to retain' claim with an experiment, not a threshold that only survivors can clear.",
+    "howToGetThere": [
+      "Compute churn for workflows_total ≥ 50 (~1%) vs < 50 (~92%). The 91-point gap should look too good to be true.",
+      "Check tenure by group: ~17 months vs ~2.7. Reaching 50 workflows requires time the churned/new users never had — that's the survivorship tell.",
+      "Reason about direction: total workflows is downstream of retention, so conditioning on it selects survivors.",
+      "Switch to a fair, tenure-independent signal — workflows_first_month — and compare churn for high vs low (~45% vs ~79%, a 33-point gap).",
+      "Note even that is confounded by engagement; conclude the '50-workflow' target is a mirage and recommend an activation experiment."
+    ],
+    "numbers": [
+      { "label": "Churn: 50+ total vs under 50", "value": "1.2% vs 92%" },
+      { "label": "Mean tenure: 50+ vs under 50", "value": "17.0 vs 2.7 months" },
+      { "label": "Naive 50+ churn gap", "value": "90.8 pts" },
+      { "label": "Fair early signal (first-month) gap", "value": "33.4 pts" }
+    ],
+    "lesson": "Beware any metric that can only be reached by surviving — cumulative usage, tenure milestones, lifetime totals. Splitting on it compares survivors to everyone else, so it will always look like a miracle retention driver even when it causes nothing. The number is measuring the outcome you care about, not a cause of it. To find a real lever, use signals available to every user at the same point in their lifecycle, and confirm cause with an experiment rather than a threshold that only the retained can clear."
+  }
+}

@@ -40,6 +40,36 @@
       "rows": 12000,
       "releaseDate": "2026-07-02",
       "blurb": "Team A closes 37% of deals, Team B only 30%, and the VP wants to reshuffle B. Compare the pods fairly before anyone gets moved."
+    },
+    {
+      "id": "sales-coaching",
+      "title": "We coached our worst reps and they improved — does coaching work?",
+      "company": "Ridgeline — B2B sales",
+      "trap": "Regression to the mean",
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-01",
+      "blurb": "The worst Q1 reps got coaching and jumped +6.2k while everyone else slipped. Enablement wants to scale it. Is the swing real, or was it always going to happen?"
+    },
+    {
+      "id": "store-refresh",
+      "title": "We remodeled our worst-rated stores and ratings rebounded — did it work?",
+      "company": "Foundry Goods — retail",
+      "trap": "Regression to the mean",
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-06-30",
+      "blurb": "The lowest-rated stores were remodeled and bounced back 5+ points. The VP wants the next tranche. Would those stores have recovered anyway?"
+    },
+    {
+      "id": "power-users",
+      "title": "Users who run 50+ workflows never churn — push everyone to 50?",
+      "company": "Cadence — workflow SaaS",
+      "trap": "Survivorship bias",
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-06-29",
+      "blurb": "Users with 50+ workflows churn at 1% vs 92% for the rest. Product wants '50 workflows' as the North Star. Is it a real lever or a mirage?"
     }
   ]
 }

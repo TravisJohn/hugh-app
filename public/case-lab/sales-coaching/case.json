@@ -1,0 +1,68 @@
+{
+  "id": "sales-coaching",
+  "title": "We coached our worst reps and they improved — does coaching work?",
+  "trap": "Regression to the mean",
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the sales-ops analyst at Ridgeline",
+    "company": "Ridgeline — a B2B software vendor",
+    "situation": "Last quarter the enablement team ran an intensive coaching program for the reps who posted the weakest Q1 numbers. This quarter those reps are up an average of 6.2k in bookings, while the reps who weren't coached are actually down 2.9k. The Head of Enablement wants to make the program permanent and company-wide, citing a 'nine-point swing.' She's asked you to confirm it before the budget request goes in.",
+    "stakeholderBelief": "\"We coached the worst reps and they jumped +6.2k while everyone else slipped. Coaching clearly works — let's scale it to the whole team.\"",
+    "question": "Did the coaching actually cause the improvement? Estimate its real effect and advise whether to scale the program."
+  },
+  "dataset": {
+    "file": "/case-lab/sales-coaching/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "rep_id", "type": "int", "description": "Unique sales-rep identifier" },
+      { "name": "region", "type": "string", "description": "Rep's sales region" },
+      { "name": "tenure_months", "type": "int", "description": "Months the rep has been in seat" },
+      { "name": "q1_sales_k", "type": "float", "description": "Q1 bookings in thousands of dollars (before coaching)" },
+      { "name": "coached", "type": "int", "description": "1 if the rep went through the coaching program, else 0" },
+      { "name": "q2_sales_k", "type": "float", "description": "Q2 bookings in thousands of dollars (after coaching)" }
+    ],
+    "sample": [
+      { "rep_id": 1, "region": "APAC", "tenure_months": 25, "q1_sales_k": 41.9, "coached": 0, "q2_sales_k": 41.6 },
+      { "rep_id": 2, "region": "APAC", "tenure_months": 30, "q1_sales_k": 56.3, "coached": 0, "q2_sales_k": 64.8 },
+      { "rep_id": 3, "region": "NA", "tenure_months": 30, "q1_sales_k": 46.8, "coached": 0, "q2_sales_k": 63.9 },
+      { "rep_id": 4, "region": "EMEA", "tenure_months": 35, "q1_sales_k": 48.5, "coached": 0, "q2_sales_k": 35.0 },
+      { "rep_id": 5, "region": "NA", "tenure_months": 4, "q1_sales_k": 60.9, "coached": 0, "q2_sales_k": 43.2 },
+      { "rep_id": 6, "region": "LATAM", "tenure_months": 28, "q1_sales_k": 65.5, "coached": 0, "q2_sales_k": 42.1 },
+      { "rep_id": 7, "region": "EMEA", "tenure_months": 29, "q1_sales_k": 48.8, "coached": 0, "q2_sales_k": 70.9 },
+      { "rep_id": 8, "region": "APAC", "tenure_months": 40, "q1_sales_k": 52.6, "coached": 1, "q2_sales_k": 52.9 }
+    ]
+  },
+  "guidingQuestions": [
+    "Confirm the headline: what's the average Q1→Q2 change for coached reps, and for uncoached reps?",
+    "Who got coached? Look at the Q1 numbers of coached vs uncoached reps — were the two groups at the same starting point?",
+    "How much of a rep's quarter is stable skill versus luck? (Check the correlation between q1_sales_k and q2_sales_k.) What does that imply for a group selected for being at an extreme?",
+    "Compare coached and uncoached reps who started at a SIMILAR (low) Q1 level. How different are their Q1→Q2 changes really?",
+    "What do you tell the Head of Enablement — is the +6.2k the coaching's effect, and would a company-wide program reproduce it?"
+  ],
+  "suggestedApproach": [
+    "Reproduce both headline numbers — the coached group's change and the uncoached group's change — so you know the exact claim.",
+    "Check whether the groups are comparable to begin with. The program targeted the worst Q1 reps, so coached and uncoached start from very different places — that breaks a simple before/after or group-vs-group read.",
+    "Ask how much of a single quarter is noise. If results aren't perfectly stable quarter to quarter, a group picked for being at the bottom will drift upward on its own.",
+    "Build a fair comparison: coached vs uncoached reps at the SAME starting level (match or bin on q1_sales_k). The gap between them is the real coaching effect.",
+    "Report that effect — and note that a clean estimate needs randomised assignment, not coaching-the-bottom."
+  ],
+  "teachingNote": {
+    "naiveRead": "The coached reps (last quarter's worst) rose +6.2k, while the uncoached reps fell -2.9k — a swing of roughly nine points in coaching's favour. It looks like a slam-dunk case for scaling the program.",
+    "theTrap": "A rep's quarter is stable skill plus luck (q1 and q2 correlate about 0.6, so ~40% of any quarter is transient). The reps who looked worst in Q1 were disproportionately unlucky — and luck doesn't repeat, so they climb back toward their true level in Q2 no matter what. That's regression to the mean. Coaching was aimed exactly at this bounce-back group, so it inherits their rebound. Worse, the uncoached comparison group skews toward last quarter's LUCKY high performers, who regress DOWN — which is why they 'slipped' and why the naive nine-point swing is doubly misleading.",
+    "honestAnswer": "Compare coached and uncoached reps who started at the same low Q1 level. Among the bottom quintile, coached reps improved about +9.3k and equally-low uncoached reps improved about +7.3k — essentially the same rebound. The coaching increment is within noise of zero. The +6.2k the team is celebrating is regression to the mean, not the effect of coaching. A company-wide program would not reproduce it, because there'd be no pool of unlucky-bottom reps for the bounce to borrow from.",
+    "howToGetThere": [
+      "Compute the average Q1→Q2 change for coached (~+6.2k) and uncoached (~-2.9k). Notice the uncoached group falling should already look suspicious.",
+      "Check who was selected: coached reps had far lower Q1 — the groups aren't comparable, so a group-vs-group or before/after read is invalid.",
+      "Quantify the noise: corr(q1, q2) ≈ 0.6, so extreme groups will move toward the mean next quarter on their own.",
+      "Match on baseline: among reps with similar (low) Q1, compare the change for coached vs uncoached — ~+9.3k vs ~+7.3k, nearly identical.",
+      "Conclude the coaching effect ≈ 0 within noise; a trustworthy estimate requires randomising who gets coached."
+    ],
+    "numbers": [
+      { "label": "Coached reps' Q1→Q2 change", "value": "+6.2k" },
+      { "label": "Uncoached reps' change", "value": "−2.9k" },
+      { "label": "Same low-Q1 reps: coached vs uncoached", "value": "+9.3k vs +7.3k" },
+      { "label": "True coaching effect", "value": "≈ 0 (within noise)" }
+    ],
+    "lesson": "Any time you select a group because it's at an extreme and then measure it again, it will drift toward the average on its own — regression to the mean — and that drift will masquerade as the effect of whatever you did in between. Comparing the bottom group's rebound to the top group's decline makes it look even stronger. To measure a real effect you need an equivalent comparison group at the same starting point, ideally assigned at random. Otherwise you're just paying to watch luck even out."
+  }
+}

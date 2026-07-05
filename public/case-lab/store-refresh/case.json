@@ -1,0 +1,68 @@
+{
+  "id": "store-refresh",
+  "title": "We remodeled our worst-rated stores and ratings rebounded — did it work?",
+  "trap": "Regression to the mean",
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the analyst on the retail-ops team at Foundry Goods",
+    "company": "Foundry Goods — a national homeware chain",
+    "situation": "Last year the company remodeled the stores with the lowest customer-satisfaction ratings. A year on, those remodeled stores are up about 5.3 points in rating, while the stores left alone are flat-to-down. The VP of Retail wants to roll the remodel program out to the next tranche of low-rated stores and is quoting the rebound as proof it works. She wants your read on the store-level data first.",
+    "stakeholderBelief": "\"We refreshed our worst stores and their ratings jumped 5+ points while the rest didn't. The remodel clearly lifts satisfaction — let's do the next batch.\"",
+    "question": "Did the remodel actually cause the rating rebound? Estimate its real effect and advise on scaling the program."
+  },
+  "dataset": {
+    "file": "/case-lab/store-refresh/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "store_id", "type": "int", "description": "Unique store identifier" },
+      { "name": "region", "type": "string", "description": "Store region" },
+      { "name": "footprint_sqft", "type": "int", "description": "Store floor area in square feet" },
+      { "name": "rating_before", "type": "float", "description": "Customer-satisfaction rating (0-100) in the year BEFORE the remodel decision" },
+      { "name": "remodeled", "type": "int", "description": "1 if the store was remodeled, else 0" },
+      { "name": "rating_after", "type": "float", "description": "Customer-satisfaction rating (0-100) in the year AFTER" }
+    ],
+    "sample": [
+      { "store_id": 1, "region": "South", "footprint_sqft": 5532, "rating_before": 73.8, "remodeled": 0, "rating_after": 67.9 },
+      { "store_id": 2, "region": "Northeast", "footprint_sqft": 8590, "rating_before": 76.3, "remodeled": 0, "rating_after": 74.1 },
+      { "store_id": 3, "region": "Northeast", "footprint_sqft": 3307, "rating_before": 70.4, "remodeled": 0, "rating_after": 68.1 },
+      { "store_id": 4, "region": "Midwest", "footprint_sqft": 6002, "rating_before": 62.0, "remodeled": 1, "rating_after": 61.4 },
+      { "store_id": 5, "region": "Northeast", "footprint_sqft": 7793, "rating_before": 47.4, "remodeled": 1, "rating_after": 52.5 },
+      { "store_id": 6, "region": "Northeast", "footprint_sqft": 8173, "rating_before": 89.3, "remodeled": 0, "rating_after": 84.8 },
+      { "store_id": 7, "region": "Midwest", "footprint_sqft": 5161, "rating_before": 62.3, "remodeled": 0, "rating_after": 69.9 },
+      { "store_id": 8, "region": "Northeast", "footprint_sqft": 7174, "rating_before": 75.7, "remodeled": 0, "rating_after": 69.4 }
+    ]
+  },
+  "guidingQuestions": [
+    "Confirm the headline: what's the average before→after rating change for remodeled stores, and for the rest?",
+    "Which stores were remodeled? Compare rating_before for remodeled vs not — did the program pick a random set, or the lowest-rated?",
+    "A single year's rating is partly a good/bad stretch. What happens to the lowest-rated stores' ratings next year even if nothing is changed?",
+    "Compare remodeled and non-remodeled stores that started at a SIMILAR (low) rating. How different is their rebound?",
+    "What do you tell the VP — is the 5-point rebound the remodel's doing, and will the next tranche show the same lift?"
+  ],
+  "suggestedApproach": [
+    "Reproduce both change numbers — remodeled and non-remodeled — so you're testing the exact claim.",
+    "Check the selection: the program targeted the lowest-rated stores, so remodeled and non-remodeled don't start from the same place.",
+    "Ask how noisy a single year's rating is. If ratings wobble year to year, the stores picked for being at the bottom will tend to climb back on their own.",
+    "Compare like with like: remodeled vs non-remodeled stores at the same low starting rating. That gap is the real remodel effect.",
+    "Report that effect, and note that a clean read needs a randomised or matched-control rollout, not remodeling-the-bottom."
+  ],
+  "teachingNote": {
+    "naiveRead": "The remodeled stores (last year's worst-rated) gained about +5.3 points while the untouched stores were flat-to-down. It reads as clear proof the remodel lifts satisfaction, and the VP wants to scale it.",
+    "theTrap": "A store's rating in any given year is its stable quality plus a good-or-bad stretch of noise. The lowest-rated stores were partly just having a bad year, and a bad year doesn't repeat — so their ratings climb back toward their true level the next year whether or not anyone touches them. That's regression to the mean. Because the remodel was aimed squarely at these bottom stores, it gets credit for a rebound that was going to happen anyway.",
+    "honestAnswer": "Compare remodeled and non-remodeled stores that started at the same low rating. Among the bottom quintile, remodeled stores rose about +7.5 points and equally-low non-remodeled stores rose about +5.7 — essentially the same bounce. The remodel's own contribution is within noise of zero. The celebrated +5.3 is regression to the mean. The next tranche of low-rated stores will 'rebound' too, remodel or not — so the program can't be judged by the before/after of the stores it selected.",
+    "howToGetThere": [
+      "Compute the average before→after change for remodeled (~+5.3) and non-remodeled (~-2.2) stores.",
+      "Check selection: remodeled stores had much lower rating_before — the groups aren't comparable.",
+      "Recognise year-to-year rating noise: stores chosen for being at the bottom regress upward on their own.",
+      "Match on baseline: among stores with similar low rating_before, compare remodeled vs not — ~+7.5 vs ~+5.7, nearly identical.",
+      "Conclude the remodel effect ≈ 0 within noise; a real estimate needs a matched or randomised control group of low-rated stores."
+    ],
+    "numbers": [
+      { "label": "Remodeled stores' change", "value": "+5.3 pts" },
+      { "label": "Non-remodeled stores' change", "value": "−2.2 pts" },
+      { "label": "Same low-rated stores: remodeled vs not", "value": "+7.5 vs +5.7 pts" },
+      { "label": "True remodel effect", "value": "≈ 0 (within noise)" }
+    ],
+    "lesson": "Selecting on an extreme and then re-measuring guarantees a move toward the average — regression to the mean — which any intervention applied in between will appear to cause. It's the same trap as coaching the worst reps or treating the sickest patients: the bottom bounces back on its own. To know whether the remodel did anything, hold a matched set of equally-low stores as a control (ideally randomised) and compare. Judge the program against that control, never against the selected stores' own past."
+  }
+}
