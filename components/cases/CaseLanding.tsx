@@ -12,6 +12,7 @@ import {
   type Manifest,
 } from "@/types/cases";
 import CaseCard from "./CaseCard";
+import CaseModeTabs from "./CaseModeTabs";
 
 /** A case's values for one facet. Single facets are wrapped to an array; an
  *  absent facet (e.g. `stack` on an analytics case) yields an empty list. */
@@ -117,7 +118,9 @@ export default function CaseLanding({
         <span className="font-serif text-lg font-semibold text-white">Hugh.</span>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-12">
+      <CaseModeTabs active="room" />
+
+      <main className="mx-auto max-w-6xl px-6 pb-12 pt-8">
         {/* Blog header */}
         <div className="mb-2 text-xs font-semibold uppercase tracking-widest text-sky-400">
           Show · The Case Room

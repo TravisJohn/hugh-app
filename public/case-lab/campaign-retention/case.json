@@ -1,0 +1,71 @@
+{
+  "id": "campaign-retention",
+  "title": "Did the win-back email actually lift retention?",
+  "trap": "Confounding / selection bias",
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the data analyst at Lumen",
+    "company": "Lumen — a habit-tracking subscription app",
+    "situation": "In Q3, Marketing sent a \"win-back\" email to a slice of the user base. Dana, the VP of Marketing, pulled the retention numbers and is thrilled: users who received the email retained at about 55% over the next 90 days, versus about 23% for everyone else — a 32-point gap. She wants to pour the entire Q4 budget into scaling the campaign to the whole base, and she needs your sign-off on the analysis first.",
+    "stakeholderBelief": "\"The win-back email lifts 90-day retention by ~30 points. Scaling it to everyone is the highest-ROI move we have.\"",
+    "question": "Is the lift real? Estimate the campaign's actual effect on 90-day retention, and tell Dana whether — and how — to scale it."
+  },
+  "dataset": {
+    "file": "/case-lab/campaign-retention/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "user_id", "type": "int", "description": "Unique user identifier" },
+      { "name": "signup_month", "type": "string", "description": "Month the user first subscribed (YYYY-MM), trailing 12 months" },
+      { "name": "plan_tier", "type": "string", "description": "Subscription tier: basic, plus, or premium" },
+      { "name": "region", "type": "string", "description": "User region: NA, EU, or APAC" },
+      { "name": "engagement_score", "type": "float", "description": "Pre-campaign engagement (0-100), measured BEFORE the win-back email went out" },
+      { "name": "got_campaign", "type": "int", "description": "1 if the user received the Q3 win-back email, else 0" },
+      { "name": "retained_90d", "type": "int", "description": "1 if the user was still subscribed 90 days later, else 0" }
+    ],
+    "sample": [
+      { "user_id": 1, "signup_month": "2026-04", "plan_tier": "premium", "region": "NA", "engagement_score": 37.6, "got_campaign": 0, "retained_90d": 0 },
+      { "user_id": 2, "signup_month": "2026-04", "plan_tier": "plus", "region": "EU", "engagement_score": 45.6, "got_campaign": 0, "retained_90d": 1 },
+      { "user_id": 3, "signup_month": "2025-08", "plan_tier": "plus", "region": "APAC", "engagement_score": 56.5, "got_campaign": 0, "retained_90d": 0 },
+      { "user_id": 4, "signup_month": "2025-12", "plan_tier": "premium", "region": "NA", "engagement_score": 45.5, "got_campaign": 0, "retained_90d": 1 },
+      { "user_id": 5, "signup_month": "2026-05", "plan_tier": "plus", "region": "APAC", "engagement_score": 60.4, "got_campaign": 1, "retained_90d": 0 },
+      { "user_id": 6, "signup_month": "2025-11", "plan_tier": "basic", "region": "APAC", "engagement_score": 68.8, "got_campaign": 1, "retained_90d": 0 },
+      { "user_id": 7, "signup_month": "2025-11", "plan_tier": "premium", "region": "NA", "engagement_score": 45.9, "got_campaign": 0, "retained_90d": 0 },
+      { "user_id": 8, "signup_month": "2026-02", "plan_tier": "plus", "region": "NA", "engagement_score": 26.0, "got_campaign": 0, "retained_90d": 0 },
+      { "user_id": 9, "signup_month": "2025-08", "plan_tier": "plus", "region": "NA", "engagement_score": 55.3, "got_campaign": 1, "retained_90d": 0 },
+      { "user_id": 10, "signup_month": "2025-09", "plan_tier": "basic", "region": "NA", "engagement_score": 74.6, "got_campaign": 1, "retained_90d": 1 }
+    ]
+  },
+  "guidingQuestions": [
+    "What's the naive 90-day retention gap between users who got the campaign and those who didn't? (This is the number Dana is quoting.)",
+    "Who actually received the campaign? Compare the two groups on engagement_score — the score measured BEFORE the email went out.",
+    "Which variable confounds the comparison, and why does it inflate the naive gap?",
+    "Estimate the campaign's effect after accounting for that confounder — e.g. stratify on engagement (deciles) or model retained_90d ~ engagement + got_campaign. How big is the honest effect now?",
+    "What do you tell Dana? Should she scale the campaign to the whole base, and does the data support her ROI claim?"
+  ],
+  "suggestedApproach": [
+    "Reproduce the stakeholder's number first — compute 90-day retention for got_campaign = 1 vs 0 — so you know exactly what claim you're testing.",
+    "Don't credit the email yet. Describe who received it: compare the campaigned and non-campaigned groups across the other columns before attributing the gap to the campaign.",
+    "If the groups already differ on something that also drives retention, that variable is confounding the comparison — decide how to account for it (stratify, match, or model).",
+    "Re-estimate the effect holding that variable constant, and check the answer is stable across at least two methods.",
+    "Turn the adjusted number into a recommendation — and note what Dana would need (e.g. a randomised holdout) to trust it next time."
+  ],
+  "teachingNote": {
+    "naiveRead": "Campaigned users retained at ~55% vs ~23% for the rest — a +31.7 point gap. Taken at face value, the win-back email looks like the single highest-leverage retention tool Lumen has, and scaling it to everyone looks like free money.",
+    "theTrap": "The campaign was NOT randomly assigned. It was sent preferentially to users who were already engaged: campaigned users average an engagement_score of 59, versus 36 for everyone else. Engagement is also the strongest driver of retention. So the two groups were already very different before a single email went out — most of that 32-point gap is the pre-existing engagement difference, not the email. This is textbook selection bias: comparing treated vs untreated when the treated were hand-picked to be better.",
+    "honestAnswer": "Once you hold engagement constant — stratify users into engagement deciles and average the within-decile campaign effect, or run retained_90d ~ engagement_score + got_campaign — the campaign's effect collapses to about +1.9 points. Real, but roughly a tenth of the headline number. The email nudges retention slightly; it does not lift it 30 points.",
+    "howToGetThere": [
+      "Compute the raw retention gap: mean(retained_90d) for got_campaign=1 minus got_campaign=0. You'll get ~+31.7 pts — Dana's number.",
+      "Before attributing it to the email, profile who was treated: group by got_campaign and look at mean engagement_score. The campaigned group is far more engaged (≈59 vs ≈36).",
+      "Recognise engagement_score as a confounder: it drives BOTH who got the campaign and who retains, so it inflates the naive comparison.",
+      "Adjust for it — stratify on engagement deciles and take the size-weighted within-stratum difference, or fit a logistic/linear model with engagement as a covariate. Any valid method lands near +2 pts.",
+      "Sense-check: the adjusted effect should be far smaller than the naive one, and stable across methods."
+    ],
+    "numbers": [
+      { "label": "Naive retention gap (campaigned − not)", "value": "+31.7 pts" },
+      { "label": "Mean engagement — campaigned vs not", "value": "59.2 vs 35.9" },
+      { "label": "Confounder-adjusted campaign effect", "value": "≈ +1.9 pts" },
+      { "label": "Overall 90-day retention", "value": "34.7%" }
+    ],
+    "lesson": "When a treatment isn't randomly assigned, a raw difference between the treated and untreated is a confounded comparison, not a causal effect. Before you attribute an outcome to an intervention, ask: who received it, and were they already different? Here the win-back email was sent to the users most likely to stay anyway. Adjust for the pre-existing difference and the real effect is a fraction of the headline. Scaling the campaign to the whole base will not reproduce a 30-point lift — budget against the ~2-point honest effect, and if you want a trustworthy number, run a randomised holdout next time."
+  }
+}

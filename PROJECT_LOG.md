@@ -1434,3 +1434,41 @@ scarce skill (judgment) only. Named surface: "The Case Room".
   - Proposed build sequence (§12): pipeline + Case #1 validated → player + Pyodide
     + checkpoint grading → memo rubric → feed + `024` migration → author 4 more →
     verify + ship behind a flag. **Next step: review/approve the PRD before code.**
+- **PRD revised to v0.2 — ungraded "takeaway" v1 (2026-07-05):** de-scoped after a
+  cost/complexity discussion. **v1 drops grading AND the in-app workbench:** the
+  learner just gets a **case + a downloadable dataset + a revealed teaching note**,
+  and works the analysis in their **own tools / favourite AI**. This collapses the
+  architecture back onto the Case Room's rails — **all-public static artifacts, no
+  sealed key, no grading/nudge API routes, zero runtime AI.** The DGP keystone and
+  the offline validate step **stay** (a broken DGP would ship a wrong teaching
+  note; the validated reference solution *becomes* the teaching note — double duty).
+  Cost: **runtime $0**; authoring ~$0.25–0.75/case offline (5-case pilot ≈ $1.50–4
+  once). Everything cut — **gap-score grading, memo rubric, Pyodide workbench,
+  sealed answer key, per-learner scoring, prediction flavour** — moved to a
+  documented **v2** that layers on top without a rewrite (the DGP + reference
+  solution already exist). Shorter build sequence: pipeline + Case #1 (validated) →
+  case page (brief + guiding questions + static sample preview + CSV download +
+  teaching-note reveal) → feed + manifest (+ optional minimal progress) → author 4
+  more → ship behind a flag. **Still awaiting approval before any code.**
+- **Case Lab v1 — first vertical slice built (branch `feat/case-lab`, 2026-07-05):**
+  PRD §5 + §14 approved; started Step 1–3 on a feature branch. Shipped Case #1
+  end-to-end, locally:
+  - *Authoring:* hand-authored the DGP for **Case #1 "Did the win-back email lift
+    retention?"** (`scripts/case-lab-src/campaign-retention/dgp.py`, seeded, numpy/
+    pandas) → emits `public/case-lab/campaign-retention/data.csv` (**12,000 rows**).
+    The planted confounder works cleanly: **naive gap +31.7 pts** (campaigned ~55%
+    vs ~23%) but **engagement-adjusted effect ≈ +1.9 pts** (campaigned users avg
+    engagement 59 vs 36). Numbers baked verbatim into the teaching note.
+  - *Content:* `public/case-lab/campaign-retention/case.json` (brief, 7-col schema,
+    10-row preview, 5 guiding questions, teaching note) + `manifest.json`.
+  - *Code:* `types/case-lab.ts`, `lib/case-lab/loader.ts` (mirrors the Case Room
+    loader — same GCS swap seam, all-public, zero runtime AI). Feed `app/cases/lab/
+    page.tsx` + `CaseLabCard`; detail `app/cases/lab/[id]/page.tsx` +
+    `CaseLabDetail` (client — brief, guiding Qs, schema/preview, **Download CSV**,
+    reveal-on-demand teaching note). `CaseModeTabs` adds a **Quick cases / The Case
+    Lab** tab bar to both `/cases` and `/cases/lab`.
+  - *Verified:* tsc clean; dev server (Next 16/Turbopack) compiles all routes (307
+    auth-redirect, no 500s); `/case-lab/…/data.csv` serves 200 (takeaway works);
+    manifest+case JSON parse; declared columns == CSV header; in-page preview rows
+    == actual CSV rows. Authenticated visual render pending (routes are auth-gated —
+    open in a logged-in browser). **Uncommitted on `feat/case-lab`.**

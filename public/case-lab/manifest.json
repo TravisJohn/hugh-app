@@ -1,0 +1,15 @@
+{
+  "batch": "2026-07",
+  "cases": [
+    {
+      "id": "campaign-retention",
+      "title": "Did the win-back email actually lift retention?",
+      "company": "Lumen — habit-tracking app",
+      "trap": "Confounding / selection bias",
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-05",
+      "blurb": "Marketing swears the Q3 win-back email lifted 90-day retention by 30 points. You've got the user-level export. Is the lift real, or is something else going on?"
+    }
+  ]
+}
