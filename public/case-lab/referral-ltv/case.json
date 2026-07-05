@@ -1,0 +1,69 @@
+{
+  "id": "referral-ltv",
+  "title": "Customers who refer a friend are worth ~1.8x — should we push referrals to grow LTV?",
+  "trap": "Survivorship / self-selection",
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the growth analyst at Tally",
+    "company": "Tally — a personal-finance subscription app",
+    "situation": "The Head of Growth found that customers who've referred a friend have an average lifetime value of about $1,210, versus $683 for those who haven't — roughly 1.8x. She wants to make referrals the centre of the growth plan: incentivise every new user to refer, on the logic that referring makes customers more valuable. She's asked you to confirm the referral→LTV link before she reallocates budget.",
+    "stakeholderBelief": "\"Referrers are worth 1.8x what non-referrers are. If we get more customers to refer, we'll grow LTV across the board.\"",
+    "question": "Does referring a friend actually raise a customer's lifetime value? Estimate the real effect of referring and advise whether a referral push will grow LTV."
+  },
+  "dataset": {
+    "file": "/case-lab/referral-ltv/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "customer_id", "type": "int", "description": "Unique customer identifier" },
+      { "name": "segment", "type": "string", "description": "Customer segment: consumer, prosumer, or smb" },
+      { "name": "signup_channel", "type": "string", "description": "How the customer signed up: organic, paid, or partner" },
+      { "name": "engagement_score", "type": "float", "description": "Engagement (0-100) from early product behaviour" },
+      { "name": "tenure_months", "type": "int", "description": "Months since the customer signed up" },
+      { "name": "referred_friend", "type": "int", "description": "1 if the customer has referred at least one friend, else 0" },
+      { "name": "ltv_usd", "type": "float", "description": "Customer lifetime value to date, in dollars" }
+    ],
+    "sample": [
+      { "customer_id": 1, "segment": "smb", "signup_channel": "organic", "engagement_score": 50.4, "tenure_months": 14, "referred_friend": 0, "ltv_usd": 747.34 },
+      { "customer_id": 2, "segment": "smb", "signup_channel": "paid", "engagement_score": 50.4, "tenure_months": 12, "referred_friend": 0, "ltv_usd": 534.09 },
+      { "customer_id": 3, "segment": "consumer", "signup_channel": "partner", "engagement_score": 27.4, "tenure_months": 9, "referred_friend": 0, "ltv_usd": 287.09 },
+      { "customer_id": 4, "segment": "consumer", "signup_channel": "organic", "engagement_score": 35.7, "tenure_months": 13, "referred_friend": 0, "ltv_usd": 411.98 },
+      { "customer_id": 5, "segment": "consumer", "signup_channel": "organic", "engagement_score": 53.1, "tenure_months": 14, "referred_friend": 0, "ltv_usd": 701.73 },
+      { "customer_id": 6, "segment": "consumer", "signup_channel": "organic", "engagement_score": 47.8, "tenure_months": 14, "referred_friend": 0, "ltv_usd": 665.37 },
+      { "customer_id": 7, "segment": "prosumer", "signup_channel": "partner", "engagement_score": 40.3, "tenure_months": 13, "referred_friend": 0, "ltv_usd": 507.54 },
+      { "customer_id": 8, "segment": "consumer", "signup_channel": "organic", "engagement_score": 36.9, "tenure_months": 7, "referred_friend": 0, "ltv_usd": 243.75 }
+    ]
+  },
+  "guidingQuestions": [
+    "Confirm the headline: average LTV for referrers vs non-referrers.",
+    "Who refers? Compare referrers and non-referrers on tenure_months and engagement_score — are they the same kind of customer?",
+    "Think about WHEN a referral happens in a customer's life. Can a brand-new or unhappy customer refer a friend? What does that imply about who ends up in the 'referred' group?",
+    "Compare referrers and non-referrers who are similarly engaged and similarly tenured. How big is the LTV gap once you hold those constant?",
+    "What do you tell the Head of Growth — will pushing referrals on new users grow LTV, and what's actually driving the 1.8x?"
+  ],
+  "suggestedApproach": [
+    "Reproduce the ~1.8x headline (mean LTV by referred_friend) so you're testing the exact claim.",
+    "Ask whether referrers are a special group to begin with. Profile their tenure and engagement against non-referrers.",
+    "Recognise referral as a late-lifecycle act: only customers who stuck around and were happy get the chance to refer, so the 'referred' group is self-selected survivors.",
+    "Build a fair comparison — referrers vs non-referrers matched on engagement and tenure — so the referral act is the only thing that differs.",
+    "Report the matched gap as the real effect, and note that incentivised referrals from new/less-engaged users won't carry the loyalty that produced the headline."
+  ],
+  "teachingNote": {
+    "naiveRead": "Referrers are worth about $1,210 in LTV versus $683 for non-referrers — roughly 1.8x, a $527 gap. It reads as a clear mandate: drive referrals and lifetime value follows.",
+    "theTrap": "Referring a friend is something happy, engaged, long-tenured customers do — late in their lifecycle, after they've already decided they love the product. Referrers here average 18 months of tenure and an engagement score of 65, versus 14 months and 46 for non-referrers. Lifetime value is driven by that engagement and tenure; the referral is a downstream marker of an already-loyal customer, not a cause of their value. A brand-new or lukewarm customer can't refer in the first place, so the 'referred' group is self-selected to be your best customers. You're reading the LTV of your most loyal customers back as if the referral created it.",
+    "honestAnswer": "Compare referrers and non-referrers who are similarly engaged and similarly tenured, and the LTV gap collapses to about $43 — the modest real effect of the referral act itself, roughly a twelfth of the naive $527. The 1.8x is almost entirely who refers, not what referring does. A referral push aimed at new or less-engaged users won't manufacture the loyalty that produced the headline: incentivising a lukewarm customer to refer doesn't turn them into an 18-month power user. Referrals are worth running as a cheap acquisition channel — but not on the theory that referring is what makes customers valuable.",
+    "howToGetThere": [
+      "Compute mean LTV by referred_friend: ~$1,210 vs ~$683 (the 1.8x).",
+      "Profile the groups: referrers have higher tenure (~18 vs ~14 mo) and engagement (~65 vs ~46) — they were already better customers.",
+      "Reason about timing: referral is a late-lifecycle act only survivors reach, so the group is self-selected.",
+      "Match on engagement and tenure and re-compare LTV — the gap shrinks to ~$43.",
+      "Conclude the referral act adds little to LTV; the headline reflects self-selection. Confirm any causal claim with a randomised referral-incentive test."
+    ],
+    "numbers": [
+      { "label": "Mean LTV — referrers vs not", "value": "$1,210 vs $683 (1.8x)" },
+      { "label": "Mean tenure — referrers vs not", "value": "18.4 vs 13.5 months" },
+      { "label": "Mean engagement — referrers vs not", "value": "65 vs 46" },
+      { "label": "LTV gap for comparable customers", "value": "≈ $43" }
+    ],
+    "lesson": "When a behaviour can only happen to people who are already succeeding — referring a friend, reaching a loyalty tier, hitting a lifetime milestone — the group that does it is self-selected to be your best customers, and their outcomes will look spectacular. That's survivorship and self-selection, not causation. Before treating the behaviour as a lever, compare people who are otherwise alike and ask what the behaviour itself adds. Usually far less than the headline — and you can only really know by running an experiment."
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "id": "loyalty-launch",
+  "title": "Revenue jumped 64% after we launched the loyalty program — did it work?",
+  "trap": "Seasonality confound",
+  "estMinutes": 30,
+  "scenario": {
+    "role": "You're the analyst on the marketing team at Harbor",
+    "company": "Harbor — an online marketplace",
+    "situation": "Harbor launched a loyalty program at the start of November. The CMO pulled the numbers: revenue in November–December ran about 64% higher than in September–October, right before launch. She's declaring the program a runaway success and wants to expand it. You've been given two full years of order-level data and asked to confirm the lift before the expansion budget is approved.",
+    "stakeholderBelief": "\"Revenue jumped 64% right after we launched loyalty in November. The program is a huge win — let's expand it.\"",
+    "question": "Is the 64% jump the loyalty program's doing? Estimate the program's real effect on revenue and advise whether the expansion is justified."
+  },
+  "dataset": {
+    "file": "/case-lab/loyalty-launch/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "order_id", "type": "int", "description": "Unique order identifier (rows are in natural export order, not sorted by date)" },
+      { "name": "order_date", "type": "date", "description": "Date the order was placed (YYYY-MM-DD), spanning 2024-01 through 2025-12" },
+      { "name": "customer_segment", "type": "string", "description": "Customer type: new, returning, or vip" },
+      { "name": "channel", "type": "string", "description": "Order channel: web, app, or marketplace" },
+      { "name": "order_value", "type": "float", "description": "Order value in dollars" }
+    ],
+    "sample": [
+      { "order_id": 1, "order_date": "2024-09-11", "customer_segment": "returning", "channel": "app", "order_value": 60.49 },
+      { "order_id": 2, "order_date": "2024-02-04", "customer_segment": "returning", "channel": "app", "order_value": 28.91 },
+      { "order_id": 3, "order_date": "2025-05-06", "customer_segment": "returning", "channel": "marketplace", "order_value": 100.2 },
+      { "order_id": 4, "order_date": "2024-09-20", "customer_segment": "vip", "channel": "marketplace", "order_value": 127.69 },
+      { "order_id": 5, "order_date": "2024-10-12", "customer_segment": "vip", "channel": "web", "order_value": 42.9 },
+      { "order_id": 6, "order_date": "2024-08-22", "customer_segment": "returning", "channel": "marketplace", "order_value": 48.74 },
+      { "order_id": 7, "order_date": "2025-11-29", "customer_segment": "new", "channel": "app", "order_value": 63.57 },
+      { "order_id": 8, "order_date": "2024-11-06", "customer_segment": "vip", "channel": "web", "order_value": 33.09 }
+    ]
+  },
+  "guidingQuestions": [
+    "Reproduce the CMO's number: total revenue in Sep–Oct 2025 vs Nov–Dec 2025. Is it about +64%?",
+    "Plot or tabulate monthly revenue across the full two years. What happens every November and December, program or not?",
+    "The launch lands right on the seasonal peak. How would you compare the same season across years to remove it? (Nov–Dec 2024 vs Nov–Dec 2025.)",
+    "Revenue can grow year to year for reasons unrelated to loyalty. How do you separate the program's effect from an underlying growth trend? (Look at like-for-like order value.)",
+    "What do you tell the CMO — how much of the 64% is the program, and is the expansion justified on that number?"
+  ],
+  "suggestedApproach": [
+    "Reproduce the pre-launch vs post-launch revenue jump so you're testing the exact claim.",
+    "Use the two years of history: chart monthly revenue and see whether Nov–Dec spikes every year, independent of the launch.",
+    "Because the launch coincides with the seasonal peak, compare the SAME season across years (Nov–Dec 2024 vs 2025) to strip the holiday out.",
+    "Separate the program from ordinary growth: compare like-for-like order value year over year, and note the underlying volume trend.",
+    "Attribute only the residual, seasonally- and trend-adjusted lift to the program — and recommend a holdout to confirm it."
+  ],
+  "teachingNote": {
+    "naiveRead": "Revenue in the two months after launch (Nov–Dec) ran ~64% above the two months before (Sep–Oct). Read straight, the loyalty program looks like it added nearly two-thirds to revenue overnight.",
+    "theTrap": "The program launched in November — straight into the biggest seasonal peak of the year. In this data, and in almost every consumer business, November and December revenue towers over the autumn shoulder months every single year, loyalty program or not. Comparing pre-launch autumn to post-launch holiday confounds the program with the holiday. The 64% is what you'd have seen with no program at all: it's the season, not the loyalty scheme.",
+    "honestAnswer": "Compare the same season across years. Year-over-year, Nov–Dec revenue is up about 17.5% — far below the 64% headline, because the seasonal spike is now on both sides of the comparison. But even that 17.5% isn't all program: the business is growing ~8% a year on volume regardless. Isolate the program by looking at like-for-like order value in the same season, which rises about 8%. So the loyalty program's real contribution is a mid-single-digit-percent lift on order value — genuine and worth having, but a small fraction of the 64% the CMO is celebrating. Expanding on the strength of '64%' would be budgeting against a number that's ~8x the real effect.",
+    "howToGetThere": [
+      "Reproduce the pre/post jump: Nov–Dec 2025 revenue vs Sep–Oct 2025 ≈ +64%.",
+      "Tabulate monthly revenue over both years — Nov/Dec spike every year, so the pre/post comparison is confounded by season.",
+      "Remove the season: compare Nov–Dec 2024 to Nov–Dec 2025 (same months, before vs after launch) → ~+17.5%.",
+      "Remove ordinary growth: the business grows ~8%/yr on volume; isolate the program with like-for-like order value → ~+8%.",
+      "Attribute only the residual (~single-digit %) to the program, and recommend a randomised holdout to pin it down."
+    ],
+    "numbers": [
+      { "label": "Naive pre-launch → post-launch revenue", "value": "+64%" },
+      { "label": "Year-over-year Nov–Dec revenue", "value": "+17.5%" },
+      { "label": "Like-for-like order value (isolates program)", "value": "≈ +8%" },
+      { "label": "Underlying annual volume growth", "value": "≈ +8%" }
+    ],
+    "lesson": "Never compare a period after a launch to the period just before it when a season sits in between — the season will masquerade as your intervention. Compare like-for-like windows across years so the seasonal pattern appears on both sides and cancels out, then strip any underlying growth trend before crediting the rest to what you did. Here a holiday launch made an ~8% program look like a 64% miracle. When you can, launch with a randomised holdout so the comparison is clean by design."
+  }
+}

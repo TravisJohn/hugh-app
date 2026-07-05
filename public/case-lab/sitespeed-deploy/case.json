@@ -1,0 +1,67 @@
+{
+  "id": "sitespeed-deploy",
+  "title": "Conversion rose after the December site-speed deploy — did the deploy do it?",
+  "trap": "Seasonality confound",
+  "estMinutes": 30,
+  "scenario": {
+    "role": "You're the analyst embedded with the web team at Verve",
+    "company": "Verve — an online retailer",
+    "situation": "The engineering team shipped a big site-speed improvement on December 1st. Conversion in December came in at 18.8%, up from 11.0% in November — a 7.7-point jump. The eng lead is presenting the deploy as a major conversion win and wants it used to justify a larger performance-engineering budget. You've been handed two years of session-level data and asked to confirm the lift.",
+    "stakeholderBelief": "\"Conversion jumped almost 8 points the month we shipped the speed improvement. The deploy is a huge conversion win.\"",
+    "question": "Did the site-speed deploy actually lift conversion? Estimate its real effect and advise whether the win is real."
+  },
+  "dataset": {
+    "file": "/case-lab/sitespeed-deploy/data.csv",
+    "rows": 40000,
+    "columns": [
+      { "name": "session_id", "type": "int", "description": "Unique session identifier (rows are in natural export order, not sorted by date)" },
+      { "name": "session_date", "type": "date", "description": "Date of the session (YYYY-MM-DD), spanning 2024-01 through 2025-12" },
+      { "name": "device", "type": "string", "description": "Device: desktop, mobile, or tablet" },
+      { "name": "traffic_source", "type": "string", "description": "How the session arrived: organic, paid, email, or social" },
+      { "name": "converted", "type": "int", "description": "1 if the session ended in a purchase, else 0" }
+    ],
+    "sample": [
+      { "session_id": 1, "session_date": "2025-05-17", "device": "desktop", "traffic_source": "email", "converted": 0 },
+      { "session_id": 2, "session_date": "2024-11-10", "device": "desktop", "traffic_source": "email", "converted": 0 },
+      { "session_id": 3, "session_date": "2025-01-19", "device": "desktop", "traffic_source": "paid", "converted": 0 },
+      { "session_id": 4, "session_date": "2025-12-18", "device": "mobile", "traffic_source": "organic", "converted": 0 },
+      { "session_id": 5, "session_date": "2024-05-16", "device": "mobile", "traffic_source": "paid", "converted": 0 },
+      { "session_id": 6, "session_date": "2025-07-27", "device": "desktop", "traffic_source": "social", "converted": 1 },
+      { "session_id": 7, "session_date": "2024-01-10", "device": "mobile", "traffic_source": "organic", "converted": 0 },
+      { "session_id": 8, "session_date": "2024-02-12", "device": "mobile", "traffic_source": "paid", "converted": 0 }
+    ]
+  },
+  "guidingQuestions": [
+    "Reproduce the eng lead's number: conversion in November 2025 vs December 2025. Is it about +7.7 points?",
+    "Tabulate conversion by month across the full two years. What does December look like every year, deploy or not?",
+    "The deploy shipped on the first day of the seasonal peak. How would you compare December to December to remove the season? (Dec 2024 vs Dec 2025.)",
+    "After that like-for-like comparison, how much lift is left that could plausibly be the deploy?",
+    "What do you tell the eng lead — is the 7.7-point jump the deploy's doing, and how should conversion changes from deploys be measured in future?"
+  ],
+  "suggestedApproach": [
+    "Reproduce the Nov→Dec conversion jump so you're testing the exact claim.",
+    "Use both years: chart monthly conversion and check whether December always spikes, independent of the deploy.",
+    "Because the deploy lands on the seasonal peak, compare the SAME month across years (Dec 2024 vs Dec 2025) to strip the holiday out.",
+    "Read the residual as the deploy's candidate effect — and treat a single-month, single-year comparison as noisy evidence, not proof.",
+    "Recommend the only clean way to measure a deploy: a randomised holdout / A-B, not a before-vs-after across a seasonal boundary."
+  ],
+  "teachingNote": {
+    "naiveRead": "December converted at 18.8% versus 11.0% in November — a 7.7-point jump the month the speed improvement shipped. It looks like the deploy delivered a large, immediate conversion win.",
+    "theTrap": "December converts far better than November every single year — holiday shoppers arrive with high purchase intent regardless of site speed. The deploy shipped on December 1st, straight into that seasonal peak, so the Nov→Dec jump credits the deploy with the holiday. The comparison confounds the deploy with the single biggest seasonal swing of the year.",
+    "honestAnswer": "Compare December to December. In 2024, before the deploy, December converted at 19.0%; in 2025, with the deploy, it converted at 18.8% — a difference of about -0.2 points, i.e. essentially zero. December always sits near 19%; the deploy didn't move it. The entire 7.7-point 'lift' was the holiday that arrives every year. The speed improvement may be worth shipping for load times and user experience, but there's no measurable conversion win here. Attributing 7.7 points to it — and sizing a budget on that — would be crediting the deploy with the calendar.",
+    "howToGetThere": [
+      "Reproduce the jump: conversion Nov 2025 (~11.0%) vs Dec 2025 (~18.8%) ≈ +7.7 pts.",
+      "Tabulate conversion by month over both years — December spikes to ~19% every year, so Nov→Dec is confounded by season.",
+      "Remove the season: compare Dec 2024 (~19.0%) to Dec 2025 (~18.8%), the same month before and after the deploy.",
+      "Read the residual: ~-0.2 pts — no detectable effect once the holiday is on both sides of the comparison.",
+      "Conclude the conversion win is seasonal, and that a deploy's true effect can only be measured with a randomised holdout."
+    ],
+    "numbers": [
+      { "label": "November 2025 conversion", "value": "11.0%" },
+      { "label": "December 2025 conversion", "value": "18.8%" },
+      { "label": "Naive Nov → Dec jump", "value": "+7.7 pts" },
+      { "label": "Like-for-like Dec 2024 → Dec 2025", "value": "≈ −0.2 pts (no lift)" }
+    ],
+    "lesson": "A before-and-after comparison across a seasonal boundary measures the season, not your change — and December is the most seductive boundary there is. Compare the same period across years so the seasonal pattern appears on both sides and cancels. Better still, measure a deploy the only way that's truly clean: ship it to a random half of traffic and compare against the held-out half. A before/after on a launch that lands on the holiday will make almost anything look like a winner."
+  }
+}

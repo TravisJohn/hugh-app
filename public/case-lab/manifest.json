@@ -70,6 +70,36 @@
       "rows": 12000,
       "releaseDate": "2026-06-29",
       "blurb": "Users with 50+ workflows churn at 1% vs 92% for the rest. Product wants '50 workflows' as the North Star. Is it a real lever or a mirage?"
+    },
+    {
+      "id": "referral-ltv",
+      "title": "Referrers are worth 1.8x — should we push referrals to grow LTV?",
+      "company": "Tally — personal-finance app",
+      "trap": "Survivorship / self-selection",
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-06-28",
+      "blurb": "Customers who referred a friend have 1.8x the lifetime value. Growth wants a referral push to lift LTV. Does referring make customers valuable — or the other way round?"
+    },
+    {
+      "id": "loyalty-launch",
+      "title": "Revenue jumped 64% after the November loyalty launch — did it work?",
+      "company": "Harbor — online marketplace",
+      "trap": "Seasonality confound",
+      "estMinutes": 30,
+      "rows": 12000,
+      "releaseDate": "2026-06-27",
+      "blurb": "Revenue rose 64% right after loyalty launched in November, and the CMO wants to expand it. Two years of orders are in the file. How much is the program vs the holidays?"
+    },
+    {
+      "id": "sitespeed-deploy",
+      "title": "Conversion rose after the December site-speed deploy — did the deploy do it?",
+      "company": "Verve — online retailer",
+      "trap": "Seasonality confound",
+      "estMinutes": 30,
+      "rows": 40000,
+      "releaseDate": "2026-06-26",
+      "blurb": "Conversion jumped ~8 points the month a speed improvement shipped — in December. Two years of sessions are in the file. Is it the deploy or the season?"
     }
   ]
 }
