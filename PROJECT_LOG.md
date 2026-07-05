@@ -1398,3 +1398,39 @@ scarce skill (judgment) only. Named surface: "The Case Room".
   Migration 023 already applied to prod Supabase; no new env vars (domain gate
   reuses `ANTHROPIC_API_KEY`). Pre-flight: clean prod build, tsc/eslint/tests
   green. Scratch files (`LEARNING_POINTS.md`, `case-analysis.html`) gitignored.
+- **Study-page header cleanup (2026-07-05):** removed the `Track / Ask / Converse`
+  tab bar and the redundant `topic_description / title` subtitle from the study
+  Kanban — the learner now follows one fixed pathway, so top-level tab nav was
+  dead weight (Ask stays reachable per-milestone from the drawer). Collapsed both
+  into one slim **goal bar**: goal title (natural case) + a days-remaining pill
+  (amber ≤7 days, rose once due). Also dropped the "Full view" cross-entry (it
+  opened a redundant second board `/tracker/[id]` with no back button + a doubled
+  title). Deleted the now-unused `StudyTabs`. Shipped to prod (`1c752c3`).
+- **PRD authored — Long-Form Data Cases / "The Case Lab" (2026-07-05):** wrote
+  `PRD-longform-cases.md` (v0.1, **awaiting approval, no code yet**) after a
+  multi-turn design discussion. A **sibling engine** to the Case Room (not an
+  extension of its MC `Decision` model): a second tab in `/cases` where the
+  learner gets a business question + a **10k+ row synthetic CSV**, analyses it
+  in-browser (**Pyodide**), passes deterministic **checkpoints**, and submits a
+  written **recommendation memo**. Key decisions locked in the discussion:
+  - *DGP keystone* — the LLM never emits 10k rows; it authors a **data-generating
+    script** that plants the lesson, code runs it → CSV **+ a known ground truth**
+    (deterministic grading without an LLM judge on the analysis).
+  - *Grading = gap-to-band + memo* — checkpoint answers graded against a **band of
+    correct outputs** derived from DGP resampling (so a valid-but-different method
+    still passes); the memo gets one Sonnet rubric call. Gap score = strokes over
+    par, echoing the Case Room's "diff vs gold path."
+  - *Two-tier data* — public `case.json` + `data.csv` (CDN-able) vs **sealed**
+    `key.json` + `dgp.py` + `solution.py` (private; grading is a server-side API
+    route). This is the one real divergence from the all-public Case Room.
+  - *Pilot* — **5 inference cases = the 5 causal traps** (confounding, Simpson's,
+    regression to the mean, survivorship, seasonality); each seeds a reusable DGP
+    archetype. Prediction/Kaggle-style flavour deferred to v2.
+  - *Delivery* — a dated **file-explorer feed**; release cadence **decoupled** from
+    authoring (batch → validate → queue → drip one/day; bad gens never ship).
+    Daily *feel* without locking a daily SLA in the pilot.
+  - Authoring pipeline mirrors `author-cases.mjs` but shells out to **offline
+    Python** for generate→run→validate→critic. New toolchain dep (authoring only).
+  - Proposed build sequence (§12): pipeline + Case #1 validated → player + Pyodide
+    + checkpoint grading → memo rubric → feed + `024` migration → author 4 more →
+    verify + ship behind a flag. **Next step: review/approve the PRD before code.**
