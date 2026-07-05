@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, LayoutDashboard, CalendarClock } from "lucide-react";
+import { ArrowLeft, CalendarClock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import SignOutButton from "@/components/landing/SignOutButton";
 import HeaderUsage from "@/components/usage/HeaderUsage";
@@ -98,29 +98,18 @@ export default async function StudyTrackPage({ params, searchParams }: Props) {
         </div>
       </header>
 
-      {/* Goal context bar — the goal title, a days-remaining reminder, and a
-          jump to the fuller tracker board. Replaces the old Track/Ask/Converse
-          tabs and the topic_description/title subtitle (both redundant now that
-          the learner follows one fixed pathway). */}
+      {/* Goal context bar — the goal title plus a days-remaining reminder.
+          Replaces the old Track/Ask/Converse tabs and the
+          topic_description/title subtitle (both redundant now that the learner
+          follows one fixed pathway). */}
       <div className="shrink-0 flex items-center gap-4 border-b border-slate-800 bg-slate-900/40 px-6 py-2.5">
         <h1 className="min-w-0 truncate text-sm font-semibold text-slate-200" title={g.topic}>
           {g.topic}
         </h1>
-        <div className="ml-auto flex shrink-0 items-center gap-4">
-          <span className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold ${daysTone}`}>
-            <CalendarClock size={12} />
-            {daysLabel}
-          </span>
-          {t && (
-            <Link
-              href={`/tracker/${t.id}`}
-              className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
-            >
-              <LayoutDashboard size={12} />
-              Full view
-            </Link>
-          )}
-        </div>
+        <span className={`ml-auto flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold ${daysTone}`}>
+          <CalendarClock size={12} />
+          {daysLabel}
+        </span>
       </div>
 
       {t ? (
