@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/server";
 import SignOutButton from "@/components/landing/SignOutButton";
 import HeaderUsage from "@/components/usage/HeaderUsage";
 import AskWorkspace from "@/components/learn/AskWorkspace";
-import StudyTabs from "@/components/study/StudyTabs";
 import { type LearningGoal } from "@/types";
 
 interface Props {
@@ -94,9 +93,6 @@ export default async function StudyAskPage({ params, searchParams }: Props) {
           <SignOutButton />
         </div>
       </header>
-
-      {/* Tab bar */}
-      <StudyTabs goalId={goalId} activeTab="ask" courseTitle={g.topic} endDate={g.end_date} />
 
       {/* Milestone focus strip — persists with the focused milestone */}
       {focusTitle && (

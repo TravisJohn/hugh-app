@@ -1,16 +1,25 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, LayoutDashboard } from "lucide-react";
+import { ArrowLeft, LayoutDashboard, CalendarClock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import SignOutButton from "@/components/landing/SignOutButton";
 import HeaderUsage from "@/components/usage/HeaderUsage";
 import KanbanBoard from "@/components/tracker/KanbanBoard";
-import StudyTabs from "@/components/study/StudyTabs";
 import { type LearningGoal, type Track, type Milestone } from "@/types";
 
 interface Props {
   params:       Promise<{ goalId: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+// Whole days between today and the goal's end date. Both ends are normalised to
+// local midnight so a few hours either side don't skew the count.
+function daysUntil(endDate: string): number {
+  const end = new Date(endDate);
+  const now = new Date();
+  end.setHours(0, 0, 0, 0);
+  now.setHours(0, 0, 0, 0);
+  return Math.round((end.getTime() - now.getTime()) / 86_400_000);
 }
 
 export default async function StudyTrackPage({ params, searchParams }: Props) {
@@ -50,6 +59,18 @@ export default async function StudyTrackPage({ params, searchParams }: Props) {
     milestones = (ms ?? []) as Milestone[];
   }
 
+  // Days-remaining reminder — nudges amber ≤7 days out, rose once due/overdue.
+  const days      = daysUntil(g.end_date);
+  const daysLabel =
+    days > 1   ? `${days} days left` :
+    days === 1 ? "1 day left"        :
+    days === 0 ? "Last day"          :
+    `${Math.abs(days)} days over`;
+  const daysTone =
+    days <= 0 ? "bg-rose-500/10 text-rose-400"   :
+    days <= 7 ? "bg-amber-500/10 text-amber-400" :
+                "bg-slate-800 text-slate-400";
+
   return (
     <div className="flex h-screen flex-col bg-[#0F172A] overflow-hidden">
 
@@ -77,27 +98,33 @@ export default async function StudyTrackPage({ params, searchParams }: Props) {
         </div>
       </header>
 
-      {/* Tab bar */}
-      <StudyTabs goalId={goalId} activeTab="track" courseTitle={g.topic} endDate={g.end_date} />
+      {/* Goal context bar — the goal title, a days-remaining reminder, and a
+          jump to the fuller tracker board. Replaces the old Track/Ask/Converse
+          tabs and the topic_description/title subtitle (both redundant now that
+          the learner follows one fixed pathway). */}
+      <div className="shrink-0 flex items-center gap-4 border-b border-slate-800 bg-slate-900/40 px-6 py-2.5">
+        <h1 className="min-w-0 truncate text-sm font-semibold text-slate-200" title={g.topic}>
+          {g.topic}
+        </h1>
+        <div className="ml-auto flex shrink-0 items-center gap-4">
+          <span className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold ${daysTone}`}>
+            <CalendarClock size={12} />
+            {daysLabel}
+          </span>
+          {t && (
+            <Link
+              href={`/tracker/${t.id}`}
+              className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              <LayoutDashboard size={12} />
+              Full view
+            </Link>
+          )}
+        </div>
+      </div>
 
       {t ? (
         <>
-          {/* Track context bar */}
-          <div className="shrink-0 flex items-center gap-3 border-b border-slate-800/60 bg-slate-900/30 px-6 py-2">
-            <span className="text-xs font-semibold uppercase tracking-widest text-slate-600">
-              {t.topic_description}
-            </span>
-            <span className="text-slate-700">/</span>
-            <span className="text-xs font-semibold text-slate-400">{t.title}</span>
-            <Link
-              href={`/tracker/${t.id}`}
-              className="ml-auto flex items-center gap-1 text-xs text-slate-600 hover:text-slate-400 transition-colors"
-            >
-              <LayoutDashboard size={11} />
-              Full view
-            </Link>
-          </div>
-
           {/* Kanban board */}
           <div className="flex-1 overflow-hidden px-6 py-5">
             <KanbanBoard initialMilestones={milestones} topicContext={g.topic} goalId={goalId} trackId={t.id} focusMilestoneId={t.focus_milestone_id} backlogPriorityMode={t.backlog_priority_mode} pulseId={pulseId} validatedId={validatedId} masteredId={masteredId} isPremium={isPremium} isAdmin={isAdmin} />
