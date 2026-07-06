@@ -10,6 +10,7 @@ import { PyodideRunner } from "@/lib/code/pyodideClient";
 import { SCENARIO, DRILL_CELLS } from "@/lib/code/drillContent";
 import CmEditor from "./CmEditor";
 import ConfettiCanvas, { type ConfettiHandle } from "./ConfettiCanvas";
+import CodeBackdrop from "./CodeBackdrop";
 import { useDrillAudio } from "@/hooks/useDrillAudio";
 
 type Status = "idle" | "running" | "pass" | "fail";
@@ -138,7 +139,8 @@ export default function DrillMock() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0F1E] text-slate-200">
+    <div className="relative min-h-screen overflow-hidden bg-[#0A0F1E] text-slate-200">
+      <CodeBackdrop />
       <ConfettiCanvas ref={confetti} />
 
       {/* Header */}
@@ -182,7 +184,7 @@ export default function DrillMock() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-6 py-8">
+      <main className="relative z-10 mx-auto max-w-3xl px-6 py-8">
         {/* Scenario */}
         <div className="mb-6 rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
           <h1 className="font-serif text-xl font-bold text-white">{SCENARIO.title}</h1>
