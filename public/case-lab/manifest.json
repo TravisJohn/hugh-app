@@ -2,6 +2,28 @@
   "batch": "2026-07",
   "cases": [
     {
+      "id": "onboarding-checklist",
+      "title": "Checklist-completers retain at nearly double — make it mandatory?",
+      "company": "Plotline — project-planning app",
+      "trap": "Self-selection",
+      "facets": { "topic": "Product", "skill": ["Self-selection"] },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-06",
+      "blurb": "Users who finish onboarding retain at nearly double, and the PM wants to gate the app on it. But who chooses to finish? Estimate the real effect before it ships."
+    },
+    {
+      "id": "redesign-dau",
+      "title": "Weekly sessions rose after the redesign — did engagement go up?",
+      "company": "Fathom — personal-finance app",
+      "trap": "Simpson's paradox",
+      "facets": { "topic": "Product", "skill": ["Simpson's paradox"] },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-06",
+      "blurb": "Sessions per user rose 12% after the redesign — but it launched with a win-back campaign. Split new vs returning users before calling it a win."
+    },
+    {
       "id": "airflow-migration-sla",
       "title": "SLA breaches jumped after the Airflow 2 migration — roll it back?",
       "company": "Switchyard — data infrastructure",

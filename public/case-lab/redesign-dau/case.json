@@ -1,0 +1,70 @@
+{
+  "id": "redesign-dau",
+  "title": "Weekly sessions rose after the redesign — did engagement go up?",
+  "trap": "Simpson's paradox",
+  "facets": { "topic": "Product", "skill": ["Simpson's paradox"] },
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the product analyst at Fathom",
+    "company": "Fathom — a personal-finance app",
+    "situation": "Fathom shipped a big redesign last month, launched alongside a win-back campaign to re-engage lapsed users. Leah, the Head of Product, pulled weekly sessions per user before and after: the average rose from 4.9 to 5.5 sessions. She's ready to call the redesign a clear engagement win and roll its patterns into the rest of the app. She wants your confirmation before the readout.",
+    "stakeholderBelief": "\"Weekly sessions per user are up 12% since the redesign. The new design lifts engagement — let's extend it everywhere.\"",
+    "question": "Did the redesign actually raise engagement? Confirm what moved between the two periods, and tell Leah whether the redesign deserves the credit."
+  },
+  "dataset": {
+    "file": "/case-lab/redesign-dau/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "user_id", "type": "int", "description": "Unique user identifier" },
+      { "name": "user_segment", "type": "string", "description": "new (joined recently) or returning (re-engaged / long-standing) user" },
+      { "name": "platform", "type": "string", "description": "Device platform: ios, android, or web" },
+      { "name": "period", "type": "string", "description": "before or after the redesign launch" },
+      { "name": "sessions_7d", "type": "int", "description": "Sessions the user opened in the measured week — the engagement outcome" }
+    ],
+    "sample": [
+      { "user_id": 1, "user_segment": "new", "platform": "ios", "period": "before", "sessions_7d": 3 },
+      { "user_id": 2, "user_segment": "new", "platform": "android", "period": "after", "sessions_7d": 1 },
+      { "user_id": 3, "user_segment": "new", "platform": "web", "period": "after", "sessions_7d": 2 },
+      { "user_id": 4, "user_segment": "new", "platform": "ios", "period": "before", "sessions_7d": 4 },
+      { "user_id": 5, "user_segment": "new", "platform": "web", "period": "before", "sessions_7d": 3 },
+      { "user_id": 6, "user_segment": "returning", "platform": "android", "period": "after", "sessions_7d": 8 },
+      { "user_id": 7, "user_segment": "new", "platform": "web", "period": "before", "sessions_7d": 6 },
+      { "user_id": 8, "user_segment": "returning", "platform": "ios", "period": "after", "sessions_7d": 3 },
+      { "user_id": 9, "user_segment": "new", "platform": "ios", "period": "before", "sessions_7d": 4 },
+      { "user_id": 10, "user_segment": "new", "platform": "ios", "period": "before", "sessions_7d": 1 }
+    ]
+  },
+  "guidingQuestions": [
+    "Reproduce Leah's number: average sessions_7d in the before period vs the after period.",
+    "Now compute average sessions_7d by user_segment WITHIN each period. What happens to new users, and to returning users, from before to after?",
+    "Compare the segment mix across periods: what share of users are returning before vs after? (Remember the win-back campaign ran alongside the redesign.)",
+    "Returning users are far more active than new users. If their share of the population jumped, what does that do to the blended average — even if both segments individually fell?",
+    "Which number answers 'did the redesign raise engagement' — the overall average over a shifted audience, or the like-for-like within-segment averages?"
+  ],
+  "suggestedApproach": [
+    "Reproduce the aggregate: mean sessions_7d by period.",
+    "Distrust the blended average across a changing audience — split by user_segment within each period before drawing a conclusion.",
+    "If both segments move opposite to the aggregate, look at the mix: compute the returning share per period.",
+    "Recognise the composition change (win-back pulling in high-activity returning users) as the driver of the aggregate, and hold the mix constant to see the real within-segment trend.",
+    "Separate the two concurrent events — redesign and win-back campaign — and attribute the sessions change to the right one."
+  ],
+  "teachingNote": {
+    "naiveRead": "Average weekly sessions rose from 4.9 to 5.5 per user — about +12%. Taken directly, the redesign looks like a clear engagement win worth extending across the app.",
+    "theTrap": "The aggregate rose on a mix shift — Simpson's paradox. The redesign launched alongside a win-back campaign that pulled back a wave of returning users, who are far more active than new users (~8 sessions/week vs ~3). Returning users went from 38% of the population before to 62% after. Because the audience tilted toward the high-activity segment, the blended average climbed even though WITHIN each segment sessions fell: new users dropped from 2.96 to 2.40 and returning users from 8.13 to 7.44. The redesign didn't lift engagement; it slightly hurt it in both segments, and the changed audience hid that.",
+    "honestAnswer": "Engagement per user went DOWN, not up, once you hold the audience constant. Both segments lost roughly half a session a week after the redesign; the +12% headline is entirely the win-back campaign reweighting the population toward active returning users. The redesign deserves no credit for the aggregate rise — if anything it's a small regression to investigate. Tell Leah to report within-segment sessions (or a mix-adjusted average), credit the win-back campaign for the audience change, and look into why both segments slipped before extending the redesign anywhere.",
+    "howToGetThere": [
+      "Reproduce the aggregate: mean(sessions_7d) by period → 4.94 before, 5.54 after (+12%).",
+      "Break it down: mean(sessions_7d) by user_segment within period → new 2.96 → 2.40 and returning 8.13 → 7.44. Both fell.",
+      "Explain the reversal via mix: returning share is 38% before vs 62% after — the audience shifted toward the more active segment.",
+      "Reconcile: a mix-adjusted average (hold segment shares fixed) shows a decline, matching the within-segment story.",
+      "Attribute correctly: the win-back campaign moved the mix; the redesign is the small within-segment drop — not the headline gain."
+    ],
+    "numbers": [
+      { "label": "Overall sessions — before vs after", "value": "4.94 → 5.54 (+12%)" },
+      { "label": "Returning share — before vs after", "value": "38% → 62%" },
+      { "label": "New-user sessions — before vs after", "value": "2.96 → 2.40 (down)" },
+      { "label": "Returning-user sessions — before vs after", "value": "8.13 → 7.44 (down)" }
+    ],
+    "lesson": "A blended average can rise while every group inside it falls — Simpson's paradox — whenever the mix of groups shifts toward the higher-scoring one. Here a win-back campaign reweighted the audience toward active returning users, lifting the overall average even as the redesign quietly cost both segments engagement. When two things change at once (a redesign and a campaign) and your metric spans a mix that moved, disaggregate before attributing anything: report within-segment rates or a fixed-mix average. The direction of the honest answer here is the opposite of the headline — which is exactly when this reflex matters most."
+  }
+}

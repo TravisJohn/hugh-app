@@ -1,0 +1,71 @@
+{
+  "id": "onboarding-checklist",
+  "title": "Checklist-completers retain at nearly double — make it mandatory?",
+  "trap": "Self-selection",
+  "facets": { "topic": "Product", "skill": ["Self-selection"] },
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the product analyst at Plotline",
+    "company": "Plotline — a project-planning app",
+    "situation": "Plotline shows new users an optional onboarding checklist. Sam, the PM, pulled the numbers and is convinced it's the key to retention: users who complete the checklist retain at 60% over 30 days versus 34% for those who don't — nearly double. He wants to make the checklist mandatory, gating the app until it's done, and expects that to pull the non-completers up to completer-level retention. He needs your analysis first.",
+    "stakeholderBelief": "\"Finishing the checklist nearly doubles 30-day retention. If we force everyone to complete it, we'll bring the rest up to ~60% too.\"",
+    "question": "Is completing the checklist what drives the retention, or the other way round? Estimate the checklist's real effect and tell Sam whether making it mandatory will lift retention."
+  },
+  "dataset": {
+    "file": "/case-lab/onboarding-checklist/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "user_id", "type": "int", "description": "Unique user identifier" },
+      { "name": "signup_source", "type": "string", "description": "How the user arrived: organic, paid, or referral" },
+      { "name": "plan", "type": "string", "description": "Account plan: free or pro" },
+      { "name": "setup_actions_first_hour", "type": "int", "description": "Number of setup actions the user took in their first hour — BEFORE the checklist — a signal of how motivated they arrived" },
+      { "name": "completed_checklist", "type": "int", "description": "1 if the user finished the onboarding checklist, else 0" },
+      { "name": "retained_30d", "type": "int", "description": "1 if the user was still active 30 days later, else 0 — the outcome" }
+    ],
+    "sample": [
+      { "user_id": 1, "signup_source": "paid", "plan": "free", "setup_actions_first_hour": 7, "completed_checklist": 0, "retained_30d": 1 },
+      { "user_id": 2, "signup_source": "organic", "plan": "free", "setup_actions_first_hour": 3, "completed_checklist": 0, "retained_30d": 0 },
+      { "user_id": 3, "signup_source": "referral", "plan": "free", "setup_actions_first_hour": 9, "completed_checklist": 1, "retained_30d": 0 },
+      { "user_id": 4, "signup_source": "paid", "plan": "pro", "setup_actions_first_hour": 6, "completed_checklist": 1, "retained_30d": 1 },
+      { "user_id": 5, "signup_source": "organic", "plan": "free", "setup_actions_first_hour": 8, "completed_checklist": 1, "retained_30d": 1 },
+      { "user_id": 6, "signup_source": "referral", "plan": "free", "setup_actions_first_hour": 7, "completed_checklist": 1, "retained_30d": 1 },
+      { "user_id": 7, "signup_source": "paid", "plan": "free", "setup_actions_first_hour": 7, "completed_checklist": 1, "retained_30d": 0 },
+      { "user_id": 8, "signup_source": "paid", "plan": "pro", "setup_actions_first_hour": 5, "completed_checklist": 0, "retained_30d": 1 },
+      { "user_id": 9, "signup_source": "organic", "plan": "free", "setup_actions_first_hour": 5, "completed_checklist": 0, "retained_30d": 1 },
+      { "user_id": 10, "signup_source": "paid", "plan": "free", "setup_actions_first_hour": 4, "completed_checklist": 1, "retained_30d": 0 }
+    ]
+  },
+  "guidingQuestions": [
+    "Reproduce Sam's number: 30-day retention for checklist-completers vs non-completers. How big is the gap?",
+    "Who completes the checklist? Compare setup_actions_first_hour — the pre-checklist motivation signal — for completers vs non-completers.",
+    "Completing the checklist is voluntary. If motivated users both complete it AND retain anyway, which direction does the causation run?",
+    "Estimate the checklist's effect holding intent constant — stratify on setup_actions_first_hour (deciles) or model retained_30d ~ setup_actions + completed_checklist. What's left?",
+    "Sam wants to gate the app on completion. Given who the non-completers are, will forcing them through the checklist give them the completer's retention?"
+  ],
+  "suggestedApproach": [
+    "Reproduce the headline gap so you know the exact claim.",
+    "Before crediting the checklist, describe who finishes it: compare the pre-checklist intent signal across completers and non-completers.",
+    "This is a self-selection setup — users opt in. If the opt-in signal also predicts retention, it confounds the raw comparison.",
+    "Adjust for intent (stratify on setup_actions or model it) and see how much of the gap survives.",
+    "Reason about the intervention: mandatory completion changes who completes, not who's motivated — forecast against the adjusted effect, and note that a randomised forced-vs-optional test would settle it."
+  ],
+  "teachingNote": {
+    "naiveRead": "Checklist-completers retain at 60.5% versus 33.5% for non-completers — a +27 point gap, nearly 1.8x. Read directly, the checklist looks like the strongest retention lever Plotline has, and forcing it looks like a free way to lift the non-completers to ~60%.",
+    "theTrap": "Completing the checklist is voluntary, so completers self-selected. The users who bother to finish it arrived more motivated: they took 7.4 setup actions in their first hour on average, versus 4.9 for non-completers. That early intent is what drives retention — the same motivation that makes someone finish the checklist also makes them stick around. The checklist is a marker of intent, not mainly a cause of retention. Comparing completers to non-completers compares motivated users to unmotivated ones and blames the difference on the checklist.",
+    "honestAnswer": "Hold intent constant — stratify on first-hour setup actions and compare completers vs not within each stratum (or model retained_30d ~ setup_actions + completed_checklist) — and the checklist's effect shrinks to about +4.6 points. Real and worth a nudge, but a sixth of the headline. Making the checklist mandatory forces low-intent users to click through it; it does not give them the motivation the voluntary completers already had, so it will not pull them from 34% to 60%. Expect a few points at most. If Sam wants a trustworthy number, randomise: force the checklist for half of new users and compare.",
+    "howToGetThere": [
+      "Compute the naive gap: retention for completed_checklist=1 (60.5%) minus =0 (33.5%) → +27.0 pts (~1.8x).",
+      "Profile who completes: mean(setup_actions_first_hour) by completion → ~7.4 vs ~4.9. Completers arrived more motivated.",
+      "Recognise self-selection: setup_actions proxies intent, which drives BOTH completion and retention, inflating the raw gap.",
+      "Adjust — stratify on setup_actions deciles and take the size-weighted within-stratum difference, or fit retained_30d ~ setup_actions + completed_checklist. The effect lands near +4.6 pts.",
+      "Reason about the policy: forcing completion moves the click, not the motivation — the honest effect, not the gap, is what a mandate would buy."
+    ],
+    "numbers": [
+      { "label": "Naive retention gap (completers − not)", "value": "60.5% vs 33.5% (+27 pts)" },
+      { "label": "Mean first-hour setup actions", "value": "7.4 vs 4.9" },
+      { "label": "Intent-adjusted checklist effect", "value": "≈ +4.6 pts" },
+      { "label": "Share who complete the checklist", "value": "46%" }
+    ],
+    "lesson": "When users opt into a behaviour, comparing the opt-ins to everyone else measures who they already were, not what the behaviour did. Motivated users complete onboarding AND retain; the checklist rides along as a marker. Before turning a voluntary behaviour into a mandate, ask whether the people doing it were different to begin with — and adjust for that difference. Here a nearly-2x story becomes a few-points one. A mandate changes who completes without changing who's motivated, so it can't reproduce the self-selected gap. The only clean read is to randomise the requirement and compare."
+  }
+}
