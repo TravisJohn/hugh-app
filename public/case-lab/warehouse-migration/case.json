@@ -1,0 +1,73 @@
+{
+  "id": "warehouse-migration",
+  "title": "Migrated queries run 60% faster — should we move everything?",
+  "trap": "Confounding / selection bias",
+  "facets": { "topic": "Data Engineering", "skill": ["Confounding", "Selection bias"] },
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the analytics engineer at Beacon",
+    "company": "Beacon — a B2B product-analytics platform",
+    "situation": "Over the last quarter the platform team moved a slice of the warehouse workload from the old engine onto Nimbus, a new query engine. Raj, the Head of Data Platform, pulled the query logs and is delighted: queries running on Nimbus average about 12 seconds versus 33 seconds on the old engine — roughly 60% faster. He wants to migrate the entire remaining workload next quarter and quote the compute savings to Finance. He needs your read on the logs first.",
+    "stakeholderBelief": "\"Nimbus runs queries ~60% faster. Migrating everything else is a no-brainer — same queries, big speedup, lower bill.\"",
+    "question": "Is the 60% speedup real? Estimate what Nimbus actually does to query runtime, and tell Raj what to expect if the rest of the workload moves over."
+  },
+  "dataset": {
+    "file": "/case-lab/warehouse-migration/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "query_id", "type": "int", "description": "Unique query identifier" },
+      { "name": "team", "type": "string", "description": "Owning team: growth, finance, product, platform, or ml" },
+      { "name": "query_type", "type": "string", "description": "Workload class: dashboard, adhoc, etl, or ml_features" },
+      { "name": "bytes_scanned_gb", "type": "float", "description": "Data scanned by the query, in GB — the dominant driver of how long a query takes" },
+      { "name": "table_count", "type": "int", "description": "Number of tables joined in the query" },
+      { "name": "scheduled_hour", "type": "int", "description": "Hour of day the query ran (0-23)" },
+      { "name": "migrated", "type": "int", "description": "1 if the query ran on the new Nimbus engine, else 0 (old engine)" },
+      { "name": "runtime_sec", "type": "float", "description": "Wall-clock runtime in seconds — the outcome" }
+    ],
+    "sample": [
+      { "query_id": 1, "team": "growth", "query_type": "dashboard", "bytes_scanned_gb": 2.82, "table_count": 2, "scheduled_hour": 2, "migrated": 1, "runtime_sec": 10.57 },
+      { "query_id": 2, "team": "growth", "query_type": "adhoc", "bytes_scanned_gb": 0.64, "table_count": 6, "scheduled_hour": 19, "migrated": 1, "runtime_sec": 3.65 },
+      { "query_id": 3, "team": "finance", "query_type": "dashboard", "bytes_scanned_gb": 4.6, "table_count": 4, "scheduled_hour": 1, "migrated": 0, "runtime_sec": 21.8 },
+      { "query_id": 4, "team": "finance", "query_type": "adhoc", "bytes_scanned_gb": 5.67, "table_count": 4, "scheduled_hour": 19, "migrated": 0, "runtime_sec": 25.5 },
+      { "query_id": 5, "team": "product", "query_type": "etl", "bytes_scanned_gb": 0.24, "table_count": 5, "scheduled_hour": 14, "migrated": 1, "runtime_sec": 2.24 },
+      { "query_id": 6, "team": "platform", "query_type": "ml_features", "bytes_scanned_gb": 0.48, "table_count": 2, "scheduled_hour": 15, "migrated": 1, "runtime_sec": 2.51 },
+      { "query_id": 7, "team": "growth", "query_type": "dashboard", "bytes_scanned_gb": 2.32, "table_count": 4, "scheduled_hour": 10, "migrated": 1, "runtime_sec": 15.37 },
+      { "query_id": 8, "team": "product", "query_type": "adhoc", "bytes_scanned_gb": 1.42, "table_count": 6, "scheduled_hour": 0, "migrated": 1, "runtime_sec": 5.45 },
+      { "query_id": 9, "team": "growth", "query_type": "adhoc", "bytes_scanned_gb": 1.98, "table_count": 4, "scheduled_hour": 2, "migrated": 1, "runtime_sec": 11.11 },
+      { "query_id": 10, "team": "growth", "query_type": "dashboard", "bytes_scanned_gb": 0.79, "table_count": 3, "scheduled_hour": 20, "migrated": 1, "runtime_sec": 3.83 }
+    ]
+  },
+  "guidingQuestions": [
+    "Reproduce Raj's number: what's the average runtime on Nimbus (migrated = 1) versus the old engine (migrated = 0)?",
+    "Which queries actually got migrated? Compare bytes_scanned_gb for migrated vs non-migrated queries — were the two groups running the same kind of work?",
+    "bytes_scanned_gb is the main thing that makes a query slow. If it also predicts which queries were migrated, what does that do to the naive comparison?",
+    "Estimate the engine effect holding query size constant — bucket queries by bytes_scanned_gb (deciles) and compare migrated vs not within each bucket, or model log(runtime) ~ log(bytes) + migrated. How big is the speedup now?",
+    "What do you tell Raj to expect when the heavy ETL and ML queries — the ones still on the old engine — move to Nimbus?"
+  ],
+  "suggestedApproach": [
+    "Compute the headline first — mean runtime by migrated — so you know the exact claim you're testing.",
+    "Before crediting the engine, profile what was migrated: compare bytes_scanned_gb (and query_type) across the two groups. If they aren't running comparable work, the raw gap isn't an engine comparison.",
+    "Query size dwarfs almost everything else in runtime. If small queries were migrated first, size is confounding the comparison — account for it by stratifying on bytes or regressing on log(bytes).",
+    "Re-estimate the migrated effect within size buckets and check it's stable; a percentage (ratio) effect travels better across sizes than an absolute second count.",
+    "Translate the adjusted effect into a forecast for the un-migrated heavy workload, and note what a clean test would look like (run the same queries on both engines)."
+  ],
+  "teachingNote": {
+    "naiveRead": "Queries on Nimbus average ~12.0s versus ~32.6s on the old engine — about a 63% reduction. Taken at face value, Nimbus looks like a massive, free speedup and migrating everything looks like pure savings.",
+    "theTrap": "The workload was not migrated at random. The small, cheap queries went first: migrated queries scanned about 2.4 GB on average, versus 7.3 GB for the queries left on the old engine — roughly 3x smaller. Bytes scanned is the dominant driver of runtime, so the migrated group was fast *before* Nimbus ever touched it. Most of the 20-second gap is the size difference between the two groups, not the engine. Comparing a bag of light dashboard queries against a bag of heavy ETL scans measures the queries, not the warehouse.",
+    "honestAnswer": "Hold query size constant — bucket queries into bytes-scanned deciles and compare migrated vs not within each bucket (or regress log(runtime) on log(bytes) + migrated) — and Nimbus's edge shrinks to about a 12% speedup. Real and worth having, but a fifth of the headline. When the heavy ETL/ML queries move over, expect ~12% off their runtime, not 60% — so budget the savings against that, not against the raw average.",
+    "howToGetThere": [
+      "Compute the naive gap: mean(runtime_sec) for migrated=1 vs migrated=0 → ~12.0s vs ~32.6s (−63%). That's Raj's number.",
+      "Profile the treated group: mean(bytes_scanned_gb) by migrated → ~2.4 GB vs ~7.3 GB. The migrated queries are far smaller.",
+      "Recognise bytes_scanned_gb as a confounder: it drives runtime AND predicts migration, so it inflates the raw comparison.",
+      "Adjust — stratify on bytes deciles and take the size-weighted within-bucket runtime ratio, or fit log(runtime) ~ log(bytes) + table_count + migrated. The engine effect lands near −12%.",
+      "Sanity-check: the adjusted effect is far smaller than the naive one and roughly constant across size buckets — a genuine engine speedup, not a workload artifact."
+    ],
+    "numbers": [
+      { "label": "Naive runtime gap (Nimbus vs old)", "value": "12.0s vs 32.6s (−63%)" },
+      { "label": "Mean GB scanned — migrated vs not", "value": "2.4 vs 7.3 GB" },
+      { "label": "Size-adjusted engine speedup", "value": "≈ −12%" },
+      { "label": "Share of workload migrated", "value": "74%" }
+    ],
+    "lesson": "A raw average that compares two groups doing different work is a comparison of the work, not the treatment. Nimbus was handed the easy queries, so it looked three times better than it is. Before attributing a performance win to a new tool, ask what it was run on — and match like with like. The transferable move is to adjust for the dominant driver (here, bytes scanned) and express the effect as a percentage that holds across sizes. The only clean way to know is to run the same queries on both engines; short of that, forecast the migration savings against the ~12% adjusted effect, not the 60% mirage."
+  }
+}

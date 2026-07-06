@@ -2,6 +2,28 @@
   "batch": "2026-07",
   "cases": [
     {
+      "id": "warehouse-migration",
+      "title": "Migrated queries run 60% faster — should we move everything?",
+      "company": "Beacon — product-analytics platform",
+      "trap": "Confounding / selection bias",
+      "facets": { "topic": "Data Engineering", "skill": ["Confounding", "Selection bias"] },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-06",
+      "blurb": "Queries on the new warehouse engine average 60% faster, and the Head of Platform wants to migrate everything. You've got the query logs. Is it the engine — or which queries got moved first?"
+    },
+    {
+      "id": "schema-validation",
+      "title": "Incidents fell on the tables we validated — did validation work?",
+      "company": "Corva — logistics data platform",
+      "trap": "Regression to the mean",
+      "facets": { "topic": "Data Engineering", "skill": ["Regression to the mean"] },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-06",
+      "blurb": "Validation was added to the worst-quality tables and their incidents dropped ~20%. The Head of Data wants it everywhere. Would those tables have improved anyway?"
+    },
+    {
       "id": "campaign-retention",
       "title": "Did the win-back email actually lift retention?",
       "company": "Lumen — habit-tracking app",

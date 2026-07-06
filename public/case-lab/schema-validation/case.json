@@ -1,0 +1,71 @@
+{
+  "id": "schema-validation",
+  "title": "Incidents fell on the tables we validated — did validation work?",
+  "trap": "Regression to the mean",
+  "facets": { "topic": "Data Engineering", "skill": ["Regression to the mean"] },
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the data engineer at Corva",
+    "company": "Corva — a logistics data platform",
+    "situation": "After a rough first half, the platform team rolled out schema/contract validation on the tables with the worst data-quality records — the ones logging the most incidents in H1. In H2, incidents on those validated tables fell noticeably. Priya, the Head of Data, is convinced: validation cut incidents on the treated tables by about a fifth, and she wants budget to put validation on every table in the warehouse. She's asked you to confirm the effect before the planning review.",
+    "stakeholderBelief": "\"Validation cut incidents ~20% on the tables we applied it to. Rolling it out warehouse-wide will cut incidents everywhere.\"",
+    "question": "Estimate the real effect of the validation layer on data-quality incidents, and tell Priya what a warehouse-wide rollout would actually buy."
+  },
+  "dataset": {
+    "file": "/case-lab/schema-validation/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "table_id", "type": "int", "description": "Unique table identifier" },
+      { "name": "domain", "type": "string", "description": "Business domain the table serves: finance, marketing, product, ops, or growth" },
+      { "name": "owner_team", "type": "string", "description": "Team that owns the table: ingest, core-model, activation, or reporting" },
+      { "name": "incidents_h1", "type": "int", "description": "Data-quality incidents logged against the table in the first half (H1), BEFORE validation" },
+      { "name": "got_validation", "type": "int", "description": "1 if schema/contract validation was added to the table for H2, else 0" },
+      { "name": "incidents_h2", "type": "int", "description": "Data-quality incidents logged in the second half (H2) — the outcome" }
+    ],
+    "sample": [
+      { "table_id": 1, "domain": "ops", "owner_team": "core-model", "incidents_h1": 1, "got_validation": 0, "incidents_h2": 2 },
+      { "table_id": 2, "domain": "marketing", "owner_team": "core-model", "incidents_h1": 1, "got_validation": 0, "incidents_h2": 1 },
+      { "table_id": 3, "domain": "growth", "owner_team": "ingest", "incidents_h1": 7, "got_validation": 0, "incidents_h2": 4 },
+      { "table_id": 4, "domain": "product", "owner_team": "reporting", "incidents_h1": 2, "got_validation": 0, "incidents_h2": 0 },
+      { "table_id": 5, "domain": "finance", "owner_team": "ingest", "incidents_h1": 4, "got_validation": 0, "incidents_h2": 2 },
+      { "table_id": 6, "domain": "growth", "owner_team": "ingest", "incidents_h1": 12, "got_validation": 1, "incidents_h2": 9 },
+      { "table_id": 7, "domain": "ops", "owner_team": "ingest", "incidents_h1": 0, "got_validation": 0, "incidents_h2": 2 },
+      { "table_id": 8, "domain": "ops", "owner_team": "reporting", "incidents_h1": 2, "got_validation": 0, "incidents_h2": 7 },
+      { "table_id": 9, "domain": "finance", "owner_team": "activation", "incidents_h1": 1, "got_validation": 0, "incidents_h2": 3 },
+      { "table_id": 10, "domain": "product", "owner_team": "core-model", "incidents_h1": 3, "got_validation": 0, "incidents_h2": 1 }
+    ]
+  },
+  "guidingQuestions": [
+    "Reproduce Priya's number: for validated tables, what's the average change in incidents from H1 to H2 (incidents_h2 − incidents_h1), and what percentage of their H1 count is that?",
+    "How were tables chosen for validation? Compare incidents_h1 for validated vs non-validated tables — were the treated tables typical, or the extreme cases?",
+    "Now find the untreated tables that were ALSO high in H1 (say, at or above the level where validation kicked in). What happened to THEIR incidents in H2, with no validation at all?",
+    "If the worst tables fall back toward average on their own, how much of the validated tables' drop can you actually credit to validation?",
+    "Estimate the effect properly — compare validated vs non-validated tables at the same H1 level (a difference-in-differences within H1 strata). What's the honest number, and what does it imply for a full rollout?"
+  ],
+  "suggestedApproach": [
+    "Reproduce the headline: mean(incidents_h2 − incidents_h1) among validated tables, and as a share of their H1 average.",
+    "Describe the selection: validated tables weren't a random sample — they were picked for being the worst in H1. Confirm that from incidents_h1 by group.",
+    "Build the counterfactual from the data: untreated tables that were equally bad in H1. If they fall too, part of the treated drop is mean-reversion, not validation.",
+    "Difference the two: within each H1 count, take (treated H1→H2 change) minus (control H1→H2 change). That nets out the reversion both groups share.",
+    "State the honest effect and what a warehouse-wide rollout — applied to average tables, not just the worst — should be expected to deliver."
+  ],
+  "teachingNote": {
+    "naiveRead": "Validated tables averaged ~7.2 incidents in H1 and fell ~1.5 in H2 — about a 21% drop. Read directly, validation looks like it removed a fifth of incidents, and applying it everywhere looks like a fifth off the whole warehouse.",
+    "theTrap": "Validation was applied to the tables with the worst H1 incident counts — not a random sample, the extreme tail. Each table has a fairly stable underlying quality; a single half-year's incident count is a noisy draw around it. The tables that looked worst in H1 were partly just unlucky that half, and an unlucky draw is followed by a more typical one — they fall back toward their own average in H2 whether or not anyone touches them. This is regression to the mean, and it's the entire shape of the naive result. The tell is in the untreated tables that were equally bad in H1: with no validation at all, they fell by the SAME ~1.5 incidents.",
+    "honestAnswer": "Compare validated against non-validated tables at the same H1 level (difference-in-differences within H1 strata) and validation's real effect is about −0.45 incidents per table — roughly 6-7%, not 21%. Most of the headline drop is mean-reversion the treated tables would have gotten for free. A warehouse-wide rollout won't cut incidents ~20%: applied to ordinary tables (which have no unlucky spike to give back), expect something in the mid-single-digit percent range. Validation is worth doing — just budget it against ~6%, and if you want a clean read next time, randomise which eligible tables get it.",
+    "howToGetThere": [
+      "Reproduce the headline: among got_validation=1, mean(incidents_h2 − incidents_h1) ≈ −1.54, on an H1 base of ~7.2 → about −21%.",
+      "Expose the selection: mean(incidents_h1) is ~7.2 for validated tables vs ~2.4 for the rest. Validation went to the extreme tail.",
+      "Build the counterfactual: among untreated tables at or above the treatment threshold, mean(incidents_h2 − incidents_h1) ≈ −1.54 — the same drop, with no validation.",
+      "Difference it out: within each incidents_h1 value, take treated change minus control change and weight by treated count → about −0.45 incidents.",
+      "Sanity-check: the honest effect is far smaller than the naive one, and the near-identical drop in the untreated-high group confirms mean-reversion is doing the work."
+    ],
+    "numbers": [
+      { "label": "Naive drop on validated tables", "value": "−1.5 incidents (~21%)" },
+      { "label": "Mean H1 incidents — validated vs not", "value": "7.2 vs 2.4" },
+      { "label": "Untreated-but-equally-bad tables' drop", "value": "−1.5 incidents (no validation)" },
+      { "label": "Diff-in-diff validation effect", "value": "≈ −0.45 incidents (~6-7%)" }
+    ],
+    "lesson": "When you act on the worst performers and measure them again, they improve — even if you did nothing. Extreme values are extreme partly by luck, and luck doesn't repeat, so the tail reverts toward the mean on its own. Selecting on H1 and then celebrating the H2 drop bakes that reversion into your estimate. The fix is a control group that was equally extreme but untreated: the difference between their change and the treated group's change is the real effect. Here that turns a 21% story into a ~6% one. Any 'we fixed the worst X and they got better' claim deserves this same reflex — build the counterfactual before you scale the intervention."
+  }
+}
