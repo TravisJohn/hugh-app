@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ArrowLeft, Play, Check, Loader2, Volume2, VolumeX,
   Music, Music2, RotateCcw, Eye, EyeOff, Trophy, Zap, RefreshCw, Minus, Plus,
+  Lightbulb, Clock,
 } from "lucide-react";
 import { PyodideRunner } from "@/lib/code/pyodideClient";
 import { SCENARIO, DRILL_CELLS, timerSecondsFor } from "@/lib/code/drillContent";
@@ -14,13 +15,10 @@ import SwarmBackdrop from "./SwarmBackdrop";
 import { useDrillAudio } from "@/hooks/useDrillAudio";
 
 type Status = "idle" | "running" | "pass" | "fail";
-interface CState { code: string; status: Status; attempts: number; usedRef: boolean; error: string | null }
+interface CState { code: string; status: Status; attempts: number; usedRef: boolean; overTime: boolean; error: string | null }
 
 const emptyCells = (): CState[] =>
-  DRILL_CELLS.map(() => ({ code: "", status: "idle", attempts: 0, usedRef: false, error: null }));
-
-// The instruction is authored as a Python comment; strip the leading # for the prompt label.
-const promptText = (i: number) => DRILL_CELLS[i].instruction.replace(/^#\s?/, "");
+  DRILL_CELLS.map(() => ({ code: "", status: "idle", attempts: 0, usedRef: false, overTime: false, error: null }));
 
 function comboLabel(c: number): string {
   if (c >= 6) return "Unstoppable!";
@@ -68,6 +66,14 @@ export default function DrillMock() {
   }, []);
 
   useEffect(() => { setTimeLeft(timerSecondsFor(DRILL_CELLS[active])); }, [active]);
+
+  // Ran out of time on the active cell → flag it (red) so it's clear which cells
+  // weren't done in time. Never blocks; passing it still turns it green.
+  useEffect(() => {
+    if (!started || timeLeft !== 0) return;
+    setCells(prev => prev.map((c, idx) =>
+      idx === active && c.status !== "pass" && !c.overTime ? { ...c, overTime: true } : c));
+  }, [timeLeft, started, active]);
 
   useEffect(() => {
     if (!started || allPassed) return;
@@ -139,8 +145,9 @@ export default function DrillMock() {
   function nextRound() { setRound(2); setShowRefs(false); setCells(emptyCells()); setActive(0); setCombo(0); }
   function restart() { setRound(1); setShowRefs(true); setCells(emptyCells()); setActive(0); setCombo(0); }
   function redoCell(i: number) {
-    setCells(prev => prev.map((c, idx) => (idx === i ? { code: "", status: "idle", attempts: 0, usedRef: false, error: null } : c)));
+    setCells(prev => prev.map((c, idx) => (idx === i ? { code: "", status: "idle", attempts: 0, usedRef: false, overTime: false, error: null } : c)));
     setActive(i);
+    setTimeLeft(timerSecondsFor(DRILL_CELLS[i]));
   }
 
   return (
@@ -242,22 +249,33 @@ export default function DrillMock() {
               const showRef = refVisible(i) && st.status !== "pass";
               const passed = st.status === "pass";
               const glowing = glowId === cell.id;
+              const overtime = st.overTime && !passed;
               return (
                 <div
                   key={cell.id}
                   className={`rounded-xl border transition-all duration-700 ${
                     passed ? "border-emerald-500/50 bg-emerald-950/10"
+                    : overtime ? "border-red-500/50 bg-red-950/10"
                     : isActive ? "border-sky-500/50 bg-slate-900/60"
                     : "border-slate-800 bg-slate-900/30"
                   } ${
                     glowing ? "shadow-[0_0_46px_-2px_rgba(16,185,129,0.6)]"
                     : passed ? "shadow-[0_0_22px_-8px_rgba(16,185,129,0.35)]"
+                    : overtime ? "shadow-[0_0_22px_-8px_rgba(239,68,68,0.4)]"
                     : ""
                   }`}
                 >
                   <div className="flex items-center justify-between px-4 py-2 text-xs">
                     <span className="font-mono text-slate-500">In [{i + 1}]</span>
-                    {isActive && st.status !== "pass" && (
+                    {passed ? (
+                      <span className="flex items-center gap-1 font-semibold text-emerald-400">
+                        <Check size={13} /> passed{st.usedRef || (round === 1) ? " · with reference" : " · from memory"}
+                      </span>
+                    ) : overtime ? (
+                      <span className="flex items-center gap-1 font-semibold text-red-400">
+                        <Clock size={12} /> over time
+                      </span>
+                    ) : isActive ? (
                       <div className="flex items-center gap-2">
                         <div className="h-1 w-28 overflow-hidden rounded-full bg-slate-800">
                           <div
@@ -267,16 +285,17 @@ export default function DrillMock() {
                         </div>
                         <span className="text-slate-500">speed</span>
                       </div>
-                    )}
-                    {st.status === "pass" && (
-                      <span className="flex items-center gap-1 font-semibold text-emerald-400">
-                        <Check size={13} /> passed{st.usedRef || (round === 1) ? " · with reference" : " · from memory"}
-                      </span>
-                    )}
+                    ) : null}
                   </div>
 
-                  {/* Prompt — outside the editor */}
-                  <p className="px-4 pb-1 text-slate-300" style={{ fontSize: fontSize + 1 }}>{promptText(i)}</p>
+                  {/* Prompt — the step + why it matters, outside the editor */}
+                  <div className="px-4 pb-2">
+                    <p className="font-medium text-slate-200" style={{ fontSize: fontSize + 1 }}>{cell.task}</p>
+                    <p className="mt-1 flex gap-1.5 text-slate-500" style={{ fontSize: Math.max(11, fontSize - 3) }}>
+                      <Lightbulb size={13} className="mt-0.5 shrink-0 text-amber-400/70" />
+                      <span>{cell.why}</span>
+                    </p>
+                  </div>
 
                   {/* Reference to replicate — read-only, non-copyable */}
                   {showRef && (

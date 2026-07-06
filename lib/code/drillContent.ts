@@ -7,8 +7,9 @@
 
 export interface DrillCell {
   id: string;
-  instruction: string; // always-visible prompt, written as a Python comment
-  solution: string;    // reference — also the pass-1 scaffold (shown commented)
+  task: string;        // what to produce, in plain language
+  why: string;         // the essence — why this step matters
+  solution: string;    // reference — the answer to replicate
   assertions: string;  // hidden asserts on the produced variable
 }
 
@@ -39,20 +40,23 @@ export const SCENARIO = {
 export const DRILL_CELLS: DrillCell[] = [
   {
     id: "eu",
-    instruction: "# eu: the rows where region == 'EU' (a list)",
+    task: `Create eu — a list of only the rows where region is "EU".`,
+    why: "Almost every analysis starts by narrowing to the slice you care about. Isolate the EU rows now so every later step runs on the right subset instead of the whole table.",
     solution: `eu = [r for r in rows if r["region"] == "EU"]`,
     assertions:
       `assert isinstance(eu, list) and len(eu) == 3 and all(r["region"] == "EU" for r in eu)`,
   },
   {
     id: "revenue",
-    instruction: "# revenue: total units * price across ALL rows",
+    task: "Create revenue — the total of units × price across all rows.",
+    why: "One headline number is what stakeholders actually ask for. Multiplying per row, then summing, is the pattern behind almost every KPI you'll ever compute.",
     solution: `revenue = sum(r["units"] * r["price"] for r in rows)`,
     assertions: `assert revenue == 206`,
   },
   {
     id: "by_region",
-    instruction: "# by_region: a dict of region -> total units",
+    task: "Create by_region — a dict mapping each region to its total units.",
+    why: "A single total hides the differences between groups. Aggregating by a key (here, region) is how you turn raw rows into a comparison — the heart of most reporting.",
     solution: `by_region = {}
 for r in rows:
     by_region[r["region"]] = by_region.get(r["region"], 0) + r["units"]`,
@@ -60,7 +64,8 @@ for r in rows:
   },
   {
     id: "top",
-    instruction: "# top: the region with the most total units (use by_region)",
+    task: "Create top — the region with the most total units (use by_region).",
+    why: "Once you have a grouped summary, the decision usually comes down to picking the max (or min). Reusing by_region shows how each step builds on the one before it.",
     solution: `top = max(by_region, key=by_region.get)`,
     assertions: `assert top == "EU"`,
   },
