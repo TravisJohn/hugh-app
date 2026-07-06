@@ -1,0 +1,71 @@
+{
+  "id": "enterprise-renewal",
+  "title": "Enterprise accounts are our most loyal — should we bet the GTM on them?",
+  "trap": "Survivorship bias",
+  "facets": { "topic": "Finance", "skill": ["Survivorship bias"] },
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the RevOps analyst at Northwind",
+    "company": "Northwind — a B2B SaaS company",
+    "situation": "Diane, the CRO, is building the case to move Northwind upmarket. Her evidence: among accounts that have made it to their first renewal, enterprise accounts are the stickiest — about 78% are still active, versus 73% for mid-market and 66% for SMB. \"Enterprise customers don't churn,\" she says, and wants to reweight sales and success heavily toward enterprise next year. She's asked you to confirm enterprise is the safest segment before she takes the plan to the board.",
+    "stakeholderBelief": "\"Enterprise accounts are our most loyal segment — highest retention of anyone. Betting the GTM on enterprise is the safe, high-retention move.\"",
+    "question": "Is enterprise really the safest, stickiest segment? Use the full account history — churned accounts included — to tell Diane what betting on enterprise actually means for retention."
+  },
+  "dataset": {
+    "file": "/case-lab/enterprise-renewal/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "account_id", "type": "int", "description": "Unique account identifier" },
+      { "name": "segment", "type": "string", "description": "Account size band: smb, mid, or enterprise" },
+      { "name": "signup_year", "type": "int", "description": "Year the account first signed a contract (2018-2025)" },
+      { "name": "acv", "type": "float", "description": "Annual contract value in dollars" },
+      { "name": "tenure_months", "type": "int", "description": "Total months the account has been a customer — whether it is still active or has since churned" },
+      { "name": "status", "type": "string", "description": "active (still a customer today) or churned (has since left)" }
+    ],
+    "sample": [
+      { "account_id": 1, "segment": "mid", "signup_year": 2025, "acv": 23374.0, "tenure_months": 12, "status": "active" },
+      { "account_id": 2, "segment": "smb", "signup_year": 2022, "acv": 2188.0, "tenure_months": 48, "status": "active" },
+      { "account_id": 3, "segment": "enterprise", "signup_year": 2022, "acv": 319986.0, "tenure_months": 48, "status": "active" },
+      { "account_id": 4, "segment": "mid", "signup_year": 2020, "acv": 55512.0, "tenure_months": 11, "status": "churned" },
+      { "account_id": 5, "segment": "smb", "signup_year": 2025, "acv": 1291.0, "tenure_months": 12, "status": "active" },
+      { "account_id": 6, "segment": "enterprise", "signup_year": 2018, "acv": 131715.0, "tenure_months": 7, "status": "churned" },
+      { "account_id": 7, "segment": "mid", "signup_year": 2020, "acv": 31346.0, "tenure_months": 57, "status": "churned" },
+      { "account_id": 8, "segment": "mid", "signup_year": 2025, "acv": 27470.0, "tenure_months": 12, "status": "active" },
+      { "account_id": 9, "segment": "smb", "signup_year": 2021, "acv": 7768.0, "tenure_months": 60, "status": "active" },
+      { "account_id": 10, "segment": "smb", "signup_year": 2019, "acv": 7001.0, "tenure_months": 73, "status": "churned" }
+    ]
+  },
+  "guidingQuestions": [
+    "Reproduce Diane's number: among accounts that reached their first renewal (tenure_months >= 12), what share are still active, by segment?",
+    "That filter only keeps accounts that survived a year. Which accounts does it drop — and for which segment are the most accounts dropped?",
+    "Now count the full picture. Take a signup cohort old enough to have faced year one, and compute the first-year churn rate (churned with tenure_months < 12) by segment.",
+    "For accounts with at least two years of possible tenure, what share of each segment survived to 24 months from signup?",
+    "Reconcile the two views: enterprise survivors are the stickiest, yet enterprise... what? What does 'bet the GTM on enterprise' actually mean for retention, and what should Diane fix first?"
+  ],
+  "suggestedApproach": [
+    "Reproduce the headline by conditioning exactly as the stakeholder did — accounts past their first renewal — and confirm enterprise looks best.",
+    "Notice the conditioning: filtering to accounts that reached a year keeps survivors and silently drops everything that churned early.",
+    "Un-condition: work from signup cohorts (all accounts of a given age, churned ones included) so early failures are counted.",
+    "Compute retention from signup — first-year churn and survival to 24 months by segment — the numbers that include the accounts that didn't make it.",
+    "State both truths precisely (survivors sticky, segment risky) and turn it into what to fix — enterprise year-one onboarding — before scaling upmarket."
+  ],
+  "teachingNote": {
+    "naiveRead": "Among accounts that reached their first renewal, enterprise are the stickiest — ~77.6% still active versus 72.5% mid and 65.6% SMB. Read directly, enterprise is the most loyal segment and shifting the GTM upmarket looks like the low-risk, high-retention play.",
+    "theTrap": "The headline is computed only on accounts that survived to their first renewal — it silently drops every account that churned in year one. That conditioning hides exactly where enterprise is weakest. Enterprise deals are big, complex, and carry high expectations, so they have the HIGHEST first-year churn: 29.3% of enterprise accounts churn before month 12, versus 19.8% mid and 14.9% SMB. Those failures vanish from the survivor view, leaving behind the enterprise accounts that clearly succeeded — which are, genuinely, very sticky. So 'enterprise survivors rarely churn' is true and 'enterprise is the safest segment' is false, and the survivor filter turns the first into the second.",
+    "honestAnswer": "Count the whole cohort and enterprise is the RISKIEST segment early, not the safest: only 63.3% of enterprise accounts survive to 24 months from signup, versus 71.5% mid and 74.7% SMB. Both things are true at once — enterprise accounts that clear year one are the most durable (lowest ongoing churn), but a far larger share never clear year one. Betting the GTM on enterprise means signing accounts with the worst early mortality; the survivor view flatters it by ignoring the fallout. Tell Diane not to read 'safe' off the active book. If she wants to go upmarket, the number to move is enterprise first-year churn — fix onboarding and early success — and retention should be measured from signup cohorts, not the surviving base.",
+    "howToGetThere": [
+      "Reproduce the headline: among tenure_months >= 12, share status='active' by segment → enterprise 77.6%, mid 72.5%, SMB 65.6%.",
+      "Spot the conditioning: that filter keeps only accounts that survived a year, dropping early churners — most heavily for enterprise.",
+      "Un-condition with cohorts: among accounts old enough to have faced year one, first-year churn (churned & tenure < 12) is 29.3% enterprise vs 19.8% mid vs 14.9% SMB.",
+      "Retention from signup: for accounts with >= 24 months of possible tenure, survival to 24 months is 63.3% enterprise vs 71.5% mid vs 74.7% SMB.",
+      "Reconcile: enterprise survivors are stickiest AND enterprise has the worst early survival — the survivor filter shows only the first."
+    ],
+    "numbers": [
+      { "label": "Survivor view — active among reached-first-renewal", "value": "Ent 77.6% · Mid 72.5% · SMB 65.6%" },
+      { "label": "First-year churn (full cohort)", "value": "Ent 29.3% · Mid 19.8% · SMB 14.9%" },
+      { "label": "Survival to 24 months from signup", "value": "Ent 63.3% · Mid 71.5% · SMB 74.7%" },
+      { "label": "Verdict", "value": "Survivors sticky, segment riskiest early" }
+    ],
+    "lesson": "When you measure a group only after filtering to the ones that lasted, you throw away the failures — and the failures are the whole point. Enterprise survivors look loyal because the enterprise accounts that didn't make it are already gone from the active book. Any metric computed on 'accounts we still have' or 'customers who reached X' is survivor-conditioned and will overstate durability, most for the segment that fails earliest. The fix is to reason from cohorts: start with everyone who signed up and follow them forward, churned accounts included. Do that and the 'safest segment' becomes the riskiest one to sign — with a clear action (fix year-one churn) that the survivor view completely hid."
+  }
+}

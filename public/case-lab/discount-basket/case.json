@@ -1,0 +1,72 @@
+{
+  "id": "discount-basket",
+  "title": "Discount-code orders are 3x bigger — blast more codes to grow baskets?",
+  "trap": "Reverse causality",
+  "facets": { "topic": "Finance", "skill": ["Reverse causality"] },
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the commercial analyst at Cartwheel",
+    "company": "Cartwheel — an online homeware retailer",
+    "situation": "Owen, the Head of Growth, has been staring at order data: orders that used a promo code average $374 versus $119 for orders without one — more than 3x. He's convinced codes drive bigger baskets and wants to email a discount code to the whole list every week to push average order value up. Finance is nervous about the margin. Owen wants your analysis to back the plan before the next planning cycle.",
+    "stakeholderBelief": "\"Promo-code orders are 3x bigger. Codes make people buy more — let's push codes to everyone and watch average order value climb.\"",
+    "question": "Do discount codes actually cause bigger baskets? Estimate the code's real effect on order value — and its effect on margin — and tell Owen whether blasting codes will grow AOV profitably."
+  },
+  "dataset": {
+    "file": "/case-lab/discount-basket/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "order_id", "type": "int", "description": "Unique order identifier" },
+      { "name": "category", "type": "string", "description": "everyday or big_ticket — the kind of purchase" },
+      { "name": "customer_type", "type": "string", "description": "new or repeat customer" },
+      { "name": "items_in_cart", "type": "int", "description": "Number of items in the cart — a proxy for how big a purchase the shopper intended" },
+      { "name": "used_code", "type": "int", "description": "1 if a promo code was applied to the order, else 0" },
+      { "name": "discount_pct", "type": "float", "description": "Fraction discounted when a code was used (0 if no code)" },
+      { "name": "order_value", "type": "float", "description": "Gross basket value before discount, in dollars — the outcome Owen is comparing" }
+    ],
+    "sample": [
+      { "order_id": 1, "category": "big_ticket", "customer_type": "repeat", "items_in_cart": 5, "used_code": 0, "discount_pct": 0.0, "order_value": 771.29 },
+      { "order_id": 2, "category": "everyday", "customer_type": "new", "items_in_cart": 2, "used_code": 0, "discount_pct": 0.0, "order_value": 37.72 },
+      { "order_id": 3, "category": "big_ticket", "customer_type": "new", "items_in_cart": 10, "used_code": 1, "discount_pct": 0.177, "order_value": 1004.83 },
+      { "order_id": 4, "category": "everyday", "customer_type": "repeat", "items_in_cart": 2, "used_code": 0, "discount_pct": 0.0, "order_value": 14.69 },
+      { "order_id": 5, "category": "everyday", "customer_type": "new", "items_in_cart": 3, "used_code": 0, "discount_pct": 0.0, "order_value": 62.03 },
+      { "order_id": 6, "category": "big_ticket", "customer_type": "new", "items_in_cart": 6, "used_code": 1, "discount_pct": 0.19, "order_value": 353.52 },
+      { "order_id": 7, "category": "big_ticket", "customer_type": "new", "items_in_cart": 7, "used_code": 0, "discount_pct": 0.0, "order_value": 848.43 },
+      { "order_id": 8, "category": "big_ticket", "customer_type": "repeat", "items_in_cart": 2, "used_code": 1, "discount_pct": 0.155, "order_value": 280.18 },
+      { "order_id": 9, "category": "everyday", "customer_type": "repeat", "items_in_cart": 4, "used_code": 0, "discount_pct": 0.0, "order_value": 105.22 },
+      { "order_id": 10, "category": "everyday", "customer_type": "repeat", "items_in_cart": 3, "used_code": 1, "discount_pct": 0.108, "order_value": 31.79 }
+    ]
+  },
+  "guidingQuestions": [
+    "Reproduce Owen's number: average order_value for orders with a code versus without. How big is the gap?",
+    "Who uses codes? Compare items_in_cart and the share of big_ticket orders for coded vs non-coded orders — were they the same kind of purchase to begin with?",
+    "Think about the shopping journey: does applying a code make someone add items, or do people planning a big purchase go looking for a code first? Which way does the arrow point?",
+    "Estimate the code's effect holding intent constant — compare coded vs non-coded orders within the same items_in_cart (and category). What's left of the $255 gap?",
+    "Now bring in margin: discount_pct shows what each code gave away. If codes don't grow the basket, what does blasting them to everyone do to revenue?"
+  ],
+  "suggestedApproach": [
+    "Reproduce the headline gap so you know the claim you're testing.",
+    "Profile who uses codes: compare items_in_cart and category across coded and non-coded orders. If code users were already buying more, the raw gap isn't the code's doing.",
+    "Name the causal direction: a large intended basket drives someone to hunt for a code — reverse causality — so the code marks big baskets rather than making them.",
+    "Adjust for intent (stratify on items_in_cart within category) and see how much of the gap survives.",
+    "Quantify the margin cost: discount given per coded order vs the adjusted basket lift, and extrapolate to a blast-to-everyone policy."
+  ],
+  "teachingNote": {
+    "naiveRead": "Coded orders average $374 versus $119 for non-coded — a $255 gap, more than 3x. Read directly, codes look like a powerful basket-builder and mailing them to everyone looks like an easy way to lift AOV.",
+    "theTrap": "The arrow points the other way. Shoppers planning a big, considered purchase are the ones who pause to search for a promo code before checking out — so a large intended basket causes code use, not the reverse. Code users were already buying more: they average 5 items per cart versus 3 for non-code orders, and skew toward big-ticket categories. The code is a marker of a big planned purchase, not its cause. Comparing coded to non-coded orders compares big-basket shoppers to small-basket shoppers and credits the code with the difference.",
+    "honestAnswer": "Hold purchase intent constant — compare coded vs non-coded orders within the same items_in_cart and category — and the code's effect on basket value collapses to about +$2, essentially zero. Meanwhile each code gives away ~$56 on orders that would have happened anyway. So blasting codes to everyone won't lift AOV; it will shave margin off purchases customers were already going to make, and train price-sensitive shoppers to wait for a code. Tell Owen the 3x gap is reverse causality: codes follow big baskets, they don't create them. If he wants to know the true effect, randomise — send codes to a random half and compare basket value and net revenue.",
+    "howToGetThere": [
+      "Compute the naive gap: mean(order_value) for used_code=1 ($374) minus =0 ($119) → +$255 (~3x).",
+      "Profile code users: mean(items_in_cart) by used_code → ~5 vs ~3, and a higher big_ticket share. They were bigger baskets already.",
+      "Name the mechanism: big planned purchases drive code-hunting — reverse causality — so code use is downstream of basket intent.",
+      "Adjust — compare coded vs non-coded within items_in_cart strata (and category). The basket effect lands near +$2.",
+      "Cost it: average discount given per coded order ≈ $56 against a ~$2 lift → the policy is margin-negative on purchases that would have happened anyway."
+    ],
+    "numbers": [
+      { "label": "Naive basket gap (coded − not)", "value": "$374 vs $119 (+$255)" },
+      { "label": "Mean items in cart — coded vs not", "value": "5 vs 3" },
+      { "label": "Intent-adjusted code effect on basket", "value": "≈ +$2" },
+      { "label": "Discount given per coded order", "value": "≈ $56" }
+    ],
+    "lesson": "Correlation with an outcome doesn't tell you which way the causation runs. Here the tempting story — codes cause big baskets — is backwards: big baskets cause code use, because people hunt for a code before a considered purchase. Whenever a behaviour and an outcome move together, ask whether the outcome could be driving the behaviour, and find a pre-treatment measure of intent to adjust for. Do that and a 3x story becomes a rounding error — plus a margin leak. The clean way to learn a code's real effect is to randomise who receives it and read net revenue, not to compare the people who already chose to redeem one."
+  }
+}

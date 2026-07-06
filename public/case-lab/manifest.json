@@ -2,6 +2,28 @@
   "batch": "2026-07",
   "cases": [
     {
+      "id": "discount-basket",
+      "title": "Discount-code orders are 3x bigger — blast more codes to grow baskets?",
+      "company": "Cartwheel — online homeware retailer",
+      "trap": "Reverse causality",
+      "facets": { "topic": "Finance", "skill": ["Reverse causality"] },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-06",
+      "blurb": "Promo-code orders average 3x the basket size, and the Head of Growth wants to blast codes to everyone. But who reaches for a code first? Check the margin math before it ships."
+    },
+    {
+      "id": "enterprise-renewal",
+      "title": "Enterprise accounts are our most loyal — should we bet the GTM on them?",
+      "company": "Northwind — B2B SaaS",
+      "trap": "Survivorship bias",
+      "facets": { "topic": "Finance", "skill": ["Survivorship bias"] },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-06",
+      "blurb": "Enterprise accounts show the highest retention, so the CRO wants to move upmarket. But the number only counts accounts that survived. Bring back the churned ones."
+    },
+    {
       "id": "onboarding-checklist",
       "title": "Checklist-completers retain at nearly double — make it mandatory?",
       "company": "Plotline — project-planning app",
