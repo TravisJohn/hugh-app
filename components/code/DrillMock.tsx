@@ -10,7 +10,7 @@ import { PyodideRunner } from "@/lib/code/pyodideClient";
 import { SCENARIO, DRILL_CELLS } from "@/lib/code/drillContent";
 import CmEditor from "./CmEditor";
 import ConfettiCanvas, { type ConfettiHandle } from "./ConfettiCanvas";
-import PhysicsBackdrop from "./PhysicsBackdrop";
+import SwarmBackdrop from "./SwarmBackdrop";
 import { useDrillAudio } from "@/hooks/useDrillAudio";
 
 type Status = "idle" | "running" | "pass" | "fail";
@@ -140,7 +140,7 @@ export default function DrillMock() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#0A0F1E] text-slate-200">
-      <PhysicsBackdrop />
+      <SwarmBackdrop />
       <ConfettiCanvas ref={confetti} />
 
       {/* Header */}
