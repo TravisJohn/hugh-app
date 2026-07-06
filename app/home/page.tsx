@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { GraduationCap, Rocket, Trophy, Lock } from "lucide-react";
+import { GraduationCap, Code2, Trophy } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import SignOutButton from "@/components/landing/SignOutButton";
@@ -8,7 +8,8 @@ import HeaderUsage from "@/components/usage/HeaderUsage";
 
 // Top-level activity picker — the post-login landing for every user. Picking
 // "Learn" leads to the "What do you want to learn?" dashboard (/home/learn);
-// "Cases" opens The Case Room (/cases). "Apply" is a locked placeholder for now.
+// "Code" opens the coding-drill landing (/code/start); "Cases" opens The Case
+// Room (/cases).
 export default async function HomePage() {
   const supabase = await createClient();
   const { user } = await verifyUserAccess(supabase);
@@ -67,7 +68,7 @@ export default async function HomePage() {
           </h1>
         </div>
 
-        {/* ── Three activities: Learn · Apply · Cases ───────────────── */}
+        {/* ── Three activities: Learn · Code · Cases ────────────────── */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-3xl shrink-0">
 
           {/* Learn — the whole learning experience */}
@@ -95,23 +96,30 @@ export default async function HomePage() {
             </span>
           </Link>
 
-          {/* Apply — locked placeholder */}
-          <div className="relative flex flex-col gap-3 rounded-2xl border border-slate-800/60 bg-slate-900/30 p-5 backdrop-blur-sm cursor-not-allowed select-none">
-            <div className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-600">
-              <Lock size={9} />
-              Coming soon
-            </div>
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-800/60 text-slate-700">
-              <Rocket size={22} />
+          {/* Code — timed coding drills */}
+          <Link
+            href="/code/start"
+            className="group flex flex-col gap-3 rounded-2xl border border-sky-500/40 bg-sky-900/10 p-5 shadow-lg shadow-sky-900/20 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-sky-400/60 hover:bg-sky-900/20 hover:shadow-xl hover:shadow-sky-500/20"
+          >
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-500/15 text-sky-400 transition-transform duration-300 group-hover:scale-110">
+              <Code2 size={22} />
             </div>
             <div>
-              <p className="font-semibold text-slate-600 text-base mb-1">Apply</p>
-              <p className="text-xs text-slate-700 leading-relaxed">
-                Put your learning to work on real, hands-on challenges scoped to
-                your topic.
+              <div className="flex items-center gap-1.5 mb-1">
+                <p className="font-semibold text-slate-100 text-base">Code</p>
+                <span className="rounded-full bg-sky-500/15 px-1.5 py-0.5 text-xs font-semibold text-sky-400">
+                  New
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Short, timed coding reps that build muscle memory — practise what
+                you&apos;ve learned or spin up your own drill.
               </p>
             </div>
-          </div>
+            <span className="mt-auto text-xs font-semibold text-sky-400 transition-all group-hover:text-sky-300">
+              Start coding →
+            </span>
+          </Link>
 
           {/* Cases — The Case Room */}
           <Link

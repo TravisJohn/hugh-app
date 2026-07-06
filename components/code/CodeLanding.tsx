@@ -10,27 +10,20 @@ import SwarmBackdrop from "./SwarmBackdrop";
 import CodeChat from "./CodeChat";
 
 // THROWAWAY SPIKE — the Code landing. Two ways in: practise something you've been
-// learning, or spin up your own. Kept light: the "learnings" are sample data and
-// both paths open the existing sample drill (/code/drill) as a placeholder until
-// the on-demand generator exists.
+// learning, or spin up your own. "From your learnings" is fed real tracks/milestones
+// from the server (see app/code/start/page.tsx); "Create your own" stays a light
+// flow. Both paths open the sample drill (/code/drill) until the generator exists.
 
 const DRILL = "/code/drill"; // placeholder target for every path
 
 type Kind = "milestone" | "diary" | "session";
 const KIND_ICON: Record<Kind, typeof BookOpen> = { milestone: BookOpen, diary: PenLine, session: MessageCircle };
 
-const LEARNINGS: { id: string; kind: Kind; label: string; meta: string }[] = [
-  { id: "l1", kind: "milestone", label: "Group-by aggregation", meta: "Data Analysis track" },
-  { id: "l2", kind: "milestone", label: "List comprehensions", meta: "What to understand · Python basics" },
-  { id: "l3", kind: "diary", label: "dict.get() with a default", meta: "your diary note" },
-  { id: "l4", kind: "session", label: "pandas merges & joins", meta: "saved Ask session" },
-  { id: "l5", kind: "milestone", label: "Window functions (SQL)", meta: "SQL track" },
-  { id: "l6", kind: "diary", label: "why max(key=…) works", meta: "your diary note" },
-];
+export type Learning = { id: string; kind: Kind; label: string; meta: string };
 
 const FOCUS_CHIPS = ["Syntax & basics", "Transforming data", "Aggregating / grouping", "A specific function"];
 
-export default function CodeLanding() {
+export default function CodeLanding({ learnings }: { learnings: Learning[] }) {
   // "Create your own" light Socratic flow: topic → one refining question → build.
   const [topic, setTopic] = useState("");
   const [step, setStep]   = useState<0 | 1>(0);
@@ -65,29 +58,41 @@ export default function CodeLanding() {
               <h2 className="text-lg font-semibold text-white">From your learnings</h2>
             </div>
             <p className="mb-4 text-sm text-slate-400">
-              Practise what you&apos;ve studied — pulled from your tracks, checklists, and notes.
+              Practise what you&apos;ve studied — pulled from your tracks and milestones.
             </p>
-            <div className="space-y-2">
-              {LEARNINGS.map(item => {
-                const Icon = KIND_ICON[item.kind];
-                return (
-                  <Link
-                    key={item.id}
-                    href={DRILL}
-                    className="group flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/40 px-3.5 py-2.5 transition-colors hover:border-emerald-500/40 hover:bg-slate-900/70"
-                  >
-                    <Icon size={15} className="shrink-0 text-slate-500" />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium text-slate-200">{item.label}</div>
-                      <div className="truncate text-xs text-slate-500">{item.meta}</div>
-                    </div>
-                    <span className="flex shrink-0 items-center gap-1 text-xs text-emerald-400 opacity-0 transition-opacity group-hover:opacity-100">
-                      Practise <ArrowRight size={12} />
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
+            {learnings.length > 0 ? (
+              <div className="space-y-2">
+                {learnings.map(item => {
+                  const Icon = KIND_ICON[item.kind];
+                  return (
+                    <Link
+                      key={item.id}
+                      href={DRILL}
+                      className="group flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/40 px-3.5 py-2.5 transition-colors hover:border-emerald-500/40 hover:bg-slate-900/70"
+                    >
+                      <Icon size={15} className="shrink-0 text-slate-500" />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium text-slate-200">{item.label}</div>
+                        <div className="truncate text-xs text-slate-500">{item.meta}</div>
+                      </div>
+                      <span className="flex shrink-0 items-center gap-1 text-xs text-emerald-400 opacity-0 transition-opacity group-hover:opacity-100">
+                        Practise <ArrowRight size={12} />
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-800 bg-slate-900/40 px-4 py-6 text-center">
+                <p className="text-sm text-slate-400">Nothing to practise yet.</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Study a track and your milestones show up here. In the meantime, create your own drill on the right.
+                </p>
+                <Link href="/home/learn" className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-emerald-400 hover:text-emerald-300">
+                  Start a track <ArrowRight size={12} />
+                </Link>
+              </div>
+            )}
           </section>
 
           {/* ── Create your own ─────────────────────────────────── */}
