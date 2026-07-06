@@ -1520,3 +1520,22 @@ scarce skill (judgment) only. Named surface: "The Case Room".
     matching facets/trap; all JSON parses; `next build` (see run). Committed in 5
     batches (schema+UI+retrofit, then DE / Orchestration / Product / Finance). Branch
     not pushed / no PR yet. **Next:** logged-in visual pass on the filter → push + PR.
+- **Ask-page + diary tweaks (branch `feat/ask-page-tweaks`, 2026-07-06):** two
+  small learner-facing quality-of-life changes.
+  - *Paste a checklist point into the composer:* each "What to understand" point
+    in the Ask-page rail (`ChecklistRail`) gets a small arrow button that drops the
+    point's text into the chat input instead of making the learner retype it.
+    `ChatWindow` exposes an imperative insert handle (append-only, never clobbers a
+    draft; focuses + moves caret to end); `AskWorkspace` bridges it between the two
+    independent panes.
+  - *Soft-archive learning-diary notes:* declutter a tracker card's diary without
+    destroying anything. Each note gets an **Archive** action (sets `archived_at`);
+    a **"Show archived (N)"** toggle reveals archived notes with **Restore**.
+    Archived notes drop out of the diary list, per-point counts, and the point
+    filter. Optimistic with revert-on-failure. **Migration `024_entry_archive.sql`**
+    adds `archived_at TIMESTAMPTZ` + a partial index on active entries; entries
+    PATCH gains `archive`/`restore` actions; `MilestoneEntry.archived_at` added.
+    **⚠ Must run migration 024 in Supabase before this ships** — the archive
+    button hits the new column.
+  - *Verified:* tsc clean; `next build` compiles. Committed in 2 feature commits;
+    branch not pushed / no PR yet.
