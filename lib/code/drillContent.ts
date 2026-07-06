@@ -23,9 +23,12 @@ export function timerSecondsFor(cell: DrillCell): number {
 }
 
 export const SCENARIO = {
-  title: "Mini sales table",
-  blurb:
-    "A small list of order rows is already loaded as `rows`. Work through the cells top-to-bottom — each builds on the last.",
+  title: "Which region should we back next quarter?",
+  role: "You're the analyst; the sales lead wants a quick, defensible read before planning.",
+  goal:
+    "Turn a raw pile of orders into a recommendation. The through-line: which region is biggest by volume, and what's our total revenue? Each cell drills one core move — filter a slice, total a column, group by a key, then pick the leader — building from raw data to the answer.",
+  outcome:
+    "There's your answer, end-to-end: total revenue is $206, and EU is the biggest region at 9 units — the one to back.",
   // Read-only setup cell (the "scenario"). Runs before every check.
   setupCode: `rows = [
     {"region": "EU",   "product": "A", "units": 3, "price": 10},
