@@ -27,6 +27,11 @@ function comboLabel(c: number): string {
   return "Nice!";
 }
 
+// Each round tightens the clock — gentle first pass, faster every repeat.
+const LEVEL_SPEEDUP = 0.8;
+const timeFor = (i: number, round: number): number =>
+  Math.max(8, Math.round(timerSecondsFor(DRILL_CELLS[i]) * Math.pow(LEVEL_SPEEDUP, round - 1)));
+
 /**
  * THROWAWAY UX SPIKE — notebook-drill loop for the future "Code" pillar.
  * The prompt + reference live OUTSIDE the editor (read-only, non-copyable) so
@@ -43,7 +48,7 @@ export default function DrillMock() {
   const [started, setStarted]   = useState(false);
   const [ready, setReady]       = useState(false);
   const [initError, setInitErr] = useState<string | null>(null);
-  const [timeLeft, setTimeLeft] = useState(timerSecondsFor(DRILL_CELLS[0]));
+  const [timeLeft, setTimeLeft] = useState(timeFor(0, 1));
   const [toast, setToast]       = useState<string | null>(null);
   const [showRefs, setShowRefs] = useState(true); // global "with comments" toggle
   const [fontSize, setFontSize] = useState(15);   // accessibility: editor/prompt text size
@@ -65,7 +70,7 @@ export default function DrillMock() {
     return () => r.destroy();
   }, []);
 
-  useEffect(() => { setTimeLeft(timerSecondsFor(DRILL_CELLS[active])); }, [active]);
+  useEffect(() => { setTimeLeft(timeFor(active, round)); }, [active, round]);
 
   // Ran out of time on the active cell → flag it (red) so it's clear which cells
   // weren't done in time. Never blocks; passing it still turns it green.
@@ -91,10 +96,10 @@ export default function DrillMock() {
     const cell = DRILL_CELLS[active];
     const st = cellsRef.current[active];
     if (!cell || !st || st.status === "pass" || showRefs) return;
-    if (timeLeft > 0 && timeLeft <= Math.ceil(timerSecondsFor(cell) * 0.3) && !st.usedRef) {
+    if (timeLeft > 0 && timeLeft <= Math.ceil(timeFor(active, round) * 0.3) && !st.usedRef) {
       revealRef(active);
     }
-  }, [timeLeft, started, active, showRefs, revealRef]);
+  }, [timeLeft, started, active, round, showRefs, revealRef]);
 
   function setCode(i: number, code: string) {
     setCells(prev => prev.map((c, idx) => (idx === i ? { ...c, code } : c)));
@@ -131,7 +136,7 @@ export default function DrillMock() {
       window.setTimeout(() => setGlowId(g => (g === passedId ? null : g)), 1200);
       if (i + 1 < DRILL_CELLS.length) {
         setActive(i + 1);
-        setTimeLeft(timerSecondsFor(DRILL_CELLS[i + 1])); // reset in the same batch — no stale-0 window
+        setTimeLeft(timeFor(i + 1, round)); // reset in the same batch — no stale-0 window
       }
     } else if (snap[i].attempts + 1 >= 2 && !showRefs) {
       revealRef(i);
@@ -144,14 +149,13 @@ export default function DrillMock() {
     if (k.length === 1 || k === "Backspace" || k === "Enter" || k === "Tab" || k === " ") audio.click();
   }
 
-  const firstTimer = timerSecondsFor(DRILL_CELLS[0]);
-  function start() { audio.unlock(); setStarted(true); setActive(0); setTimeLeft(firstTimer); }
-  function nextRound() { setRound(2); setShowRefs(false); setCells(emptyCells()); setActive(0); setCombo(0); setTimeLeft(firstTimer); }
-  function restart() { setRound(1); setShowRefs(true); setCells(emptyCells()); setActive(0); setCombo(0); setTimeLeft(firstTimer); }
+  function start() { audio.unlock(); setStarted(true); setActive(0); setTimeLeft(timeFor(0, round)); }
+  function nextRound() { const r = round + 1; setRound(r); setShowRefs(false); setCells(emptyCells()); setActive(0); setCombo(0); setTimeLeft(timeFor(0, r)); }
+  function restart() { setRound(1); setShowRefs(true); setCells(emptyCells()); setActive(0); setCombo(0); setTimeLeft(timeFor(0, 1)); }
   function redoCell(i: number) {
     setCells(prev => prev.map((c, idx) => (idx === i ? { code: "", status: "idle", attempts: 0, usedRef: false, overTime: false, error: null } : c)));
     setActive(i);
-    setTimeLeft(timerSecondsFor(DRILL_CELLS[i]));
+    setTimeLeft(timeFor(i, round));
   }
 
   return (
@@ -252,7 +256,7 @@ export default function DrillMock() {
             {DRILL_CELLS.map((cell, i) => {
               const st = cells[i];
               const isActive = i === active && !allPassed;
-              const pct = Math.round((timeLeft / timerSecondsFor(cell)) * 100);
+              const pct = Math.round((timeLeft / timeFor(i, round)) * 100);
               const showRef = refVisible(i) && st.status !== "pass";
               const passed = st.status === "pass";
               const glowing = glowId === cell.id;

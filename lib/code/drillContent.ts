@@ -19,7 +19,7 @@ export interface DrillCell {
  * to a sane range.
  */
 export function timerSecondsFor(cell: DrillCell): number {
-  return Math.max(12, Math.min(60, Math.round(8 + cell.solution.length / 3.2)));
+  return Math.max(14, Math.min(75, Math.round(10 + cell.solution.length / 2.8)));
 }
 
 export const SCENARIO = {
