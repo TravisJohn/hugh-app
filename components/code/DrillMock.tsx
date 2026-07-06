@@ -28,7 +28,7 @@ function comboLabel(c: number): string {
 }
 
 // Each round tightens the clock — gentle first pass, faster every repeat.
-const LEVEL_SPEEDUP = 0.8;
+const LEVEL_SPEEDUP = 0.85;
 const timeFor = (i: number, round: number): number =>
   Math.max(8, Math.round(timerSecondsFor(DRILL_CELLS[i]) * Math.pow(LEVEL_SPEEDUP, round - 1)));
 
