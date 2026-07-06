@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft, Play, Check, X, Loader2, Volume2, VolumeX,
-  Music, Music2, RotateCcw, Lightbulb, Trophy, Zap,
+  ArrowLeft, Play, Check, Loader2, Volume2, VolumeX,
+  Music, Music2, RotateCcw, Eye, EyeOff, Trophy, Zap, RefreshCw,
 } from "lucide-react";
 import { PyodideRunner } from "@/lib/code/pyodideClient";
 import { SCENARIO, DRILL_CELLS } from "@/lib/code/drillContent";
@@ -13,16 +13,13 @@ import ConfettiCanvas, { type ConfettiHandle } from "./ConfettiCanvas";
 import { useDrillAudio } from "@/hooks/useDrillAudio";
 
 type Status = "idle" | "running" | "pass" | "fail";
-interface CState { code: string; status: Status; attempts: number; usedHint: boolean; error: string | null }
+interface CState { code: string; status: Status; attempts: number; usedRef: boolean; error: string | null }
 
-const commentOut = (s: string) => s.split("\n").map(l => `# ${l}`).join("\n");
-const starter = (i: number, withScaffold: boolean) =>
-  withScaffold
-    ? `${DRILL_CELLS[i].instruction}\n${commentOut(DRILL_CELLS[i].solution)}\n\n`
-    : `${DRILL_CELLS[i].instruction}\n`;
+const emptyCells = (): CState[] =>
+  DRILL_CELLS.map(() => ({ code: "", status: "idle", attempts: 0, usedRef: false, error: null }));
 
-const initCells = (withScaffold: boolean): CState[] =>
-  DRILL_CELLS.map((_, i) => ({ code: starter(i, withScaffold), status: "idle", attempts: 0, usedHint: false, error: null }));
+// The instruction is authored as a Python comment; strip the leading # for the prompt label.
+const promptText = (i: number) => DRILL_CELLS[i].instruction.replace(/^#\s?/, "");
 
 function comboLabel(c: number): string {
   if (c >= 6) return "Unstoppable!";
@@ -32,15 +29,15 @@ function comboLabel(c: number): string {
 }
 
 /**
- * THROWAWAY UX SPIKE — the notebook-drill loop for the future "Code" pillar.
- * Cells build on each other (state carries); Shift+Enter checks a cell against
- * hidden asserts on the result. Round 1 shows the answer commented to replicate;
- * round 2 is comment-only from memory; struggling (2 fails or the speed meter
- * running low) re-reveals the hint. Correct cells fire an escalating celebration.
- * Not wired to nav/DB — disposable, for feel only.
+ * THROWAWAY UX SPIKE — notebook-drill loop for the future "Code" pillar.
+ * The prompt + reference live OUTSIDE the editor (read-only, non-copyable) so
+ * you must type from memory rather than uncommenting. Shift+Enter checks a cell
+ * against hidden asserts on the result. A learner-controlled Reference toggle
+ * replaces the rigid "round 2 = no comments" rule; per-cell Redo + Restart let
+ * you re-practice freely. Correct cells fire an escalating celebration.
  */
 export default function DrillMock() {
-  const [cells, setCells]       = useState<CState[]>(() => initCells(true));
+  const [cells, setCells]       = useState<CState[]>(emptyCells);
   const [round, setRound]       = useState(1);
   const [active, setActive]     = useState(0);
   const [combo, setCombo]       = useState(0);
@@ -49,15 +46,17 @@ export default function DrillMock() {
   const [initError, setInitErr] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState(DRILL_CELLS[0].timerSeconds);
   const [toast, setToast]       = useState<string | null>(null);
+  const [showRefs, setShowRefs] = useState(true); // global "with comments" toggle
 
-  const runnerRef  = useRef<PyodideRunner | null>(null);
-  const confetti   = useRef<ConfettiHandle>(null);
-  const cellsRef   = useRef(cells); cellsRef.current = cells;
-  const audio      = useDrillAudio();
+  const runnerRef = useRef<PyodideRunner | null>(null);
+  const confetti  = useRef<ConfettiHandle>(null);
+  const cellsRef  = useRef(cells); cellsRef.current = cells;
+  const audio     = useDrillAudio();
 
   const allPassed = cells.every(c => c.status === "pass");
+  const owned = allPassed && round === 2;
+  const refVisible = (i: number) => showRefs || cells[i].usedRef;
 
-  // Boot Pyodide once.
   useEffect(() => {
     const r = new PyodideRunner();
     runnerRef.current = r;
@@ -65,37 +64,28 @@ export default function DrillMock() {
     return () => r.destroy();
   }, []);
 
-  // Reset the speed meter when the active cell changes.
   useEffect(() => { setTimeLeft(DRILL_CELLS[active]?.timerSeconds ?? 20); }, [active]);
 
-  // Tick the speed meter down while working an unsolved cell.
   useEffect(() => {
     if (!started || allPassed) return;
     const id = setInterval(() => setTimeLeft(t => Math.max(0, t - 1)), 1000);
     return () => clearInterval(id);
   }, [started, active, allPassed]);
 
-  const revealHint = useCallback((i: number) => {
-    setCells(prev => prev.map((c, idx) => {
-      if (idx !== i || c.usedHint) return c;
-      const scaffold = commentOut(DRILL_CELLS[i].solution);
-      const code = c.code.includes(DRILL_CELLS[i].solution)
-        ? c.code
-        : `${c.code.trimEnd()}\n\n# hint — replicate this:\n${scaffold}\n`;
-      return { ...c, usedHint: true, code };
-    }));
+  // Speed meter low → reveal this cell's reference (never punishes).
+  const revealRef = useCallback((i: number) => {
+    setCells(prev => prev.map((c, idx) => (idx === i && !c.usedRef ? { ...c, usedRef: true } : c)));
   }, []);
 
-  // Speed meter running low → re-show the hint (never punishes).
   useEffect(() => {
     if (!started) return;
     const cell = DRILL_CELLS[active];
     const st = cellsRef.current[active];
-    if (!cell || !st || st.status === "pass") return;
-    if (timeLeft > 0 && timeLeft <= Math.ceil(cell.timerSeconds * 0.3) && !st.usedHint) {
-      revealHint(active);
+    if (!cell || !st || st.status === "pass" || showRefs) return;
+    if (timeLeft > 0 && timeLeft <= Math.ceil(cell.timerSeconds * 0.3) && !st.usedRef) {
+      revealRef(active);
     }
-  }, [timeLeft, started, active, revealHint]);
+  }, [timeLeft, started, active, showRefs, revealRef]);
 
   function setCode(i: number, code: string) {
     setCells(prev => prev.map((c, idx) => (idx === i ? { ...c, code } : c)));
@@ -104,51 +94,48 @@ export default function DrillMock() {
   const runCell = useCallback(async (i: number) => {
     const runner = runnerRef.current;
     if (!runner || !ready) return;
-    const snapshot = cellsRef.current;
-    if (snapshot[i].status === "running") return;
+    const snap = cellsRef.current;
+    if (snap[i].status === "running" || snap[i].status === "pass") return;
     setCells(prev => prev.map((c, idx) => (idx === i ? { ...c, status: "running", error: null } : c)));
 
-    const preamble = SCENARIO.setupCode + "\n" + snapshot.slice(0, i).map(c => c.code).join("\n") + "\n";
-    const res = await runner.run(preamble + snapshot[i].code, DRILL_CELLS[i].assertions);
+    const preamble = SCENARIO.setupCode + "\n" + snap.slice(0, i).map(c => c.code).join("\n") + "\n";
+    const res = await runner.run(preamble + snap[i].code, DRILL_CELLS[i].assertions);
 
-    const wasHinted = snapshot[i].usedHint;
+    // The reference being visible for this cell counts as "helped" — combo only
+    // builds when you produce it from memory.
+    const helped = showRefs || snap[i].usedRef;
     setCells(prev => prev.map((c, idx) =>
-      idx === i ? { ...c, status: res.passed ? "pass" : "fail", attempts: c.attempts + 1, error: res.passed ? null : (res.error ?? "Not quite yet.") } : c,
+      idx === i
+        ? { ...c, status: res.passed ? "pass" : "fail", attempts: c.attempts + 1, error: res.passed ? null : (res.error ?? "Not quite yet.") }
+        : c,
     ));
 
     if (res.passed) {
-      const nextCombo = wasHinted ? 0 : combo + 1;
+      const nextCombo = helped ? 0 : combo + 1;
       setCombo(nextCombo);
       confetti.current?.fire(nextCombo);
       audio.celebrate(nextCombo);
       setToast(comboLabel(nextCombo));
       window.setTimeout(() => setToast(null), 1300);
       if (i + 1 < DRILL_CELLS.length) setActive(i + 1);
-    } else if (snapshot[i].attempts + 1 >= 2) {
-      revealHint(i);
+    } else if (snap[i].attempts + 1 >= 2 && !showRefs) {
+      revealRef(i);
     }
-  }, [ready, combo, audio, revealHint]);
+  }, [ready, combo, showRefs, audio, revealRef]);
 
-  function start() {
-    audio.unlock();
-    setStarted(true);
-    setActive(0);
+  function onType(e: React.KeyboardEvent) {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const k = e.key;
+    if (k.length === 1 || k === "Backspace" || k === "Enter" || k === "Tab" || k === " ") audio.click();
   }
 
-  function nextRound() {
-    setRound(2);
-    setCells(initCells(false));
-    setActive(0);
-    setCombo(0);
+  function start() { audio.unlock(); setStarted(true); setActive(0); }
+  function nextRound() { setRound(2); setShowRefs(false); setCells(emptyCells()); setActive(0); setCombo(0); }
+  function restart() { setRound(1); setShowRefs(true); setCells(emptyCells()); setActive(0); setCombo(0); }
+  function redoCell(i: number) {
+    setCells(prev => prev.map((c, idx) => (idx === i ? { code: "", status: "idle", attempts: 0, usedRef: false, error: null } : c)));
+    setActive(i);
   }
-
-  function practiceAgain() {
-    setCells(initCells(round === 1));
-    setActive(0);
-    setCombo(0);
-  }
-
-  const owned = allPassed && round === 2;
 
   return (
     <div className="min-h-screen bg-[#0A0F1E] text-slate-200">
@@ -160,26 +147,36 @@ export default function DrillMock() {
           <Link href="/code" className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300">
             <ArrowLeft size={14} /> Back
           </Link>
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-100">Hugh Code</span>
-            <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-amber-300">
-              Drill · spike
-            </span>
-            <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-400">
-              Round {round} · {round === 1 ? "with hints" : "from memory"}
-            </span>
-          </div>
+          <span className="font-semibold text-slate-100">Hugh Code</span>
+          <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-amber-300">
+            Drill · spike
+          </span>
+          <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-400">Round {round}</span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {combo >= 2 && (
             <span className="flex items-center gap-1 text-xs font-semibold text-amber-300">
-              <Zap size={13} /> combo ×{combo}
+              <Zap size={13} /> ×{combo}
             </span>
           )}
-          <button onClick={audio.toggleSound} title="Sound effects" className="text-slate-400 hover:text-slate-200">
+          {started && (
+            <>
+              <button
+                onClick={() => setShowRefs(v => !v)}
+                title="Show / hide the reference answers"
+                className={`flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors ${showRefs ? "bg-sky-500/15 text-sky-300" : "text-slate-400 hover:text-slate-200"}`}
+              >
+                {showRefs ? <Eye size={13} /> : <EyeOff size={13} />} Reference
+              </button>
+              <button onClick={restart} title="Restart the drill" className="text-slate-400 hover:text-slate-200">
+                <RotateCcw size={16} />
+              </button>
+            </>
+          )}
+          <button onClick={audio.toggleSound} title="Sound" className="text-slate-400 hover:text-slate-200">
             {audio.soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
           </button>
-          <button onClick={audio.toggleMusic} title="Background music" className="text-slate-400 hover:text-slate-200">
+          <button onClick={audio.toggleMusic} title="Music" className="text-slate-400 hover:text-slate-200">
             {audio.musicOn ? <Music size={16} /> : <Music2 size={16} className="opacity-40" />}
           </button>
         </div>
@@ -215,6 +212,7 @@ export default function DrillMock() {
               const st = cells[i];
               const isActive = i === active && !allPassed;
               const pct = Math.round((timeLeft / cell.timerSeconds) * 100);
+              const showRef = refVisible(i) && st.status !== "pass";
               return (
                 <div
                   key={cell.id}
@@ -239,12 +237,26 @@ export default function DrillMock() {
                     )}
                     {st.status === "pass" && (
                       <span className="flex items-center gap-1 font-semibold text-emerald-400">
-                        <Check size={13} /> passed{st.usedHint ? " (with hint)" : ""}
+                        <Check size={13} /> passed{st.usedRef || (round === 1) ? " · with reference" : " · from memory"}
                       </span>
                     )}
                   </div>
 
-                  <div className="h-40 border-y border-slate-800/60">
+                  {/* Prompt — outside the editor */}
+                  <p className="px-4 pb-1 text-sm text-slate-300">{promptText(i)}</p>
+
+                  {/* Reference to replicate — read-only, non-copyable */}
+                  {showRef && (
+                    <pre
+                      onCopy={e => e.preventDefault()}
+                      className="mx-4 mb-2 select-none overflow-x-auto rounded-lg border border-sky-500/20 bg-sky-950/20 p-2.5 text-xs text-sky-200/80"
+                      title="Type this yourself — copy is disabled on purpose"
+                    >
+{cell.solution}
+                    </pre>
+                  )}
+
+                  <div className="h-32 border-y border-slate-800/60" onKeyDown={onType}>
                     <CmEditor
                       value={st.code}
                       onChange={v => setCode(i, v)}
@@ -255,17 +267,17 @@ export default function DrillMock() {
 
                   <div className="flex items-center justify-between gap-3 px-4 py-2">
                     <div className="min-w-0 flex-1 truncate text-xs">
-                      {st.status === "fail" && (
-                        <span className="text-amber-400">✗ {st.error}</span>
-                      )}
+                      {st.status === "fail" && <span className="text-amber-400">✗ {st.error}</span>}
                     </div>
-                    <div className="flex items-center gap-2">
-                      {st.status !== "pass" && !st.usedHint && (
-                        <button
-                          onClick={() => revealHint(i)}
-                          className="flex items-center gap-1 text-xs text-slate-500 hover:text-amber-300"
-                        >
-                          <Lightbulb size={12} /> Hint
+                    <div className="flex items-center gap-3">
+                      {(st.status === "pass" || st.attempts > 0) && (
+                        <button onClick={() => redoCell(i)} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300">
+                          <RefreshCw size={12} /> Redo
+                        </button>
+                      )}
+                      {st.status !== "pass" && !refVisible(i) && (
+                        <button onClick={() => revealRef(i)} className="flex items-center gap-1 text-xs text-slate-500 hover:text-sky-300">
+                          <Eye size={12} /> Reveal
                         </button>
                       )}
                       <button
@@ -283,7 +295,6 @@ export default function DrillMock() {
               );
             })}
 
-            {/* Round / completion controls */}
             {allPassed && (
               <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/15 p-5 text-center">
                 {owned ? (
@@ -291,15 +302,15 @@ export default function DrillMock() {
                     <Trophy className="mx-auto text-amber-300" size={26} />
                     <p className="mt-2 font-semibold text-white">Owned it 🏆</p>
                     <p className="mt-1 text-sm text-slate-400">You did it from memory. That&apos;s the rep that sticks.</p>
-                    <button onClick={practiceAgain} className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:border-slate-500">
-                      <RotateCcw size={14} /> Practice again
+                    <button onClick={restart} className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:border-slate-500">
+                      <RotateCcw size={14} /> Start over
                     </button>
                   </>
                 ) : (
                   <>
                     <Check className="mx-auto text-emerald-400" size={26} />
-                    <p className="mt-2 font-semibold text-white">Round 1 done — you replicated every cell.</p>
-                    <p className="mt-1 text-sm text-slate-400">Now do it again with no code shown, just the comments.</p>
+                    <p className="mt-2 font-semibold text-white">Round 1 done.</p>
+                    <p className="mt-1 text-sm text-slate-400">Round 2 hides the reference — do it from memory. (You can flip it back on anytime.)</p>
                     <button onClick={nextRound} className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-400">
                       <Play size={14} /> Round 2 — from memory
                     </button>
@@ -311,7 +322,6 @@ export default function DrillMock() {
         )}
       </main>
 
-      {/* Transient celebration toast */}
       {toast && (
         <div className="pointer-events-none fixed left-1/2 top-24 z-50 -translate-x-1/2 animate-fadeIn">
           <span className="rounded-full bg-amber-500/20 px-5 py-2 text-lg font-bold text-amber-200 shadow-lg backdrop-blur">

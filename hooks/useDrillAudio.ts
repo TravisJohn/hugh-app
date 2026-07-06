@@ -44,6 +44,22 @@ export function useDrillAudio() {
     if (musicOn) musicRef.current?.play().catch(() => {});
   }, [musicOn]);
 
+  // Subtle mechanical-keyboard click per keystroke (aesthetic).
+  const click = useCallback(() => {
+    const ac = acRef.current;
+    if (!ac || !soundOnRef.current) return;
+    const osc = ac.createOscillator();
+    const g = ac.createGain();
+    osc.type = "square";
+    osc.frequency.value = 1500 + Math.random() * 500;
+    const t = ac.currentTime;
+    g.gain.setValueAtTime(0.05, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
+    osc.connect(g).connect(ac.destination);
+    osc.start(t);
+    osc.stop(t + 0.04);
+  }, []);
+
   const chime = useCallback((combo: number) => {
     const ac = acRef.current;
     if (!ac || !soundOnRef.current) return;
@@ -90,5 +106,5 @@ export function useDrillAudio() {
 
   const toggleSound = useCallback(() => setSoundOn(s => !s), []);
 
-  return { unlock, celebrate, musicOn, toggleMusic, soundOn, toggleSound };
+  return { unlock, celebrate, click, musicOn, toggleMusic, soundOn, toggleSound };
 }
