@@ -1,23 +1,45 @@
 "use client";
 
+import { useMemo, useRef } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { python } from "@codemirror/lang-python";
 import { oneDark } from "@codemirror/theme-one-dark";
+import { keymap } from "@codemirror/view";
+import { Prec } from "@codemirror/state";
 
 interface Props {
   value: string;
   onChange?: (value: string) => void;
   readOnly?: boolean;
+  /** When provided, Shift+Enter runs this (used by the notebook-drill cells). */
+  onSubmit?: () => void;
 }
 
 // Defined once at module scope so the editor isn't rebuilt on every render.
-const extensions = [python()];
+const baseExtensions = [python()];
 
 /**
  * Thin CodeMirror 6 wrapper shared by the learner editor and Hugh's ghost
  * panel. Python highlighting, one-dark theme, fills its flex parent.
  */
-export default function CmEditor({ value, onChange, readOnly = false }: Props) {
+export default function CmEditor({ value, onChange, readOnly = false, onSubmit }: Props) {
+  // Call the latest onSubmit via a ref so the keymap extension stays stable.
+  const submitRef = useRef(onSubmit);
+  submitRef.current = onSubmit;
+
+  const extensions = useMemo(() => {
+    if (!onSubmit) return baseExtensions;
+    return [
+      python(),
+      Prec.highest(
+        keymap.of([
+          { key: "Shift-Enter", run: () => { submitRef.current?.(); return true; } },
+        ]),
+      ),
+    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!onSubmit]);
+
   return (
     <CodeMirror
       value={value}
