@@ -1489,3 +1489,34 @@ scarce skill (judgment) only. Named surface: "The Case Room".
   `b104474`, `9054aac`); branch not pushed / no PR yet. **Next:** logged-in visual
   pass → push + PR; the AI generate→validate pipeline (`author-longform.mjs`) is the
   scaling play for future monthly batches.
+- **Case Lab — topic/skill tags + filter + 8-case expansion → 18 total (branch
+  `feat/case-lab`, 2026-07-06):** the Lab feed had no filtering (just a trap badge +
+  date), while the Case Room already had a facet filter. Ported that pattern to the
+  Lab and broadened coverage beyond the marketing/sales/product traps.
+  - *Schema:* added `CaseLabFacets` to `types/case-lab.ts` — `topic` (single domain)
+    + `skill` (normalized, filterable form of the headline `trap`; array) — plus
+    `FACET_KEYS`/`FACET_LABELS`, mirroring the Case Room. `facets` now on both
+    `CaseLabCase` and `CaseLabStub`.
+  - *UI:* new client `components/case-lab/CaseLabLanding.tsx` — direct port of the
+    Case Room's collapsible-pill + search filter (emerald accent, newest-first
+    inside the filtered set). `app/cases/lab/page.tsx` is now a thin server wrapper;
+    `CaseLabCard` gained a topic badge. Retrofitted all 10 existing cases + manifest
+    with facets (no data changes).
+  - *8 new cases* (each a genuine inference trap, DE/ops datasets), 2 per topic:
+    **Data Engineering** — warehouse-migration (confounding: 60%→~12% adjusted),
+    schema-validation (reg-to-mean: −21%→~−6% diff-in-diff). **Orchestration** —
+    airflow-migration-sla (selection: +7.8→−0.7 pts adjusted), retry-success-rate
+    (Simpson's: overall 92.1→94.0% up while every task class fell). **Product** —
+    onboarding-checklist (self-selection: 1.8x→+4.6 pts), redesign-dau (Simpson's:
+    sessions +12% while both segments fell). **Finance** — discount-basket (reverse
+    causality: +$255→~+$2 basket vs ~$56 given away), enterprise-renewal
+    (survivorship: 77.6% survivor-view vs 63.3% full-cohort survival).
+  - *Coverage after:* 18 cases across 8 topics (Product 5, Marketing 3, DE/Orch/
+    Sales/Finance 2 each, Support/Retail 1); skills — Simpson's 4, Confounding 4,
+    reg-to-mean 3, selection 3, survivorship 3, self-selection 2, reverse-causality
+    2, seasonality 2. Same seeded numpy/pandas DGP → validated-numbers pipeline as
+    v1 (`scripts/case-lab-src/<id>/dgp.py`).
+  - *Verified:* tsc clean; every manifest id resolves to a case.json + data.csv with
+    matching facets/trap; all JSON parses; `next build` (see run). Committed in 5
+    batches (schema+UI+retrofit, then DE / Orchestration / Product / Finance). Branch
+    not pushed / no PR yet. **Next:** logged-in visual pass on the filter → push + PR.
