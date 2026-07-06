@@ -27,6 +27,18 @@ function comboLabel(c: number): string {
   return "Nice!";
 }
 
+// Colour code for the reference "anatomy" — soft tints so the logical groups of
+// each line read at a glance (iteration vs filter vs call…) to build the model.
+const KIND_COLOR: Record<string, string> = {
+  assign: "148,163,184", bracket: "100,116,139", expr: "56,189,248",
+  iter: "251,191,36", cond: "244,114,182", call: "167,139,250", arg: "52,211,153",
+};
+const KIND_LABEL: Record<string, string> = {
+  assign: "assignment", bracket: "structure", expr: "expression",
+  iter: "iteration", cond: "condition / filter", call: "function call", arg: "argument",
+};
+const LEGEND_KINDS = ["iter", "cond", "call", "expr", "arg", "assign"] as const;
+
 /**
  * THROWAWAY UX SPIKE — notebook-drill loop for the future "Code" pillar.
  * The prompt + reference live OUTSIDE the editor (read-only, non-copyable) so
@@ -231,6 +243,15 @@ export default function DrillMock() {
           <pre className="mt-1.5 overflow-x-auto rounded-lg border border-slate-800 bg-slate-950/60 p-3 text-xs text-slate-400">
 {SCENARIO.setupCode}
           </pre>
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
+            <span className="uppercase tracking-wide text-slate-600">Code anatomy:</span>
+            {LEGEND_KINDS.map(k => (
+              <span key={k} className="flex items-center gap-1">
+                <span className="inline-block h-2.5 w-2.5 rounded" style={{ backgroundColor: `rgba(${KIND_COLOR[k]},0.5)` }} />
+                {KIND_LABEL[k]}
+              </span>
+            ))}
+          </div>
         </div>
 
         {initError && (
@@ -309,10 +330,18 @@ export default function DrillMock() {
                     <pre
                       onCopy={e => e.preventDefault()}
                       style={{ fontSize: fontSize - 1 }}
-                      className="mx-4 mb-2 select-none overflow-x-auto rounded-lg border border-sky-500/20 bg-sky-950/20 p-2.5 leading-relaxed text-sky-200/80"
-                      title="Type this yourself — copy is disabled on purpose"
+                      className="mx-4 mb-2 select-none overflow-x-auto rounded-lg border border-slate-700/50 bg-slate-950/50 p-2.5 leading-relaxed text-slate-300"
+                      title="Type this yourself — colours group the logical parts. Copy is disabled on purpose."
                     >
-{cell.solution}
+                      {cell.anatomy
+                        ? cell.anatomy.map((seg, k) => (
+                            <span
+                              key={k}
+                              title={KIND_LABEL[seg.kind]}
+                              style={{ backgroundColor: `rgba(${KIND_COLOR[seg.kind]}, 0.13)`, borderRadius: "3px" }}
+                            >{seg.text}</span>
+                          ))
+                        : cell.solution}
                     </pre>
                   )}
 
