@@ -27,10 +27,6 @@ function comboLabel(c: number): string {
   return "Nice!";
 }
 
-// Two faint tints alternated across a line's logical chunks — no meaning, just a
-// visual "these belong together" so the shape of the code reads at a glance.
-const GROUP_TINTS = ["rgba(56,189,248,0.10)", "rgba(148,163,184,0.11)"];
-
 /**
  * THROWAWAY UX SPIKE — notebook-drill loop for the future "Code" pillar.
  * The prompt + reference live OUTSIDE the editor (read-only, non-copyable) so
@@ -367,7 +363,7 @@ export default function DrillMock() {
               {/* Review — the shape of what you just wrote, in logical chunks */}
               <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
                 <div className="mb-1 text-[11px] font-semibold uppercase tracking-widest text-sky-400">Review · the building blocks</div>
-                <p className="mb-3 text-xs text-slate-500">Each line, grouped into its logical chunks — read it as blocks, not characters.</p>
+                <p className="mb-3 text-xs text-slate-500">The full solution you built, step by step.</p>
                 <div className="space-y-3">
                   {DRILL_CELLS.map((cell) => (
                     <div key={cell.id}>
@@ -375,11 +371,7 @@ export default function DrillMock() {
                       <pre
                         className="overflow-x-auto rounded-lg border border-slate-800 bg-slate-950/60 p-2.5 leading-relaxed text-slate-300"
                         style={{ fontSize: fontSize - 1 }}
-                      >
-                        {(cell.groups ?? [cell.solution]).map((g, k) => (
-                          <span key={k} style={{ backgroundColor: GROUP_TINTS[k % GROUP_TINTS.length], borderRadius: "3px" }}>{g}</span>
-                        ))}
-                      </pre>
+                      >{cell.solution}</pre>
                     </div>
                   ))}
                 </div>
