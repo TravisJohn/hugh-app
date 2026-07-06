@@ -1,14 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ListChecks, Loader2 } from "lucide-react";
+import { ListChecks, Loader2, ArrowLeftToLine } from "lucide-react";
 import { type LearningPoint, type PointStatus } from "@/types";
 import { normalizeCoverage, countByStatus } from "@/utils/coverage";
 import PointStatusControl from "./PointStatusControl";
 
 interface Props {
-  milestoneId:    string;
-  milestoneTitle: string;
+  milestoneId:      string;
+  milestoneTitle:   string;
+  // Drops a point's text into the chat composer (wired up by AskWorkspace), so
+  // the learner can ask about an idea without retyping it.
+  onInsertToPrompt?: (text: string) => void;
 }
 
 /**
@@ -18,7 +21,7 @@ interface Props {
  * later, or are still stuck — purely their own awareness check. (No AI judges
  * coverage, and none of this gates mastery.)
  */
-export default function ChecklistRail({ milestoneId, milestoneTitle }: Props) {
+export default function ChecklistRail({ milestoneId, milestoneTitle, onInsertToPrompt }: Props) {
   const [points, setPoints]     = useState<LearningPoint[]>([]);
   const [statuses, setStatuses] = useState<Record<string, PointStatus>>({});
   const [loading, setLoading]   = useState(true);
@@ -80,7 +83,18 @@ export default function ChecklistRail({ milestoneId, milestoneTitle }: Props) {
         ) : (
           <ol className="space-y-3">
             {points.map(p => (
-              <li key={p.id} className="flex items-start justify-between gap-2">
+              <li key={p.id} className="group flex items-start gap-2">
+                {onInsertToPrompt && (
+                  <button
+                    type="button"
+                    onClick={() => onInsertToPrompt(p.text)}
+                    title="Ask Hugh about this — drops it into the chat box"
+                    aria-label={`Ask about: ${p.text}`}
+                    className="mt-0.5 shrink-0 text-slate-600 transition-colors hover:text-sky-400 focus:text-sky-400 focus:outline-none"
+                  >
+                    <ArrowLeftToLine size={13} />
+                  </button>
+                )}
                 <span className="flex-1 text-sm leading-snug text-slate-400">
                   {p.text}
                 </span>

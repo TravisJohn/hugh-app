@@ -24,6 +24,9 @@ interface Props {
   milestoneTitle?:     string;
   onTranscriptChange?: (text: string) => void;
   onSummariseStart?:   () => void;
+  // Imperative handle the parent wires to the checklist rail, so tapping a
+  // "what to understand" point drops it into the composer (panes stay independent).
+  insertRef?:          React.MutableRefObject<((text: string) => void) | null>;
 }
 
 // Wrap-up nudge tuning. The nudge appears when Hugh judges the card covered, or
@@ -37,7 +40,7 @@ const OFFER_COOLDOWN = 4;   // user messages to stay quiet after a "keep chattin
 const WELCOME = (topic: string) =>
   `Hi! I'm Hugh, and I'm here to help you learn about **${topic}**. Ask me anything — concepts, examples, how things work, or where to start.`;
 
-export default function ChatWindow({ topic, goalId, milestoneId, milestoneTitle, onTranscriptChange, onSummariseStart }: Props) {
+export default function ChatWindow({ topic, goalId, milestoneId, milestoneTitle, onTranscriptChange, onSummariseStart, insertRef }: Props) {
   const [messages, setMessages]     = useState<Message[]>([
     { role: "assistant", content: WELCOME(topic) },
   ]);
@@ -102,6 +105,24 @@ export default function ChatWindow({ topic, goalId, milestoneId, milestoneTitle,
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }, [draft]);
+
+  // Expose an "insert into the composer" handle for the checklist rail. Appends
+  // to any existing draft (never clobbers what the learner typed) and focuses the
+  // input with the caret at the end so they can tweak and send.
+  useEffect(() => {
+    if (!insertRef) return;
+    insertRef.current = (text: string) => {
+      setDraft(prev => (prev.trim() ? `${prev.replace(/\s+$/, "")}\n${text}` : text));
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.focus();
+        const end = el.value.length;
+        el.setSelectionRange(end, end);
+      });
+    };
+    return () => { if (insertRef) insertRef.current = null; };
+  }, [insertRef]);
 
   // Shared send path for both plain-text turns and mirrored-code turns. The code
   // turn is just an ordinary user message whose content happens to be a fenced
