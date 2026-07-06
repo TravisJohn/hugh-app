@@ -7,7 +7,7 @@ import {
   Music, Music2, RotateCcw, Eye, EyeOff, Trophy, Zap, RefreshCw, Minus, Plus,
 } from "lucide-react";
 import { PyodideRunner } from "@/lib/code/pyodideClient";
-import { SCENARIO, DRILL_CELLS } from "@/lib/code/drillContent";
+import { SCENARIO, DRILL_CELLS, timerSecondsFor } from "@/lib/code/drillContent";
 import CmEditor from "./CmEditor";
 import ConfettiCanvas, { type ConfettiHandle } from "./ConfettiCanvas";
 import SwarmBackdrop from "./SwarmBackdrop";
@@ -45,10 +45,11 @@ export default function DrillMock() {
   const [started, setStarted]   = useState(false);
   const [ready, setReady]       = useState(false);
   const [initError, setInitErr] = useState<string | null>(null);
-  const [timeLeft, setTimeLeft] = useState(DRILL_CELLS[0].timerSeconds);
+  const [timeLeft, setTimeLeft] = useState(timerSecondsFor(DRILL_CELLS[0]));
   const [toast, setToast]       = useState<string | null>(null);
   const [showRefs, setShowRefs] = useState(true); // global "with comments" toggle
   const [fontSize, setFontSize] = useState(15);   // accessibility: editor/prompt text size
+  const [glowId, setGlowId]     = useState<string | null>(null); // cell glowing right after a pass
 
   const runnerRef = useRef<PyodideRunner | null>(null);
   const confetti  = useRef<ConfettiHandle>(null);
@@ -66,7 +67,7 @@ export default function DrillMock() {
     return () => r.destroy();
   }, []);
 
-  useEffect(() => { setTimeLeft(DRILL_CELLS[active]?.timerSeconds ?? 20); }, [active]);
+  useEffect(() => { setTimeLeft(timerSecondsFor(DRILL_CELLS[active])); }, [active]);
 
   useEffect(() => {
     if (!started || allPassed) return;
@@ -84,7 +85,7 @@ export default function DrillMock() {
     const cell = DRILL_CELLS[active];
     const st = cellsRef.current[active];
     if (!cell || !st || st.status === "pass" || showRefs) return;
-    if (timeLeft > 0 && timeLeft <= Math.ceil(cell.timerSeconds * 0.3) && !st.usedRef) {
+    if (timeLeft > 0 && timeLeft <= Math.ceil(timerSecondsFor(cell) * 0.3) && !st.usedRef) {
       revealRef(active);
     }
   }, [timeLeft, started, active, showRefs, revealRef]);
@@ -119,6 +120,9 @@ export default function DrillMock() {
       audio.celebrate(nextCombo);
       setToast(comboLabel(nextCombo));
       window.setTimeout(() => setToast(null), 1300);
+      const passedId = DRILL_CELLS[i].id;
+      setGlowId(passedId);
+      window.setTimeout(() => setGlowId(g => (g === passedId ? null : g)), 1200);
       if (i + 1 < DRILL_CELLS.length) setActive(i + 1);
     } else if (snap[i].attempts + 1 >= 2 && !showRefs) {
       revealRef(i);
@@ -234,15 +238,21 @@ export default function DrillMock() {
             {DRILL_CELLS.map((cell, i) => {
               const st = cells[i];
               const isActive = i === active && !allPassed;
-              const pct = Math.round((timeLeft / cell.timerSeconds) * 100);
+              const pct = Math.round((timeLeft / timerSecondsFor(cell)) * 100);
               const showRef = refVisible(i) && st.status !== "pass";
+              const passed = st.status === "pass";
+              const glowing = glowId === cell.id;
               return (
                 <div
                   key={cell.id}
-                  className={`rounded-xl border transition-colors ${
-                    st.status === "pass" ? "border-emerald-500/40 bg-emerald-950/10"
+                  className={`rounded-xl border transition-all duration-700 ${
+                    passed ? "border-emerald-500/50 bg-emerald-950/10"
                     : isActive ? "border-sky-500/50 bg-slate-900/60"
                     : "border-slate-800 bg-slate-900/30"
+                  } ${
+                    glowing ? "shadow-[0_0_46px_-2px_rgba(16,185,129,0.6)]"
+                    : passed ? "shadow-[0_0_22px_-8px_rgba(16,185,129,0.35)]"
+                    : ""
                   }`}
                 >
                   <div className="flex items-center justify-between px-4 py-2 text-xs">

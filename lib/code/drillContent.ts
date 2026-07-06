@@ -10,7 +10,15 @@ export interface DrillCell {
   instruction: string; // always-visible prompt, written as a Python comment
   solution: string;    // reference — also the pass-1 scaffold (shown commented)
   assertions: string;  // hidden asserts on the produced variable
-  timerSeconds: number;
+}
+
+/**
+ * The speed-meter budget for a cell, derived from how much code it takes — a
+ * rough "time to type it" so longer answers get proportionally longer. Clamped
+ * to a sane range.
+ */
+export function timerSecondsFor(cell: DrillCell): number {
+  return Math.max(12, Math.min(60, Math.round(8 + cell.solution.length / 3.2)));
 }
 
 export const SCENARIO = {
@@ -35,14 +43,12 @@ export const DRILL_CELLS: DrillCell[] = [
     solution: `eu = [r for r in rows if r["region"] == "EU"]`,
     assertions:
       `assert isinstance(eu, list) and len(eu) == 3 and all(r["region"] == "EU" for r in eu)`,
-    timerSeconds: 20,
   },
   {
     id: "revenue",
     instruction: "# revenue: total units * price across ALL rows",
     solution: `revenue = sum(r["units"] * r["price"] for r in rows)`,
     assertions: `assert revenue == 206`,
-    timerSeconds: 25,
   },
   {
     id: "by_region",
@@ -51,13 +57,11 @@ export const DRILL_CELLS: DrillCell[] = [
 for r in rows:
     by_region[r["region"]] = by_region.get(r["region"], 0) + r["units"]`,
     assertions: `assert by_region == {"EU": 9, "NA": 6, "APAC": 7}`,
-    timerSeconds: 35,
   },
   {
     id: "top",
     instruction: "# top: the region with the most total units (use by_region)",
     solution: `top = max(by_region, key=by_region.get)`,
     assertions: `assert top == "EU"`,
-    timerSeconds: 25,
   },
 ];
