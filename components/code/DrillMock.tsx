@@ -12,6 +12,7 @@ import { SCENARIO, DRILL_CELLS, timerSecondsFor } from "@/lib/code/drillContent"
 import CmEditor from "./CmEditor";
 import ConfettiCanvas, { type ConfettiHandle } from "./ConfettiCanvas";
 import SwarmBackdrop from "./SwarmBackdrop";
+import CodeChat from "./CodeChat";
 import { useDrillAudio } from "@/hooks/useDrillAudio";
 
 type Status = "idle" | "running" | "pass" | "fail";
@@ -418,6 +419,8 @@ export default function DrillMock() {
           </span>
         </div>
       )}
+
+      <CodeChat />
     </div>
   );
 }
