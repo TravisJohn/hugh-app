@@ -7,7 +7,7 @@ import {
   Maximize2, Minimize2, ChevronDown, PenLine, BookOpen,
   OctagonAlert, CheckCircle2, ClipboardCheck, Mic,
   ListChecks, Check, Pencil, RotateCw, AlertTriangle, Paperclip,
-  Download, FileText, Sparkles, Tag,
+  Download, FileText, Sparkles, Tag, Archive,
 } from "lucide-react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
@@ -130,6 +130,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
   const [showActions,   setShowActions]     = useState(true);
   const [showDiary,     setShowDiary]       = useState(true);
   const [showWriteEntry, setShowWriteEntry] = useState(true);
+  const [showArchived,  setShowArchived]    = useState(false);
 
   // Which individual entries are expanded
   const [openEntries, setOpenEntries] = useState<Set<string>>(new Set());
@@ -220,6 +221,27 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
 
   function replaceEntry(updated: MilestoneEntry) {
     setEntries(prev => prev.map(e => e.id === updated.id ? updated : e));
+  }
+
+  // Soft-archive: hide from the diary but keep the row (restorable). Optimistic —
+  // the active/archived lists derive from `archived_at`, so flipping it locally
+  // moves the entry; we reconcile with the server row and revert on failure.
+  function setArchived(entryId: string, archived: boolean) {
+    const prevArchivedAt = entries.find(e => e.id === entryId)?.archived_at ?? null;
+    const optimistic = archived ? new Date().toISOString() : null;
+    setEntries(prev => prev.map(e => e.id === entryId ? { ...e, archived_at: optimistic } : e));
+    if (archived) setOpenEntries(prev => { const n = new Set(prev); n.delete(entryId); return n; });
+    void fetch(`/api/tracker/entries/${entryId}`, {
+      method:  "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ action: archived ? "archive" : "restore" }),
+    })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(d => { if (d.entry) replaceEntry(d.entry as MilestoneEntry); })
+      .catch(() => {
+        // Revert to the entry's prior archive state on failure.
+        setEntries(prev => prev.map(e => e.id === entryId ? { ...e, archived_at: prevArchivedAt } : e));
+      });
   }
 
   // Background fact-check for a saved/edited entry
@@ -378,17 +400,22 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
     return `/review/${milestone.id}?returnUrl=${encodeURIComponent(pathname)}`;
   }
 
+  // Archived entries are hidden from the diary and every count/filter — they only
+  // surface under the "Show archived" toggle.
+  const activeEntries   = entries.filter(e => !e.archived_at);
+  const archivedEntries = entries.filter(e => e.archived_at);
+
   // Learning-point tag lookups for the diary: id → text, per-point entry counts,
   // and the entries visible under the active filter.
   const pointsById = new Map(points.map(p => [p.id, p.text]));
-  const entryCountByPoint = entries.reduce<Record<string, number>>((acc, e) => {
+  const entryCountByPoint = activeEntries.reduce<Record<string, number>>((acc, e) => {
     if (e.point_id) acc[e.point_id] = (acc[e.point_id] ?? 0) + 1;
     return acc;
   }, {});
   const activeFilterText = filterPointId ? pointsById.get(filterPointId) ?? null : null;
   const visibleEntries   = filterPointId
-    ? entries.filter(e => e.point_id === filterPointId)
-    : entries;
+    ? activeEntries.filter(e => e.point_id === filterPointId)
+    : activeEntries;
 
   function focusPointInDiary(pointId: string) {
     setFilterPointId(prev => (prev === pointId ? null : pointId));
@@ -803,7 +830,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                     icon={<BookOpen size={13} />}
                     open={showDiary}
                     onToggle={() => setShowDiary(v => !v)}
-                    count={entries.length || undefined}
+                    count={activeEntries.length || undefined}
                   />
 
                   {showDiary && (
@@ -813,9 +840,11 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                           <Loader2 size={18} className="animate-spin text-slate-500" />
                         </div>
                       )}
-                      {!loadingEntries && entries.length === 0 && (
+                      {!loadingEntries && activeEntries.length === 0 && (
                         <p className="py-6 text-center text-xs text-slate-600">
-                          No entries yet — log your first insight below.
+                          {archivedEntries.length > 0
+                            ? "No active entries — all your notes here are archived."
+                            : "No entries yet — log your first insight below."}
                         </p>
                       )}
 
@@ -835,7 +864,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                           </button>
                         </div>
                       )}
-                      {!loadingEntries && entries.length > 0 && visibleEntries.length === 0 && (
+                      {!loadingEntries && activeEntries.length > 0 && visibleEntries.length === 0 && (
                         <p className="py-6 text-center text-xs text-slate-600">
                           No entries tagged to this learning point yet.
                         </p>
@@ -1004,15 +1033,27 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                                     </div>
                                   )}
 
-                                  {/* Plain edit affordance when there's no warning */}
-                                  {!isEditing && !showWarning && (
-                                    <button
-                                      onClick={() => startEdit(entry)}
-                                      className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-400 transition-colors"
-                                    >
-                                      <Pencil size={10} />
-                                      Edit
-                                    </button>
+                                  {/* Row actions: edit (no warning) + archive to declutter */}
+                                  {!isEditing && (
+                                    <div className="flex items-center gap-4">
+                                      {!showWarning && (
+                                        <button
+                                          onClick={() => startEdit(entry)}
+                                          className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-400 transition-colors"
+                                        >
+                                          <Pencil size={10} />
+                                          Edit
+                                        </button>
+                                      )}
+                                      <button
+                                        onClick={() => setArchived(entry.id, true)}
+                                        title="Archive this note — you can restore it from “Show archived”"
+                                        className="ml-auto flex items-center gap-1 text-xs text-slate-600 hover:text-red-400 transition-colors"
+                                      >
+                                        <Archive size={11} />
+                                        Archive
+                                      </button>
+                                    </div>
                                   )}
                                 </div>
                               )}
@@ -1021,6 +1062,49 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
                         })}
                         <div ref={entriesEndRef} />
                       </div>
+
+                      {/* Archived notes — hidden by default; restore anytime. */}
+                      {archivedEntries.length > 0 && (
+                        <div className="pb-4">
+                          <button
+                            onClick={() => setShowArchived(v => !v)}
+                            className="flex items-center gap-1.5 text-xs text-slate-600 transition-colors hover:text-slate-400"
+                          >
+                            <Archive size={11} />
+                            {showArchived ? "Hide" : "Show"} archived ({archivedEntries.length})
+                            <ChevronDown
+                              size={12}
+                              className={`transition-transform ${showArchived ? "" : "-rotate-90"}`}
+                            />
+                          </button>
+
+                          {showArchived && (
+                            <div className="mt-2 space-y-1.5">
+                              {archivedEntries.map(entry => (
+                                <div
+                                  key={entry.id}
+                                  className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2"
+                                >
+                                  <span className="min-w-0 flex-1 truncate text-xs text-slate-500">
+                                    {entry.title || entry.body.slice(0, 65) + (entry.body.length > 65 ? "…" : "")}
+                                  </span>
+                                  <span className="shrink-0 text-xs text-slate-700">
+                                    {fmtCompact(entry.created_at)}
+                                  </span>
+                                  <button
+                                    onClick={() => setArchived(entry.id, false)}
+                                    title="Restore this note to the diary"
+                                    className="flex shrink-0 items-center gap-1 text-xs text-slate-500 transition-colors hover:text-sky-400"
+                                  >
+                                    <RotateCw size={11} />
+                                    Restore
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </>
                   )}
                 </div>

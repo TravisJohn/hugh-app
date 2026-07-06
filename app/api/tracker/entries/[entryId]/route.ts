@@ -9,6 +9,8 @@ import { isValidPointTag } from "@/lib/tracker/points";
  *
  * Body shapes:
  *  - { action: "accept" }              → apply `correction` to the body, clear the warning
+ *  - { action: "archive" }             → soft-archive (hide from the diary, keep the row)
+ *  - { action: "restore" }             → un-archive
  *  - { body, title?, pointId? }        → edit the entry; resets fact_status to
  *    'pending' so the client can re-verify. The permanent gap_note is preserved.
  *  - { pointId: string | null }        → re-tag only (no content change)
@@ -24,7 +26,7 @@ export async function PATCH(
 
   const { entryId } = await params;
   const body = (await request.json()) as {
-    action?:  "accept";
+    action?:  "accept" | "archive" | "restore";
     body?:    string;
     title?:   string;
     pointId?: string | null;
@@ -60,6 +62,10 @@ export async function PATCH(
       fact_status: "correct",
       corrected:   true,
     };
+  } else if (body.action === "archive") {
+    update = { archived_at: new Date().toISOString() };
+  } else if (body.action === "restore") {
+    update = { archived_at: null };
   } else if (body.body?.trim()) {
     const newBody  = body.body.trim();
     const newTitle = body.title?.trim();

@@ -176,6 +176,9 @@ export interface MilestoneEntry {
   // Optional tag to one of the milestone's learning points (a LearningPoint.id
   // from learning_points JSONB). null = untagged / general entry.
   point_id:     string | null;
+  // Soft-archive: null = active (shown by default), a timestamp = archived
+  // (hidden behind "Show archived", restorable). Entries are never hard-deleted.
+  archived_at:  string | null;
   created_at:   string;
 }
 
