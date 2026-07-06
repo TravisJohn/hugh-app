@@ -129,7 +129,10 @@ export default function DrillMock() {
       const passedId = DRILL_CELLS[i].id;
       setGlowId(passedId);
       window.setTimeout(() => setGlowId(g => (g === passedId ? null : g)), 1200);
-      if (i + 1 < DRILL_CELLS.length) setActive(i + 1);
+      if (i + 1 < DRILL_CELLS.length) {
+        setActive(i + 1);
+        setTimeLeft(timerSecondsFor(DRILL_CELLS[i + 1])); // reset in the same batch — no stale-0 window
+      }
     } else if (snap[i].attempts + 1 >= 2 && !showRefs) {
       revealRef(i);
     }
@@ -141,9 +144,10 @@ export default function DrillMock() {
     if (k.length === 1 || k === "Backspace" || k === "Enter" || k === "Tab" || k === " ") audio.click();
   }
 
-  function start() { audio.unlock(); setStarted(true); setActive(0); }
-  function nextRound() { setRound(2); setShowRefs(false); setCells(emptyCells()); setActive(0); setCombo(0); }
-  function restart() { setRound(1); setShowRefs(true); setCells(emptyCells()); setActive(0); setCombo(0); }
+  const firstTimer = timerSecondsFor(DRILL_CELLS[0]);
+  function start() { audio.unlock(); setStarted(true); setActive(0); setTimeLeft(firstTimer); }
+  function nextRound() { setRound(2); setShowRefs(false); setCells(emptyCells()); setActive(0); setCombo(0); setTimeLeft(firstTimer); }
+  function restart() { setRound(1); setShowRefs(true); setCells(emptyCells()); setActive(0); setCombo(0); setTimeLeft(firstTimer); }
   function redoCell(i: number) {
     setCells(prev => prev.map((c, idx) => (idx === i ? { code: "", status: "idle", attempts: 0, usedRef: false, overTime: false, error: null } : c)));
     setActive(i);
