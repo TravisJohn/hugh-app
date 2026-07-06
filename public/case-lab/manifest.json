@@ -2,6 +2,28 @@
   "batch": "2026-07",
   "cases": [
     {
+      "id": "airflow-migration-sla",
+      "title": "SLA breaches jumped after the Airflow 2 migration — roll it back?",
+      "company": "Switchyard — data infrastructure",
+      "trap": "Confounding / selection bias",
+      "facets": { "topic": "Orchestration", "skill": ["Selection bias", "Confounding"] },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-06",
+      "blurb": "DAGs on Airflow 2 breach SLA 1.6x as often, and the platform lead wants to roll back. But which DAGs were migrated first? Check before the rollback note goes out."
+    },
+    {
+      "id": "retry-success-rate",
+      "title": "Auto-retries pushed task success to 94% — did retries fix reliability?",
+      "company": "Orbit — marketing-analytics SaaS",
+      "trap": "Simpson's paradox",
+      "facets": { "topic": "Orchestration", "skill": ["Simpson's paradox"] },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-06",
+      "blurb": "Overall task success rose ~2 points after retries went 1→3, and the platform lead calls it the win of the quarter. Split by task class before she presents it."
+    },
+    {
       "id": "warehouse-migration",
       "title": "Migrated queries run 60% faster — should we move everything?",
       "company": "Beacon — product-analytics platform",

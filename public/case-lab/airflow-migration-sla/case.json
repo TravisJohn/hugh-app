@@ -1,0 +1,73 @@
+{
+  "id": "airflow-migration-sla",
+  "title": "SLA breaches jumped after the Airflow 2 migration — roll it back?",
+  "trap": "Confounding / selection bias",
+  "facets": { "topic": "Orchestration", "skill": ["Selection bias", "Confounding"] },
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the platform engineer at Switchyard",
+    "company": "Switchyard — a data-infrastructure company",
+    "situation": "The team has been moving DAGs off the old scheduler onto Airflow 2. Marcus, the Head of Data Platform, pulled a quarter of run logs and is alarmed: DAGs running on Airflow 2 breach their SLA about 21% of the time, versus 13% for the ones still on the old scheduler — the migrated DAGs breach roughly 1.6x as often. He's drafting a note to pause the migration and roll the moved DAGs back. He wants your read before he sends it.",
+    "stakeholderBelief": "\"Airflow 2 is less reliable — migrated DAGs breach SLA far more. We should halt the migration and roll back before it gets worse.\"",
+    "question": "Is Airflow 2 actually causing more SLA breaches? Estimate the scheduler's real effect and tell Marcus whether rolling back is the right call."
+  },
+  "dataset": {
+    "file": "/case-lab/airflow-migration-sla/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "run_id", "type": "int", "description": "Unique DAG-run identifier" },
+      { "name": "dag_id", "type": "string", "description": "Which DAG this run belongs to (~240 distinct DAGs)" },
+      { "name": "task_count", "type": "int", "description": "Number of tasks in the DAG — a measure of its complexity" },
+      { "name": "upstream_deps", "type": "int", "description": "Count of upstream dependencies feeding the DAG" },
+      { "name": "data_volume_gb", "type": "float", "description": "Data processed by the run, in GB" },
+      { "name": "scheduled_hour", "type": "int", "description": "Hour of day the run was scheduled (0-23); 1-5 is the nightly batch crunch" },
+      { "name": "migrated", "type": "int", "description": "1 if the run executed on Airflow 2, else 0 (old scheduler)" },
+      { "name": "sla_breached", "type": "int", "description": "1 if the run missed its SLA, else 0 — the outcome" }
+    ],
+    "sample": [
+      { "run_id": 1, "dag_id": "dag_000", "task_count": 14, "upstream_deps": 3, "data_volume_gb": 6.64, "scheduled_hour": 21, "migrated": 1, "sla_breached": 0 },
+      { "run_id": 2, "dag_id": "dag_001", "task_count": 5, "upstream_deps": 2, "data_volume_gb": 6.52, "scheduled_hour": 13, "migrated": 0, "sla_breached": 0 },
+      { "run_id": 3, "dag_id": "dag_002", "task_count": 19, "upstream_deps": 3, "data_volume_gb": 2.01, "scheduled_hour": 13, "migrated": 1, "sla_breached": 0 },
+      { "run_id": 4, "dag_id": "dag_003", "task_count": 21, "upstream_deps": 7, "data_volume_gb": 7.07, "scheduled_hour": 16, "migrated": 1, "sla_breached": 0 },
+      { "run_id": 5, "dag_id": "dag_004", "task_count": 3, "upstream_deps": 1, "data_volume_gb": 1.92, "scheduled_hour": 6, "migrated": 0, "sla_breached": 0 },
+      { "run_id": 6, "dag_id": "dag_005", "task_count": 4, "upstream_deps": 2, "data_volume_gb": 3.47, "scheduled_hour": 12, "migrated": 0, "sla_breached": 0 },
+      { "run_id": 7, "dag_id": "dag_006", "task_count": 12, "upstream_deps": 3, "data_volume_gb": 3.32, "scheduled_hour": 21, "migrated": 1, "sla_breached": 0 },
+      { "run_id": 8, "dag_id": "dag_007", "task_count": 9, "upstream_deps": 3, "data_volume_gb": 1.15, "scheduled_hour": 14, "migrated": 0, "sla_breached": 0 },
+      { "run_id": 9, "dag_id": "dag_008", "task_count": 11, "upstream_deps": 4, "data_volume_gb": 1.29, "scheduled_hour": 20, "migrated": 1, "sla_breached": 0 },
+      { "run_id": 10, "dag_id": "dag_009", "task_count": 6, "upstream_deps": 1, "data_volume_gb": 25.38, "scheduled_hour": 0, "migrated": 1, "sla_breached": 0 }
+    ]
+  },
+  "guidingQuestions": [
+    "Reproduce Marcus's number: what's the SLA breach rate for migrated (Airflow 2) runs versus non-migrated runs?",
+    "Which DAGs got migrated first? Compare task_count and upstream_deps for migrated vs non-migrated runs — are the two groups running comparable DAGs?",
+    "Complexity (task_count, deps, data volume, nightly scheduling) drives breaches. If the heavy DAGs were migrated first, what does that do to the raw migrated-vs-not comparison?",
+    "Estimate the scheduler effect holding complexity constant — bucket runs by task_count (deciles) and compare migrated vs not within each bucket, or model sla_breached ~ task_count + deps + volume + migrated. What's left of the effect?",
+    "What do you tell Marcus — is Airflow 2 the problem, and would rolling back actually reduce breaches?"
+  ],
+  "suggestedApproach": [
+    "Reproduce the headline breach rates by migrated so you know the exact claim.",
+    "Profile what was migrated: compare task_count, upstream_deps and data_volume_gb across the two groups. If Airflow 2 is holding the heavy DAGs, the raw comparison isn't about the scheduler.",
+    "Complexity is the obvious confounder — it drives breaches and drove migration order. Account for it by stratifying on task_count or regressing on the complexity columns.",
+    "Re-estimate the migrated effect within complexity buckets and check it's stable and near zero.",
+    "Turn it into a recommendation: would a rollback move the fragile DAGs back to an equally-loaded old scheduler, and what would a fair test (same DAGs, both schedulers) look like?"
+  ],
+  "teachingNote": {
+    "naiveRead": "Airflow 2 runs breach SLA 21.0% of the time versus 13.2% on the old scheduler — a +7.8 point gap, about 1.6x. Read directly, the new scheduler looks materially less reliable and a rollback looks prudent.",
+    "theTrap": "DAGs weren't migrated at random. The heaviest, most dependency-laden DAGs went first — migrated runs average 19.2 tasks versus 10.6 for the ones still on the old scheduler, nearly double. Task count, dependencies, data volume and nightly scheduling are what actually cause SLA breaches, and Airflow 2 was handed a disproportionate share of the fragile, breach-prone DAGs. So the migrated group breached more before the new scheduler could help or hurt. The comparison measures which DAGs were moved, not the scheduler they were moved to.",
+    "honestAnswer": "Hold complexity constant — bucket runs into task-count deciles and compare migrated vs not within each bucket (or model sla_breached on the complexity columns + migrated) — and the scheduler effect collapses to about −0.7 points: essentially neutral, if anything a hair better. Airflow 2 is not causing the breaches; the migration order is. Rolling back would just move the fragile heavy DAGs onto an old scheduler that was breaching just as much for DAGs like them. The fix is capacity and DAG-level tuning for the heavy jobs, not a rollback — and next time, migrate a mix of light and heavy DAGs so the comparison stays fair.",
+    "howToGetThere": [
+      "Compute the naive gap: breach rate for migrated=1 (21.0%) minus migrated=0 (13.2%) → +7.8 pts. That's Marcus's number.",
+      "Profile the treated group: mean(task_count) by migrated → ~19.2 vs ~10.6. The migrated DAGs are far heavier.",
+      "Recognise complexity as a confounder: it drives breaches AND predicted migration order, inflating the raw gap.",
+      "Adjust — stratify on task_count deciles and take the size-weighted within-bucket breach difference, or fit sla_breached ~ task_count + upstream_deps + data_volume_gb + migrated. The migrated effect lands near −0.7 pts.",
+      "Sanity-check: within a fixed complexity bucket, migrated and non-migrated runs breach at nearly the same rate — the scheduler isn't the driver."
+    ],
+    "numbers": [
+      { "label": "Naive breach gap (Airflow 2 − old)", "value": "21.0% vs 13.2% (+7.8 pts)" },
+      { "label": "Mean task_count — migrated vs not", "value": "19.2 vs 10.6" },
+      { "label": "Complexity-adjusted scheduler effect", "value": "≈ −0.7 pts (neutral)" },
+      { "label": "Share of runs migrated", "value": "40%" }
+    ],
+    "lesson": "When a change is rolled out to the hardest cases first, the treated group looks worse for reasons that have nothing to do with the change. Airflow 2 inherited the heavy, breach-prone DAGs, so it took the blame for their breaches. Before attributing a reliability shift to a new system, ask what was moved onto it — and compare like-for-like DAGs. Adjust for the real driver (complexity) and the scheduler is neutral. A rollback wouldn't fix anything, because the SLA misses live in the DAGs, not the scheduler. The clean test is to run the same DAGs on both schedulers; short of that, stratify before you conclude."
+  }
+}

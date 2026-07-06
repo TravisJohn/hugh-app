@@ -1,0 +1,72 @@
+{
+  "id": "retry-success-rate",
+  "title": "Auto-retries pushed task success to 94% — did retries fix reliability?",
+  "trap": "Simpson's paradox",
+  "facets": { "topic": "Orchestration", "skill": ["Simpson's paradox"] },
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the data engineer on platform reliability at Orbit",
+    "company": "Orbit — a marketing-analytics SaaS",
+    "situation": "Last quarter the platform bumped default task retries from 1 to 3 across every DAG. Nadia, the platform lead, pulled task-run logs from before and after the change: overall task success climbed from 92.1% to 94.0%. She's ready to present retries as the reliability win of the quarter and make 3 retries the permanent standard. She wants you to confirm the numbers before the all-hands.",
+    "stakeholderBelief": "\"Bumping retries to 3 lifted task success ~2 points across the board. Retries fixed our reliability — let's make it the standard.\"",
+    "question": "Did the retry change actually improve reliability? Confirm what really moved between the two periods, and tell Nadia whether retries deserve the credit."
+  },
+  "dataset": {
+    "file": "/case-lab/retry-success-rate/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "run_id", "type": "int", "description": "Unique task-run identifier" },
+      { "name": "dag_id", "type": "string", "description": "Which DAG the task belongs to" },
+      { "name": "task_class", "type": "string", "description": "Kind of task: sensor (cheap polling), transform, load, or ml" },
+      { "name": "period", "type": "string", "description": "before or after the retry change" },
+      { "name": "max_retries", "type": "int", "description": "Configured retries for the run: 1 before, 3 after" },
+      { "name": "duration_sec", "type": "float", "description": "Task runtime in seconds" },
+      { "name": "succeeded", "type": "int", "description": "1 if the task ultimately succeeded, else 0 — the outcome" }
+    ],
+    "sample": [
+      { "run_id": 1, "dag_id": "dag_000", "task_class": "transform", "period": "before", "max_retries": 1, "duration_sec": 7.3, "succeeded": 1 },
+      { "run_id": 2, "dag_id": "dag_001", "task_class": "sensor", "period": "after", "max_retries": 3, "duration_sec": 16.2, "succeeded": 1 },
+      { "run_id": 3, "dag_id": "dag_002", "task_class": "sensor", "period": "after", "max_retries": 3, "duration_sec": 19.8, "succeeded": 1 },
+      { "run_id": 4, "dag_id": "dag_003", "task_class": "sensor", "period": "before", "max_retries": 1, "duration_sec": 7.8, "succeeded": 1 },
+      { "run_id": 5, "dag_id": "dag_004", "task_class": "transform", "period": "before", "max_retries": 1, "duration_sec": 42.1, "succeeded": 1 },
+      { "run_id": 6, "dag_id": "dag_005", "task_class": "load", "period": "after", "max_retries": 3, "duration_sec": 51.1, "succeeded": 0 },
+      { "run_id": 7, "dag_id": "dag_006", "task_class": "sensor", "period": "before", "max_retries": 1, "duration_sec": 18.3, "succeeded": 1 },
+      { "run_id": 8, "dag_id": "dag_007", "task_class": "sensor", "period": "after", "max_retries": 3, "duration_sec": 9.1, "succeeded": 1 },
+      { "run_id": 9, "dag_id": "dag_008", "task_class": "sensor", "period": "before", "max_retries": 1, "duration_sec": 2.9, "succeeded": 1 },
+      { "run_id": 10, "dag_id": "dag_009", "task_class": "transform", "period": "before", "max_retries": 1, "duration_sec": 129.6, "succeeded": 0 }
+    ]
+  },
+  "guidingQuestions": [
+    "Reproduce Nadia's number: overall task success rate in the before period vs the after period.",
+    "Now compute success rate by task_class WITHIN each period. What happens to each class — sensor, transform, load, ml — from before to after?",
+    "Compare the mix of task classes across the two periods. What share of tasks are cheap sensor tasks before vs after?",
+    "If every class got worse but the overall rate went up, what must be true about how the task mix changed — and which metric is telling the truth about reliability?",
+    "Retries went 1 → 3 in the same window. Given the per-class picture, do retries deserve the credit for the headline — and what actually happened to the work that matters?"
+  ],
+  "suggestedApproach": [
+    "Reproduce the aggregate first: overall success by period.",
+    "Never trust an aggregate across a changing mix — break success down by task_class within each period before concluding anything.",
+    "If the subgroup story disagrees with the aggregate, look at the mix: compute each class's share of tasks per period.",
+    "Decide which number answers the reliability question — the blended rate over a shifted mix, or the like-for-like within-class rates.",
+    "Separate the two things that happened at once (retry bump + a monitoring-driven sensor flood) and say what each did, rather than crediting the retry change for a mix artifact."
+  ],
+  "teachingNote": {
+    "naiveRead": "Overall task success rose from 92.1% before to 94.0% after the retry bump — about +1.9 points. Taken at face value, moving to 3 retries improved reliability and should be the new standard.",
+    "theTrap": "The aggregate reversed on a mix shift — Simpson's paradox. The retry rollout coincided with a monitoring push that flooded the schedulers with cheap sensor tasks (near-100% success): sensors went from 30% of all tasks before to 75% after. Because the mix tilted hard toward the highest-success class, the blended rate rose even though EVERY class got worse: sensor 99.3% → 96.9%, transform 90.2% → 85.9%, load 89.5% → 85.2%, ml 85.8% → 83.4%. A concurrent dependency upgrade quietly regressed real execution, and retries didn't fix it. The headline is measuring the task mix, not reliability.",
+    "honestAnswer": "Reliability got WORSE, not better. Within every task class success fell by 2-4 points in the after period; the +1.9 point aggregate is an illusion created by the surge of trivially-successful sensor tasks diluting the pool. Retries deserve no credit — if anything they masked a real regression on transform/load/ml, the work that actually matters. Tell Nadia not to present retries as a win: report the per-class rates, investigate what regressed the pipeline tasks (the dependency upgrade in the same window), and track success on a fixed task mix (or weight by class) so a change in what runs can't masquerade as a change in how well it runs.",
+    "howToGetThere": [
+      "Reproduce the aggregate: mean(succeeded) by period → 92.1% before, 94.0% after (+1.9 pts).",
+      "Break it down: mean(succeeded) by task_class within period → every class is LOWER after (sensor 99.3→96.9, transform 90.2→85.9, load 89.5→85.2, ml 85.8→83.4).",
+      "Explain the reversal via mix: share of sensor tasks is 30% before vs 75% after — the pool tilted toward the highest-success class.",
+      "Reconcile: a size-weighted or fixed-mix success rate (hold class shares constant) shows a decline, matching the per-class story.",
+      "Attribute correctly: the retry bump and a sensor flood happened together; the aggregate rise is the mix, and the within-class fall is the real signal."
+    ],
+    "numbers": [
+      { "label": "Overall success — before vs after", "value": "92.1% → 94.0% (+1.9 pts)" },
+      { "label": "Sensor share of tasks — before vs after", "value": "30% → 75%" },
+      { "label": "Transform success — before vs after", "value": "90.2% → 85.9%" },
+      { "label": "Every class, within period", "value": "down 2-4 pts after" }
+    ],
+    "lesson": "An aggregate rate over a changing population can move opposite to every subgroup inside it — Simpson's paradox. Here a flood of easy sensor tasks lifted the blended success rate while the actual work regressed underneath it. Whenever a headline metric spans a mix that shifted, disaggregate before you attribute the change to anything: compute the rate within stable subgroups, and check whether the group shares moved. Two things happened at once (more retries, more sensors); the reflex is to separate them, not to credit the intervention you were hoping worked. Track reliability on a fixed or weighted task mix so composition changes can't fake a win."
+  }
+}
