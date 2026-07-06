@@ -2,6 +2,7 @@
   "id": "store-refresh",
   "title": "We remodeled our worst-rated stores and ratings rebounded — did it work?",
   "trap": "Regression to the mean",
+  "facets": { "topic": "Retail", "skill": ["Regression to the mean"] },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the analyst on the retail-ops team at Foundry Goods",

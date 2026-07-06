@@ -2,6 +2,7 @@
   "id": "power-users",
   "title": "Users who run 50+ workflows never churn — should we push everyone to 50?",
   "trap": "Survivorship bias",
+  "facets": { "topic": "Product", "skill": ["Survivorship bias"] },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the growth analyst at Cadence",

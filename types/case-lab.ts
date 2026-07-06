@@ -11,6 +11,24 @@ export interface CaseLabColumn {
   description: string;
 }
 
+/** The filterable dimensions of a Case Lab case, mirroring the Case Room's facet
+ *  model but tighter: `topic` is the single domain the dataset is about, `skill`
+ *  is the analytical lesson(s) planted in it (a normalized, filterable form of the
+ *  headline `trap` string — a case may carry more than one). */
+export interface CaseLabFacets {
+  topic: string;
+  skill: string[];
+}
+
+/** The keys of {@link CaseLabFacets}, in display order — drives the filter panel. */
+export const FACET_KEYS = ["topic", "skill"] as const;
+export type FacetKey = (typeof FACET_KEYS)[number];
+
+export const FACET_LABELS: Record<FacetKey, string> = {
+  topic: "Topic",
+  skill: "Skill",
+};
+
 /** The business framing shown at the top of a case. */
 export interface CaseLabScenario {
   role: string;            // who the learner is playing
@@ -35,6 +53,7 @@ export interface CaseLabCase {
   id: string;
   title: string;
   trap: string;                      // e.g. "Confounding / selection bias"
+  facets: CaseLabFacets;             // topic + normalized skill(s) — filterable
   estMinutes: number;
   scenario: CaseLabScenario;
   dataset: {
@@ -54,6 +73,7 @@ export interface CaseLabStub {
   title: string;
   company: string;
   trap: string;
+  facets: CaseLabFacets;             // topic + normalized skill(s) — filterable
   estMinutes: number;
   rows: number;
   releaseDate: string;               // ISO date — drives the dated feed order

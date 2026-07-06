@@ -2,6 +2,7 @@
   "id": "support-churn",
   "title": "Do support tickets cause churn — should we cut the support team?",
   "trap": "Confounding / reverse causality",
+  "facets": { "topic": "Support", "skill": ["Confounding", "Reverse causality"] },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the analyst at Meridian",

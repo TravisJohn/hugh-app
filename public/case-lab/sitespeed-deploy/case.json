@@ -2,6 +2,7 @@
   "id": "sitespeed-deploy",
   "title": "Conversion rose after the December site-speed deploy — did the deploy do it?",
   "trap": "Seasonality confound",
+  "facets": { "topic": "Product", "skill": ["Seasonality"] },
   "estMinutes": 30,
   "scenario": {
     "role": "You're the analyst embedded with the web team at Verve",

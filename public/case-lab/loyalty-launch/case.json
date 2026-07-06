@@ -2,6 +2,7 @@
   "id": "loyalty-launch",
   "title": "Revenue jumped 64% after we launched the loyalty program — did it work?",
   "trap": "Seasonality confound",
+  "facets": { "topic": "Marketing", "skill": ["Seasonality"] },
   "estMinutes": 30,
   "scenario": {
     "role": "You're the analyst on the marketing team at Harbor",

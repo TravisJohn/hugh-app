@@ -2,6 +2,7 @@
   "id": "sales-team-winrate",
   "title": "Team A's win rate beats Team B — is B underperforming?",
   "trap": "Simpson's paradox",
+  "facets": { "topic": "Sales", "skill": ["Simpson's paradox"] },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the RevOps analyst at Vantage",

@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import { loadLabManifest } from "@/lib/case-lab/loader";
 import CaseModeTabs from "@/components/cases/CaseModeTabs";
-import CaseLabCard from "@/components/case-lab/CaseLabCard";
+import CaseLabLanding from "@/components/case-lab/CaseLabLanding";
 
 // The Case Lab feed — a dated index of long-form takeaway cases. Auth-gated like
 // the rest of the learner area. Reads only the manifest (each case loads on its
@@ -47,15 +47,7 @@ export default async function CaseLabPage() {
           reveal the expert teaching note and check your thinking.
         </p>
 
-        <div className="mt-8 flex flex-col gap-1 text-sm text-slate-500">
-          {cases.length} case{cases.length === 1 ? "" : "s"}
-        </div>
-
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          {cases.map((stub) => (
-            <CaseLabCard key={stub.id} stub={stub} />
-          ))}
-        </div>
+        <CaseLabLanding cases={cases} />
       </main>
     </div>
   );

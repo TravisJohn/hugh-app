@@ -2,6 +2,7 @@
   "id": "checkout-redesign",
   "title": "The new checkout converts worse overall — do we roll it back?",
   "trap": "Simpson's paradox",
+  "facets": { "topic": "Product", "skill": ["Simpson's paradox"] },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the analyst on the growth team at Kettle",

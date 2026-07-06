@@ -2,6 +2,7 @@
   "id": "campaign-retention",
   "title": "Did the win-back email actually lift retention?",
   "trap": "Confounding / selection bias",
+  "facets": { "topic": "Marketing", "skill": ["Confounding", "Selection bias"] },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the data analyst at Lumen",

@@ -9,7 +9,10 @@ export default function CaseLabCard({ stub }: { stub: CaseLabStub }) {
       href={`/cases/lab/${stub.id}`}
       className="group flex flex-col rounded-2xl border border-slate-800 bg-slate-900/40 p-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-500/40 hover:bg-slate-900/70"
     >
-      <div className="mb-3 flex items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="rounded-full border border-slate-700 bg-slate-800/60 px-2 py-0.5 text-xs font-medium text-slate-300">
+          {stub.facets.topic}
+        </span>
         <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-400">
           {stub.trap}
         </span>

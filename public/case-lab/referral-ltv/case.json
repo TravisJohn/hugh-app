@@ -2,6 +2,7 @@
   "id": "referral-ltv",
   "title": "Customers who refer a friend are worth ~1.8x — should we push referrals to grow LTV?",
   "trap": "Survivorship / self-selection",
+  "facets": { "topic": "Marketing", "skill": ["Survivorship bias", "Self-selection"] },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the growth analyst at Tally",

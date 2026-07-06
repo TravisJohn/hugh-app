@@ -2,6 +2,7 @@
   "id": "sales-coaching",
   "title": "We coached our worst reps and they improved — does coaching work?",
   "trap": "Regression to the mean",
+  "facets": { "topic": "Sales", "skill": ["Regression to the mean"] },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the sales-ops analyst at Ridgeline",
