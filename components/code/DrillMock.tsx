@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, Play, Check, Loader2, Volume2, VolumeX,
-  Music, Music2, RotateCcw, Eye, EyeOff, Trophy, Zap, RefreshCw,
+  Music, Music2, RotateCcw, Eye, EyeOff, Trophy, Zap, RefreshCw, Minus, Plus,
 } from "lucide-react";
 import { PyodideRunner } from "@/lib/code/pyodideClient";
 import { SCENARIO, DRILL_CELLS } from "@/lib/code/drillContent";
@@ -48,6 +48,7 @@ export default function DrillMock() {
   const [timeLeft, setTimeLeft] = useState(DRILL_CELLS[0].timerSeconds);
   const [toast, setToast]       = useState<string | null>(null);
   const [showRefs, setShowRefs] = useState(true); // global "with comments" toggle
+  const [fontSize, setFontSize] = useState(15);   // accessibility: editor/prompt text size
 
   const runnerRef = useRef<PyodideRunner | null>(null);
   const confetti  = useRef<ConfettiHandle>(null);
@@ -161,6 +162,26 @@ export default function DrillMock() {
               <Zap size={13} /> ×{combo}
             </span>
           )}
+          {/* Text size (accessibility) */}
+          <div className="flex items-center gap-1 rounded-lg border border-slate-800 px-1 py-0.5">
+            <button
+              onClick={() => setFontSize(s => Math.max(13, s - 2))}
+              disabled={fontSize <= 13}
+              title="Smaller text"
+              className="flex h-5 w-5 items-center justify-center rounded text-slate-400 hover:bg-slate-800 hover:text-slate-100 disabled:opacity-30"
+            >
+              <Minus size={12} />
+            </button>
+            <span className="w-8 select-none text-center text-[10px] font-semibold uppercase tracking-wide text-slate-500">Aa</span>
+            <button
+              onClick={() => setFontSize(s => Math.min(24, s + 2))}
+              disabled={fontSize >= 24}
+              title="Larger text"
+              className="flex h-5 w-5 items-center justify-center rounded text-slate-400 hover:bg-slate-800 hover:text-slate-100 disabled:opacity-30"
+            >
+              <Plus size={12} />
+            </button>
+          </div>
           {started && (
             <>
               <button
@@ -245,25 +266,31 @@ export default function DrillMock() {
                   </div>
 
                   {/* Prompt — outside the editor */}
-                  <p className="px-4 pb-1 text-sm text-slate-300">{promptText(i)}</p>
+                  <p className="px-4 pb-1 text-slate-300" style={{ fontSize: fontSize + 1 }}>{promptText(i)}</p>
 
                   {/* Reference to replicate — read-only, non-copyable */}
                   {showRef && (
                     <pre
                       onCopy={e => e.preventDefault()}
-                      className="mx-4 mb-2 select-none overflow-x-auto rounded-lg border border-sky-500/20 bg-sky-950/20 p-2.5 text-xs text-sky-200/80"
+                      style={{ fontSize: fontSize - 1 }}
+                      className="mx-4 mb-2 select-none overflow-x-auto rounded-lg border border-sky-500/20 bg-sky-950/20 p-2.5 leading-relaxed text-sky-200/80"
                       title="Type this yourself — copy is disabled on purpose"
                     >
 {cell.solution}
                     </pre>
                   )}
 
-                  <div className="h-32 border-y border-slate-800/60" onKeyDown={onType}>
+                  <div
+                    className="border-y border-slate-800/60"
+                    style={{ height: Math.round(fontSize * 7 + 46) }}
+                    onKeyDown={onType}
+                  >
                     <CmEditor
                       value={st.code}
                       onChange={v => setCode(i, v)}
                       onSubmit={() => runCell(i)}
                       readOnly={st.status === "pass"}
+                      fontSize={fontSize}
                     />
                   </div>
 
