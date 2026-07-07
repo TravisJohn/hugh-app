@@ -56,15 +56,18 @@ export async function POST(request: NextRequest) {
 
   try {
     const res = await anthropic.messages.create({
-      model:      "claude-sonnet-4-6",
+      // TRIAL: learn/chat is the highest-volume route, so we're testing Haiku
+      // (5x cheaper input, 3x cheaper output) against Sonnet for tutoring quality.
+      // Revert this one line to "claude-sonnet-4-6" if the answers get weaker.
+      model:      "claude-haiku-4-5",
       max_tokens: 1024,
       system:     focusedLearningSystemPrompt(topic.trim()),
       messages:   capped,
       // Prompt caching: auto-place a breakpoint on the last message, so the
       // system prompt + prior conversation prefix is reused across turns of the
       // same chat. Cache reads cost ~0.1x; this is the bulk of learn/chat spend.
-      // (Effective once the prefix exceeds Sonnet's ~2048-token cache minimum —
-      // i.e. after the first couple of turns; shorter prefixes silently skip.)
+      // (Effective once the prefix exceeds Haiku's ~4096-token cache minimum —
+      // a bit later than Sonnet's 2048; shorter prefixes silently skip.)
       //
       // During a Pomodoro focus block we switch to the 1-hour TTL: deliberate,
       // spaced study leaves gaps >5 min between questions, which would expire the
