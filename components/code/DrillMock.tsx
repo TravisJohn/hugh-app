@@ -41,6 +41,7 @@ const LEVEL_SPEEDUP = 0.85;
  */
 export default function DrillMock({ content }: { content: DrillContent }) {
   const { scenario: SCENARIO, cells: DRILL_CELLS } = content;
+  const cumulative = content.cumulative !== false; // packs (false) run each cell on fresh setup
 
   const emptyCells = useCallback(
     (): CState[] => DRILL_CELLS.map(() => ({ code: "", status: "idle", attempts: 0, usedRef: false, overTime: false, error: null })),
@@ -123,7 +124,8 @@ export default function DrillMock({ content }: { content: DrillContent }) {
     if (snap[i].status === "running" || snap[i].status === "pass") return;
     setCells(prev => prev.map((c, idx) => (idx === i ? { ...c, status: "running", error: null } : c)));
 
-    const preamble = SCENARIO.setupCode + "\n" + snap.slice(0, i).map(c => c.code).join("\n") + "\n";
+    const priors = cumulative ? snap.slice(0, i).map(c => c.code).join("\n") : "";
+    const preamble = SCENARIO.setupCode + "\n" + priors + "\n";
     const res = await runner.run(preamble + snap[i].code, DRILL_CELLS[i].assertions);
 
     // The reference being visible for this cell counts as "helped" — combo only

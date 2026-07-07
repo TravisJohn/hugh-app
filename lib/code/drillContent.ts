@@ -27,6 +27,11 @@ export interface Scenario {
 export interface DrillContent {
   scenario: Scenario;
   cells: DrillCell[];
+  // Scenario drills build on each other (a cell can use an earlier cell's
+  // variable), so each check runs setup + all prior cells. Practice packs are
+  // independent bite-size reps — every cell runs against the fresh setup only.
+  // Omitted / true = cumulative (back-compat); false = independent.
+  cumulative?: boolean;
 }
 
 /**

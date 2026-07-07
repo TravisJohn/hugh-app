@@ -4,21 +4,26 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Wand2 } from "lucide-react";
 import { SAMPLE_DRILL, type DrillContent } from "@/lib/code/drillContent";
+import { getPack } from "@/lib/code/packs";
 import SwarmBackdrop from "./SwarmBackdrop";
 import DrillMock from "./DrillMock";
 
-// Owns the async step between "user picked a learning" and "drill is ready".
-// With a topic it asks /api/code/generate-drill to build a drill for it (showing
-// a build screen), then hands the content to DrillMock. Without a topic — or if
-// generation fails — it falls back to the sample drill so the page always works.
+// Picks the drill content and renders DrillMock.
+// - `pack`: a curated practice pack — static, instant, no LLM (the main path).
+// - `topic`: legacy AI-generated drill via /api/code/generate-drill (build screen
+//   + sample fallback); kept working but no longer linked from the landing.
+// - neither: the sample drill.
 
-export default function DrillLoader({ topic, context, focus }: { topic?: string; context?: string; focus?: string }) {
-  const [content, setContent] = useState<DrillContent | null>(topic ? null : SAMPLE_DRILL);
+export default function DrillLoader({ pack, topic, context, focus }: { pack?: string; topic?: string; context?: string; focus?: string }) {
+  const packContent = pack ? getPack(pack)?.content : undefined;
+  const initial = packContent ?? (topic ? null : SAMPLE_DRILL);
+
+  const [content, setContent] = useState<DrillContent | null>(initial);
   const [failed, setFailed]   = useState(false);
   const started = useRef(false);
 
   useEffect(() => {
-    if (!topic || started.current) return;
+    if (!topic || packContent || started.current) return;
     started.current = true; // guard against React 18 double-invoke in dev
 
     let cancelled = false;
@@ -41,7 +46,7 @@ export default function DrillLoader({ topic, context, focus }: { topic?: string;
     })();
 
     return () => { cancelled = true; };
-  }, [topic, context, focus]);
+  }, [topic, context, focus, packContent]);
 
   if (!content) {
     return (
