@@ -8,7 +8,7 @@ import {
   Lightbulb, Clock,
 } from "lucide-react";
 import { PyodideRunner } from "@/lib/code/pyodideClient";
-import { SCENARIO, DRILL_CELLS, timerSecondsFor } from "@/lib/code/drillContent";
+import { timerSecondsFor, type DrillContent } from "@/lib/code/drillContent";
 import CmEditor from "./CmEditor";
 import ConfettiCanvas, { type ConfettiHandle } from "./ConfettiCanvas";
 import SwarmBackdrop from "./SwarmBackdrop";
@@ -17,9 +17,6 @@ import { useDrillAudio } from "@/hooks/useDrillAudio";
 
 type Status = "idle" | "running" | "pass" | "fail";
 interface CState { code: string; status: Status; attempts: number; usedRef: boolean; overTime: boolean; error: string | null }
-
-const emptyCells = (): CState[] =>
-  DRILL_CELLS.map(() => ({ code: "", status: "idle", attempts: 0, usedRef: false, overTime: false, error: null }));
 
 function comboLabel(c: number): string {
   if (c >= 6) return "Unstoppable!";
@@ -30,18 +27,31 @@ function comboLabel(c: number): string {
 
 // Each round tightens the clock — gentle first pass, faster every repeat.
 const LEVEL_SPEEDUP = 0.85;
-const timeFor = (i: number, round: number): number =>
-  Math.max(8, Math.round(timerSecondsFor(DRILL_CELLS[i]) * Math.pow(LEVEL_SPEEDUP, round - 1)));
 
 /**
- * THROWAWAY UX SPIKE — notebook-drill loop for the future "Code" pillar.
- * The prompt + reference live OUTSIDE the editor (read-only, non-copyable) so
- * you must type from memory rather than uncommenting. Shift+Enter checks a cell
- * against hidden asserts on the result. A learner-controlled Reference toggle
- * replaces the rigid "round 2 = no comments" rule; per-cell Redo + Restart let
- * you re-practice freely. Correct cells fire an escalating celebration.
+ * Notebook-drill loop for the "Code" pillar. The prompt + reference live OUTSIDE
+ * the editor (read-only, non-copyable) so you must type from memory rather than
+ * uncommenting. Shift+Enter checks a cell against hidden asserts on the result.
+ * A learner-controlled Reference toggle replaces the rigid "round 2 = no
+ * comments" rule; per-cell Redo + Restart let you re-practice freely. Correct
+ * cells fire an escalating celebration.
+ *
+ * The drill content (scenario + cells) is passed in — either a generated drill
+ * for the learning the user picked, or the sample fallback (see DrillLoader).
  */
-export default function DrillMock() {
+export default function DrillMock({ content }: { content: DrillContent }) {
+  const { scenario: SCENARIO, cells: DRILL_CELLS } = content;
+
+  const emptyCells = useCallback(
+    (): CState[] => DRILL_CELLS.map(() => ({ code: "", status: "idle", attempts: 0, usedRef: false, overTime: false, error: null })),
+    [DRILL_CELLS],
+  );
+  const timeFor = useCallback(
+    (i: number, round: number): number =>
+      Math.max(8, Math.round(timerSecondsFor(DRILL_CELLS[i]) * Math.pow(LEVEL_SPEEDUP, round - 1))),
+    [DRILL_CELLS],
+  );
+
   const [cells, setCells]       = useState<CState[]>(emptyCells);
   const [round, setRound]       = useState(1);
   const [active, setActive]     = useState(0);
@@ -167,7 +177,7 @@ export default function DrillMock() {
       {/* Header */}
       <header className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-800 bg-[#0A0F1E]/90 px-6 py-3 backdrop-blur">
         <div className="flex items-center gap-4">
-          <Link href="/code" className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300">
+          <Link href="/code/start" className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300">
             <ArrowLeft size={14} /> Back
           </Link>
           <span className="font-semibold text-slate-100">Hugh Code</span>
@@ -232,7 +242,7 @@ export default function DrillMock() {
           <h1 className="font-serif text-xl font-bold text-white">{SCENARIO.title}</h1>
           <p className="mt-1 text-sm italic text-slate-400">{SCENARIO.role}</p>
           <p className="mt-2 text-sm leading-relaxed text-slate-300">{SCENARIO.goal}</p>
-          <div className="mt-3 text-xs text-slate-500">Your data — <code className="text-slate-400">rows</code>:</div>
+          <div className="mt-3 text-xs text-slate-500">Your data:</div>
           <pre className="mt-1.5 overflow-x-auto rounded-lg border border-slate-800 bg-slate-950/60 p-3 text-xs text-slate-400">
 {SCENARIO.setupCode}
           </pre>

@@ -14,7 +14,13 @@ import CodeChat from "./CodeChat";
 // from the server (see app/code/start/page.tsx); "Create your own" stays a light
 // flow. Both paths open the sample drill (/code/drill) until the generator exists.
 
-const DRILL = "/code/drill"; // placeholder target for every path
+// Carry the picked learning / topic to the drill, which generates a drill for it.
+const drillHref = (params: Record<string, string | undefined>) => {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v?.trim()) qs.set(k, v.trim());
+  const q = qs.toString();
+  return q ? `/code/drill?${q}` : "/code/drill";
+};
 
 type Kind = "milestone" | "diary" | "session";
 const KIND_ICON: Record<Kind, typeof BookOpen> = { milestone: BookOpen, diary: PenLine, session: MessageCircle };
@@ -67,7 +73,7 @@ export default function CodeLanding({ learnings }: { learnings: Learning[] }) {
                   return (
                     <Link
                       key={item.id}
-                      href={DRILL}
+                      href={drillHref({ topic: item.label, context: item.meta })}
                       className="group flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/40 px-3.5 py-2.5 transition-colors hover:border-emerald-500/40 hover:bg-slate-900/70"
                     >
                       <Icon size={15} className="shrink-0 text-slate-500" />
@@ -155,7 +161,7 @@ export default function CodeLanding({ learnings }: { learnings: Learning[] }) {
                   </div>
                 </div>
                 <Link
-                  href={DRILL}
+                  href={drillHref({ topic, focus: focus ?? undefined })}
                   aria-disabled={!focus}
                   onClick={e => { if (!focus) e.preventDefault(); }}
                   className={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-white transition-colors ${
@@ -170,7 +176,7 @@ export default function CodeLanding({ learnings }: { learnings: Learning[] }) {
         </div>
 
         <p className="mt-6 text-center text-xs text-slate-600">
-          Spike — every path opens the sample drill for now; on-demand generation comes next.
+          Hugh builds a fresh drill from whatever you pick — it takes a few seconds.
         </p>
       </main>
 
