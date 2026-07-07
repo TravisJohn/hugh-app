@@ -6,12 +6,27 @@
 // so every solution and assertion is pure-Python stdlib over a list-of-dicts
 // dataset named `rows`. That constraint is baked into the prompt.
 
+import { createHash } from "node:crypto";
 import type { DrillCell, DrillContent, Scenario } from "./drillContent";
 
 export interface DrillRequest {
   topic: string;      // what to practise, e.g. "Airflow Core Concepts"
   context?: string;   // where it came from, e.g. "Building Airflow DAGs (track)"
   focus?: string;     // optional lean, e.g. "Aggregating / grouping"
+}
+
+// Bump when the prompt/output shape changes meaningfully — the cache key folds
+// this in, so old cached drills are naturally superseded rather than served stale.
+export const DRILL_PROMPT_VERSION = "1";
+
+// Stable key for the code_drills cache. Drills are generic (keyed by what you're
+// practising, not who you are), so the same topic is shared across users and
+// revisits — and getting the same drill back is a feature for muscle memory.
+export function drillCacheKey(req: DrillRequest): string {
+  const norm = (s?: string) => (s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  // JSON.stringify keeps field boundaries unambiguous (no delimiter char needed).
+  const basis = JSON.stringify([DRILL_PROMPT_VERSION, norm(req.topic), norm(req.context), norm(req.focus)]);
+  return createHash("sha256").update(basis).digest("hex");
 }
 
 const MIN_CELLS = 3;

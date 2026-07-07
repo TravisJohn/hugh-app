@@ -3,7 +3,8 @@
  * Requires: SUPABASE_ACCESS_TOKEN in .env.local
  * Get your token at: https://supabase.com/dashboard/account/tokens
  *
- * Usage: npx tsx scripts/run-migration.ts
+ * Usage: npx tsx scripts/run-migration.ts <migration-file>
+ *   e.g. npx tsx scripts/run-migration.ts 025_code_drills.sql
  */
 import fs from "fs";
 import path from "path";
@@ -43,10 +44,24 @@ if (!projectRef) {
   process.exit(1);
 }
 
+const migrationArg = process.argv[2];
+if (!migrationArg) {
+  console.error(
+    "\nError: no migration file given.\n" +
+      "Usage: npx tsx scripts/run-migration.ts <file>\n" +
+      "  e.g. npx tsx scripts/run-migration.ts 025_code_drills.sql\n"
+  );
+  process.exit(1);
+}
 const migrationPath = path.resolve(
   process.cwd(),
-  "supabase/migrations/001_initial_schema.sql"
+  "supabase/migrations",
+  migrationArg
 );
+if (!fs.existsSync(migrationPath)) {
+  console.error(`Error: migration file not found: ${migrationPath}`);
+  process.exit(1);
+}
 const sql = fs.readFileSync(migrationPath, "utf-8");
 
 async function main() {

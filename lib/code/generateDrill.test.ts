@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseDrill, buildDrillPrompt, DrillParseError } from "./generateDrill";
+import { parseDrill, buildDrillPrompt, drillCacheKey, DrillParseError } from "./generateDrill";
 
 const validCell = { task: "Create x — the total.", why: "It matters.", solution: "x = sum(r['n'] for r in rows)", assertions: "assert x == 3" };
 const valid = {
@@ -51,6 +51,27 @@ describe("parseDrill", () => {
 
   it("throws on non-JSON input", () => {
     expect(() => parseDrill("the model refused to answer")).toThrow(DrillParseError);
+  });
+});
+
+describe("drillCacheKey", () => {
+  it("is stable and case/whitespace-insensitive for the same request", () => {
+    const a = drillCacheKey({ topic: "Airflow Core Concepts" });
+    const b = drillCacheKey({ topic: "  airflow   core concepts " });
+    expect(a).toBe(b);
+    expect(a).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("differs when topic, context, or focus differ", () => {
+    const base = drillCacheKey({ topic: "merges" });
+    expect(drillCacheKey({ topic: "joins" })).not.toBe(base);
+    expect(drillCacheKey({ topic: "merges", context: "pandas track" })).not.toBe(base);
+    expect(drillCacheKey({ topic: "merges", focus: "grouping" })).not.toBe(base);
+  });
+
+  it("does not collide when a token straddles the topic/context boundary", () => {
+    // "a b"/"" must not key the same as "a"/"b".
+    expect(drillCacheKey({ topic: "a b" })).not.toBe(drillCacheKey({ topic: "a", context: "b" }));
   });
 });
 
