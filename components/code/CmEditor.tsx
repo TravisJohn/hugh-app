@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { memo, useMemo, useRef } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { python } from "@codemirror/lang-python";
 import { oneDark } from "@codemirror/theme-one-dark";
@@ -23,8 +23,13 @@ const baseExtensions = [python()];
 /**
  * Thin CodeMirror 6 wrapper shared by the learner editor and Hugh's ghost
  * panel. Python highlighting, one-dark theme, fills its flex parent.
+ *
+ * Memoized: a notebook drill mounts one editor per cell (a dozen+), and every
+ * keystroke / timer tick re-renders the parent. Without memo, all editors would
+ * reconcile CodeMirror on each of those — the source of the typing lag. With
+ * stable handler props from the parent, only the edited cell's editor re-renders.
  */
-export default function CmEditor({ value, onChange, readOnly = false, onSubmit, fontSize = 13 }: Props) {
+function CmEditor({ value, onChange, readOnly = false, onSubmit, fontSize = 13 }: Props) {
   // Call the latest onSubmit via a ref so the keymap extension stays stable.
   const submitRef = useRef(onSubmit);
   submitRef.current = onSubmit;
@@ -63,3 +68,5 @@ export default function CmEditor({ value, onChange, readOnly = false, onSubmit, 
     />
   );
 }
+
+export default memo(CmEditor);

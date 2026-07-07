@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, Play, Check, Loader2, Volume2, VolumeX,
@@ -113,9 +113,9 @@ export default function DrillMock({ content }: { content: DrillContent }) {
     }
   }, [timeLeft, started, active, round, showRefs, revealRef]);
 
-  function setCode(i: number, code: string) {
+  const setCode = useCallback((i: number, code: string) => {
     setCells(prev => prev.map((c, idx) => (idx === i ? { ...c, code } : c)));
-  }
+  }, []);
 
   const runCell = useCallback(async (i: number) => {
     const runner = runnerRef.current;
@@ -155,6 +155,19 @@ export default function DrillMock({ content }: { content: DrillContent }) {
       revealRef(i);
     }
   }, [ready, combo, showRefs, audio, revealRef]);
+
+  // Stable per-cell handlers so the memoized CmEditors don't re-render en masse.
+  // runCell's identity changes with combo/showRefs, so call it through a ref to
+  // keep each cell's onSubmit referentially stable across renders.
+  const runCellRef = useRef(runCell); runCellRef.current = runCell;
+  const codeHandlers = useMemo(
+    () => DRILL_CELLS.map((_, i) => (v: string) => setCode(i, v)),
+    [DRILL_CELLS.length, setCode],
+  );
+  const runHandlers = useMemo(
+    () => DRILL_CELLS.map((_, i) => () => { void runCellRef.current(i); }),
+    [DRILL_CELLS.length],
+  );
 
   function onType(e: React.KeyboardEvent) {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -338,8 +351,8 @@ export default function DrillMock({ content }: { content: DrillContent }) {
                   >
                     <CmEditor
                       value={st.code}
-                      onChange={v => setCode(i, v)}
-                      onSubmit={() => runCell(i)}
+                      onChange={codeHandlers[i]}
+                      onSubmit={runHandlers[i]}
                       readOnly={st.status === "pass"}
                       fontSize={fontSize}
                     />
