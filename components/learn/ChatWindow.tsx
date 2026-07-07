@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Loader2, Sparkles, Code2 } from "lucide-react";
+import { Send, Loader2, Sparkles, Code2, Download } from "lucide-react";
 import ChatBubble from "./ChatBubble";
 import OffTrackNotice from "./OffTrackNotice";
 import SummaryPanel, { type SummaryData } from "./SummaryPanel";
 import PomodoroControl from "./PomodoroControl";
 import { usePomodoroContext } from "./PomodoroProvider";
 import CodeComposer from "@/components/askcode/CodeComposer";
+import { buildTranscriptMarkdown, transcriptFilename } from "@/lib/learn/transcript";
 import { isCodeModeRequest, isCodeModeCommand } from "@/lib/askcode/detect";
 import { fenceCode, mergeCodeExample } from "@/lib/askcode/format";
 import type { ChatResponse } from "@/types/askcode";
@@ -260,6 +261,22 @@ export default function ChatWindow({ topic, goalId, milestoneId, milestoneTitle,
     }
   }
 
+  // Export the whole exchange as a Markdown file — handy for debugging Hugh or
+  // for a learner to attach when flagging something to improve. Browser-only:
+  // build the text, hand it to the browser as a download, clean up the URL.
+  function downloadTranscript() {
+    const md   = buildTranscriptMarkdown(messages, { topic, milestoneTitle, at: new Date() });
+    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href = url;
+    a.download = transcriptFilename(topic);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -280,7 +297,8 @@ export default function ChatWindow({ topic, goalId, milestoneId, milestoneTitle,
     setOfferCooldownUntil(userCount + OFFER_COOLDOWN);
   }
 
-  const canSummarise = messages.length >= 3;
+  const canSummarise  = messages.length >= 3;
+  const hasTranscript = messages.some(m => m.role === "user"); // at least one real exchange
 
   return (
     <div className="flex flex-1 min-h-0 min-w-0">
@@ -291,21 +309,36 @@ export default function ChatWindow({ topic, goalId, milestoneId, milestoneTitle,
         {/* Toolbar */}
         <div className="shrink-0 flex items-center justify-between border-b border-slate-800/50 px-4 py-2">
           <PomodoroControl pomo={pomo} />
-          <button
-            onClick={handleSummarise}
-            disabled={!canSummarise || summarizing}
-            title={canSummarise ? "Summarise this session" : "Have a conversation first"}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-              panelOpen
-                ? "bg-violet-600/20 text-violet-300"
-                : canSummarise
-                ? "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
-                : "cursor-not-allowed text-slate-600"
-            }`}
-          >
-            <Sparkles size={13} />
-            Summarise session
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={downloadTranscript}
+              disabled={!hasTranscript}
+              title={hasTranscript ? "Download this conversation as a Markdown file" : "Have a conversation first"}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                hasTranscript
+                  ? "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
+                  : "cursor-not-allowed text-slate-600"
+              }`}
+            >
+              <Download size={13} />
+              Download transcript
+            </button>
+            <button
+              onClick={handleSummarise}
+              disabled={!canSummarise || summarizing}
+              title={canSummarise ? "Summarise this session" : "Have a conversation first"}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                panelOpen
+                  ? "bg-violet-600/20 text-violet-300"
+                  : canSummarise
+                  ? "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
+                  : "cursor-not-allowed text-slate-600"
+              }`}
+            >
+              <Sparkles size={13} />
+              Summarise session
+            </button>
+          </div>
         </div>
 
         {/* Off-track banner */}
