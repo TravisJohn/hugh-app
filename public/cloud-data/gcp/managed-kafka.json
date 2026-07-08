@@ -1,0 +1,55 @@
+{
+  "id": "managed-kafka",
+  "provider": "gcp",
+  "name": "Managed Service for Apache Kafka",
+  "groups": ["streaming"],
+  "oneLiner": "Fully-managed Apache Kafka on Google Cloud for streaming ingestion.",
+  "whatItIs": "Managed Service for Apache Kafka is Google Cloud's managed offering of real Apache Kafka. Google runs and scales the Kafka clusters, applies patches and handles availability, while keeping the standard open-source Kafka APIs so existing Kafka clients, Kafka Connect and the wider ecosystem work unchanged. Kafka is the industry-standard distributed event log — producers publish to partitioned topics, many consumers read independently with durable retention. On GCP it's the choice for teams specifically committed to Kafka (for its ecosystem or portability) rather than the serverless-native Pub/Sub. It integrates with GCP identity, networking and downstream services like Dataflow and BigQuery.",
+  "inPractice": {
+    "narrative": "Services publish events to Kafka topics on a managed cluster — the durable streaming backbone. A Dataflow pipeline consumes the topics for real-time processing into BigQuery, a Kafka Connect sink lands raw events in Cloud Storage, and other services subscribe independently. Because it's standard Kafka, existing Kafka apps and connectors run without changes. Managed Kafka is the streaming ingestion layer feeding the GCP analytics stack.",
+    "flow": ["Producers (services)", "Managed Kafka (topics)", "Dataflow / Kafka Connect", "BigQuery / Cloud Storage"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Real Apache Kafka", "detail": "Runs open-source Kafka with standard APIs, so Kafka clients, Kafka Connect and Streams work unchanged — portability and ecosystem reuse are the point." },
+    { "term": "Topics, partitions, offsets", "detail": "Producers write to topics partitioned for ordering/parallelism; consumers track offsets and read independently, with retention enabling replay." },
+    { "term": "Managed operations", "detail": "Google provisions brokers, patches, scales and provides availability, removing most of the operational burden of self-run Kafka." },
+    { "term": "GCP integration", "detail": "Wired into IAM, VPC networking and downstream services (Dataflow, BigQuery), so Kafka fits the GCP data stack." },
+    { "term": "Consumer groups", "detail": "A consumer group shares a topic's partitions for scalable parallel consumption; separate groups each get the full stream." },
+    { "term": "Kafka vs Pub/Sub", "detail": "Choose managed Kafka for the Kafka ecosystem/portability; choose Pub/Sub for a fully-serverless, auto-scaling model with no partitions to manage." }
+  ],
+  "whenToUse": [
+    "Teams committed to Apache Kafka and its ecosystem on GCP.",
+    "Streaming ingestion backbones feeding many independent consumers.",
+    "Reusing existing Kafka apps, Connect connectors or Streams.",
+    "Portability where standard Kafka APIs matter.",
+    "High-throughput durable event pipelines with replay."
+  ],
+  "whenNotToUse": [
+    "Fully-serverless messaging with no capacity management — use Pub/Sub.",
+    "Simple task queues/dispatch — use Cloud Tasks.",
+    "Low-volume, occasional messaging where Kafka is overkill.",
+    "Teams without Kafka expertise wanting the least ops surface — Pub/Sub is simpler."
+  ],
+  "keyFacts": [
+    { "label": "Engine", "value": "Managed open-source Apache Kafka." },
+    { "label": "Compatibility", "value": "Standard Kafka APIs, Connect and Streams." },
+    { "label": "Parallelism", "value": "Topics + partitions + consumer groups." },
+    { "label": "Integration", "value": "IAM, VPC, Dataflow, BigQuery." },
+    { "label": "Durability", "value": "Replicated topics with retention/replay." },
+    { "label": "Billing", "value": "Per cluster capacity (vCPU/RAM) + storage + networking." }
+  ],
+  "pricingShape": "Managed Kafka bills for the cluster's provisioned capacity (compute and memory of the brokers) plus storage for retained data and networking — so cost tracks the cluster you keep running, and right-sizing capacity and retention are the main levers. Because Kafka clusters are persistent, there's a baseline cost even at low load, which is the trade-off versus Pub/Sub's serverless pay-per-volume model. Downstream services (Dataflow, BigQuery) and cross-zone traffic are separate. The choice is ecosystem/portability (Kafka) vs zero capacity management (Pub/Sub).",
+  "gotchas": [
+    "Clusters bill continuously — size capacity and retention deliberately to avoid paying for idle brokers.",
+    "You still own Kafka concerns: partitions, consumer lag and rebalancing affect throughput/ordering.",
+    "Ordering is per partition only — partition-key choice determines actual ordering.",
+    "If you don't need the Kafka ecosystem, Pub/Sub is lower-effort and scales without partitions.",
+    "Cross-zone traffic and storage retention add cost at scale — monitor both."
+  ],
+  "equivalents": [
+    { "provider": "aws", "id": "msk", "name": "Amazon MSK", "note": "Managed Kafka on AWS; the direct analogue." },
+    { "provider": "azure", "id": "event-hubs", "name": "Azure Event Hubs", "note": "Kafka-compatible endpoint rather than full managed Kafka clusters." }
+  ],
+  "docsUrl": "https://cloud.google.com/managed-service-for-apache-kafka/docs"
+}

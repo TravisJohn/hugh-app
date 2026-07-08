@@ -1,0 +1,56 @@
+{
+  "id": "rds",
+  "provider": "aws",
+  "name": "Amazon RDS",
+  "short": "Relational Database Service",
+  "groups": ["relational"],
+  "oneLiner": "Managed relational databases (PostgreSQL, MySQL, etc.) — the OLTP source of truth.",
+  "whatItIs": "RDS is AWS's managed relational database service. It runs standard engines — PostgreSQL, MySQL, MariaDB, SQL Server, Oracle — and handles the operational grind: provisioning, patching, backups, replication and failover. It's a transactional (OLTP) database: strong consistency, joins, transactions, indexes — the system of record behind applications. In a data platform, RDS is usually a source, not a destination: the operational database whose data gets replicated (via CDC/DMS) into the lake and warehouse for analytics. Amazon Aurora is AWS's cloud-native, higher-performance relational engine in the same family.",
+  "inPractice": {
+    "narrative": "An application records orders and customers in an RDS PostgreSQL instance — fast, consistent, transactional writes. Analytics doesn't query that production database directly (it would compete with the app); instead, AWS DMS captures changes and streams them into S3/Redshift, where reporting happens. So RDS is the operational source of truth at the front of the pipeline, and its data flows outward to the analytical world rather than being analysed in place.",
+    "flow": ["Application (transactions)", "Amazon RDS (OLTP)", "DMS / CDC", "S3 lake → Redshift", "BI"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Managed engines", "detail": "Runs PostgreSQL, MySQL, MariaDB, SQL Server and Oracle. You get the real engine and SQL; AWS manages the host, patching and backups." },
+    { "term": "OLTP, not OLAP", "detail": "Row-oriented, transactional, strongly consistent — built for many small reads/writes with joins and integrity, not big analytical scans." },
+    { "term": "Multi-AZ high availability", "detail": "Multi-AZ deploys a synchronous standby in another zone with automatic failover, so a zone failure doesn't take the database down." },
+    { "term": "Read replicas", "detail": "Asynchronous read replicas offload read traffic and can serve reporting; they scale reads but aren't for heavy analytics." },
+    { "term": "Backups & PITR", "detail": "Automated backups and snapshots enable point-in-time recovery within a retention window — data protection without custom tooling." },
+    { "term": "Aurora sibling", "detail": "Amazon Aurora is a MySQL/PostgreSQL-compatible, cloud-native engine with a distributed storage layer for more performance and durability — same RDS management, different internals." }
+  ],
+  "whenToUse": [
+    "The transactional system of record behind an application.",
+    "Workloads needing joins, transactions, constraints and strong consistency.",
+    "Lifting an existing PostgreSQL/MySQL/SQL Server database to a managed service.",
+    "Operational data that will later feed the lake/warehouse via CDC.",
+    "Moderate read scaling via read replicas."
+  ],
+  "whenNotToUse": [
+    "Large analytical scans, aggregations and BI — use Redshift/Athena; don't hammer the OLTP DB.",
+    "Massive-scale key-value/serverless access patterns — use DynamoDB.",
+    "Petabyte data lakes — that's S3, not a relational instance.",
+    "Extreme write throughput beyond a single primary — consider Aurora or a distributed store."
+  ],
+  "keyFacts": [
+    { "label": "Type", "value": "Managed relational (OLTP) database." },
+    { "label": "Engines", "value": "PostgreSQL, MySQL, MariaDB, SQL Server, Oracle." },
+    { "label": "HA", "value": "Multi-AZ synchronous standby with automatic failover." },
+    { "label": "Read scaling", "value": "Asynchronous read replicas." },
+    { "label": "Recovery", "value": "Automated backups + point-in-time recovery." },
+    { "label": "Billing", "value": "Per instance-hour + storage + I/O + backups (or Aurora pricing)." }
+  ],
+  "pricingShape": "RDS bills for the database instance (per-hour by instance class, running continuously unless stopped), plus provisioned storage, I/O, backup storage beyond the free allotment, and data transfer. Multi-AZ roughly doubles instance cost for the standby, and each read replica is another billed instance. Because the primary runs 24/7, cost is steady — the levers are right-sizing the instance class, using Reserved Instances for steady workloads, and not over-provisioning replicas. Aurora prices differently (compute + consumption-based storage/IO or Serverless v2 capacity units).",
+  "gotchas": [
+    "Running analytics on the production RDS competes with the app — replicate to the lake/warehouse instead.",
+    "Multi-AZ doubles instance cost (standby) and each read replica adds another instance bill.",
+    "A single primary caps write throughput; scaling writes means Aurora or sharding, not more replicas.",
+    "Storage autoscaling and I/O can surprise on the bill for write-heavy workloads.",
+    "Engine major-version upgrades need testing and planned downtime/failover — they aren't invisible."
+  ],
+  "equivalents": [
+    { "provider": "gcp", "id": "cloud-sql", "name": "Cloud SQL", "note": "Managed PostgreSQL/MySQL/SQL Server; the direct analogue on GCP (Spanner for global scale)." },
+    { "provider": "azure", "id": "azure-sql-database", "name": "Azure SQL Database", "note": "Managed SQL Server-based relational database; Azure's OLTP analogue." }
+  ],
+  "docsUrl": "https://docs.aws.amazon.com/rds/"
+}

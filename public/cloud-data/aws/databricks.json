@@ -1,0 +1,55 @@
+{
+  "id": "databricks",
+  "provider": "aws",
+  "name": "Databricks on AWS",
+  "groups": ["compute"],
+  "oneLiner": "Lakehouse platform — managed Spark, Delta Lake and ML on AWS.",
+  "whatItIs": "Databricks is a unified analytics platform built by the original creators of Apache Spark, running on AWS as a first-class deployment. Its big idea is the lakehouse: combine the cheap, open storage of a data lake (S3) with the reliability and performance of a warehouse, using the open Delta Lake table format (ACID transactions on files). One platform covers data engineering (Spark ETL), SQL analytics (Databricks SQL warehouses), and ML/AI — with collaborative notebooks, job scheduling and Unity Catalog governance. It's a popular alternative to stitching EMR + Glue + Redshift together, and it's cloud-portable (near-identical across AWS, Azure and GCP).",
+  "inPractice": {
+    "narrative": "Raw data lands in S3. Databricks jobs run Spark to clean and transform it into Delta tables organised as bronze/silver/gold layers, all sitting in S3 but with ACID guarantees and time travel. Analysts query the gold tables via Databricks SQL, data scientists train models on the same data with MLflow, and Unity Catalog governs who sees what. One platform spans the whole flow from raw lake files to BI and ML.",
+    "flow": ["S3 (raw)", "Databricks (Spark + Delta Lake)", "Delta gold tables", "Databricks SQL / ML"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Lakehouse", "detail": "Warehouse-like reliability (ACID, schema, performance) directly on open lake storage — one copy of data serving both ETL/ML and SQL analytics, avoiding a separate warehouse silo." },
+    { "term": "Delta Lake", "detail": "An open table format adding ACID transactions, schema enforcement, upserts/merges and time travel to Parquet files in S3 — the foundation of the lakehouse." },
+    { "term": "Clusters & Photon", "detail": "Managed Spark clusters (auto-scaling, spot-capable) run workloads; the Photon engine accelerates SQL/DataFrame queries. Serverless options remove cluster management." },
+    { "term": "Databricks SQL", "detail": "SQL warehouses and a query/dashboard experience over lakehouse tables, so analysts get warehouse-style BI without moving data out." },
+    { "term": "Unity Catalog", "detail": "Centralised governance — catalog, lineage, and fine-grained access across all workspaces and data assets." },
+    { "term": "MLflow & notebooks", "detail": "Collaborative notebooks plus MLflow for experiment tracking, model registry and deployment — data engineering and ML on one platform." }
+  ],
+  "whenToUse": [
+    "A unified lakehouse for ETL, SQL analytics and ML on AWS.",
+    "Large-scale Spark data engineering with reliable Delta tables.",
+    "Teams wanting one platform instead of EMR + Glue + Redshift + notebooks.",
+    "Collaborative data science with MLflow and notebooks.",
+    "Multi-cloud portability of a consistent platform."
+  ],
+  "whenNotToUse": [
+    "Simple serverless ETL with no platform needs — Glue may be lighter.",
+    "Pure SQL-over-S3 exploration only — Athena is simpler/cheaper.",
+    "Small workloads that don't justify the platform cost/complexity.",
+    "Teams wanting fully AWS-native, single-vendor tooling only."
+  ],
+  "keyFacts": [
+    { "label": "Type", "value": "Lakehouse platform (Spark + Delta Lake) on AWS." },
+    { "label": "Storage", "value": "Open Delta tables on S3 (your account)." },
+    { "label": "Engines", "value": "Spark clusters, Photon, serverless SQL warehouses." },
+    { "label": "Governance", "value": "Unity Catalog (catalog, lineage, access)." },
+    { "label": "ML", "value": "MLflow, notebooks, model registry." },
+    { "label": "Billing", "value": "DBUs (Databricks) + AWS compute/storage underneath." }
+  ],
+  "pricingShape": "Databricks bills in DBUs (Databricks Units) — a usage measure that varies by workload type (jobs vs all-purpose vs SQL) and tier — on top of the raw AWS EC2/S3 you pay AWS directly. So there are two bills: the AWS infrastructure and the Databricks DBU premium. Levers: use job clusters (cheaper than all-purpose) for scheduled work, auto-terminate idle clusters, use spot instances and Photon/serverless for efficiency, and right-size clusters. Idle all-purpose clusters are the classic waste — they burn both EC2 and DBUs while nobody's running anything.",
+  "gotchas": [
+    "Idle all-purpose clusters bill both DBUs and EC2 — set aggressive auto-termination.",
+    "Two cost layers (DBUs + cloud infra) make spend easy to underestimate — model both.",
+    "Job clusters are much cheaper than all-purpose for scheduled work — don't run pipelines on interactive clusters.",
+    "Delta gives ACID but small-file and OPTIMIZE/VACUUM maintenance still matter for performance/cost.",
+    "Unity Catalog setup and workspace/account structure need planning to govern cleanly at scale."
+  ],
+  "equivalents": [
+    { "provider": "gcp", "id": "databricks", "name": "Databricks on Google Cloud", "note": "Same platform on GCP over Cloud Storage." },
+    { "provider": "azure", "id": "databricks", "name": "Azure Databricks", "note": "First-party Azure service; same platform, deeper Azure integration." }
+  ],
+  "docsUrl": "https://docs.databricks.com/aws/"
+}

@@ -1,0 +1,55 @@
+{
+  "id": "synapse-analytics",
+  "provider": "azure",
+  "name": "Azure Synapse Analytics",
+  "groups": ["warehouse"],
+  "oneLiner": "Enterprise analytics uniting a dedicated SQL warehouse, Spark and pipelines.",
+  "whatItIs": "Synapse Analytics is Azure's integrated analytics platform: it bundles a provisioned data warehouse (the dedicated SQL pool), an on-demand serverless SQL engine, Apache Spark pools, and data-integration pipelines (the same engine as Data Factory) under one Studio. The idea is a single place to ingest, prepare, warehouse and serve data. The classic 'warehouse' inside it is the dedicated SQL pool — a massively-parallel columnar store you provision and scale. (Microsoft is steering new work toward Microsoft Fabric, which reimagines much of this as SaaS, but Synapse remains widely deployed.)",
+  "inPractice": {
+    "narrative": "Curated data sits in ADLS. Synapse Pipelines or Spark shape it, then load it into a dedicated SQL pool modelled as a star schema. Power BI connects to the SQL pool for reporting. Because everything lives in one Studio, the same team ingests, transforms and serves without stitching separate services together. The dedicated SQL pool is the fast serving layer at the end.",
+    "flow": ["ADLS (curated)", "Synapse Pipelines / Spark", "Dedicated SQL pool (star schema)", "Power BI"],
+    "highlight": 2
+  },
+  "coreConcepts": [
+    { "term": "Dedicated SQL pool", "detail": "The provisioned MPP warehouse (measured in DWUs). Columnar storage, distributions and partitions like other MPP warehouses; you scale DWUs up/down or pause to save cost." },
+    { "term": "Serverless SQL pool", "detail": "An always-available, on-demand engine that queries files in ADLS with no provisioning, billed per TB processed — good for exploration and lightweight serving." },
+    { "term": "Distributions", "detail": "Hash, round-robin or replicated distribution controls how rows spread across the 60 underlying distributions — choosing hash keys well avoids data movement in joins." },
+    { "term": "Apache Spark pools", "detail": "Managed Spark inside Synapse for big-data transformation and ML, sharing the same workspace, storage and security as the SQL engines." },
+    { "term": "Synapse Pipelines", "detail": "The Data Factory integration engine embedded in Synapse for orchestrating copy and transform activities." },
+    { "term": "Pause & scale", "detail": "The dedicated pool can be paused (stops compute billing, keeps storage) and resized — the main cost control for non-24x7 warehouses." }
+  ],
+  "whenToUse": [
+    "A Microsoft-stack enterprise warehouse feeding Power BI.",
+    "Teams wanting warehouse SQL, Spark and pipelines in one governed workspace.",
+    "Modelled, curated data served at scale to many BI users.",
+    "Mixing serverless exploration of the lake with a provisioned warehouse for serving.",
+    "Organisations already standardised on Azure AD, ADLS and Power BI."
+  ],
+  "whenNotToUse": [
+    "OLTP and single-row transactions — use Azure SQL Database or Cosmos DB.",
+    "Small/simple analytics where a full platform is overkill — serverless SQL or a database may do.",
+    "Greenfield builds where Microsoft now steers you to Fabric — weigh that first.",
+    "Very spiky, rare querying where a provisioned pool would idle — use serverless SQL."
+  ],
+  "keyFacts": [
+    { "label": "Warehouse engine", "value": "Dedicated SQL pool — provisioned MPP, sized in DWUs." },
+    { "label": "On-demand engine", "value": "Serverless SQL pool — pay per TB processed over ADLS files." },
+    { "label": "Also includes", "value": "Apache Spark pools + Synapse (Data Factory) Pipelines." },
+    { "label": "Storage", "value": "Works over ADLS Gen2; columnar storage in the dedicated pool." },
+    { "label": "Cost control", "value": "Pause and scale the dedicated pool; serverless bills only on query." },
+    { "label": "Direction", "value": "Microsoft Fabric is the newer SaaS successor for greenfield." }
+  ],
+  "pricingShape": "The dedicated SQL pool bills per hour by DWU size while it's running (pause it and compute billing stops; storage persists) — so right-sizing and pausing off-hours is the main saver. The serverless SQL pool bills per TB of data processed with nothing to provision. Spark pools bill per vCore-hour while a session runs, and pipelines bill by activity/data-movement. Storage in ADLS is separate. Net: a provisioned warehouse you must manage for cost, alongside pay-per-use serverless and Spark for spiky work.",
+  "gotchas": [
+    "A running dedicated pool bills continuously — forgetting to pause a dev/test pool is a common waste.",
+    "Distribution choice (hash key) makes or breaks join performance in the dedicated pool.",
+    "Serverless and dedicated pools are different engines with different features/limits — code isn't always portable between them.",
+    "Microsoft is investing in Fabric; check whether new projects should start there instead.",
+    "Loading is fastest via PolyBase/COPY from ADLS in the right format — row-by-row inserts are slow."
+  ],
+  "equivalents": [
+    { "provider": "aws", "id": "redshift", "name": "Amazon Redshift", "note": "Closest provisioned-MPP-warehouse analogue to the dedicated SQL pool." },
+    { "provider": "gcp", "id": "bigquery", "name": "BigQuery", "note": "Serverless-first; closer to Synapse's serverless SQL pool than the dedicated pool." }
+  ],
+  "docsUrl": "https://learn.microsoft.com/azure/synapse-analytics/"
+}

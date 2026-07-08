@@ -1,0 +1,56 @@
+{
+  "id": "emr",
+  "provider": "aws",
+  "name": "Amazon EMR",
+  "short": "Elastic MapReduce",
+  "groups": ["compute"],
+  "oneLiner": "Managed Spark, Hadoop, Hive and Presto clusters for big-data processing.",
+  "whatItIs": "EMR is AWS's managed big-data platform: it runs open-source frameworks — Apache Spark, Hadoop, Hive, Presto/Trino, HBase, Flink — on clusters AWS provisions and manages for you. You get the full control of real Spark/Hadoop (custom versions, libraries, tuning, notebooks) without hand-building the cluster. It reads and writes S3 as its data lake, and comes in three flavours: on EC2 (most control), on EKS (Kubernetes), and EMR Serverless (no cluster sizing). It's the heavy-lifting compute layer for large-scale, code-first data processing and ML.",
+  "inPractice": {
+    "narrative": "A team has terabytes of raw data in S3 and complex Spark transformations that need custom libraries and tuning. They run an EMR cluster (or EMR Serverless) executing PySpark jobs that read from S3, process at scale, and write curated Parquet back to S3, updating the Glue Data Catalog. Athena and Redshift then query the results. EMR is chosen over Glue when the team wants full Spark control, specific engine versions, or interactive notebooks.",
+    "flow": ["S3 (raw)", "EMR Spark cluster", "S3 (curated Parquet) + Glue Catalog", "Athena / Redshift"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Cluster deployment options", "detail": "EMR on EC2 (classic, most control), EMR on EKS (run on your Kubernetes), and EMR Serverless (submit jobs, no cluster to size) — same frameworks, different ops models." },
+    { "term": "Frameworks", "detail": "Bundles Spark, Hadoop/YARN, Hive, Presto/Trino, HBase, Flink and more; you choose the release with specific open-source versions." },
+    { "term": "Decoupled storage (EMRFS)", "detail": "Data lives in S3, not on the cluster, so clusters are transient compute you can kill after a job without losing data — the cloud-native pattern versus on-prem HDFS." },
+    { "term": "Instance fleets & Spot", "detail": "Mix on-demand and Spot instances across types/AZs; Spot can cut big-job cost dramatically, at the risk of interruptions on task nodes." },
+    { "term": "Transient vs long-running", "detail": "Spin a cluster up for one job then terminate (cheap, batch), or keep a long-running cluster for interactive/steady work." },
+    { "term": "Notebooks & Studio", "detail": "EMR Studio/notebooks give interactive Spark development against clusters for data science and exploration." }
+  ],
+  "whenToUse": [
+    "Large-scale, code-first Spark/Hadoop processing needing full control.",
+    "Specific open-source engine versions or custom libraries Glue can't give you.",
+    "Interactive, notebook-driven big-data development and ML.",
+    "Cost optimisation via Spot instances on huge batch jobs.",
+    "Migrating existing Hadoop/Spark workloads to a managed cloud platform."
+  ],
+  "whenNotToUse": [
+    "Simple serverless ETL where you don't want any cluster concept — use Glue.",
+    "Pure SQL-over-S3 exploration — Athena is lighter.",
+    "Tiny/occasional jobs where cluster spin-up overhead dominates — Glue/Lambda fit better.",
+    "Teams without the skills/appetite to tune Spark and manage cluster config."
+  ],
+  "keyFacts": [
+    { "label": "Frameworks", "value": "Spark, Hadoop, Hive, Presto/Trino, HBase, Flink, etc." },
+    { "label": "Deploy modes", "value": "EMR on EC2, EMR on EKS, EMR Serverless." },
+    { "label": "Storage", "value": "S3-backed (EMRFS); clusters are transient compute." },
+    { "label": "Cost saver", "value": "Spot instances and transient clusters." },
+    { "label": "Control", "value": "Full version/library/tuning control vs serverless Glue." },
+    { "label": "Billing", "value": "EC2/EKS resources + EMR per-instance uplift, or Serverless per-usage." }
+  ],
+  "pricingShape": "On EC2/EKS you pay for the underlying instances plus a small EMR per-instance surcharge for the time the cluster runs — so transient clusters (spin up, run, terminate) and Spot instances are the big savers; a forgotten long-running cluster burns money. EMR Serverless instead bills for the vCPU/memory your jobs actually consume, with no cluster to leave idle. Storage is separate in S3. Net: EC2 mode rewards disciplined cluster lifecycle management; Serverless trades some control for pay-per-job simplicity.",
+  "gotchas": [
+    "A long-running cluster left up over a weekend is a classic large surprise bill — terminate transient clusters.",
+    "Spot interruptions can kill task nodes mid-job; use them for task (not core) nodes and design for retries.",
+    "It's real Spark/Hadoop — you own tuning (executors, memory, partitions); defaults are rarely optimal for big jobs.",
+    "Version upgrades of the EMR release can change framework behaviour; pin and test.",
+    "More operational surface than Glue — right choice only when you actually need the control."
+  ],
+  "equivalents": [
+    { "provider": "gcp", "id": "dataproc", "name": "Dataproc", "note": "Managed Spark/Hadoop; very close analogue with fast-starting ephemeral clusters." },
+    { "provider": "azure", "id": "hdinsight", "name": "Azure HDInsight", "note": "Managed open-source clusters; Databricks is the popular alternative on Azure." }
+  ],
+  "docsUrl": "https://docs.aws.amazon.com/emr/"
+}

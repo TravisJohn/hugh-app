@@ -1,0 +1,55 @@
+{
+  "id": "bigquery",
+  "provider": "gcp",
+  "name": "BigQuery",
+  "groups": ["warehouse"],
+  "oneLiner": "Serverless, petabyte-scale data warehouse with decoupled storage and compute.",
+  "whatItIs": "BigQuery is Google Cloud's data warehouse, and it's serverless in the fullest sense: there's no cluster to size, start or tune — you write SQL and Google runs it across thousands of machines behind the scenes. Storage and compute are fully separated, so data sits cheaply and you pay for the compute a query uses (or for reserved capacity). It scans huge tables fast, handles streaming inserts, and has built-in ML (BigQuery ML) and now generative-AI functions. For many teams BigQuery is the whole analytics platform, not just the warehouse.",
+  "inPractice": {
+    "narrative": "Data arrives two ways: batch files loaded from Cloud Storage, and streaming rows pushed via the Storage Write API. Analysts write SQL in BigQuery to model and aggregate it — no infrastructure to manage — and Looker or Looker Studio dashboards read straight from BigQuery. Because it's serverless, a nightly transform and an ad-hoc analyst query use the same engine with no cluster to keep warm. BigQuery is both the store and the query engine.",
+    "flow": ["Cloud Storage / streaming", "BigQuery (load or external)", "BigQuery SQL + BI Engine", "Looker dashboards"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Serverless + separated storage/compute", "detail": "No nodes to manage. Storage is billed per GB; query compute is billed separately (per TB scanned on-demand, or via reserved slots). This separation is why it scales so transparently." },
+    { "term": "Slots", "detail": "A slot is a unit of query compute. On-demand queries draw from a shared pool; editions/reservations let you buy dedicated slot capacity for predictable cost and concurrency." },
+    { "term": "Partitioning & clustering", "detail": "Partition tables by date/integer to prune scans, and cluster by common filter columns to co-locate related rows. Together they cut bytes scanned — the main cost and speed lever." },
+    { "term": "Streaming & Storage Write API", "detail": "Rows can be inserted in near-real-time and queried within seconds, so BigQuery serves both batch and fresh data without a separate system." },
+    { "term": "BigQuery ML & AI", "detail": "Train and run models (regression, clustering, time-series, and calls to Vertex/Gemini) with SQL — no data export needed for many ML tasks." },
+    { "term": "External & BigLake tables", "detail": "Query files in Cloud Storage (or other clouds) in place; BigLake adds fine-grained governance over those external tables." }
+  ],
+  "whenToUse": [
+    "A serverless analytics warehouse where you don't want to manage clusters.",
+    "Fast SQL over huge datasets for BI, reporting and exploration.",
+    "Workloads mixing batch and near-real-time streamed data.",
+    "In-warehouse ML/AI via BigQuery ML without moving data.",
+    "Spiky or unpredictable query patterns (on-demand billing scales to zero when idle)."
+  ],
+  "whenNotToUse": [
+    "OLTP: single-row lookups and high-frequency updates — use Cloud SQL, Spanner or Firestore.",
+    "Very high-concurrency low-latency app queries — put a serving/cache layer in front.",
+    "Frequent small point mutations to individual rows — it's scan-optimised, not row-update-optimised.",
+    "When strict, capped monthly cost is essential and queries are unbounded — use reservations, not on-demand."
+  ],
+  "keyFacts": [
+    { "label": "Model", "value": "Serverless, columnar MPP warehouse; storage and compute separated." },
+    { "label": "Compute billing", "value": "On-demand per TB scanned, or reserved slots (Editions)." },
+    { "label": "Storage billing", "value": "Per GB-month (active vs long-term auto-discounted)." },
+    { "label": "Freshness", "value": "Streaming inserts queryable within seconds." },
+    { "label": "Built-in", "value": "BigQuery ML, geospatial, search, external/BigLake tables." },
+    { "label": "Ops", "value": "Nothing to provision, patch or scale." }
+  ],
+  "pricingShape": "Two compute models: on-demand (pay per TB scanned — scales to zero when idle, but an unbounded SELECT * is a real bill) or Editions/reservations (buy slot capacity for predictable cost and concurrency). Storage is separate and cheap, with automatic long-term discounts for untouched data. The dominant lever is bytes scanned: partitioning, clustering, selecting only needed columns, and avoiding SELECT * are what keep on-demand costs sane. Reservations plus a per-user/query bytes limit are how teams cap spend at scale.",
+  "gotchas": [
+    "On-demand billing is per byte scanned, so SELECT * over a wide table is expensive even for a few rows — always project columns and filter partitions.",
+    "Streaming inserts have their own cost and quotas, and streamed data has a short buffer before it's fully optimised.",
+    "Unpartitioned/unclustered big tables scan fully every time — the top cause of surprise bills.",
+    "It's not for OLTP; frequent single-row DML is slow and can hit quota limits.",
+    "Cross-region queries and data movement have rules and costs — keep datasets and compute co-located."
+  ],
+  "equivalents": [
+    { "provider": "aws", "id": "redshift", "name": "Amazon Redshift", "note": "Provisioned clusters by default (Serverless option exists); BigQuery is serverless-first." },
+    { "provider": "azure", "id": "synapse-analytics", "name": "Synapse Analytics", "note": "Dedicated SQL pool is provisioned; serverless SQL is closer to BigQuery on-demand." }
+  ],
+  "docsUrl": "https://cloud.google.com/bigquery/docs"
+}

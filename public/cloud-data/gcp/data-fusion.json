@@ -1,0 +1,55 @@
+{
+  "id": "data-fusion",
+  "provider": "gcp",
+  "name": "Cloud Data Fusion",
+  "groups": ["integration"],
+  "oneLiner": "Managed, visual (CDAP) data-integration and ETL pipelines.",
+  "whatItIs": "Cloud Data Fusion is Google Cloud's managed, mostly code-free data-integration service, built on the open-source CDAP project. You build pipelines by dragging and connecting nodes — sources, transforms, sinks — in a visual studio, and Data Fusion runs them by spinning up ephemeral Dataproc (Spark) clusters under the hood. It's aimed at teams who want ETL/ELT with connectors and lineage without hand-writing Spark, while still landing data in Cloud Storage or BigQuery. Think of it as the visual, connector-rich integration layer on GCP.",
+  "inPractice": {
+    "narrative": "A data engineer needs to pull from databases, SaaS APIs and files, clean and join them, and land the result in BigQuery. Rather than writing Spark, they assemble a Data Fusion pipeline visually with pre-built connectors and transforms. When it runs, Data Fusion provisions an ephemeral Dataproc cluster, executes, and tears it down. Lineage and metadata are captured automatically. Analysts then query the loaded tables in BigQuery.",
+    "flow": ["Databases / SaaS / files", "Data Fusion pipeline (visual)", "ephemeral Dataproc (Spark)", "BigQuery / Cloud Storage", "Looker"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Visual pipelines (CDAP)", "detail": "Pipelines are graphs of plug-in nodes (sources, transforms, sinks) built in a UI; the underlying engine is open-source CDAP, so pipelines are portable and extensible." },
+    { "term": "Runs on ephemeral Dataproc", "detail": "Execution happens on Dataproc Spark clusters that Data Fusion creates per run and deletes after — you get Spark scale without managing clusters." },
+    { "term": "Connectors / plugins", "detail": "A large library of pre-built connectors (databases, SaaS, storage) and transforms; you can add custom plugins for gaps." },
+    { "term": "Wrangler", "detail": "An interactive UI for exploring a data sample and building cleansing/transform steps by example, which become pipeline logic." },
+    { "term": "Lineage & metadata", "detail": "Field- and dataset-level lineage is captured automatically, aiding governance and debugging of where data came from." },
+    { "term": "Editions & instances", "detail": "You run a Data Fusion instance (Developer/Basic/Enterprise editions) that hosts the designer and pipeline runtime; the instance itself bills hourly." }
+  ],
+  "whenToUse": [
+    "Code-free / low-code ETL for teams that prefer visual pipeline building.",
+    "Integrating many sources (databases, SaaS, files) with pre-built connectors.",
+    "ELT into BigQuery or Cloud Storage with built-in lineage.",
+    "Migrating existing CDAP/Hadoop-era pipelines to managed GCP.",
+    "Standardising integration with governance and metadata across teams."
+  ],
+  "whenNotToUse": [
+    "Simple, code-first Spark ETL where engineers prefer Dataflow/Dataproc directly.",
+    "Real-time low-latency streaming as the core need — Dataflow/Pub-Sub fit better.",
+    "Tiny/occasional jobs where a running instance's hourly cost isn't justified.",
+    "Highly custom logic that fights the visual model — plain code may be simpler."
+  ],
+  "keyFacts": [
+    { "label": "Style", "value": "Visual / low-code pipelines (open-source CDAP)." },
+    { "label": "Execution", "value": "Ephemeral Dataproc (Spark) clusters per run." },
+    { "label": "Connectors", "value": "Large library of sources, transforms and sinks; extensible." },
+    { "label": "Governance", "value": "Automatic field/dataset lineage and metadata." },
+    { "label": "Billing", "value": "Per-hour Data Fusion instance + Dataproc compute per run." },
+    { "label": "Editions", "value": "Developer / Basic / Enterprise." }
+  ],
+  "pricingShape": "Two cost layers: the Data Fusion instance itself bills per hour by edition (Enterprise costs notably more than Developer) for the time the instance exists — this runs even when no pipeline is executing, so teams sometimes stop instances off-hours. Then each pipeline run bills for the ephemeral Dataproc compute it uses. Net: a fixed-ish instance cost plus variable per-run compute. For light or bursty use, the always-on instance charge can dominate, so it's most economical when the instance is well-utilised.",
+  "gotchas": [
+    "The Data Fusion instance bills hourly even when idle — an unused Enterprise instance is a real recurring cost.",
+    "It launches Dataproc clusters under the hood; misconfigured compute profiles waste money or slow runs.",
+    "Startup latency per run (cluster spin-up) makes it poor for very frequent tiny jobs.",
+    "Visual pipelines get unwieldy for very complex logic; some tasks are cleaner in code.",
+    "Custom plugins/versions add maintenance; keep an eye on CDAP/Data Fusion version upgrades."
+  ],
+  "equivalents": [
+    { "provider": "aws", "id": "glue", "name": "AWS Glue", "note": "Serverless Spark ETL + catalog; Glue Studio offers a visual mode too." },
+    { "provider": "azure", "id": "data-factory", "name": "Azure Data Factory", "note": "Visual integration + orchestration across many connectors." }
+  ],
+  "docsUrl": "https://cloud.google.com/data-fusion/docs"
+}

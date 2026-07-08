@@ -1,0 +1,55 @@
+{
+  "id": "workflows",
+  "provider": "gcp",
+  "name": "Cloud Workflows",
+  "groups": ["orchestration"],
+  "oneLiner": "Serverless orchestration of Google Cloud services and APIs as steps.",
+  "whatItIs": "Cloud Workflows is Google Cloud's serverless orchestration service. You define a workflow in YAML (or JSON) as a series of steps that call Google Cloud APIs, Cloud Functions, Cloud Run, or any HTTP endpoint, with conditionals, loops, error handling and retries. Workflows executes it, managing state and control flow, with nothing to provision and pay-per-step billing. It's aimed at connecting services and automating processes — the lightweight, event-driven counterpart to Cloud Composer (managed Airflow): where Composer suits complex data-pipeline DAGs, Workflows shines for serverless service orchestration and glue where an always-on Airflow environment would be overkill.",
+  "inPractice": {
+    "narrative": "An event triggers a small pipeline: call a Cloud Function to validate, start a Dataflow job, wait for it, then load a BigQuery table and publish a Pub/Sub message — with retries on failure. A Cloud Workflows YAML definition models those steps, calling each service's API directly and handling errors, with no orchestration server running between executions. It bills per step executed. Workflows is the serverless conductor for GCP service orchestration.",
+    "flow": ["Event / schedule", "Cloud Workflows (YAML steps)", "Cloud Functions / Dataflow / BigQuery", "result + Pub/Sub"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "YAML/JSON step definitions", "detail": "Workflows are declarative sequences of steps with assignments, conditions (switch), loops, and calls — versionable and readable, executed by the managed service." },
+    { "term": "Service & HTTP connectors", "detail": "Steps call Google Cloud APIs via built-in connectors, or any HTTP endpoint, so it orchestrates GCP services and external APIs alike without glue code." },
+    { "term": "Error handling & retries", "detail": "Try/retry/except semantics with configurable backoff make workflows resilient to transient failures declaratively." },
+    { "term": "Serverless & event-driven", "detail": "No infrastructure to run; triggered by Cloud Scheduler, Eventarc events or direct calls, and it scales automatically — pay only per step." },
+    { "term": "Waits & callbacks", "detail": "Steps can sleep/poll or wait for a callback, coordinating long-running or human-in-the-loop processes." },
+    { "term": "Workflows vs Composer", "detail": "Workflows is lightweight serverless orchestration/glue; Cloud Composer (Airflow) is the choice for rich data-pipeline DAGs, backfills and the Airflow ecosystem." }
+  ],
+  "whenToUse": [
+    "Serverless orchestration of GCP services and APIs without a server.",
+    "Event-driven automation and service-to-service glue.",
+    "Coordinating steps with conditionals, loops, retries and waits.",
+    "Lightweight pipeline orchestration where Composer/Airflow is overkill.",
+    "Calling external HTTP APIs as part of an automated process."
+  ],
+  "whenNotToUse": [
+    "Complex data-pipeline DAGs with backfills and the Airflow ecosystem — use Cloud Composer.",
+    "Heavy data transformation in the orchestrator — call Dataflow/Dataproc instead.",
+    "Long-running stateful stream processing — that's Dataflow.",
+    "Simple single-function triggers — Eventarc + a function may suffice."
+  ],
+  "keyFacts": [
+    { "label": "Type", "value": "Serverless workflow orchestration." },
+    { "label": "Definition", "value": "YAML/JSON steps with conditionals, loops, error handling." },
+    { "label": "Calls", "value": "GCP API connectors, Cloud Functions/Run, any HTTP endpoint." },
+    { "label": "Triggers", "value": "Cloud Scheduler, Eventarc, or direct invocation." },
+    { "label": "Contrast", "value": "Lightweight vs Cloud Composer's Airflow DAGs." },
+    { "label": "Billing", "value": "Per step executed (internal vs external steps priced differently)." }
+  ],
+  "pricingShape": "Cloud Workflows bills per step executed, with external/HTTP-callout steps priced higher than internal steps, and a free monthly allotment. There's no server, so idle workflows cost nothing and cost scales with steps run — very cheap for typical orchestration volumes. Downstream services (Dataflow, Functions, BigQuery) are billed separately. The levers are keeping step counts reasonable and minimising unnecessary external callouts. For heavy data-pipeline orchestration you'd weigh Cloud Composer, whose always-on environment has a baseline cost Workflows avoids.",
+  "gotchas": [
+    "External/HTTP steps cost more than internal steps — chatty external polling adds up.",
+    "It orchestrates, it doesn't process — don't do heavy compute in a workflow; call a service.",
+    "It's not Airflow — for DAG scheduling, backfills and rich operators use Cloud Composer.",
+    "Long polling/waits should use proper wait/callback patterns rather than tight loops.",
+    "YAML workflows get verbose for complex logic; structure and sub-workflows help."
+  ],
+  "equivalents": [
+    { "provider": "aws", "id": "step-functions", "name": "AWS Step Functions", "note": "Serverless state-machine orchestration across AWS services." },
+    { "provider": "azure", "id": "logic-apps", "name": "Azure Logic Apps", "note": "Low-code workflow/integration with 1000+ connectors." }
+  ],
+  "docsUrl": "https://cloud.google.com/workflows/docs"
+}

@@ -1,0 +1,55 @@
+{
+  "id": "lake-formation",
+  "provider": "aws",
+  "name": "AWS Lake Formation",
+  "groups": ["governance"],
+  "oneLiner": "Central permissions and governance layer over an S3 data lake.",
+  "whatItIs": "Lake Formation sits on top of S3 and the Glue Data Catalog to add centralised security and governance to a data lake. Instead of managing a tangle of S3 bucket policies and IAM rules, you grant database/table/column/row permissions in one place, and services like Athena, Redshift Spectrum, EMR and Glue enforce them. It also helps build the lake — blueprints to ingest data, plus tag-based access control (LF-Tags) to manage permissions at scale. The point is one governance model for who can see which data in the lake, expressed in familiar table terms rather than raw storage ACLs.",
+  "inPractice": {
+    "narrative": "An org has a shared S3 data lake catalogued in Glue, used by many teams via Athena and Redshift Spectrum. Rather than hand-crafting bucket policies, an admin uses Lake Formation to grant the finance team SELECT on certain tables, mask a PII column from analysts, and restrict a region's rows to that region's team — all with LF-Tags. When anyone queries via Athena, Lake Formation enforces exactly those grants. It's the permission brain over the lake the query engines obey.",
+    "flow": ["S3 lake + Glue Catalog", "Lake Formation grants (table/column/row, LF-Tags)", "Athena / Redshift Spectrum / EMR", "governed query results"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Fine-grained permissions", "detail": "Grant access at database, table, column and row level (plus cell masking) in catalog terms — far more granular and manageable than S3/IAM policies." },
+    { "term": "LF-Tags (tag-based access control)", "detail": "Attach tags to catalog resources and grant permissions on tags, so access scales by policy instead of enumerating every table — the key to governing a large lake." },
+    { "term": "Enforced by integrated engines", "detail": "Athena, Redshift Spectrum, EMR and Glue honour Lake Formation grants at query time, giving consistent security across tools." },
+    { "term": "Blueprints & ingestion", "detail": "Workflows to ingest data from databases/logs into the lake and register it in the catalog, bootstrapping the lake." },
+    { "term": "Data locations & credential vending", "detail": "Lake Formation registers S3 locations and vends temporary credentials to query engines, so users don't need direct bucket access." },
+    { "term": "Cross-account sharing", "detail": "Share catalog resources securely across AWS accounts (often with Resource Access Manager) for data-mesh-style setups." }
+  ],
+  "whenToUse": [
+    "Centralising fine-grained access control over an S3 + Glue data lake.",
+    "Column/row-level security and PII masking across query engines.",
+    "Managing permissions at scale with tag-based policies (LF-Tags).",
+    "Sharing governed lake data across teams or AWS accounts.",
+    "Replacing brittle hand-managed S3/IAM policies for analytics data."
+  ],
+  "whenNotToUse": [
+    "A small single-team lake where basic IAM/bucket policies are enough.",
+    "Non-AWS-native query tools that don't integrate with Lake Formation enforcement.",
+    "Governing data outside the S3/Glue catalog world — it's lake-scoped.",
+    "Operational database access control — that's IAM/DB-native, not Lake Formation."
+  ],
+  "keyFacts": [
+    { "label": "Role", "value": "Central security/governance layer over S3 + Glue Catalog." },
+    { "label": "Granularity", "value": "Database, table, column, row, cell masking." },
+    { "label": "Scale mechanism", "value": "LF-Tags (tag-based access control)." },
+    { "label": "Enforced by", "value": "Athena, Redshift Spectrum, EMR, Glue." },
+    { "label": "Sharing", "value": "Cross-account resource sharing." },
+    { "label": "Billing", "value": "No separate charge for LF itself; pay for underlying S3/Glue/query services." }
+  ],
+  "pricingShape": "Lake Formation itself is essentially free to use — there's no per-permission or per-governance charge for its core access control. You pay for the services underneath: S3 storage and requests, the Glue Data Catalog and crawlers, and the query engines (Athena scan cost, Redshift, EMR). So governance doesn't add a compute bill; it adds a control plane. The value is operational — replacing sprawling IAM/bucket policies with manageable, auditable grants — rather than a cost trade-off.",
+  "gotchas": [
+    "Adopting it changes the permission model — mixing legacy IAM/bucket policies with LF grants causes confusing access failures; migrate deliberately.",
+    "Only integrated engines enforce LF permissions; a tool with raw S3 access can bypass them, so lock down direct bucket access.",
+    "LF-Tag design needs planning up front — ad-hoc tags become as messy as the policies you replaced.",
+    "Row-level/cell filtering has engine-specific support and limits — verify your query engine honours the feature you need.",
+    "Cross-account sharing setup (RAM, resource links) is fiddly and easy to misconfigure."
+  ],
+  "equivalents": [
+    { "provider": "gcp", "id": "dataplex", "name": "Dataplex", "note": "Catalog + governance across GCP lakes/warehouses; broader data-management scope." },
+    { "provider": "azure", "id": "purview", "name": "Microsoft Purview", "note": "Enterprise catalog, lineage and governance across the estate." }
+  ],
+  "docsUrl": "https://docs.aws.amazon.com/lake-formation/"
+}

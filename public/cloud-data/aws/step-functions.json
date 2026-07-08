@@ -1,0 +1,55 @@
+{
+  "id": "step-functions",
+  "provider": "aws",
+  "name": "AWS Step Functions",
+  "groups": ["orchestration"],
+  "oneLiner": "Serverless workflow orchestration as state machines across AWS services.",
+  "whatItIs": "Step Functions is AWS's serverless orchestration service. You define a workflow as a state machine — a sequence of steps with branching, parallelism, retries, error handling and waits — and Step Functions runs it, calling Lambda functions and 200+ AWS services directly, tracking state and showing a visual execution graph. Unlike Airflow (MWAA), there's no server to run: you pay per state transition and it scales automatically. It's ideal for event-driven and application-style orchestration — coordinating a pipeline's steps, retrying failures, and reacting to events — where a full Airflow environment would be heavyweight.",
+  "inPractice": {
+    "narrative": "A file lands in S3 and needs a multi-step process: validate, run a Glue job, wait for it, then load Redshift and notify — with retries if any step fails. A Step Functions state machine models exactly that flow, invoking each service in turn, handling waits and errors, and surfacing a visual trace of every execution. No orchestration server runs between events; it wakes on the trigger and bills per transition. Step Functions is the serverless conductor for event-driven pipelines.",
+    "flow": ["Event / schedule", "Step Functions (state machine)", "Lambda / Glue / services", "result + notify"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "State machine", "detail": "A workflow defined as states (task, choice, parallel, map, wait, pass, fail) using Amazon States Language (JSON) — with a visual editor (Workflow Studio)." },
+    { "term": "Direct service integrations", "detail": "Steps can call 200+ AWS services (Lambda, Glue, ECS, DynamoDB, SNS, etc.) directly without glue code, plus the SDK integrations for fine-grained calls." },
+    { "term": "Built-in error handling", "detail": "Per-state retries with backoff, catch/fallback branches and timeouts make robust, self-healing workflows declarative rather than hand-coded." },
+    { "term": "Standard vs Express", "detail": "Standard workflows are durable and long-running (up to a year), billed per transition; Express workflows are high-volume, short-lived and billed by count/duration — pick by workload." },
+    { "term": "Map & parallel", "detail": "Parallel branches and Map (including distributed Map over large datasets) fan work out, enabling scalable batch orchestration." },
+    { "term": "Callbacks & waits", "detail": "Wait states and task tokens let a workflow pause for human approval or an external system to signal back before continuing." }
+  ],
+  "whenToUse": [
+    "Event-driven orchestration of AWS services without running a server.",
+    "Coordinating pipeline steps with retries, branching and error handling.",
+    "Application/microservice workflows (approvals, sagas, long-running processes).",
+    "Fan-out batch processing via Map/parallel states.",
+    "Lightweight orchestration where full Airflow (MWAA) is overkill."
+  ],
+  "whenNotToUse": [
+    "Rich data-pipeline scheduling with a DAG ecosystem and backfills — MWAA/Airflow fits better.",
+    "Heavy data transformation inside the orchestrator — call Glue/EMR for that.",
+    "Complex Python-defined pipelines teams already run in Airflow.",
+    "Simple single-function triggers — EventBridge + Lambda may suffice."
+  ],
+  "keyFacts": [
+    { "label": "Type", "value": "Serverless workflow orchestration (state machines)." },
+    { "label": "Definition", "value": "Amazon States Language (JSON) + visual Workflow Studio." },
+    { "label": "Integrations", "value": "200+ AWS services directly, plus Lambda." },
+    { "label": "Types", "value": "Standard (durable, ≤1 yr) and Express (high-volume, short)." },
+    { "label": "Resilience", "value": "Built-in retries, catch, timeouts, waits/callbacks." },
+    { "label": "Billing", "value": "Standard: per state transition; Express: per run + duration." }
+  ],
+  "pricingShape": "Standard workflows bill per state transition — each step executed — so cost scales with how many steps run, not idle time (there's no server). Express workflows, for high-volume short flows, bill by number of executions and their duration/memory, which is far cheaper at scale for chatty workflows. Downstream services (Lambda, Glue) are billed separately. The levers are choosing Standard vs Express by volume/duration, and not exploding transition counts with overly granular states. Because it's serverless, an idle workflow costs nothing.",
+  "gotchas": [
+    "Standard bills per transition — very chatty state machines with many tiny steps add up; consider Express or coarser states.",
+    "Choosing the wrong type (Standard vs Express) can be much costlier or hit duration limits — match to the workload.",
+    "It orchestrates, it doesn't process — don't cram heavy compute into the workflow; call a service.",
+    "It's not Airflow — teams needing DAG scheduling, backfills and a Python ecosystem may prefer MWAA.",
+    "Amazon States Language has a learning curve; complex flows get verbose (Workflow Studio helps)."
+  ],
+  "equivalents": [
+    { "provider": "gcp", "id": "workflows", "name": "Cloud Workflows", "note": "Serverless orchestration of GCP services/APIs; YAML/JSON step definitions." },
+    { "provider": "azure", "id": "logic-apps", "name": "Azure Logic Apps", "note": "Low-code workflow/integration with 1000+ connectors." }
+  ],
+  "docsUrl": "https://docs.aws.amazon.com/step-functions/"
+}

@@ -1,0 +1,55 @@
+{
+  "id": "purview",
+  "provider": "azure",
+  "name": "Microsoft Purview",
+  "groups": ["governance"],
+  "oneLiner": "Unified data governance, catalog and lineage across your estate.",
+  "whatItIs": "Microsoft Purview is Azure's (and Microsoft 365's) unified data governance suite. Its data-map component scans data sources — ADLS, Synapse, SQL, Power BI, and even other clouds and on-prem — to build an enterprise catalog of what data exists, where it is, and how it's classified. It automatically detects sensitive data (PII), tracks lineage across pipelines, and provides a searchable catalog with business glossary so people can find and understand data. Purview is the estate-wide 'what do we have and who can use it' layer, broader than a single lake, spanning the whole Microsoft data landscape.",
+  "inPractice": {
+    "narrative": "A large enterprise has data in ADLS, several SQL databases, Synapse and Power BI. Purview scans them all into a data map, auto-classifies columns that look like PII, and stitches together lineage showing how a Power BI report traces back through Synapse to raw ADLS files. A data steward curates a business glossary; analysts search the catalog to find the authoritative customer table and see its sensitivity and owner. Purview is the estate-wide catalog and governance record.",
+    "flow": ["ADLS / SQL / Synapse / Power BI", "Purview scan → data map", "classification + lineage + glossary", "searchable governed catalog"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Data map", "detail": "The foundation: a graph of scanned sources, assets and their metadata across the estate, kept fresh by scheduled scans." },
+    { "term": "Automated classification", "detail": "Built-in and custom classifiers detect sensitive data types (PII, financial) during scans, tagging assets for governance." },
+    { "term": "Data catalog & glossary", "detail": "A searchable catalog with business glossary terms links technical assets to business meaning, ownership and definitions." },
+    { "term": "Lineage", "detail": "Captures how data moves and transforms across ADF, Synapse, Power BI and more, enabling impact analysis and trust." },
+    { "term": "Broad connectivity", "detail": "Scans Azure sources plus multi-cloud (S3), on-prem databases and SaaS — its scope is enterprise-wide, not just one lake." },
+    { "term": "Capacity units / scanning", "detail": "Usage is measured by the data map's capacity units (metadata stored) and the compute for scans/classification." }
+  ],
+  "whenToUse": [
+    "Enterprise-wide cataloguing and governance across many data sources.",
+    "Automated discovery and classification of sensitive data (PII) for compliance.",
+    "End-to-end lineage across Azure data services and Power BI.",
+    "A searchable catalog + business glossary so users can find/trust data.",
+    "Governing hybrid/multi-cloud and on-prem estates, not just one lake."
+  ],
+  "whenNotToUse": [
+    "A small single-source project where a full governance suite is overkill.",
+    "Fine-grained query-time access enforcement on one lake — that's more Synapse/BigLake-style.",
+    "Real-time data processing — Purview describes and governs, it doesn't move data.",
+    "Teams entirely outside the Microsoft/Azure ecosystem with narrow needs."
+  ],
+  "keyFacts": [
+    { "label": "Role", "value": "Enterprise data governance: catalog, classification, lineage." },
+    { "label": "Foundation", "value": "The data map built from scheduled source scans." },
+    { "label": "Scope", "value": "Azure + multi-cloud (S3) + on-prem + Power BI/M365." },
+    { "label": "Sensitivity", "value": "Automated PII/data classification." },
+    { "label": "Discovery", "value": "Searchable catalog with business glossary." },
+    { "label": "Billing", "value": "Data-map capacity units + scan/classification compute." }
+  ],
+  "pricingShape": "Purview bills mainly on the data map's capacity units (roughly, how much metadata it keeps online) plus the compute consumed by scanning and classification runs (priced by vCore-hours of scan). So cost grows with the size of your catalog and how frequently/broadly you scan sources — governing a huge, frequently-rescanned estate costs more than a modest one scanned weekly. The underlying data sources are billed separately. The lever is scan scope and frequency versus how much of the estate you truly need continuously mapped.",
+  "gotchas": [
+    "Frequent, broad scans over many/large sources drive scan-compute cost — tune scan scope and schedules.",
+    "The data map capacity has a baseline cost that persists as the catalog grows.",
+    "It governs and describes data but doesn't enforce query-time row/column access on its own — pair with source-level security.",
+    "Lineage coverage depends on connector support; some sources/tools report lineage more completely than others.",
+    "Microsoft Purview spans both Azure data governance and M365 compliance — make sure you're looking at the data-governance capabilities you mean."
+  ],
+  "equivalents": [
+    { "provider": "aws", "id": "lake-formation", "name": "AWS Lake Formation", "note": "Lake-scoped permissions/governance; narrower than Purview's estate-wide catalog." },
+    { "provider": "gcp", "id": "dataplex", "name": "Dataplex", "note": "Catalog, governance and quality across GCP data; Purview reaches wider into hybrid/M365." }
+  ],
+  "docsUrl": "https://learn.microsoft.com/purview/"
+}

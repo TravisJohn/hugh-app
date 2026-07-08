@@ -1,0 +1,55 @@
+{
+  "id": "azure-cache-redis",
+  "provider": "azure",
+  "name": "Azure Cache for Redis",
+  "groups": ["cache"],
+  "oneLiner": "Managed in-memory Redis for microsecond caching on Azure.",
+  "whatItIs": "Azure Cache for Redis is Azure's managed Redis service, keeping hot data in RAM for microsecond access. It's the speed layer in front of slower stores: the app reads the cache first and only queries Azure SQL/Cosmos DB on a miss, cutting latency and database load. Redis here also backs sessions, rate limiters, leaderboards and pub/sub. It offers tiers from Basic up to Enterprise (with Redis Enterprise modules and active geo-replication). As with any cache, it's an accelerator holding a copy of hot data — not the durable system of record.",
+  "inPractice": {
+    "narrative": "A web app stores session state and frequently-read reference data in Azure Cache for Redis. Requests read from the cache in microseconds, so Azure SQL only handles writes and cache misses. On updates, the app writes the database and invalidates the cached entries. The cache sits between the app and the database as a fast copy of hot data, absorbing read traffic that would otherwise hammer the source of truth.",
+    "flow": ["Application", "Azure Cache for Redis — hot reads", "Azure SQL / Cosmos DB (source of truth)"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "In-memory, microsecond latency", "detail": "RAM-backed reads/writes are sub-millisecond, far faster than disk databases — but memory is finite and volatile by default." },
+    { "term": "Cache-aside pattern", "detail": "App reads cache, loads from the database on a miss and populates the cache, invalidating on writes; TTLs bound staleness." },
+    { "term": "Tiers", "detail": "Basic (single node, no SLA), Standard (replicated, HA), Premium (clustering, persistence, VNet), and Enterprise/Enterprise Flash (Redis Enterprise modules, active geo-replication)." },
+    { "term": "Clustering & scale-out", "detail": "Premium/Enterprise support clustering to shard data across nodes for more memory and throughput." },
+    { "term": "Persistence & geo-replication", "detail": "Premium+ can persist to storage and (Enterprise) actively geo-replicate across regions for resilience — beyond a pure volatile cache." },
+    { "term": "Eviction & TTLs", "detail": "Eviction policies and TTLs manage a full cache and trade staleness against hit rate." }
+  ],
+  "whenToUse": [
+    "Caching hot data to cut database load and latency (cache-aside).",
+    "Session state, rate limiting, counters and leaderboards.",
+    "Sub-millisecond reads a disk-backed database can't hit.",
+    "Redis pub/sub or lightweight coordination alongside caching.",
+    "Absorbing read spikes in front of Azure SQL/Cosmos DB."
+  ],
+  "whenNotToUse": [
+    "As the durable system of record — it's volatile, finite memory.",
+    "Datasets too large to hold economically in RAM.",
+    "Analytical queries and joins — use Synapse/Fabric.",
+    "Data that cannot tolerate loss without careful persistence design."
+  ],
+  "keyFacts": [
+    { "label": "Type", "value": "Managed in-memory cache/store (Redis)." },
+    { "label": "Latency", "value": "Microsecond reads/writes (RAM-backed)." },
+    { "label": "Tiers", "value": "Basic, Standard, Premium, Enterprise / Enterprise Flash." },
+    { "label": "Scale", "value": "Clustering (Premium/Enterprise); active geo-replication (Enterprise)." },
+    { "label": "Durability", "value": "Volatile by default; persistence on Premium+." },
+    { "label": "Billing", "value": "Per cache instance-hour by tier and size." }
+  ],
+  "pricingShape": "Azure Cache for Redis bills per instance-hour by tier and cache size — the tier sets both capacity and features (HA, clustering, persistence, geo-replication), and the instance runs continuously. Cost therefore tracks the memory and tier you provision, so sizing to your hot working set and picking the lowest tier that meets your HA/feature needs are the main levers. Basic has no SLA (dev only); Standard adds replication; Premium/Enterprise cost more for clustering, persistence and geo-replication. Reserved capacity discounts steady workloads.",
+  "gotchas": [
+    "It's a cache, not a database — keep the durable copy in Azure SQL/Cosmos/etc.",
+    "Basic tier has no replication or SLA — never use it for production.",
+    "Cache invalidation is hard; missed invalidations serve stale data.",
+    "Under-provisioned memory plus eviction kills the hit rate and the benefit.",
+    "Persistence and geo-replication require Premium/Enterprise — a cold cache after failover stampedes the backing store without them."
+  ],
+  "equivalents": [
+    { "provider": "aws", "id": "elasticache", "name": "Amazon ElastiCache", "note": "Managed Redis/Memcached; the direct analogue on AWS." },
+    { "provider": "gcp", "id": "memorystore", "name": "Memorystore", "note": "Managed Redis/Memcached; the direct analogue on GCP." }
+  ],
+  "docsUrl": "https://learn.microsoft.com/azure/azure-cache-for-redis/"
+}

@@ -1,0 +1,55 @@
+{
+  "id": "cloud-sql",
+  "provider": "gcp",
+  "name": "Cloud SQL",
+  "groups": ["relational"],
+  "oneLiner": "Managed relational databases (PostgreSQL, MySQL, SQL Server) — the OLTP source of truth.",
+  "whatItIs": "Cloud SQL is Google Cloud's managed relational database service, running standard PostgreSQL, MySQL and SQL Server engines while handling provisioning, patching, backups, replication and failover for you. It's a transactional (OLTP) database — strong consistency, joins, transactions, indexes — the system of record behind applications. In a GCP data platform, Cloud SQL is typically a source: operational data lands here, then flows into BigQuery for analytics via CDC (Datastream) or federated queries. For globally-distributed, horizontally-scaling relational needs beyond a single primary, GCP offers Spanner as the step up.",
+  "inPractice": {
+    "narrative": "An app writes transactions to a Cloud SQL PostgreSQL instance — consistent, relational, fast. Rather than run reports against production, the team uses Datastream to capture changes and replicate them into BigQuery, where analysts query freely without touching the app's database. Cloud SQL is the operational source of truth at the front; BigQuery is where the analysis happens downstream.",
+    "flow": ["Application (transactions)", "Cloud SQL (OLTP)", "Datastream / CDC", "BigQuery", "Looker"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Managed engines", "detail": "Runs PostgreSQL, MySQL and SQL Server; you get the real engine and SQL while Google manages the host, patching and backups." },
+    { "term": "OLTP, not OLAP", "detail": "Transactional and strongly consistent — for many small reads/writes with joins and integrity, not large analytical scans (that's BigQuery)." },
+    { "term": "High availability", "detail": "An HA configuration keeps a synchronous standby in another zone with automatic failover, protecting against zone outages." },
+    { "term": "Read replicas", "detail": "Asynchronous read replicas (including cross-region) offload reads; they scale read traffic but aren't an analytics engine." },
+    { "term": "Backups & PITR", "detail": "Automated backups and binary logging enable point-in-time recovery within the retention window." },
+    { "term": "Spanner for scale", "detail": "When you outgrow a single primary and need horizontal, globally-consistent SQL, Cloud Spanner is GCP's distributed relational option." }
+  ],
+  "whenToUse": [
+    "The transactional system of record behind an application on GCP.",
+    "Workloads needing joins, transactions, constraints and strong consistency.",
+    "Migrating existing PostgreSQL/MySQL/SQL Server databases to managed GCP.",
+    "Operational data that will feed BigQuery via CDC (Datastream).",
+    "Moderate read scaling with read replicas."
+  ],
+  "whenNotToUse": [
+    "Analytical scans, aggregations and BI — use BigQuery, not the OLTP database.",
+    "Global horizontal scale with strong consistency — use Spanner.",
+    "Huge wide-column/time-series volume — use Bigtable.",
+    "Petabyte data lakes — that's Cloud Storage, not a relational instance."
+  ],
+  "keyFacts": [
+    { "label": "Type", "value": "Managed relational (OLTP) database." },
+    { "label": "Engines", "value": "PostgreSQL, MySQL, SQL Server." },
+    { "label": "HA", "value": "Zonal synchronous standby with automatic failover." },
+    { "label": "Read scaling", "value": "Read replicas (incl. cross-region)." },
+    { "label": "Recovery", "value": "Automated backups + point-in-time recovery." },
+    { "label": "Billing", "value": "Per instance (vCPU/memory) + storage + network (or Spanner for scale)." }
+  ],
+  "pricingShape": "Cloud SQL bills for the instance (by vCPU and memory) running continuously unless stopped, plus provisioned storage, backups and network egress. HA configuration adds the standby's cost, and each read replica is another billed instance. Committed-use discounts cut cost for steady workloads. The levers are right-sizing the instance, avoiding unnecessary replicas, and stopping non-prod instances. Spanner, by contrast, bills by nodes/processing units and storage for distributed scale — a different model for a different need.",
+  "gotchas": [
+    "Reporting on the production Cloud SQL instance competes with the app — replicate to BigQuery instead.",
+    "HA and read replicas each add full instance costs.",
+    "A single primary limits write throughput; scaling writes means Spanner or sharding, not more replicas.",
+    "Cross-region replicas add egress and lag; weigh latency vs cost.",
+    "Major-version upgrades require testing and a maintenance window — plan for brief disruption."
+  ],
+  "equivalents": [
+    { "provider": "aws", "id": "rds", "name": "Amazon RDS", "note": "Managed relational engines; the direct analogue (Aurora for cloud-native scale)." },
+    { "provider": "azure", "id": "azure-sql-database", "name": "Azure SQL Database", "note": "Managed SQL Server-based relational database; Azure's OLTP analogue." }
+  ],
+  "docsUrl": "https://cloud.google.com/sql/docs"
+}

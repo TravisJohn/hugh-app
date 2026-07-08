@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { GraduationCap, Code2, Trophy } from "lucide-react";
+import { GraduationCap, Code2, Trophy, Cloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import SignOutButton from "@/components/landing/SignOutButton";
@@ -9,7 +9,7 @@ import HeaderUsage from "@/components/usage/HeaderUsage";
 // Top-level activity picker — the post-login landing for every user. Picking
 // "Learn" leads to the "What do you want to learn?" dashboard (/home/learn);
 // "Code" opens the coding-drill landing (/code/start); "Cases" opens The Case
-// Room (/cases).
+// Room (/cases); "Cloud Skills" opens the cloud-services reference (/cloud).
 export default async function HomePage() {
   const supabase = await createClient();
   const { user } = await verifyUserAccess(supabase);
@@ -68,8 +68,8 @@ export default async function HomePage() {
           </h1>
         </div>
 
-        {/* ── Three activities: Learn · Code · Cases ────────────────── */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-3xl shrink-0">
+        {/* ── Four activities: Learn · Code · Cases · Cloud Skills ──── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-2xl shrink-0">
 
           {/* Learn — the whole learning experience */}
           <Link
@@ -143,6 +143,31 @@ export default async function HomePage() {
             </div>
             <span className="mt-auto text-xs font-semibold text-amber-400 transition-all group-hover:text-amber-300">
               Enter the Case Room →
+            </span>
+          </Link>
+
+          {/* Cloud Skills — cloud-services reference */}
+          <Link
+            href="/cloud"
+            className="group flex flex-col gap-3 rounded-2xl border border-violet-500/40 bg-violet-900/10 p-5 shadow-lg shadow-violet-900/20 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-violet-400/60 hover:bg-violet-900/20 hover:shadow-xl hover:shadow-violet-500/20"
+          >
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400 transition-transform duration-300 group-hover:scale-110">
+              <Cloud size={22} />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5 mb-1">
+                <p className="font-semibold text-slate-100 text-base">Cloud Skills</p>
+                <span className="rounded-full bg-violet-500/15 px-1.5 py-0.5 text-xs font-semibold text-violet-400">
+                  New
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Know your cloud — AWS, GCP and Azure services for data work, grouped by
+                what they do, with an assistant to ask anything.
+              </p>
+            </div>
+            <span className="mt-auto text-xs font-semibold text-violet-400 transition-all group-hover:text-violet-300">
+              Explore the clouds →
             </span>
           </Link>
 

@@ -1,0 +1,55 @@
+{
+  "id": "event-hubs",
+  "provider": "azure",
+  "name": "Azure Event Hubs",
+  "groups": ["streaming"],
+  "oneLiner": "Big-data streaming and event ingestion, Kafka-compatible.",
+  "whatItIs": "Event Hubs is Azure's managed event-ingestion service — a big-data streaming pipe that can take in millions of events per second from producers and hold them durably for consumers to read. Events are spread across partitions and retained for a window so multiple consumer groups can read independently. Crucially it exposes a Kafka-compatible endpoint, so existing Kafka apps can point at it with a config change. It's the front door for real-time data on Azure, feeding Stream Analytics, Functions, Databricks or Fabric for processing.",
+  "inPractice": {
+    "narrative": "Telemetry from apps and devices is published to an Event Hub. It's partitioned and retained durably. A Stream Analytics job (or Databricks/Functions) reads it via a consumer group to compute real-time metrics, while Event Hubs Capture simultaneously writes the raw stream to ADLS as Avro for batch analysis. Because it speaks Kafka, an existing Kafka producer can publish without rewriting. Event Hubs is the ingestion layer the processors subscribe to.",
+    "flow": ["Apps / devices (or Kafka producers)", "Event Hubs (partitions)", "Stream Analytics / Databricks", "ADLS + Power BI"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Partitions", "detail": "An event hub is split into partitions for parallelism and ordering; events with the same partition key land in the same partition, preserving per-key order. Partition count is set at creation." },
+    { "term": "Consumer groups", "detail": "Each consumer group is an independent view/cursor over the stream, so multiple downstream systems can read the same events at their own offset." },
+    { "term": "Kafka compatibility", "detail": "Event Hubs exposes an Apache Kafka endpoint; Kafka clients/tools work against it without code changes, easing migrations." },
+    { "term": "Capture", "detail": "Event Hubs Capture automatically writes incoming events to ADLS/Blob as Avro on a size/time trigger — raw archival for batch without extra code." },
+    { "term": "Throughput units / processing units", "detail": "Capacity is provisioned as Throughput Units (Standard) or Processing Units (Premium), or auto-inflated; the Dedicated tier gives a single-tenant cluster." },
+    { "term": "Retention", "detail": "Events are kept for a configurable window (longer on higher tiers), enabling replay and late consumers before they expire." }
+  ],
+  "whenToUse": [
+    "High-throughput real-time event ingestion on Azure.",
+    "Migrating or running Kafka workloads without managing Kafka.",
+    "Fanning events to multiple processors via consumer groups.",
+    "Auto-archiving raw streams to ADLS with Capture.",
+    "Feeding Stream Analytics, Functions, Databricks or Fabric."
+  ],
+  "whenNotToUse": [
+    "Discrete command/task messaging with per-message locks and ordering guarantees — use Service Bus.",
+    "Heavy stateful stream computation — that belongs in Stream Analytics/Databricks, not the hub.",
+    "Very low-volume, occasional messages where a queue is simpler and cheaper.",
+    "Rich enterprise message routing/topics — Service Bus is the better fit."
+  ],
+  "keyFacts": [
+    { "label": "Role", "value": "Partitioned, durable real-time event ingestion." },
+    { "label": "Compatibility", "value": "Kafka-compatible endpoint." },
+    { "label": "Parallelism", "value": "Partitions (fixed at creation) + consumer groups." },
+    { "label": "Archival", "value": "Capture writes raw events to ADLS/Blob as Avro." },
+    { "label": "Capacity", "value": "Throughput/Processing Units; Standard/Premium/Dedicated tiers." },
+    { "label": "Billing", "value": "Per TU/PU + ingress events (plus Capture/retention)." }
+  ],
+  "pricingShape": "Standard tier bills by Throughput Units (each ~1 MB/s in, 2 MB/s out) plus a charge per million ingress events — so cost scales with provisioned capacity and volume, and auto-inflate helps avoid throttling during spikes. Premium/Dedicated use Processing Units or a reserved cluster for predictable, higher-scale workloads at a fixed rate. Capture and extended retention add charges. The main levers are matching TUs/PUs to real throughput (not peak-forever) and choosing the right tier for your scale.",
+  "gotchas": [
+    "Partition count is fixed at creation and can't be changed later — under-provisioning limits parallelism permanently.",
+    "Ordering is only per partition; partition-key choice determines the order you actually get.",
+    "Throughput Units throttle when exceeded — enable auto-inflate or size for real peaks.",
+    "It's for event streaming, not transactional messaging — for locks/ordering/dead-lettering per message, use Service Bus.",
+    "Consumers track their own offsets; a lagging consumer can miss data once retention expires."
+  ],
+  "equivalents": [
+    { "provider": "aws", "id": "kinesis-data-streams", "name": "Kinesis Data Streams", "note": "Shard-based streaming; partitions play the role of shards." },
+    { "provider": "gcp", "id": "pubsub", "name": "Pub/Sub", "note": "Serverless, auto-scaling messaging with no partitions to provision." }
+  ],
+  "docsUrl": "https://learn.microsoft.com/azure/event-hubs/"
+}

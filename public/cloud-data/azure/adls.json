@@ -1,0 +1,56 @@
+{
+  "id": "adls",
+  "provider": "azure",
+  "name": "Azure Data Lake Storage Gen2",
+  "short": "ADLS Gen2",
+  "groups": ["storage"],
+  "oneLiner": "Hierarchical, analytics-optimised object storage built on Blob.",
+  "whatItIs": "ADLS Gen2 is Azure Blob Storage with a hierarchical namespace (HNS) switched on. That one setting is the whole story: instead of flat keys pretending to be folders, ADLS has real directories you can rename, move and secure atomically. It keeps Blob's cheap, durable, unlimited object storage but adds POSIX-style permissions and directory operations that big-data engines expect — so it's the default data lake underneath Synapse, Databricks and Fabric on Azure. Under the hood it's the same storage account and blobs; the HNS flag is what makes it a 'data lake' rather than plain object storage.",
+  "inPractice": {
+    "narrative": "Raw events and files land in an ADLS 'bronze' container. A Databricks or Synapse Spark job cleans them into partitioned Parquet/Delta in a 'silver' container. Synapse SQL (dedicated or serverless) then reads those files, and Power BI reads from Synapse. Because ADLS has real directories, teams organise the lake as bronze/silver/gold folders and grant access per-folder — something flat object stores can't do as cleanly.",
+    "flow": ["App & event data", "ADLS Gen2 (bronze)", "Databricks / Synapse Spark", "ADLS Gen2 (silver / gold)", "Synapse SQL", "Power BI"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Hierarchical namespace (HNS)", "detail": "The defining feature — real directories with atomic rename/move/delete and per-directory ACLs. Enabled on the storage account at creation; you can't retrofit it easily, so decide up front." },
+    { "term": "Storage account & container", "detail": "Data lives in a storage account; containers (a.k.a. filesystems) are the top-level grouping, then directories and files below. One account can serve many workloads." },
+    { "term": "Blob under the hood", "detail": "ADLS Gen2 is Blob storage — same access tiers, redundancy and most APIs — plus the DFS (Data Lake) endpoint for filesystem-style operations. Tools speak either the Blob or the DFS endpoint." },
+    { "term": "Access tiers", "detail": "Hot, Cool, Cold and Archive trade storage cost against access cost and retrieval latency (Archive is offline and needs a rehydrate). Lifecycle policies move blobs between tiers by age or last-access." },
+    { "term": "Redundancy options", "detail": "LRS (one datacentre), ZRS (across zones), GRS/RA-GRS (geo-replicated) — you pick the durability/availability vs cost trade-off per account." },
+    { "term": "POSIX ACLs + RBAC", "detail": "Access combines Azure RBAC (coarse, at container/account) with POSIX-style ACLs on directories and files (fine-grained) — the model Spark/Hadoop security expects." }
+  ],
+  "whenToUse": [
+    "As the data lake under Synapse, Databricks or Microsoft Fabric.",
+    "Analytics workloads that need directory operations and per-folder security.",
+    "Landing raw data and organising it into bronze/silver/gold medallion layers.",
+    "Storing large Parquet/Delta datasets queried by Spark and Synapse SQL.",
+    "Cheap retention via Cool/Cold/Archive tiers with lifecycle management."
+  ],
+  "whenNotToUse": [
+    "Low-latency key lookups of small records — use Cosmos DB or Table storage.",
+    "In-place row updates and transactions — use a database or a Delta/Iceberg table layer on top.",
+    "Simple app blob storage with no analytics needs — plain Blob (HNS off) is fine and cheaper to reason about.",
+    "A managed NFS/SMB share for legacy apps — use Azure Files."
+  ],
+  "keyFacts": [
+    { "label": "Durability", "value": "At least 11 nines with LRS; more with ZRS/GRS." },
+    { "label": "Availability SLA", "value": "99.9% (Hot, read-write); higher with RA-GRS reads." },
+    { "label": "Built on", "value": "Azure Blob Storage + hierarchical namespace (DFS endpoint)." },
+    { "label": "Key feature", "value": "Real directories with atomic rename/move and POSIX ACLs." },
+    { "label": "Access tiers", "value": "Hot / Cool / Cold / Archive (Archive is offline, needs rehydrate)." },
+    { "label": "Capacity", "value": "Effectively unlimited; up to 5 PiB per storage account by default." }
+  ],
+  "pricingShape": "You pay for: (1) stored GB-month by access tier, with cold tiers cheaper to hold but pricier to read and subject to minimum retention; (2) operations (reads, writes, list) priced per tier; (3) egress out of the region/Azure; and (4) redundancy — ZRS/GRS cost more than LRS. HNS adds small per-transaction overhead but pays for itself in analytics. As always for lakes, colder tiers plus lifecycle rules keep old data cheap, and Parquet + partitioning cut what downstream engines scan.",
+  "gotchas": [
+    "The hierarchical namespace must be enabled at account creation — turning a flat Blob account into ADLS Gen2 later is a migration, not a toggle.",
+    "Two endpoints (Blob vs DFS) exist for the same data; some tools/SDKs only speak one — mismatches cause confusing 'not found' errors.",
+    "Archive tier is offline: reading needs a rehydrate that can take hours — don't put anything latency-sensitive there.",
+    "GRS gives geo-durability but failover/read access has caveats; know whether you have GRS or RA-GRS before relying on secondary reads.",
+    "Egress and cross-region reads are billed — keep Synapse/Databricks in the same region as the account."
+  ],
+  "equivalents": [
+    { "provider": "aws", "id": "s3", "name": "Amazon S3", "note": "Flat object store; S3 lacks a true hierarchical namespace (though Mountpoint/S3 features narrow the gap)." },
+    { "provider": "gcp", "id": "cloud-storage", "name": "Cloud Storage", "note": "Flat object store like S3; ADLS's real directories are the main conceptual difference." }
+  ],
+  "docsUrl": "https://learn.microsoft.com/azure/storage/blobs/data-lake-storage-introduction"
+}

@@ -1,0 +1,55 @@
+{
+  "id": "datasync",
+  "provider": "aws",
+  "name": "AWS DataSync",
+  "groups": ["movement"],
+  "oneLiner": "Fast, managed bulk data transfer from on-prem/other clouds into AWS storage.",
+  "whatItIs": "DataSync is AWS's managed online data-transfer service for moving large amounts of file and object data — from on-prem NFS/SMB shares, HDFS, or other clouds (including S3-compatible stores) into AWS storage like S3, EFS and FSx. It handles the hard parts of bulk transfer: parallelisation, encryption in transit, integrity verification, retries and incremental syncs, at speeds far beyond scripting your own copy. Where DMS moves databases, DataSync moves files and objects. It's a common way to seed a data lake with existing datasets or keep an on-prem file store synced to S3.",
+  "inPractice": {
+    "narrative": "A company has terabytes of files on an on-prem NAS that need to land in an S3 data lake. Rather than script fragile copies, they deploy a DataSync agent on-prem and run a task that transfers the data to S3 in parallel — encrypted, verified, and resumable — then schedule incremental syncs to keep new files flowing. Once in S3, Glue and Athena take over. DataSync is the ingestion on-ramp that gets bulk file data into AWS reliably.",
+    "flow": ["On-prem NAS / other cloud files", "DataSync (agent + task)", "S3 (data lake)", "Glue / Athena processing"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Agent + task model", "detail": "For on-prem sources a lightweight DataSync agent runs near the data; a task defines source, destination and options. Cloud-to-cloud transfers may not need an agent." },
+    { "term": "Managed transfer", "detail": "Parallelised, encrypted, integrity-checked transfer with automatic retries — far more reliable and faster than hand-rolled rsync/scripts at scale." },
+    { "term": "Incremental sync", "detail": "After the first copy, DataSync transfers only changes, so it can keep a source and S3 continuously in sync on a schedule." },
+    { "term": "Targets", "detail": "Writes to S3, EFS and FSx (and can move between them), making it a general ingestion tool for AWS file/object storage." },
+    { "term": "Online vs offline", "detail": "DataSync is for online (network) transfer; for datasets too big for the network in reasonable time, the AWS Snow family ships physical devices instead." },
+    { "term": "Bandwidth & scheduling", "detail": "Throttling and scheduling let you control network impact and run large transfers during off-hours." }
+  ],
+  "whenToUse": [
+    "Bulk-loading on-prem files/objects into an S3 data lake.",
+    "Ongoing scheduled sync from on-prem NAS/HDFS to AWS.",
+    "Migrating file data between clouds or into EFS/FSx.",
+    "Reliable, verified transfer of large datasets over the network.",
+    "Seeding analytics storage with existing file archives."
+  ],
+  "whenNotToUse": [
+    "Database migration/replication — use DMS.",
+    "Datasets too large to move over the network in time — use the Snow family (offline).",
+    "Real-time event/stream ingestion — that's Kinesis/MSK.",
+    "Small ad-hoc copies where the CLI/SDK is simpler."
+  ],
+  "keyFacts": [
+    { "label": "Role", "value": "Managed online bulk file/object transfer into AWS." },
+    { "label": "Sources", "value": "On-prem NFS/SMB/HDFS, other clouds, S3-compatible stores." },
+    { "label": "Targets", "value": "S3, EFS, FSx (and between them)." },
+    { "label": "Features", "value": "Parallel, encrypted, verified, incremental, scheduled." },
+    { "label": "Offline sibling", "value": "AWS Snow family for network-impractical volumes." },
+    { "label": "Billing", "value": "Per GB transferred (+ underlying storage/egress)." }
+  ],
+  "pricingShape": "DataSync bills per gigabyte of data transferred, plus the usual underlying costs (destination storage, and egress on the source side if applicable). There's no standing instance charge — you pay for what you move, so a one-time seed is a one-time cost while a recurring sync costs per run by the changed data. Levers: use incremental syncs so you only pay to move new/changed files, schedule and throttle to fit bandwidth, and for truly massive first-loads compare against the Snow family's offline shipping economics.",
+  "gotchas": [
+    "The on-prem agent needs deploying and network access — plan connectivity and bandwidth up front.",
+    "Per-GB pricing means a full re-copy is costly; rely on incremental syncs after the first load.",
+    "It moves files/objects, not databases — use DMS for database replication.",
+    "Network transfer of petabytes can be impractically slow/expensive — the Snow family may be cheaper/faster.",
+    "Large transfers can saturate links; use bandwidth throttling and off-hours scheduling."
+  ],
+  "equivalents": [
+    { "provider": "gcp", "id": "storage-transfer", "name": "Storage Transfer Service", "note": "Managed bulk transfer into Cloud Storage; GCP's analogue (Transfer Appliance for offline)." },
+    { "provider": "azure", "id": "data-box", "name": "Azure Data Box", "note": "Bulk transfer into Azure; Data Box covers offline, AzCopy/Storage Mover the online path." }
+  ],
+  "docsUrl": "https://docs.aws.amazon.com/datasync/"
+}

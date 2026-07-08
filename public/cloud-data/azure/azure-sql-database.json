@@ -1,0 +1,55 @@
+{
+  "id": "azure-sql-database",
+  "provider": "azure",
+  "name": "Azure SQL Database",
+  "groups": ["relational"],
+  "oneLiner": "Managed relational (SQL Server) database — the OLTP source of truth on Azure.",
+  "whatItIs": "Azure SQL Database is Azure's fully-managed relational database, built on the SQL Server engine but delivered as a cloud service — Microsoft handles patching, backups, HA and (with serverless/elastic options) even scaling. It's a transactional (OLTP) database with the full T-SQL surface, strong consistency, joins and transactions: the system of record behind applications. In an Azure data platform it's usually a source — operational data lives here, then flows into Synapse/Fabric or the lake for analytics via CDC or pipelines. It comes in deployment flavours (single database, elastic pool, and the near-100%-compatible Managed Instance for lift-and-shift).",
+  "inPractice": {
+    "narrative": "An application stores transactions in Azure SQL Database — consistent, relational, fully managed. For analytics, the team doesn't query production directly; a pipeline or CDC feed replicates the data into ADLS/Synapse, where Power BI reports run. Azure SQL Database is the operational source of truth up front, and its data flows outward into the analytical stack rather than being analysed in place.",
+    "flow": ["Application (transactions)", "Azure SQL Database (OLTP)", "CDC / Data Factory", "ADLS → Synapse", "Power BI"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "SQL Server engine, managed", "detail": "Runs the SQL Server engine with full T-SQL, delivered as a service — you skip host management, patching and backup operations." },
+    { "term": "OLTP, not OLAP", "detail": "Transactional and strongly consistent, for many small reads/writes with joins and integrity — analytics belongs in Synapse/Fabric, not here." },
+    { "term": "Deployment options", "detail": "Single database, elastic pools (share resources across many databases), and Managed Instance (near-full SQL Server compatibility for lift-and-shift)." },
+    { "term": "Purchasing models", "detail": "DTU (bundled) or vCore (choose CPU/memory), with Provisioned or Serverless compute; serverless auto-pauses and scales for intermittent workloads." },
+    { "term": "Built-in HA & backups", "detail": "High availability, automated backups and point-in-time restore are built in; zone-redundant and geo-replication options add resilience." },
+    { "term": "Elastic pools", "detail": "Pools let many databases share a budget of resources — cost-efficient when you run lots of small, variable databases." }
+  ],
+  "whenToUse": [
+    "The transactional system of record behind an Azure application.",
+    "Workloads needing joins, transactions, constraints and strong consistency.",
+    "Migrating SQL Server workloads to a managed service (Managed Instance for lift-and-shift).",
+    "Operational data that will feed Synapse/Fabric/the lake for analytics.",
+    "Intermittent workloads that benefit from serverless auto-pause."
+  ],
+  "whenNotToUse": [
+    "Analytical scans, aggregations and BI — use Synapse/Fabric, not the OLTP database.",
+    "Globally-distributed multi-model NoSQL at scale — use Cosmos DB.",
+    "Petabyte data lakes — that's ADLS, not a relational database.",
+    "Massive write throughput beyond a single primary's limits."
+  ],
+  "keyFacts": [
+    { "label": "Type", "value": "Managed relational (OLTP) database on the SQL Server engine." },
+    { "label": "Deployments", "value": "Single database, elastic pool, Managed Instance." },
+    { "label": "Compute", "value": "DTU or vCore; Provisioned or Serverless (auto-pause)." },
+    { "label": "HA", "value": "Built-in; zone-redundant and geo-replication options." },
+    { "label": "Recovery", "value": "Automated backups + point-in-time restore." },
+    { "label": "Billing", "value": "Per DTU or vCore + storage (Serverless bills per-second when active)." }
+  ],
+  "pricingShape": "Two purchasing models: DTU bundles compute/storage/IO into one unit, while vCore lets you size CPU and memory (and apply Azure Hybrid Benefit for existing SQL licences). Provisioned compute bills continuously for the tier you pick; Serverless bills per-second while active and auto-pauses when idle — ideal for intermittent databases. Elastic pools share a resource budget across many databases to cut cost. Storage, backups and geo-replication are extra. Levers: right-size the tier, use Serverless for spiky workloads, pools for many small DBs, and reserved capacity for steady ones.",
+  "gotchas": [
+    "Running reports on the production database competes with the app — replicate to Synapse/Fabric instead.",
+    "Serverless auto-pause adds cold-start latency on the first query after idle — fine for dev, weigh for user-facing.",
+    "DTU vs vCore confusion leads to mis-sized/overpriced databases — vCore is clearer for tuning.",
+    "Managed Instance (lift-and-shift) is pricier and deploys into a VNet — different from single database.",
+    "Geo-replication and zone redundancy improve resilience but add cost — enable deliberately."
+  ],
+  "equivalents": [
+    { "provider": "aws", "id": "rds", "name": "Amazon RDS", "note": "Managed relational engines incl. SQL Server; Aurora for cloud-native scale." },
+    { "provider": "gcp", "id": "cloud-sql", "name": "Cloud SQL", "note": "Managed PostgreSQL/MySQL/SQL Server; Spanner for global scale." }
+  ],
+  "docsUrl": "https://learn.microsoft.com/azure/azure-sql/database/"
+}

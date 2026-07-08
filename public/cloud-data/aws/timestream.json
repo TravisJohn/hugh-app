@@ -1,0 +1,55 @@
+{
+  "id": "timestream",
+  "provider": "aws",
+  "name": "Amazon Timestream",
+  "groups": ["olap"],
+  "oneLiner": "Serverless time-series database for IoT and operational metrics at scale.",
+  "whatItIs": "Amazon Timestream is AWS's purpose-built, serverless time-series database — optimised for data that arrives as a stream of timestamped points, like IoT sensor readings, application metrics and monitoring telemetry. Time-series workloads have distinct needs (huge write volume, time-ordered queries, data that gets colder with age), and Timestream handles them with automatic tiering between fast memory and cheap long-term storage, plus a SQL-like query language with time-series functions (interpolation, smoothing, windowing). It scales writes and storage without servers to manage. It's the serving/analytics store for time-stamped operational data that a general warehouse handles less efficiently.",
+  "inPractice": {
+    "narrative": "A fleet of IoT devices emits millions of sensor readings. They stream (often via Kinesis/IoT Core) into Timestream, which stores recent data in a fast memory tier and ages older data into cheap magnetic storage automatically. Dashboards in Grafana or QuickSight run time-series queries — rolling averages, gap-filling, per-device trends — directly against Timestream. It's the serving layer for time-stamped operational data, tuned for exactly the write volume and time-ordered queries that pattern demands.",
+    "flow": ["IoT / metrics streams", "Kinesis / IoT Core", "Timestream (time-series DB)", "Grafana / QuickSight"],
+    "highlight": 2
+  },
+  "coreConcepts": [
+    { "term": "Purpose-built for time-series", "detail": "Designed around timestamped points: high-ingest, append-heavy writes and queries over time ranges — a shape general-purpose databases handle inefficiently." },
+    { "term": "Automatic storage tiering", "detail": "Recent data sits in a fast in-memory store for low-latency queries; older data ages into cheaper long-term storage automatically, matching cost to access patterns." },
+    { "term": "Time-series query functions", "detail": "A SQL-like language with built-in interpolation, gap-filling, smoothing and time-window aggregation makes common time-series analysis concise." },
+    { "term": "Serverless scaling", "detail": "No clusters to provision; ingestion and storage scale automatically, and you pay for what you write, store and query." },
+    { "term": "Retention policies", "detail": "Per-table retention for the memory and magnetic tiers controls how long data stays hot vs cold vs expired — a key cost/perf lever." },
+    { "term": "Ingestion sources", "detail": "Commonly fed from Kinesis, IoT Core, Managed Flink or direct writes, and queried from Grafana, QuickSight and the SDK." }
+  ],
+  "whenToUse": [
+    "Storing and analysing high-volume timestamped data (IoT, metrics, telemetry).",
+    "Time-ordered queries with interpolation, gap-filling and windowing.",
+    "Serverless time-series storage with automatic hot/cold tiering.",
+    "Operational dashboards (Grafana/QuickSight) over recent + historical metrics.",
+    "Workloads where a general warehouse is inefficient for time-series."
+  ],
+  "whenNotToUse": [
+    "General-purpose analytics/joins across business data — use Redshift/Athena.",
+    "Transactional (OLTP) workloads — use RDS/DynamoDB.",
+    "Non-time-series data where the model adds no benefit.",
+    "Ad-hoc BI over modelled star schemas — that's a warehouse's job."
+  ],
+  "keyFacts": [
+    { "label": "Type", "value": "Serverless, purpose-built time-series database." },
+    { "label": "Storage", "value": "Automatic tiering: in-memory (hot) → magnetic (cold)." },
+    { "label": "Query", "value": "SQL-like with time-series functions (interpolation, windows)." },
+    { "label": "Scaling", "value": "Serverless; scales ingest and storage automatically." },
+    { "label": "Feeds", "value": "Kinesis, IoT Core, Managed Flink; Grafana/QuickSight." },
+    { "label": "Billing", "value": "Per data written + stored (by tier) + queries scanned." }
+  ],
+  "pricingShape": "Timestream bills separately for writes, storage (at different rates for the memory vs magnetic tiers), and query data scanned — all usage-based with no servers to provision. Because recent data in the memory tier costs more than aged data in magnetic storage, retention settings (how long data stays hot) are the biggest cost lever, alongside query efficiency. There's no idle-cluster cost. The model rewards tuning retention to how far back queries actually need low latency, and letting older data fall to the cheap tier.",
+  "gotchas": [
+    "Memory-tier retention drives cost — keeping too much data hot is expensive; tune retention to real query needs.",
+    "It's for time-series specifically — forcing general relational/analytics workloads onto it is awkward and inefficient.",
+    "Queries bill by data scanned — unbounded time ranges over big tables cost more; filter by time.",
+    "The query language is SQL-like but not a full warehouse dialect — complex joins/modelling belong in Redshift.",
+    "Ingestion design (batching, source integration) affects write cost and throughput — plan the pipeline."
+  ],
+  "equivalents": [
+    { "provider": "azure", "id": "data-explorer", "name": "Azure Data Explorer", "note": "Fast time-series/log analytics with KQL; broader ad-hoc exploration." },
+    { "provider": "gcp", "id": "bigquery", "name": "BigQuery", "note": "No dedicated time-series DB; BigQuery (or Bigtable for high-ingest) covers the need on GCP." }
+  ],
+  "docsUrl": "https://docs.aws.amazon.com/timestream/"
+}

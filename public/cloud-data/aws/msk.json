@@ -1,0 +1,56 @@
+{
+  "id": "msk",
+  "provider": "aws",
+  "name": "Amazon MSK",
+  "short": "Managed Streaming for Apache Kafka",
+  "groups": ["streaming"],
+  "oneLiner": "Fully-managed Apache Kafka for streaming ingestion and event backbones.",
+  "whatItIs": "Amazon MSK runs real Apache Kafka as a managed service — AWS provisions the brokers, handles patching, scaling and recovery, and keeps the open-source Kafka APIs so existing Kafka apps, tooling and the ecosystem (Kafka Connect, Streams) work unchanged. Kafka is the industry-standard distributed event log: producers publish to topics partitioned across brokers, and many independent consumers read at their own offset, with data retained durably. MSK is the choice when a team is committed to Kafka specifically — for its ecosystem, exactly-once semantics, or portability — rather than the AWS-native Kinesis. MSK Serverless removes capacity planning entirely.",
+  "inPractice": {
+    "narrative": "Microservices publish events to Kafka topics on an MSK cluster — the durable event backbone. A Kafka Connect sink streams those events to S3 for the lake, a Managed Flink app consumes the same topics for real-time metrics, and another service subscribes for operational reactions. Because it's standard Kafka, the team reuses existing Kafka code and connectors. MSK is the managed streaming ingestion layer many consumers hang off.",
+    "flow": ["Producers (microservices)", "MSK (Kafka topics)", "Kafka Connect / Flink consumers", "S3 lake / warehouse"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Real Apache Kafka", "detail": "MSK runs open-source Kafka, so the Kafka protocol, client libraries, Kafka Connect and Kafka Streams all work as-is — key for portability and reusing the ecosystem." },
+    { "term": "Topics, partitions, offsets", "detail": "Producers write to topics split into partitions (ordering + parallelism per partition); consumers track offsets and read independently, with durable retention enabling replay." },
+    { "term": "Provisioned vs Serverless", "detail": "Provisioned MSK gives you sized brokers (you manage capacity/tuning); MSK Serverless auto-scales throughput and removes broker/partition planning." },
+    { "term": "Kafka Connect (MSK Connect)", "detail": "Managed connectors move data in/out of Kafka (e.g. to S3, databases) without running your own Connect cluster." },
+    { "term": "Durability & replication", "detail": "Topics are replicated across brokers/AZs for durability and availability; retention lets late or new consumers replay history." },
+    { "term": "Consumer groups", "detail": "A consumer group shares a topic's partitions for scalable parallel consumption, while different groups each get the full stream." }
+  ],
+  "whenToUse": [
+    "Teams committed to Apache Kafka and its ecosystem/tooling.",
+    "Streaming ingestion backbones feeding many independent consumers.",
+    "Reusing existing Kafka apps, Connect connectors or Streams.",
+    "Cross-environment portability where standard Kafka matters.",
+    "High-throughput event pipelines with durable replay."
+  ],
+  "whenNotToUse": [
+    "AWS-native streaming with less to manage — Kinesis Data Streams may be simpler.",
+    "Simple task queues with per-message delete — use SQS.",
+    "Low-volume, occasional messaging where Kafka is overkill.",
+    "Teams without Kafka expertise wanting the least operational surface (consider Serverless or Kinesis)."
+  ],
+  "keyFacts": [
+    { "label": "Engine", "value": "Managed open-source Apache Kafka." },
+    { "label": "Compatibility", "value": "Standard Kafka APIs, Connect and Streams." },
+    { "label": "Modes", "value": "Provisioned (sized brokers) or MSK Serverless." },
+    { "label": "Parallelism", "value": "Topics + partitions + consumer groups." },
+    { "label": "Durability", "value": "Multi-broker/AZ replication with retention/replay." },
+    { "label": "Billing", "value": "Provisioned: per broker-hour + storage; Serverless: per throughput/usage." }
+  ],
+  "pricingShape": "Provisioned MSK bills per broker-hour (by broker size), plus storage for retained data and some networking — so cost tracks the cluster you keep running, whether or not it's busy, making right-sized brokers and retention the main levers. MSK Serverless instead bills by throughput and storage consumed, removing capacity planning and idle-broker waste, at a higher per-unit rate that suits variable workloads. Kafka Connect and cross-AZ traffic add cost. The choice mirrors other services: provisioned rewards steady high utilisation; serverless suits spiky or unpredictable streams.",
+  "gotchas": [
+    "Provisioned clusters bill continuously — an over-sized or idle cluster wastes money; consider Serverless for variable load.",
+    "You still own Kafka concerns: partition counts, consumer lag, and rebalancing affect throughput and ordering.",
+    "Cross-AZ data transfer between brokers/consumers can add meaningful cost at scale.",
+    "Ordering is per partition only — partition-key choice determines the ordering you actually get.",
+    "Running Kafka well needs Kafka knowledge; if you don't need the ecosystem, Kinesis is lower-effort."
+  ],
+  "equivalents": [
+    { "provider": "gcp", "id": "managed-kafka", "name": "Managed Service for Apache Kafka", "note": "Managed Kafka on GCP; the direct analogue." },
+    { "provider": "azure", "id": "event-hubs", "name": "Azure Event Hubs", "note": "Kafka-compatible endpoint rather than full managed Kafka clusters." }
+  ],
+  "docsUrl": "https://docs.aws.amazon.com/msk/"
+}

@@ -1,0 +1,55 @@
+{
+  "id": "storage-transfer",
+  "provider": "gcp",
+  "name": "Storage Transfer Service",
+  "groups": ["movement"],
+  "oneLiner": "Managed bulk data transfer from other clouds/on-prem into Cloud Storage.",
+  "whatItIs": "Storage Transfer Service is Google Cloud's managed service for moving large volumes of file and object data into Cloud Storage — from Amazon S3, Azure Blob, other Cloud Storage buckets, or on-prem file systems and HDFS. It handles scheduling, parallelism, integrity checks, retries and incremental transfers so you don't script fragile copies. It's the on-ramp for seeding a GCS data lake with existing datasets or keeping data synced from another cloud. Where Datastream moves database changes, Storage Transfer Service moves bulk files/objects. For volumes too large for the network, GCP offers Transfer Appliance (offline shipping).",
+  "inPractice": {
+    "narrative": "A team migrating to GCP has petabytes in an Amazon S3 bucket. Storage Transfer Service copies it into Cloud Storage — managed, parallel, verified — and can run on a schedule to keep picking up new objects until cutover. On-prem file shares are handled with an agent-based transfer. Once the data lands in GCS, Dataflow and BigQuery take over. Storage Transfer Service is the reliable bulk on-ramp into the GCP lake.",
+    "flow": ["S3 / Azure Blob / on-prem files", "Storage Transfer Service", "Cloud Storage (data lake)", "Dataflow / BigQuery"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Cloud-to-cloud transfer", "detail": "Moves data directly from S3, Azure Blob and other GCS buckets into Cloud Storage — a common migration/multi-cloud ingestion path with no agent for cloud sources." },
+    { "term": "On-prem (agent-based)", "detail": "For POSIX file systems and HDFS, transfer agents run near the source to move data into Cloud Storage." },
+    { "term": "Scheduling & incremental", "detail": "Transfers can be one-time or scheduled, copying only new/changed objects on later runs to keep destinations current." },
+    { "term": "Managed reliability", "detail": "Parallelised, integrity-checked and retried automatically — handling scale and flakiness that hand-rolled scripts struggle with." },
+    { "term": "Filtering & options", "detail": "Include/exclude by prefix, age or overwrite rules control exactly what moves and how conflicts are handled." },
+    { "term": "Transfer Appliance (offline)", "detail": "For datasets too large for the network in reasonable time, a physical appliance ships data into GCP instead." }
+  ],
+  "whenToUse": [
+    "Migrating buckets from S3/Azure Blob into Cloud Storage.",
+    "Bulk-loading on-prem files/HDFS into the GCS data lake.",
+    "Scheduled, incremental sync from another cloud or source.",
+    "Reliable, verified transfer of large datasets at scale.",
+    "Seeding analytics storage with existing archives."
+  ],
+  "whenNotToUse": [
+    "Database migration/replication — use Datastream (or Database Migration Service).",
+    "Datasets too large for the network — use Transfer Appliance (offline).",
+    "Real-time event/stream ingestion — that's Pub/Sub.",
+    "Trivial one-off copies where gsutil/gcloud storage is simpler."
+  ],
+  "keyFacts": [
+    { "label": "Role", "value": "Managed bulk file/object transfer into Cloud Storage." },
+    { "label": "Sources", "value": "S3, Azure Blob, other GCS buckets, on-prem/HDFS (agent)." },
+    { "label": "Target", "value": "Cloud Storage." },
+    { "label": "Features", "value": "Scheduled, incremental, parallel, integrity-checked." },
+    { "label": "Offline sibling", "value": "Transfer Appliance for network-impractical volumes." },
+    { "label": "Billing", "value": "Service is largely free; pay egress/operations + destination storage." }
+  ],
+  "pricingShape": "The Storage Transfer Service itself carries little to no direct charge for cloud-to-cloud/on-prem transfers — the real costs are the source-side egress (e.g. AWS charging to read out of S3), request/operation costs, and the destination Cloud Storage. So a migration's expense is dominated by the other cloud's egress and the new storage, not a transfer-service fee. Levers: use incremental transfers to avoid re-moving data, filter to only what's needed, and for huge first-loads weigh Transfer Appliance against network egress economics.",
+  "gotchas": [
+    "The big cost is usually source egress (e.g. S3 read-out), not the transfer service — budget for the other cloud's bill.",
+    "On-prem transfers need agents and network setup — plan connectivity and bandwidth.",
+    "It moves files/objects, not databases — use Datastream/DMS for database data.",
+    "Network transfer of petabytes may be impractical — Transfer Appliance can be cheaper/faster.",
+    "Overwrite/delete options must be set carefully so a sync doesn't clobber or remove unintended objects."
+  ],
+  "equivalents": [
+    { "provider": "aws", "id": "datasync", "name": "AWS DataSync", "note": "Managed online bulk transfer into AWS storage; Snow family for offline." },
+    { "provider": "azure", "id": "data-box", "name": "Azure Data Box", "note": "Bulk transfer into Azure; Data Box for offline, AzCopy/Storage Mover online." }
+  ],
+  "docsUrl": "https://cloud.google.com/storage-transfer/docs"
+}

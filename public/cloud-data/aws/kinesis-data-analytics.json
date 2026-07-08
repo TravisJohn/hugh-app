@@ -1,0 +1,56 @@
+{
+  "id": "kinesis-data-analytics",
+  "provider": "aws",
+  "name": "Managed Service for Apache Flink",
+  "short": "formerly Kinesis Data Analytics",
+  "groups": ["streaming"],
+  "oneLiner": "Managed Apache Flink for real-time stream processing and analytics.",
+  "whatItIs": "Amazon Managed Service for Apache Flink (the rebrand of Kinesis Data Analytics) runs Apache Flink applications without you managing the Flink cluster. Flink is the leading engine for stateful stream processing — windowed aggregations, joins across streams, event-time handling, exactly-once state — and this service provisions, scales and checkpoints it for you. You write the processing logic (Java/Scala/Python, or SQL via Flink SQL) and point it at a source like Kinesis Data Streams or MSK, then emit results to sinks. It's the compute that turns raw streams into real-time metrics, alerts and enriched events.",
+  "inPractice": {
+    "narrative": "Clickstream events flow into a Kinesis Data Stream. A Managed Flink application reads that stream and computes tumbling 1-minute counts, sessionises users, and flags anomalies — all in real time, keeping state across events. It writes rolling metrics to a dashboard and enriched events to another stream or S3. Flink is the brain doing the stateful math on the stream that a simple consumer couldn't.",
+    "flow": ["Kinesis Data Streams / MSK", "Managed Flink app (windowed, stateful)", "Dashboards / S3 / downstream stream"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Stateful stream processing", "detail": "Flink keeps managed, fault-tolerant state (counts, sessions, joins) across events and checkpoints it, so results survive failures with exactly-once semantics." },
+    { "term": "Event time & watermarks", "detail": "Flink processes by event time (when things happened) not arrival time, using watermarks to handle out-of-order and late data correctly — critical for accurate windows." },
+    { "term": "Windowing", "detail": "Tumbling, sliding and session windows aggregate streams over time; the core primitive for real-time metrics." },
+    { "term": "APIs", "detail": "Write apps in Java/Scala/Python (DataStream/Table API) or with Flink SQL for declarative stream queries; Studio notebooks allow interactive development." },
+    { "term": "Kinesis Processing Units (KPUs)", "detail": "Capacity is measured in KPUs (CPU/memory/network); the service can autoscale them with load, and you pay per KPU-hour." },
+    { "term": "Sources & sinks", "detail": "Connects to Kinesis Data Streams, MSK/Kafka and others as input, and writes to streams, S3, OpenSearch, databases and more." }
+  ],
+  "whenToUse": [
+    "Real-time analytics needing windows, joins or stateful logic over streams.",
+    "Correct event-time processing of out-of-order/late data.",
+    "Enriching or transforming streams continuously before they land.",
+    "Exactly-once real-time pipelines without running your own Flink cluster.",
+    "Streaming SQL over Kinesis/MSK for near-real-time metrics."
+  ],
+  "whenNotToUse": [
+    "Simple pass-through delivery to S3/Redshift — use Kinesis Data Firehose.",
+    "Stateless per-record transforms triggered occasionally — a Lambda consumer is simpler.",
+    "Batch analytics with no latency requirement — do it in Athena/EMR/Redshift.",
+    "Teams without streaming/Flink experience for very simple needs — the model has a learning curve."
+  ],
+  "keyFacts": [
+    { "label": "Engine", "value": "Managed Apache Flink (stateful stream processing)." },
+    { "label": "APIs", "value": "Java/Scala/Python (DataStream/Table) and Flink SQL; Studio notebooks." },
+    { "label": "Semantics", "value": "Event-time processing, exactly-once state via checkpoints." },
+    { "label": "Sources", "value": "Kinesis Data Streams, MSK/Kafka, and more." },
+    { "label": "Capacity", "value": "Kinesis Processing Units (KPUs), autoscalable." },
+    { "label": "Billing", "value": "Per KPU-hour (plus storage for state/backups)." }
+  ],
+  "pricingShape": "You pay per KPU-hour for the capacity the application runs on, plus a bit for running-application storage and durable backups. Because a streaming app runs continuously, cost is essentially 'KPUs × time it's up' — so right-sizing parallelism and enabling autoscaling (to shed KPUs at low load) are the main levers. Unlike a batch job, there's no scale-to-zero while the app is active; you stop the application to stop most charges. State size and checkpointing add modest storage costs.",
+  "gotchas": [
+    "It runs continuously, so an idle-but-running app still bills KPU-hours — stop apps you're not using.",
+    "Getting event-time/watermark configuration wrong silently produces incorrect windowed results.",
+    "Large managed state raises cost and checkpoint duration; design state size deliberately.",
+    "Flink has a real learning curve; simple needs can be over-served versus a Lambda consumer.",
+    "The service was renamed from Kinesis Data Analytics — older docs/SQL-only 'KDA for SQL' guidance is legacy."
+  ],
+  "equivalents": [
+    { "provider": "gcp", "id": "dataflow", "name": "Dataflow", "note": "Serverless Apache Beam for unified stream/batch; different engine, similar role." },
+    { "provider": "azure", "id": "stream-analytics", "name": "Azure Stream Analytics", "note": "SQL-first managed stream processing; simpler but less flexible than Flink." }
+  ],
+  "docsUrl": "https://docs.aws.amazon.com/managed-flink/"
+}

@@ -1,0 +1,55 @@
+{
+  "id": "cloud-functions",
+  "provider": "gcp",
+  "name": "Cloud Functions",
+  "groups": ["serverless"],
+  "oneLiner": "Event-driven serverless functions for glue and lightweight processing.",
+  "whatItIs": "Cloud Functions is Google Cloud's serverless functions service: you deploy a single function and it runs in response to events — a file arriving in Cloud Storage, a Pub/Sub message, an HTTP request — scaling automatically and billing only while it runs. No servers to manage. The 2nd generation is built on Cloud Run and Eventarc, giving longer timeouts, more memory and a broader set of event sources. In data pipelines it's the lightweight glue: react to events, do small transforms, and trigger heavier services like Dataflow or BigQuery. It's not for long-running heavy compute — it's for short, event-driven tasks.",
+  "inPractice": {
+    "narrative": "A file lands in a Cloud Storage bucket. That event triggers a Cloud Function that validates the file, writes metadata to Firestore, and publishes a Pub/Sub message that kicks off a Dataflow job for the real processing. Another function runs on a Pub/Sub message to call an API and load a small result into BigQuery. Each runs only when its event fires and costs nothing idle. Cloud Functions is the event-driven wiring, not the heavy lifter.",
+    "flow": ["Event (GCS upload / Pub/Sub / HTTP)", "Cloud Function", "trigger Dataflow / write Firestore / load BigQuery", "downstream pipeline"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Event-driven & HTTP triggers", "detail": "Functions fire on Cloud Storage events, Pub/Sub messages, Firestore changes, HTTP requests and (via Eventarc in gen2) many more sources — you write logic, not pollers." },
+    { "term": "1st vs 2nd generation", "detail": "Gen2 is built on Cloud Run + Eventarc, offering longer timeouts (up to 60 min for HTTP), more memory/CPU, concurrency per instance, and broader events than gen1." },
+    { "term": "Pay-per-use", "detail": "Billed by invocations and compute time (vCPU/memory × duration), plus networking; idle functions cost nothing — serverless economics." },
+    { "term": "Stateless & ephemeral", "detail": "Each invocation is stateless in a temporary environment; persist state to Cloud Storage/Firestore/BigQuery. Instances are reused warm when possible." },
+    { "term": "Cold starts & min instances", "detail": "New/scaled-out instances initialise with some latency; setting minimum instances keeps a few warm for latency-sensitive functions." },
+    { "term": "Concurrency (gen2)", "detail": "Gen2 can handle multiple concurrent requests per instance (Cloud Run model), improving efficiency versus gen1's one-request-per-instance." }
+  ],
+  "whenToUse": [
+    "Event-driven glue between GCP services (GCS→process→Pub/Sub).",
+    "Lightweight transforms, validation and small API calls.",
+    "Triggering heavier jobs (Dataflow, BigQuery loads) from events.",
+    "HTTP endpoints/webhooks without managing a server.",
+    "Spiky workloads that should scale to zero when idle."
+  ],
+  "whenNotToUse": [
+    "Long-running or heavy compute — use Dataflow/Dataproc or Cloud Run jobs.",
+    "Sustained high-throughput services where a running container is cheaper.",
+    "Large stateful in-memory processing — functions are stateless/ephemeral.",
+    "Complex multi-service apps better served directly by Cloud Run."
+  ],
+  "keyFacts": [
+    { "label": "Model", "value": "Serverless, event-driven functions; scales to zero." },
+    { "label": "Generations", "value": "Gen2 on Cloud Run + Eventarc (longer/larger than gen1)." },
+    { "label": "Triggers", "value": "Cloud Storage, Pub/Sub, Firestore, HTTP, Eventarc sources." },
+    { "label": "Timeout", "value": "Up to 60 min (gen2 HTTP); shorter for event functions." },
+    { "label": "Concurrency", "value": "Multiple requests per instance in gen2." },
+    { "label": "Billing", "value": "Per invocation + compute time (vCPU/mem × duration) + networking." }
+  ],
+  "pricingShape": "Cloud Functions bills for invocations plus compute time (vCPU and memory times duration) and networking, with a free tier — idle means (near) zero cost, busy scales with work. Levers mirror other FaaS: right-size memory/CPU (more can mean shorter, cheaper runs), keep functions fast, and use minimum instances only when cold starts genuinely hurt (that adds a standing cost). For steady high-volume traffic, a continuously-running Cloud Run service can be cheaper than per-invocation functions — switch when throughput is sustained.",
+  "gotchas": [
+    "Gen1 vs gen2 differ significantly (timeouts, events, concurrency) — use gen2 for new work and check feature parity.",
+    "Cold starts add latency on scale-out; set minimum instances for latency-sensitive paths (at a cost).",
+    "Functions are stateless — persist anything durable to GCS/Firestore/BigQuery, not local disk.",
+    "A function writing to the bucket/topic that triggers it can create infinite loops and runaway cost.",
+    "Heavy or long jobs don't belong here — trigger Dataflow/Dataproc instead of forcing big work into a function."
+  ],
+  "equivalents": [
+    { "provider": "aws", "id": "lambda", "name": "AWS Lambda", "note": "Event-driven serverless functions; the direct analogue on AWS." },
+    { "provider": "azure", "id": "azure-functions", "name": "Azure Functions", "note": "Event-driven serverless compute; the direct analogue on Azure." }
+  ],
+  "docsUrl": "https://cloud.google.com/functions/docs"
+}

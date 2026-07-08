@@ -1,0 +1,55 @@
+{
+  "id": "stream-analytics",
+  "provider": "azure",
+  "name": "Azure Stream Analytics",
+  "groups": ["streaming"],
+  "oneLiner": "Real-time, SQL-based stream processing over Event Hubs and IoT.",
+  "whatItIs": "Azure Stream Analytics is a fully-managed, SQL-first stream-processing engine. You write a familiar SQL query — with windowing and temporal joins — that runs continuously over an input stream (usually Event Hubs or IoT Hub) and emits results to sinks like Power BI, ADLS, SQL or another event hub. There's no cluster to manage and no Java/Scala to write: the SQL dialect plus built-in functions cover most real-time analytics needs. It's the low-friction way to compute live metrics and alerts on Azure, trading Flink/Beam's flexibility for simplicity.",
+  "inPractice": {
+    "narrative": "Device telemetry streams into Event Hubs. A Stream Analytics job runs a SQL query with a tumbling window to compute per-minute averages and detect threshold breaches, outputting live tiles to a Power BI dashboard and writing raw aggregates to ADLS. Setting it up is mostly writing SQL and wiring inputs/outputs — no code deployment. It's the quickest path from an event stream to a real-time dashboard on Azure.",
+    "flow": ["Event Hubs / IoT Hub", "Stream Analytics (SQL, windowed)", "Power BI / ADLS / SQL"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "SQL query language", "detail": "A T-SQL-like dialect with streaming extensions; you express the whole job as a query, which is far lower-friction than writing Flink/Beam code." },
+    { "term": "Windowing functions", "detail": "Tumbling, hopping, sliding and session windows aggregate the stream over time; the core primitive for live metrics." },
+    { "term": "Temporal joins & reference data", "detail": "Join a stream to another stream within a time bound, or enrich it with slowly-changing reference data from Blob/SQL." },
+    { "term": "Inputs & outputs", "detail": "Inputs are typically Event Hubs or IoT Hub; outputs include Power BI (live dashboards), ADLS, Azure SQL, Cosmos DB and event hubs — wired via config." },
+    { "term": "Streaming Units (SUs)", "detail": "Capacity is measured in Streaming Units (CPU/memory); you scale SUs for throughput and parallelism, and pay per SU." },
+    { "term": "Event ordering & late arrival", "detail": "Policies control how late and out-of-order events are handled (adjust, drop) so windowed results stay correct." }
+  ],
+  "whenToUse": [
+    "Real-time dashboards and alerts computed with SQL, minimal code.",
+    "IoT and telemetry analytics over Event Hubs/IoT Hub.",
+    "Windowed aggregations and simple stream enrichment/joins.",
+    "Quick time-to-value streaming where Flink/Beam is overkill.",
+    "Direct live output to Power BI."
+  ],
+  "whenNotToUse": [
+    "Complex, highly-custom stateful processing beyond SQL — use Databricks/Flink.",
+    "Very large-scale streaming needing fine-grained engine control.",
+    "Batch analytics with no latency requirement — use Synapse/Databricks.",
+    "Logic that doesn't map cleanly to SQL and windows."
+  ],
+  "keyFacts": [
+    { "label": "Model", "value": "Managed, SQL-first continuous stream processing." },
+    { "label": "Inputs", "value": "Event Hubs, IoT Hub (plus Blob reference data)." },
+    { "label": "Outputs", "value": "Power BI, ADLS, Azure SQL, Cosmos DB, event hubs." },
+    { "label": "Windows", "value": "Tumbling, hopping, sliding, session." },
+    { "label": "Capacity", "value": "Streaming Units (SUs), scalable." },
+    { "label": "Billing", "value": "Per Streaming Unit while the job runs." }
+  ],
+  "pricingShape": "You pay per Streaming Unit for the time the job is running — a job is a continuous process, so cost is 'SUs × uptime', and you scale SUs to meet throughput/parallelism. There's no scale-to-zero while a job is started; you stop the job to stop billing. Because there's no cluster or code infrastructure, the model is simple: size SUs to the stream, avoid over-provisioning, and stop jobs that aren't needed. It's typically cheaper and simpler to operate than a Flink/Beam deployment for straightforward workloads.",
+  "gotchas": [
+    "A started job bills SUs continuously even with no events — stop jobs you're not using.",
+    "Under-provisioned SUs cause the job to fall behind (watermark delay) and lag real time.",
+    "Late-arrival and out-of-order policies must be set correctly or windowed results are wrong.",
+    "The SQL model is simpler but less flexible than Flink/Beam — complex logic may not fit.",
+    "Partition alignment between Event Hubs and the query affects achievable parallelism and throughput."
+  ],
+  "equivalents": [
+    { "provider": "aws", "id": "kinesis-data-analytics", "name": "Managed Service for Apache Flink", "note": "More powerful/flexible (Flink) but higher complexity than SQL-first ASA." },
+    { "provider": "gcp", "id": "dataflow", "name": "Dataflow", "note": "Beam-based unified stream/batch; more flexible, more to learn than ASA." }
+  ],
+  "docsUrl": "https://learn.microsoft.com/azure/stream-analytics/"
+}

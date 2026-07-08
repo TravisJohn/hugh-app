@@ -1,0 +1,56 @@
+{
+  "id": "cloud-storage",
+  "provider": "gcp",
+  "name": "Cloud Storage",
+  "short": "GCS",
+  "groups": ["storage"],
+  "oneLiner": "Unified object storage — the data-lake foundation across Google Cloud.",
+  "whatItIs": "Cloud Storage is Google Cloud's object store: files (\"objects\") live in \"buckets\" and are fetched by name over HTTPS. Like all object stores it is not a filesystem and not a database — objects are immutable blobs, and the slashes in a name are just naming, not real folders. It is the cheap, durable, effectively-unlimited floor that the rest of GCP analytics stands on: raw data lands here, Dataflow and Dataproc process it, and BigQuery loads from or queries directly against it. If you learn one GCP storage service, learn this one.",
+  "inPractice": {
+    "narrative": "A team streams app and event data into a Cloud Storage 'raw' bucket — the lake's front door. A Dataflow or Dataproc job cleans and reshapes it into date-partitioned Parquet in a 'curated' bucket. BigQuery then either loads that data or queries it in place as external/BigLake tables, and Looker dashboards read from BigQuery. Cloud Storage appears at both ends — raw landing and curated output — and stays the neutral hand-off point between every tool.",
+    "flow": ["App & event data", "Cloud Storage (raw)", "Dataflow / Dataproc", "Cloud Storage (curated Parquet)", "BigQuery", "Looker dashboards"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Bucket & object", "detail": "A bucket is a globally-unique name tied to a location (region, dual-region or multi-region); the object key is the full path within it. As with S3, 'folders' are just key prefixes." },
+    { "term": "Location type", "detail": "Region (one place, lowest latency/cost), dual-region (two set regions, low-latency HA) or multi-region (a broad geography, highest availability). Analytics workloads usually co-locate the bucket with BigQuery/compute." },
+    { "term": "Storage classes", "detail": "Standard (hot), Nearline (~monthly access), Coldline (~quarterly), Archive (rarely). Same API and millisecond access across all classes — colder ones just cost more to read and have minimum storage durations." },
+    { "term": "Strong consistency", "detail": "GCS is strongly consistent for reads-after-writes and for bucket/object listing — no stale-read caveats to design around." },
+    { "term": "Autoclass & lifecycle", "detail": "Autoclass moves objects between classes automatically based on access; lifecycle rules can transition or delete objects by age. Both keep cold data cheap without manual work." },
+    { "term": "Uniform bucket-level access", "detail": "The modern default: permissions via IAM at the bucket level instead of per-object ACLs — simpler and easier to reason about securely." }
+  ],
+  "whenToUse": [
+    "As the raw landing zone / data lake for any GCP analytics stack.",
+    "Staging files that BigQuery loads or queries as external / BigLake tables.",
+    "Storing large immutable blobs: logs, exports, images, model artifacts, Parquet tables.",
+    "Cheap long-term retention with Nearline/Coldline/Archive and lifecycle rules.",
+    "Serving static assets, often fronted by Cloud CDN."
+  ],
+  "whenNotToUse": [
+    "Low-latency random reads/writes of small records — use Bigtable or Firestore.",
+    "Data you need to update in place or transact over — objects are whole-file replace only.",
+    "A POSIX filesystem for lift-and-shift apps — use Filestore.",
+    "Structured data you'll mostly query with SQL — land it, but do the querying in BigQuery."
+  ],
+  "keyFacts": [
+    { "label": "Durability", "value": "11 nines (99.999999999%) annual durability, data redundantly stored." },
+    { "label": "Availability SLA", "value": "99.95% (multi-region/dual-region Standard); 99.9% regional Standard." },
+    { "label": "Max object size", "value": "5 TB per object." },
+    { "label": "Capacity", "value": "Unlimited objects and total size per bucket." },
+    { "label": "Consistency", "value": "Strong for object reads, writes and listing." },
+    { "label": "Scope", "value": "Bucket names are globally unique; data location is set per bucket." }
+  ],
+  "pricingShape": "You pay on: (1) storage per GB-month, much cheaper for colder classes but with minimum storage durations (delete a Coldline object early and you still pay the minimum); (2) operations — Class A (writes/lists) cost more than Class B (reads), so many tiny objects and heavy listing add up; (3) network egress — out to the internet or across regions is billed, while same-region reads to GCP services are cheap or free; and (4) retrieval fees on the colder classes. Co-locating the bucket with BigQuery and compute is the simplest way to keep the network bill near zero.",
+  "gotchas": [
+    "Bucket names share one global namespace and hint that a bucket exists — avoid guessable names for sensitive data.",
+    "Cross-region and internet egress is billed; keep buckets in the same region as BigQuery and compute.",
+    "Colder classes have minimum storage durations and retrieval fees — churny data is cheaper in Standard.",
+    "Public access via 'allUsers' is the classic misconfig; prefer uniform bucket-level access and keep public off unless you mean it.",
+    "Querying files in place is convenient but pays per byte scanned in BigQuery — Parquet + partitioning still matters."
+  ],
+  "equivalents": [
+    { "provider": "aws", "id": "s3", "name": "Amazon S3", "note": "The original object store; near 1:1 concepts (buckets, keys, storage classes)." },
+    { "provider": "azure", "id": "adls", "name": "ADLS Gen2", "note": "Blob storage with a true hierarchical namespace, so it behaves more folder-like than GCS." }
+  ],
+  "docsUrl": "https://cloud.google.com/storage/docs"
+}

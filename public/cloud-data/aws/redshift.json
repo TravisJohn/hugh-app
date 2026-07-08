@@ -1,0 +1,55 @@
+{
+  "id": "redshift",
+  "provider": "aws",
+  "name": "Amazon Redshift",
+  "groups": ["warehouse"],
+  "oneLiner": "Petabyte-scale columnar data warehouse for BI and analytics SQL.",
+  "whatItIs": "Redshift is AWS's cloud data warehouse: a SQL database tuned for analytics rather than transactions. It stores data by column (not by row) and spreads it across many nodes, so aggregations over billions of rows return in seconds. You load curated data in — typically from S3 — model it into fact and dimension tables, and point BI tools at it. Redshift Spectrum lets it also query Parquet sitting in S3 without loading. It's the 'gold' serving layer where cleaned data becomes dashboards and reports.",
+  "inPractice": {
+    "narrative": "Curated Parquet lands in S3. A COPY command (or Spectrum external tables) pulls it into Redshift, where analysts model star schemas and build the metrics the business reports on. BI tools like QuickSight or Tableau connect over SQL and hit those tables directly. Redshift is the fast serving layer at the end of the pipeline — the place raw lake data becomes trustworthy numbers.",
+    "flow": ["S3 (curated Parquet)", "COPY / Redshift Spectrum", "Redshift (star schema)", "QuickSight / Tableau"],
+    "highlight": 2
+  },
+  "coreConcepts": [
+    { "term": "Columnar + MPP", "detail": "Data is stored column-by-column and queries run massively-parallel across compute nodes/slices. Great for scanning a few columns over huge tables; poor for single-row lookups." },
+    { "term": "Distribution & sort keys", "detail": "DISTKEY controls how rows spread across nodes (co-locate joined tables to avoid data shuffling); SORTKEY orders data on disk so range scans skip blocks. Choosing these well is the main performance lever." },
+    { "term": "RA3 + managed storage", "detail": "Modern RA3 nodes decouple compute from storage (data in S3-backed managed storage), so you size compute for speed and pay for storage separately — much closer to BigQuery's separation than old DC2 nodes." },
+    { "term": "Redshift Spectrum", "detail": "Query Parquet/ORC directly in S3 as external tables, joining lake data to warehouse tables without loading it — a lakehouse bridge." },
+    { "term": "Serverless option", "detail": "Redshift Serverless auto-provisions capacity (billed in RPUs) so you skip cluster sizing for spiky or intermittent workloads." },
+    { "term": "Workload management (WLM)", "detail": "Queues and concurrency scaling govern how competing queries share the cluster — important once many analysts and dashboards hit it at once." }
+  ],
+  "whenToUse": [
+    "A central BI/analytics warehouse for modelled, curated data.",
+    "Fast aggregations and joins over large fact tables for dashboards and reports.",
+    "Teams already deep in AWS wanting tight S3, Glue and IAM integration.",
+    "Querying lake data in S3 (Spectrum) alongside loaded warehouse tables.",
+    "Predictable, steady analytics load where a sized cluster is cost-effective."
+  ],
+  "whenNotToUse": [
+    "High-volume single-row OLTP reads/writes — use an operational DB (RDS/Aurora, DynamoDB).",
+    "Truly spiky or rare workloads where a provisioned cluster idles — consider Serverless or Athena.",
+    "Unstructured/ad-hoc file exploration with no modelling — Athena over S3 is lighter.",
+    "Very high concurrency of tiny lookups — a warehouse is the wrong shape."
+  ],
+  "keyFacts": [
+    { "label": "Model", "value": "Columnar, MPP SQL warehouse (PostgreSQL-derived dialect)." },
+    { "label": "Compute", "value": "Provisioned RA3/DC2 clusters or Redshift Serverless (RPUs)." },
+    { "label": "Storage", "value": "RA3 managed storage decouples compute from data; scales to petabytes." },
+    { "label": "Lake query", "value": "Spectrum reads Parquet/ORC in S3 as external tables." },
+    { "label": "Concurrency", "value": "Concurrency Scaling adds transient clusters for bursts." },
+    { "label": "Best for", "value": "Scan-heavy analytics, not single-row transactions." }
+  ],
+  "pricingShape": "Two models. Provisioned: you pay per node-hour for the cluster you size (RA3 separates the storage bill), cheaper if it runs steadily, wasteful if it idles. Serverless: you pay per RPU-hour only while queries run, better for spiky/intermittent use. On top: managed storage per GB-month (RA3), Spectrum charges per TB scanned in S3 (so Parquet + partitioning cut cost), plus concurrency-scaling credits. The big lever is right-sizing compute to your actual query pattern and not letting a provisioned cluster sit idle.",
+  "gotchas": [
+    "Bad DISTKEY/SORTKEY choices cause data shuffles and full scans — the difference between seconds and minutes.",
+    "Provisioned clusters bill whether or not anyone queries — idle warehouses quietly burn money.",
+    "Spectrum bills per TB scanned in S3; unpartitioned or CSV data makes 'external' queries expensive.",
+    "It's PostgreSQL-flavoured but not Postgres — some functions/extensions and true OLTP behaviour aren't there.",
+    "VACUUM/ANALYZE maintenance matters on heavy-update tables to reclaim space and keep stats fresh (less so on modern auto-maintained setups)."
+  ],
+  "equivalents": [
+    { "provider": "gcp", "id": "bigquery", "name": "BigQuery", "note": "Fully serverless by default — no clusters or keys to tune; Redshift Serverless narrows the gap." },
+    { "provider": "azure", "id": "synapse-analytics", "name": "Synapse Analytics", "note": "Dedicated SQL pool is the closest provisioned-warehouse analogue." }
+  ],
+  "docsUrl": "https://docs.aws.amazon.com/redshift/"
+}

@@ -1,0 +1,55 @@
+{
+  "id": "dataplex",
+  "provider": "gcp",
+  "name": "Dataplex",
+  "groups": ["governance"],
+  "oneLiner": "Unified catalog, governance and quality across your lakes and warehouses.",
+  "whatItIs": "Dataplex is Google Cloud's data-governance and management fabric. It lets you organise data spread across Cloud Storage buckets and BigQuery datasets into logical lakes and zones, automatically catalogs and profiles it, and applies governance — access policies, data quality checks and lineage — consistently across it all. It now incorporates Data Catalog for search/metadata. Where BigLake enforces fine-grained access, Dataplex is the higher-level control plane that discovers, describes, governs and monitors the quality of your data estate so people can find and trust it.",
+  "inPractice": {
+    "narrative": "A company's data is scattered across many GCS buckets and BigQuery datasets. An admin defines Dataplex lakes and zones that logically group them by domain, and Dataplex auto-discovers tables, harvests metadata into the catalog, runs data-quality scans, and tracks lineage. Analysts search the catalog to find trustworthy datasets; policies applied in Dataplex (enforced via BigLake) govern access. It's the map-and-rulebook over an otherwise sprawling estate.",
+    "flow": ["GCS buckets + BigQuery datasets", "Dataplex lakes / zones (discover, catalog, profile)", "quality + policies + lineage", "analysts find & trust data"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Lakes & zones", "detail": "Logical containers that group physical data (GCS/BigQuery) by domain and refine it into zones (e.g. raw vs curated), independent of where bytes physically live." },
+    { "term": "Data Catalog / discovery", "detail": "Auto-discovers assets and harvests technical + business metadata into a searchable catalog, so users can find datasets across the estate." },
+    { "term": "Auto data quality & profiling", "detail": "Built-in scans profile data and run quality rules (nulls, ranges, uniqueness), surfacing scores and issues without a separate tool." },
+    { "term": "Governance & policies", "detail": "Central access and data policies applied across grouped assets, enforced together with BigLake for fine-grained control." },
+    { "term": "Lineage", "detail": "Tracks how data flows and transforms across BigQuery/Dataflow/etc., aiding trust, debugging and impact analysis." },
+    { "term": "Attribute/tag-based classification", "detail": "Classify and tag data (e.g. PII) to drive policy and discovery at scale rather than per-table management." }
+  ],
+  "whenToUse": [
+    "Governing and cataloguing data spread across GCS and BigQuery centrally.",
+    "Making datasets discoverable and trustworthy for analysts (search + metadata).",
+    "Automated data-quality profiling and rule checks across the estate.",
+    "Applying consistent policies and classification at scale.",
+    "Tracking lineage for governance and impact analysis."
+  ],
+  "whenNotToUse": [
+    "A tiny single-dataset project where a catalog/governance layer is overkill.",
+    "Purely enforcing table access with nothing else — BigLake alone may suffice.",
+    "Non-GCP data estates as the primary target — it's GCP-centric.",
+    "Real-time data processing — it's governance/management, not a pipeline engine."
+  ],
+  "keyFacts": [
+    { "label": "Role", "value": "Data governance, catalog, quality and lineage fabric." },
+    { "label": "Organises", "value": "Cloud Storage + BigQuery into logical lakes/zones." },
+    { "label": "Catalog", "value": "Incorporates Data Catalog for search/metadata." },
+    { "label": "Quality", "value": "Built-in profiling and data-quality scans." },
+    { "label": "Enforcement", "value": "Policies applied with BigLake for fine-grained access." },
+    { "label": "Billing", "value": "Per data-processing (discovery/quality tasks) + catalog usage." }
+  ],
+  "pricingShape": "Dataplex charges are largely usage-based: the data-processing it does for discovery, profiling and data-quality scans (billed by processing units/DCUs for the time those tasks run), plus catalog metadata storage/API usage. Organising data into lakes and zones itself is cheap; the cost grows with how much scanning and quality checking you run. Underlying storage (GCS/BigQuery) and query compute are separate. So the lever is how frequently and broadly you profile/scan versus governing metadata that changes slowly.",
+  "gotchas": [
+    "Frequent quality/discovery scans over large data accrue processing cost — schedule them sensibly.",
+    "It's a management layer, not storage or compute — people expect a 'lake product' and it's really governance over existing data.",
+    "Effective use needs a domain/zone design up front; ad-hoc grouping undermines the value.",
+    "Fine-grained access enforcement leans on BigLake — Dataplex policies and BigLake need to line up.",
+    "The Data Catalog/Dataplex product boundaries have shifted over time; follow current docs for what lives where."
+  ],
+  "equivalents": [
+    { "provider": "aws", "id": "lake-formation", "name": "AWS Lake Formation", "note": "Central lake governance/permissions; narrower than Dataplex's catalog+quality scope." },
+    { "provider": "azure", "id": "purview", "name": "Microsoft Purview", "note": "Enterprise catalog, lineage and governance across the estate." }
+  ],
+  "docsUrl": "https://cloud.google.com/dataplex/docs"
+}

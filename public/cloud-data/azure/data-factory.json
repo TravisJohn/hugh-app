@@ -1,0 +1,56 @@
+{
+  "id": "data-factory",
+  "provider": "azure",
+  "name": "Azure Data Factory",
+  "short": "ADF",
+  "groups": ["integration", "orchestration"],
+  "oneLiner": "Cloud data integration for ETL/ELT plus pipeline orchestration (incl. Managed Airflow).",
+  "whatItIs": "Azure Data Factory is Azure's data-integration and orchestration service — and it genuinely wears both hats, which is why it appears under Integration and Orchestration. As integration, it moves data between 90+ sources with the Copy activity and transforms it visually with Mapping Data Flows (which run on managed Spark). As orchestration, its pipelines schedule, chain, branch and monitor activities — and it now also offers Managed Airflow for teams who want DAGs. On Azure it's the default glue that gets data from A to B and coordinates the steps in between.",
+  "inPractice": {
+    "narrative": "A pipeline needs to pull from on-prem SQL Server and a SaaS API each night, land the data in ADLS, transform it, and load Synapse — in a set order with retries and alerting. ADF's Copy activities ingest the sources, a Mapping Data Flow (on managed Spark) does the transforms, and the ADF pipeline orchestrates the whole sequence on a schedule. It's doing both jobs at once: the integration and the orchestration.",
+    "flow": ["On-prem / SaaS / files", "ADF Copy activity", "ADLS (raw)", "ADF Mapping Data Flow", "Synapse / Power BI"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Pipelines & activities", "detail": "A pipeline is an ordered graph of activities (copy, data flow, notebook, stored proc, etc.) with dependencies, branching and retries — this is the orchestration layer." },
+    { "term": "Copy activity", "detail": "The high-throughput data-movement engine with 90+ connectors (databases, SaaS, files, on-prem via a self-hosted integration runtime)." },
+    { "term": "Mapping Data Flows", "detail": "Visual, code-free transformations that ADF compiles and runs on managed Spark clusters — the ETL/transform side." },
+    { "term": "Integration Runtime (IR)", "detail": "The compute that actually executes activities: Azure IR (cloud), Self-hosted IR (on-prem/VNet access), or Azure-SSIS IR (lift-and-shift SSIS packages)." },
+    { "term": "Triggers", "detail": "Schedule, tumbling-window or event-based triggers start pipelines — the scheduling half of orchestration." },
+    { "term": "Managed Airflow", "detail": "ADF can host managed Apache Airflow environments, so teams wanting code-first DAGs get them within the same service." }
+  ],
+  "whenToUse": [
+    "Moving data between many sources into ADLS/Synapse on Azure.",
+    "Code-free visual transforms (Mapping Data Flows) without writing Spark.",
+    "Orchestrating multi-step data pipelines with scheduling, retries and monitoring.",
+    "Reaching on-prem/VNet sources via a self-hosted integration runtime.",
+    "Lifting existing SSIS packages to the cloud (Azure-SSIS IR)."
+  ],
+  "whenNotToUse": [
+    "Heavy custom, code-first transformation logic engineers would rather write in Spark/Databricks.",
+    "Real-time streaming pipelines — use Event Hubs + Stream Analytics/Dataflow-style tools.",
+    "Simple single-trigger event glue — an Azure Function may be lighter.",
+    "Teams that want pure open-source Airflow control end-to-end (though Managed Airflow narrows this)."
+  ],
+  "keyFacts": [
+    { "label": "Two roles", "value": "Data integration (Copy + Data Flows) and pipeline orchestration." },
+    { "label": "Connectors", "value": "90+ sources incl. on-prem via self-hosted IR." },
+    { "label": "Transforms", "value": "Mapping Data Flows run on managed Spark, code-free." },
+    { "label": "Orchestration", "value": "Pipelines with dependencies, triggers, retries; Managed Airflow option." },
+    { "label": "Compute", "value": "Integration Runtimes: Azure / Self-hosted / Azure-SSIS." },
+    { "label": "Billing", "value": "Per activity run + data-movement + Data Flow vCore-hours." }
+  ],
+  "pricingShape": "ADF bills by usage across a few axes: pipeline activity runs (a small charge per orchestration activity), data movement (priced by Copy throughput/DIUs), and Mapping Data Flow execution (per vCore-hour of the managed Spark cluster while it runs, plus cluster startup time). Self-hosted IR is free software but runs on your own VMs. There's no big always-on cluster, so cost tracks how much you move and transform. Data Flows are the usual cost driver — keeping clusters small and runs efficient matters most.",
+  "gotchas": [
+    "Mapping Data Flows pay for Spark cluster startup on every run — batching transforms beats many tiny flows.",
+    "Self-hosted IR is your responsibility to install, patch and scale — it's a VM you own.",
+    "It plays both integration and orchestration roles; teams sometimes overload pipelines with logic better done in Spark/Databricks.",
+    "Debugging visual Data Flows over large data can be slow; test on samples first.",
+    "Event/tumbling-window triggers have semantics worth understanding to avoid missed or duplicated runs."
+  ],
+  "equivalents": [
+    { "provider": "aws", "id": "glue", "name": "AWS Glue", "note": "Serverless Spark ETL + catalog; Step Functions/MWAA cover orchestration on AWS." },
+    { "provider": "gcp", "id": "data-fusion", "name": "Cloud Data Fusion", "note": "Visual integration; Cloud Composer handles orchestration on GCP." }
+  ],
+  "docsUrl": "https://learn.microsoft.com/azure/data-factory/"
+}

@@ -1,0 +1,56 @@
+{
+  "id": "sqs",
+  "provider": "aws",
+  "name": "Amazon SQS",
+  "short": "Simple Queue Service",
+  "groups": ["messaging"],
+  "oneLiner": "Managed message queue for decoupling and buffering between services.",
+  "whatItIs": "SQS is AWS's fully-managed message queue — one of its oldest services and a workhorse of decoupled architectures. A producer sends messages to a queue; consumers poll and process them, then delete them. The queue buffers work so producers and consumers run independently and at different rates, absorbing spikes and surviving consumer outages. Unlike a streaming log (Kinesis/Kafka), each SQS message is typically processed once by one consumer and then removed — it's a task/work queue, not a replayable event stream. It's serverless, scales effectively infinitely, and is the default way to decouple components on AWS.",
+  "inPractice": {
+    "narrative": "An upload service needs to trigger heavy processing without blocking users. It drops a message per upload onto an SQS queue and returns immediately. A fleet of consumers (or a Lambda) polls the queue and processes items at its own pace, so a traffic spike just lengthens the queue instead of overwhelming the workers. Failed messages retry and, after enough attempts, move to a dead-letter queue for inspection. SQS is the buffer that decouples the fast front end from the slower back end.",
+    "flow": ["Producer service", "SQS queue (buffer)", "Consumers / Lambda", "downstream processing"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Queue, not a log", "detail": "A message is delivered to one consumer and deleted after processing — there's no replay or multiple independent readers like a streaming log. It's a work queue." },
+    { "term": "Standard vs FIFO", "detail": "Standard queues offer massive throughput with at-least-once delivery and best-effort ordering; FIFO queues guarantee exactly-once processing and strict order at lower throughput." },
+    { "term": "Visibility timeout", "detail": "When a consumer picks up a message it's hidden for a timeout; if not deleted in time it reappears for retry — the mechanism behind reliable, retryable processing." },
+    { "term": "Dead-letter queues", "detail": "Messages that fail repeatedly are routed to a DLQ so poison messages don't block the queue and can be examined separately." },
+    { "term": "Long polling", "detail": "Consumers can wait for messages rather than busy-polling, cutting empty receives and cost." },
+    { "term": "Decoupling pattern", "detail": "SQS lets producers and consumers scale and fail independently; it pairs with SNS/EventBridge for fan-out (SNS→many SQS queues)." }
+  ],
+  "whenToUse": [
+    "Decoupling and buffering work between services.",
+    "Absorbing traffic spikes so consumers process at their own rate.",
+    "Reliable, retryable task/job processing with dead-letter handling.",
+    "Triggering Lambda/consumers asynchronously from producers.",
+    "Ordered, exactly-once task processing (FIFO queues)."
+  ],
+  "whenNotToUse": [
+    "Replayable event streams with multiple independent consumers — use Kinesis/MSK.",
+    "Rich pub/sub fan-out to many subscribers — use SNS/EventBridge (often with SQS).",
+    "Real-time analytics on a stream of events — that's a streaming service.",
+    "Very high-throughput strict ordering where FIFO limits bite."
+  ],
+  "keyFacts": [
+    { "label": "Type", "value": "Managed message/work queue (serverless)." },
+    { "label": "Semantics", "value": "Message delivered once and deleted (not a replayable log)." },
+    { "label": "Queue types", "value": "Standard (high throughput) and FIFO (ordered, exactly-once)." },
+    { "label": "Reliability", "value": "Visibility timeout + retries + dead-letter queues." },
+    { "label": "Scaling", "value": "Effectively unlimited; nothing to provision." },
+    { "label": "Billing", "value": "Per request (send/receive/delete); FIFO priced higher." }
+  ],
+  "pricingShape": "SQS bills per request — each send, receive and delete API call — with a generous free tier and FIFO priced higher than Standard. There's no capacity to provision and nothing runs idle, so cost scales directly with message volume and how efficiently you poll. Long polling and batching (sending/receiving up to 10 messages per call) cut request counts and therefore cost. Because it's so cheap per message and fully serverless, SQS is rarely a cost concern; the main lever is avoiding chatty short-poll loops that rack up empty receives.",
+  "gotchas": [
+    "It's not a stream — you can't replay messages or have multiple independent consumers read the same message (use SNS→SQS or Kinesis for that).",
+    "Standard queues are at-least-once with best-effort ordering — consumers must be idempotent and not assume order.",
+    "A too-short visibility timeout causes duplicate processing; too-long delays retries — tune it to processing time.",
+    "Without a dead-letter queue, poison messages retry forever and can clog processing.",
+    "Short polling produces empty receives that add request cost — prefer long polling and batching."
+  ],
+  "equivalents": [
+    { "provider": "gcp", "id": "cloud-tasks", "name": "Cloud Tasks", "note": "Managed task queue for dispatching async work (Pub/Sub covers streaming)." },
+    { "provider": "azure", "id": "service-bus", "name": "Azure Service Bus", "note": "Enterprise broker with queues + topics and richer messaging features." }
+  ],
+  "docsUrl": "https://docs.aws.amazon.com/sqs/"
+}

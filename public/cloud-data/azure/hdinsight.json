@@ -1,0 +1,55 @@
+{
+  "id": "hdinsight",
+  "provider": "azure",
+  "name": "Azure HDInsight",
+  "groups": ["compute"],
+  "oneLiner": "Managed open-source clusters — Spark, Hadoop, Hive and Kafka.",
+  "whatItIs": "HDInsight is Azure's managed open-source big-data service: it provisions clusters running Apache Spark, Hadoop, Hive, Kafka, HBase and more, so you get the full frameworks without building the cluster yourself. It reads and writes ADLS as its data lake and integrates with Azure networking and security. It's the classic Hadoop-ecosystem offering on Azure — though for many new Spark and lakehouse workloads teams now reach for Azure Databricks or Synapse Spark, HDInsight remains the choice for broad open-source components (like managed Kafka or HBase) and lift-and-shift Hadoop.",
+  "inPractice": {
+    "narrative": "A team migrating an on-prem Hadoop/Spark estate wants the same open-source components in the cloud without rewriting everything. They run an HDInsight cluster (Spark or Hadoop) that reads raw data from ADLS, processes it, and writes curated output back, which Synapse SQL then serves to Power BI. HDInsight is chosen when the workload needs specific OSS components or a familiar Hadoop environment rather than a more abstracted service.",
+    "flow": ["ADLS (raw)", "HDInsight Spark/Hadoop cluster", "ADLS (curated)", "Synapse SQL / Power BI"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Cluster types", "detail": "You pick a cluster flavour at creation — Spark, Hadoop, Kafka, HBase, Interactive Query (LLAP) — each pre-configured for that framework." },
+    { "term": "Managed open-source stack", "detail": "Runs standard Apache components on Azure VMs with monitoring and security wired in, so you keep OSS APIs and tooling." },
+    { "term": "ADLS-backed storage", "detail": "Data lives in ADLS Gen2 (or Blob), decoupled from the cluster, so clusters can be resized or recreated without losing data." },
+    { "term": "Persistent clusters", "detail": "Unlike Dataproc's ~90s ephemeral model, HDInsight clusters take longer to create and are typically run as longer-lived — so cost control means sizing and deleting deliberately." },
+    { "term": "Enterprise Security Package", "detail": "Optional add-on for Azure AD-based auth, Ranger policies and fine-grained access — for multi-user enterprise clusters." },
+    { "term": "Managed Kafka / HBase", "detail": "A key reason to choose HDInsight: managed Kafka and HBase clusters that some other Azure analytics services don't provide directly." }
+  ],
+  "whenToUse": [
+    "Lift-and-shift of on-prem Hadoop/Spark to a managed Azure service.",
+    "Workloads needing specific OSS components (managed Kafka, HBase, LLAP).",
+    "Teams wanting standard open-source APIs rather than a proprietary abstraction.",
+    "Enterprise multi-user clusters with Ranger/AD security.",
+    "Batch and interactive big-data processing over ADLS."
+  ],
+  "whenNotToUse": [
+    "New Spark/lakehouse work where Databricks or Synapse Spark is the better modern fit.",
+    "Fully serverless, fast-ephemeral compute needs — HDInsight clusters are heavier to spin up.",
+    "Simple SQL-over-lake exploration — use Synapse serverless SQL.",
+    "Tiny/occasional jobs where a standing cluster isn't justified."
+  ],
+  "keyFacts": [
+    { "label": "Frameworks", "value": "Spark, Hadoop, Hive/LLAP, Kafka, HBase." },
+    { "label": "Storage", "value": "ADLS Gen2 / Blob-backed; decoupled from compute." },
+    { "label": "Cluster model", "value": "Typed clusters; generally longer-lived than ephemeral." },
+    { "label": "Security", "value": "Optional Enterprise Security Package (AD + Ranger)." },
+    { "label": "Niche strength", "value": "Managed Kafka and HBase on Azure." },
+    { "label": "Billing", "value": "Per-VM (cluster nodes) while the cluster exists." }
+  ],
+  "pricingShape": "HDInsight bills for the cluster's VMs (head, worker and any specialised nodes) for as long as the cluster exists — there's no fast scale-to-zero, so cost control means sizing clusters correctly and deleting them when idle. Storage in ADLS is separate. Because clusters are relatively slow to create, teams often keep them running longer than strictly needed, which is where money leaks. For steady workloads it's predictable; for bursty ones, lighter/serverless alternatives may be cheaper.",
+  "gotchas": [
+    "Clusters bill per VM continuously — an idle cluster left running is the main cost trap.",
+    "Cluster creation is slower than Dataproc's ephemeral model, so per-job disposable clusters are less practical.",
+    "For new Spark work, Databricks/Synapse Spark are often the recommended path — check before defaulting to HDInsight.",
+    "Cluster type is fixed at creation; changing frameworks means a new cluster.",
+    "Enterprise security (AD/Ranger) adds setup complexity for multi-user scenarios."
+  ],
+  "equivalents": [
+    { "provider": "aws", "id": "emr", "name": "Amazon EMR", "note": "Managed Spark/Hadoop with ephemeral and serverless modes." },
+    { "provider": "gcp", "id": "dataproc", "name": "Dataproc", "note": "Managed Spark/Hadoop with very fast ephemeral clusters and a serverless option." }
+  ],
+  "docsUrl": "https://learn.microsoft.com/azure/hdinsight/"
+}

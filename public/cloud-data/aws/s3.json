@@ -1,0 +1,57 @@
+{
+  "id": "s3",
+  "provider": "aws",
+  "name": "Amazon S3",
+  "short": "Simple Storage Service",
+  "groups": ["storage"],
+  "oneLiner": "Virtually unlimited object storage — the default landing zone and data lake on AWS.",
+  "whatItIs": "Amazon S3 is AWS's object store: you put files (\"objects\") into named containers (\"buckets\") and get them back by key over HTTPS. It is not a filesystem and not a database — there are no folders (the slashes in a key are just naming) and no in-place editing (writing an object replaces the whole thing). Because it is cheap, durable and effectively unlimited, S3 is the foundation almost every AWS data platform sits on: raw data lands here, warehouses like Redshift and query engines like Athena read from here, and processed results are written back here. If you learn one AWS storage service, learn this one.",
+  "inPractice": {
+    "narrative": "Picture a company collecting clickstream and order events. Those events land as raw JSON files in an S3 'bronze' bucket — this is the lake's front door. A scheduled Glue (Spark) job cleans and reshapes them into columnar Parquet, partitioned by date, and writes them to a 'silver' bucket. Analysts then point Athena or Redshift Spectrum straight at those Parquet files to run SQL without ever moving the data, and the dashboards they build read from there. Notice S3 shows up three times: raw landing, curated output, and the thing every query engine reads from. That's the whole point — S3 is the shared floor everything else stands on.",
+    "flow": ["App & clickstream events", "S3 (raw / bronze)", "Glue ETL", "S3 (curated Parquet / silver)", "Athena / Redshift", "BI dashboards"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Bucket & key", "detail": "A bucket is a globally-unique namespace in one region; the key is the object's full path within it. Together (bucket + key) they uniquely address an object. \"Folders\" are a UI illusion over key prefixes." },
+    { "term": "Object", "detail": "The data plus metadata plus a version id. Objects are immutable — you overwrite, you don't edit. Max object size is 5 TB; a single PUT is capped at 5 GB, so larger uploads use multipart upload." },
+    { "term": "Storage classes", "detail": "Same API, different cost/latency trade-offs: Standard (hot), Standard-IA / One Zone-IA (infrequent), Glacier Instant / Flexible / Deep Archive (cold, cheapest, retrieval delay). Intelligent-Tiering moves objects between tiers automatically." },
+    { "term": "Consistency", "detail": "Since 2020 S3 is strongly read-after-write consistent for all operations — a successful write is immediately readable. Older tutorials warning about \"eventual consistency\" are out of date." },
+    { "term": "Prefixes & performance", "detail": "S3 scales per-prefix (3,500 writes / 5,500 reads per second per prefix). Spreading keys across many prefixes multiplies throughput; this is why date-partitioned lakes (year=/month=/day=) both prune scans and parallelise I/O." },
+    { "term": "Partitioning for analytics", "detail": "A data lake stores columnar files (Parquet/ORC) laid out in Hive-style partition folders. Athena/Glue/Spark then read only the partitions a query touches — the single biggest lever on lake query cost and speed." }
+  ],
+  "whenToUse": [
+    "As the raw landing zone / data lake for any AWS analytics stack.",
+    "Storing large, immutable blobs: logs, exports, images, backups, model artifacts, Parquet tables.",
+    "Decoupling producers and consumers — write once, let Athena, Redshift Spectrum, EMR and Glue all read the same files.",
+    "Static website assets and large downloads served via CloudFront.",
+    "Cheap long-term retention using Glacier tiers and lifecycle rules."
+  ],
+  "whenNotToUse": [
+    "Low-latency random reads/writes of small records — use DynamoDB.",
+    "Data you need to update in place or transact over — S3 has no partial updates and no multi-object transactions.",
+    "A POSIX filesystem for apps that expect one — use EFS/FSx (though Mountpoint for S3 narrows this gap).",
+    "Sub-millisecond serving or millions of tiny objects where per-request cost and listing dominate."
+  ],
+  "keyFacts": [
+    { "label": "Durability", "value": "11 nines (99.999999999%) — data spread across ≥3 AZs (except One Zone-IA)." },
+    { "label": "Availability SLA", "value": "99.9% for S3 Standard." },
+    { "label": "Max object size", "value": "5 TB (5 GB per single PUT; larger needs multipart)." },
+    { "label": "Bucket capacity", "value": "Unlimited objects; unlimited total size." },
+    { "label": "Throughput", "value": "≥3,500 PUT / 5,500 GET requests per second per prefix." },
+    { "label": "Scope", "value": "Bucket names are globally unique; data itself is regional." }
+  ],
+  "pricingShape": "You pay on four axes, and the surprises are rarely the first one: (1) storage per GB-month, which varies a lot by class — Deep Archive is ~20× cheaper than Standard; (2) requests — PUT/GET/LIST are billed per thousand, so millions of tiny objects or heavy listing can cost more than the bytes; (3) data transfer OUT to the internet or across regions (transfer IN and same-region reads to most AWS services are free); and (4) management features like Intelligent-Tiering monitoring and inventory. For analytics, the sleeper cost is scanning: query engines bill by bytes read, so Parquet + partitioning cut both S3 request cost and downstream query cost.",
+  "gotchas": [
+    "Bucket names are a single global namespace — someone else may already own the name you want, and names leak your bucket's existence.",
+    "Cross-region and internet data-transfer-out is billed and adds up fast; keep compute in the same region as the bucket.",
+    "'Folders' aren't real — deleting a prefix means deleting every object under it; empty prefixes just vanish.",
+    "Public-access misconfiguration is the classic breach; Block Public Access is on by default now — leave it on unless you truly mean to publish.",
+    "LIST is eventually-priced and slow at scale; for millions of objects use S3 Inventory instead of listing live.",
+    "Lifecycle transitions to Glacier have per-object minimums and retrieval fees — archiving billions of tiny objects can cost more than leaving them in Standard."
+  ],
+  "equivalents": [
+    { "provider": "gcp", "id": "cloud-storage", "name": "Cloud Storage", "note": "Closest 1:1 — buckets, objects, storage classes; GCS buckets are global-ish with location constraints." },
+    { "provider": "azure", "id": "adls", "name": "ADLS Gen2", "note": "Blob storage with a real hierarchical namespace, so ADLS behaves more folder-like than S3." }
+  ],
+  "docsUrl": "https://docs.aws.amazon.com/s3/"
+}

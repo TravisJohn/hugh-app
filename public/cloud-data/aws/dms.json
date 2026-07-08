@@ -1,0 +1,56 @@
+{
+  "id": "dms",
+  "provider": "aws",
+  "name": "AWS DMS",
+  "short": "Database Migration Service",
+  "groups": ["movement"],
+  "oneLiner": "Migrate and continuously replicate (CDC) databases into AWS.",
+  "whatItIs": "AWS Database Migration Service moves data from a source database to a target, either as a one-time migration or as ongoing change-data-capture (CDC) replication. It reads the source's transaction log and applies inserts/updates/deletes to the target continuously, keeping them in sync with minimal load and downtime. In a data platform, DMS is the bridge that gets operational data out of OLTP databases (RDS, on-prem, other clouds) and into the analytics world — S3, Redshift or another database — without pausing the source. It also handles heterogeneous migrations (e.g. Oracle → PostgreSQL), often paired with the Schema Conversion Tool.",
+  "inPractice": {
+    "narrative": "A production PostgreSQL database holds live orders. Analytics needs that data, but querying production is off-limits. DMS does an initial full load of the tables into S3/Redshift, then switches to CDC — tailing the database's write-ahead log and streaming every change into the lake in near-real-time. Analysts get fresh data to query while the app's database is untouched. DMS is the replication pipe between the operational source and the analytical target.",
+    "flow": ["Source DB (RDS / on-prem)", "DMS (full load + CDC)", "S3 / Redshift", "analytics"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Full load + CDC", "detail": "DMS first bulk-copies existing data (full load), then continuously applies ongoing changes via change-data-capture, so the target stays current with minimal source impact." },
+    { "term": "Change data capture", "detail": "CDC reads the source's transaction log to capture inserts/updates/deletes as they happen — near-real-time replication without querying tables repeatedly." },
+    { "term": "Homogeneous vs heterogeneous", "detail": "Same-engine moves (PostgreSQL→PostgreSQL) are straightforward; cross-engine (Oracle→PostgreSQL) needs schema conversion (SCT/DMS Schema Conversion) for types and code." },
+    { "term": "Replication instance/serverless", "detail": "A replication instance (or DMS Serverless) runs the task; you size it for throughput, or let serverless auto-scale capacity." },
+    { "term": "Targets beyond databases", "detail": "Targets include S3 (as files for the lake), Redshift, Kinesis, OpenSearch and databases — making DMS a common lake-ingestion tool, not just a DB-to-DB mover." },
+    { "term": "Task settings & transformations", "detail": "Table mappings and lightweight transformations select and reshape what's replicated (filtering rows, renaming) during the move." }
+  ],
+  "whenToUse": [
+    "Continuously replicating OLTP data into S3/Redshift for analytics (CDC).",
+    "Migrating databases to AWS with minimal downtime.",
+    "Heterogeneous migrations (e.g. Oracle → Aurora PostgreSQL) with schema conversion.",
+    "Keeping a lake/warehouse in near-real-time sync with source databases.",
+    "Streaming DB changes to Kinesis/OpenSearch for downstream use."
+  ],
+  "whenNotToUse": [
+    "Bulk file/object transfer (not databases) — use DataSync.",
+    "Heavy in-flight transformation — land the data then transform with Glue/EMR.",
+    "One-off flat-file loads where a simple COPY/ingest is enough.",
+    "Streaming event ingestion from apps — that's Kinesis/MSK, not DMS."
+  ],
+  "keyFacts": [
+    { "label": "Role", "value": "Database migration + ongoing CDC replication." },
+    { "label": "Modes", "value": "Full load, full load + CDC, or CDC-only." },
+    { "label": "Compute", "value": "Replication instance or DMS Serverless." },
+    { "label": "Sources", "value": "Most relational + some NoSQL databases (on-prem/cloud)." },
+    { "label": "Targets", "value": "S3, Redshift, Kinesis, OpenSearch, databases, etc." },
+    { "label": "Billing", "value": "Per replication instance-hour (or serverless capacity) + storage/transfer." }
+  ],
+  "pricingShape": "DMS bills for the replication instance running the task — per-hour by instance size — plus log/storage and data transfer; DMS Serverless instead bills by capacity units consumed. Because CDC tasks run continuously to stay in sync, an ongoing replication has a steady cost proportional to the instance size you provision. Levers: right-size the replication instance to throughput, use serverless for variable loads, and stop tasks/instances you no longer need. The Schema Conversion Tool itself is free; the cost is the replication compute.",
+  "gotchas": [
+    "CDC requires source-side settings (e.g. logical replication / supplemental logging) — miss them and CDC silently can't capture changes.",
+    "An under-sized replication instance falls behind on high-change-rate sources, growing replication lag.",
+    "Heterogeneous migrations need schema conversion; DMS moves data, not complex stored procedures/code.",
+    "It does light transformation only — don't try to reshape heavily in DMS; land then transform.",
+    "Continuous CDC tasks run (and bill) 24/7 — track and stop ones no longer needed."
+  ],
+  "equivalents": [
+    { "provider": "gcp", "id": "datastream", "name": "Datastream", "note": "Serverless CDC into BigQuery/Cloud Storage; GCP's change-replication analogue." },
+    { "provider": "azure", "id": "database-migration-service", "name": "Azure Database Migration Service", "note": "Managed database migration/replication into Azure." }
+  ],
+  "docsUrl": "https://docs.aws.amazon.com/dms/"
+}

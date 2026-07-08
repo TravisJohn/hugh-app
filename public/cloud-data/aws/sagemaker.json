@@ -1,0 +1,55 @@
+{
+  "id": "sagemaker",
+  "provider": "aws",
+  "name": "Amazon SageMaker",
+  "groups": ["ml"],
+  "oneLiner": "End-to-end platform to build, train and deploy machine-learning models.",
+  "whatItIs": "SageMaker is AWS's managed machine-learning platform, covering the whole lifecycle: prepare data, build and train models on managed compute, tune them, then deploy to real-time or batch endpoints — without provisioning ML infrastructure yourself. It spans notebooks (Studio), built-in algorithms, bring-your-own frameworks (PyTorch/TensorFlow), distributed training, hyperparameter tuning, a model registry, pipelines for MLOps, and hosting. The newer SageMaker also folds in data and analytics tooling. It's the place ML/data-science teams on AWS take a model from experiment to production.",
+  "inPractice": {
+    "narrative": "A data scientist pulls training data from S3 into a SageMaker Studio notebook, experiments, then launches a managed training job on GPU instances that spin up, train, and shut down. A tuning job finds good hyperparameters; the best model is registered and deployed to a real-time endpoint that the app calls for predictions. SageMaker Pipelines automates retraining as new data lands. The managed compute exists only while jobs run — you don't keep a GPU cluster idle.",
+    "flow": ["S3 (training data)", "SageMaker training + tuning", "model registry", "endpoint (real-time / batch)", "app predictions"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Studio & notebooks", "detail": "SageMaker Studio is the IDE for ML — notebooks, experiments and job management in one place, with managed kernels/compute." },
+    { "term": "Managed training jobs", "detail": "You specify data, a container/algorithm and instance type; SageMaker provisions the compute, runs training, saves the model to S3, and tears the compute down — pay only for job time." },
+    { "term": "Built-in + BYO frameworks", "detail": "Use built-in algorithms, or bring PyTorch/TensorFlow/scikit or a custom container. Distributed training scales across many instances/GPUs." },
+    { "term": "Hyperparameter tuning", "detail": "Automatic Model Tuning searches hyperparameter space with parallel training jobs to find the best-performing configuration." },
+    { "term": "Endpoints & inference options", "detail": "Deploy to real-time endpoints, serverless inference, asynchronous, or batch transform — matching latency/cost to the use case." },
+    { "term": "Pipelines & registry (MLOps)", "detail": "SageMaker Pipelines defines repeatable train/eval/deploy workflows; the Model Registry versions and governs models for production." }
+  ],
+  "whenToUse": [
+    "End-to-end ML on AWS: build, train, tune, deploy, monitor.",
+    "Managed training on GPU/large instances without running clusters.",
+    "Productionising models with endpoints, pipelines and a registry (MLOps).",
+    "Distributed training and automated hyperparameter tuning at scale.",
+    "Teams wanting ML tightly integrated with S3, IAM and the AWS stack."
+  ],
+  "whenNotToUse": [
+    "Simple in-database ML on tabular data — Redshift ML / Athena may be enough.",
+    "Just calling a pretrained AI API (vision, language) — use Bedrock/AI services.",
+    "Tiny one-off experiments where a local notebook is simpler and free.",
+    "Teams with no ML needs beyond analytics — it's a specialist platform."
+  ],
+  "keyFacts": [
+    { "label": "Scope", "value": "Full ML lifecycle: prep, train, tune, deploy, monitor." },
+    { "label": "Compute", "value": "Managed training jobs on chosen instances (incl. GPU), spun up per job." },
+    { "label": "Frameworks", "value": "Built-in algorithms + PyTorch/TensorFlow/custom containers." },
+    { "label": "Inference", "value": "Real-time, serverless, async, and batch endpoints." },
+    { "label": "MLOps", "value": "Pipelines + Model Registry for repeatable production." },
+    { "label": "Billing", "value": "Per-second compute for notebooks/training/endpoints + storage." }
+  ],
+  "pricingShape": "SageMaker bills for the compute you use across each phase: notebook/Studio instances while running, training jobs per-second for the instances they use (spun up and down automatically), and hosting endpoints for as long as they're deployed. Real-time endpoints are the classic cost trap — they run 24/7 and bill even with no traffic, so serverless/async inference or shutting idle endpoints saves money. Training with Spot instances cuts cost for interruptible jobs. Storage (S3, model artifacts) is separate. Levers: kill idle notebooks/endpoints, use Spot for training, right-size instances.",
+  "gotchas": [
+    "Real-time endpoints bill continuously while deployed — a forgotten endpoint is a common surprise cost; use serverless inference or delete idle ones.",
+    "Idle Studio/notebook instances keep billing — shut them down.",
+    "GPU instances are expensive; use Spot for training and right-size instance types.",
+    "The platform is broad and can feel heavyweight for simple models — match the tool to the need.",
+    "MLOps maturity requires discipline (pipelines, registry); ad-hoc usage drifts into unreproducible models."
+  ],
+  "equivalents": [
+    { "provider": "gcp", "id": "vertex-ai", "name": "Vertex AI", "note": "Unified ML/GenAI platform; the direct analogue on GCP." },
+    { "provider": "azure", "id": "azure-ml", "name": "Azure Machine Learning", "note": "End-to-end ML platform; the direct analogue on Azure." }
+  ],
+  "docsUrl": "https://docs.aws.amazon.com/sagemaker/"
+}

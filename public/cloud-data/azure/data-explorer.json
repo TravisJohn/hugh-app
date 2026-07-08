@@ -1,0 +1,56 @@
+{
+  "id": "data-explorer",
+  "provider": "azure",
+  "name": "Azure Data Explorer",
+  "short": "Kusto / ADX",
+  "groups": ["olap"],
+  "oneLiner": "Fast, real-time analytics over logs, telemetry and time-series (KQL).",
+  "whatItIs": "Azure Data Explorer (ADX, also known by its engine name Kusto) is a fast analytics service built for exploring huge volumes of log, telemetry and time-series data in near-real-time. You ingest streaming or batch data and query it with KQL (Kusto Query Language) — a purpose-built language that's extremely quick and expressive for filtering, aggregating and finding patterns over billions of rows. It powers many Microsoft services (Azure Monitor, Log Analytics, Sentinel) under the hood. Where a warehouse suits modelled business data, ADX is tuned for high-ingest, append-only, time-stamped machine data and interactive exploration of it. It's also the real-time analytics engine surfaced within Microsoft Fabric.",
+  "inPractice": {
+    "narrative": "Applications and devices emit high-volume logs and telemetry, streamed (via Event Hubs) into Azure Data Explorer. Engineers and analysts run KQL queries interactively to spot errors, aggregate metrics over time windows, and detect anomalies across billions of events in seconds. Dashboards (ADX dashboards or Power BI) sit on top for monitoring. ADX is the real-time analytics serving layer for machine data — fast interactive exploration a general warehouse would struggle to match at this ingest rate.",
+    "flow": ["Logs / telemetry", "Event Hubs", "Azure Data Explorer (KQL)", "ADX dashboards / Power BI"],
+    "highlight": 2
+  },
+  "coreConcepts": [
+    { "term": "KQL (Kusto Query Language)", "detail": "A purpose-built, pipe-based query language optimised for fast filtering, aggregation and time-series/pattern analysis over massive log and telemetry datasets." },
+    { "term": "Built for machine data", "detail": "Tuned for high-ingest, append-only, timestamped data (logs, metrics, traces) and interactive exploration — a different shape from modelled warehouse tables." },
+    { "term": "Near-real-time ingestion", "detail": "Streams data in (Event Hubs, IoT Hub, connectors) and makes it queryable within seconds, plus batch ingestion for historical loads." },
+    { "term": "Powers Microsoft telemetry", "detail": "The engine behind Azure Monitor Log Analytics and Sentinel, so KQL skills transfer across Azure's observability stack." },
+    { "term": "Time-series & analytics functions", "detail": "Rich built-in operators for time-series (make-series), anomaly detection and pattern matching make analytical exploration concise." },
+    { "term": "Clusters (and Fabric)", "detail": "Runs as a provisioned cluster (or serverless-style within Microsoft Fabric Real-Time Analytics); you scale compute for ingest/query throughput." }
+  ],
+  "whenToUse": [
+    "Interactive analytics over large log/telemetry/time-series datasets.",
+    "Near-real-time exploration and monitoring of machine data.",
+    "Anomaly detection and pattern analysis across billions of events.",
+    "Teams already using KQL via Azure Monitor/Sentinel.",
+    "Real-time analytics within Microsoft Fabric."
+  ],
+  "whenNotToUse": [
+    "Transactional (OLTP) workloads — use Azure SQL/Cosmos DB.",
+    "Modelled business-data BI over star schemas — use Synapse/Fabric warehouse.",
+    "Low-volume data where a full analytics cluster is overkill.",
+    "Heavy update/delete workloads — it's append/analytics-oriented."
+  ],
+  "keyFacts": [
+    { "label": "Type", "value": "Real-time log/telemetry/time-series analytics (Kusto engine)." },
+    { "label": "Language", "value": "KQL (Kusto Query Language)." },
+    { "label": "Ingest", "value": "Near-real-time streaming (Event Hubs/IoT Hub) + batch." },
+    { "label": "Powers", "value": "Azure Monitor, Log Analytics, Sentinel." },
+    { "label": "Deployment", "value": "Provisioned cluster or Microsoft Fabric Real-Time Analytics." },
+    { "label": "Billing", "value": "Per cluster compute (VMs/markup) + storage; Fabric capacity option." }
+  ],
+  "pricingShape": "As a provisioned cluster, ADX bills for the compute instances (VMs plus an Azure Data Explorer markup) for as long as the cluster runs, plus storage for ingested data — so cost tracks cluster size and uptime, and right-sizing plus autoscale (and stopping dev clusters) are the main levers. Within Microsoft Fabric, real-time analytics is billed against Fabric capacity instead. Because a running cluster has a baseline cost, ADX is most economical at steady, high-volume ingest/query; for occasional small workloads it can be over-provisioned. Hot-cache retention (how much data stays on fast storage) also affects cost.",
+  "gotchas": [
+    "A running cluster bills continuously — right-size, autoscale and stop non-prod clusters to avoid waste.",
+    "It's for append-heavy machine data analytics, not OLTP or heavy updates.",
+    "KQL is powerful but new to many — there's a learning curve versus SQL (though it's quick to pick up).",
+    "Hot-cache (retention on fast storage) size drives both performance and cost — tune it to query needs.",
+    "It overlaps with Synapse/Fabric — decide when data belongs in ADX (logs/telemetry) vs the warehouse (modelled business data)."
+  ],
+  "equivalents": [
+    { "provider": "aws", "id": "timestream", "name": "Amazon Timestream", "note": "Serverless time-series DB; ADX is broader for log/telemetry exploration (OpenSearch also overlaps on AWS)." },
+    { "provider": "gcp", "id": "bigquery", "name": "BigQuery", "note": "No dedicated Kusto-style engine; BigQuery (with Log Analytics) covers much of the need on GCP." }
+  ],
+  "docsUrl": "https://learn.microsoft.com/azure/data-explorer/"
+}

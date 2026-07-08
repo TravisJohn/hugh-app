@@ -1,0 +1,55 @@
+{
+  "id": "cosmos-db",
+  "provider": "azure",
+  "name": "Azure Cosmos DB",
+  "groups": ["nosql"],
+  "oneLiner": "Globally distributed, multi-model NoSQL with turnkey replication.",
+  "whatItIs": "Cosmos DB is Azure's globally-distributed, multi-model NoSQL database. Its signature features are turnkey global distribution — replicate your data to any number of Azure regions with a click, with multi-region writes — and guaranteed low-latency reads/writes backed by SLAs. It's multi-model and multi-API: you can use it as a document store (NoSQL/SQL API), or via MongoDB, Cassandra, Gremlin (graph) or Table APIs, so existing apps can often connect unchanged. It's the choice for planet-scale operational apps that need data close to users everywhere with tunable consistency.",
+  "inPractice": {
+    "narrative": "A global e-commerce app needs product and cart data served with low latency to users in North America, Europe and Asia. It stores that data in Cosmos DB replicated to regions on all three continents with multi-region writes, so every user reads and writes locally. For analytics, the team enables the analytical store (Azure Synapse Link), which mirrors data columnar-style for Synapse to query — without touching the operational workload. Cosmos DB serves the app worldwide; Synapse Link handles the analytics side.",
+    "flow": ["Global app users", "Cosmos DB (multi-region replicas)", "Synapse Link (analytical store)", "Synapse / Power BI"],
+    "highlight": 1
+  },
+  "coreConcepts": [
+    { "term": "Turnkey global distribution", "detail": "Add/remove regions with a click; optional multi-region writes let every region accept writes. Data is automatically replicated with conflict resolution." },
+    { "term": "Multi-model / multi-API", "detail": "One service, several APIs: NoSQL (core document/SQL), MongoDB, Cassandra, Gremlin (graph), Table — so many existing apps connect without rewrites." },
+    { "term": "Partitioning", "detail": "Data is sharded by a partition key across physical partitions; choosing a high-cardinality, evenly-accessed key is critical to avoid hot partitions." },
+    { "term": "Tunable consistency", "detail": "Five levels from Strong to Eventual (plus Bounded Staleness, Session, Consistent Prefix) let you trade latency/availability against consistency per workload." },
+    { "term": "Request Units (RUs)", "detail": "Throughput and cost are measured in RUs — a normalised unit per operation. You provision RUs (manual/autoscale) or use serverless; RU efficiency drives the bill." },
+    { "term": "Synapse Link (HTAP)", "detail": "An auto-synced analytical (columnar) store lets Synapse run analytics over Cosmos data without impacting the transactional workload or building ETL." }
+  ],
+  "whenToUse": [
+    "Global apps needing low-latency data in multiple regions.",
+    "Multi-region writes and high availability with SLA guarantees.",
+    "Lifting MongoDB/Cassandra/Table apps to a managed service via compatible APIs.",
+    "Elastic, spiky operational workloads (serverless or autoscale RUs).",
+    "HTAP: operational data plus near-real-time analytics via Synapse Link."
+  ],
+  "whenNotToUse": [
+    "Complex relational joins/transactions across many tables — use Azure SQL.",
+    "Heavy ad-hoc analytical querying directly — use the analytical store/Synapse, not the transactional API.",
+    "Cost-sensitive simple workloads where RU provisioning is wasteful — size carefully or use serverless.",
+    "Cases needing strong global consistency with lowest latency — the two trade off."
+  ],
+  "keyFacts": [
+    { "label": "Model", "value": "Multi-model, multi-API globally-distributed NoSQL." },
+    { "label": "APIs", "value": "NoSQL/SQL, MongoDB, Cassandra, Gremlin, Table." },
+    { "label": "Distribution", "value": "Turnkey multi-region, optional multi-region writes." },
+    { "label": "Consistency", "value": "Five tunable levels (Strong → Eventual)." },
+    { "label": "Throughput", "value": "Request Units (provisioned/autoscale/serverless)." },
+    { "label": "Analytics", "value": "Synapse Link analytical store (HTAP)." }
+  ],
+  "pricingShape": "Cost is driven by Request Units (RUs) and storage. You either provision RUs per container/database (manual or autoscale — you pay for the capacity reserved, so under-utilised provisioning wastes money) or use serverless (pay per RU consumed, good for spiky/low workloads). Every region you replicate to multiplies throughput cost, and multi-region writes add more. Storage is per GB-month; the analytical store and Synapse Link have separate charges. The dominant lever is RU efficiency — good partition keys and query design — plus not over-provisioning or over-replicating.",
+  "gotchas": [
+    "Every operation costs RUs; inefficient queries/partition keys silently burn throughput and money.",
+    "Hot partitions from a poor partition key throttle despite high provisioned RUs.",
+    "Each added region and multi-region writes multiply cost — replicate deliberately.",
+    "Strong consistency and low global latency pull against each other — pick the consistency level per workload.",
+    "The transactional API isn't for heavy analytics — use Synapse Link/analytical store instead of hammering it with reports."
+  ],
+  "equivalents": [
+    { "provider": "aws", "id": "dynamodb", "name": "Amazon DynamoDB", "note": "Serverless key-value/document; Global Tables give multi-region, but single-model." },
+    { "provider": "gcp", "id": "bigtable", "name": "Bigtable", "note": "Wide-column at huge scale; Firestore is closer for multi-region document/serverless." }
+  ],
+  "docsUrl": "https://learn.microsoft.com/azure/cosmos-db/"
+}
