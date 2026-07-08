@@ -12,6 +12,7 @@ import type { DrillRunner, RunResult } from "@/types/code";
 type WorkerMessage =
   | { type: "ready" }
   | { type: "init-error"; error: string }
+  | { type: "preloaded"; id: number; error: string | null }
   | { type: "result"; id: number; passed: boolean; stdout: string; error: string | null };
 
 /** Max wall-clock for a single run before we assume an infinite loop. */
@@ -29,6 +30,7 @@ export class PyodideRunner implements DrillRunner {
   private rejectReady: ((e: Error) => void) | null = null;
   private nextId = 1;
   private pending = new Map<number, PendingRun>();
+  private preloads = new Map<number, () => void>();
 
   /** Boots the worker + Pyodide. Idempotent — returns the same promise. */
   init(): Promise<void> {
@@ -59,12 +61,32 @@ export class PyodideRunner implements DrillRunner {
       this.rejectReady?.(new Error(msg.error));
       return;
     }
+    if (msg.type === "preloaded") {
+      const resolve = this.preloads.get(msg.id);
+      if (resolve) { this.preloads.delete(msg.id); resolve(); }
+      return;
+    }
     // type === "result"
     const entry = this.pending.get(msg.id);
     if (!entry) return;
     clearTimeout(entry.timer);
     this.pending.delete(msg.id);
     entry.resolve({ passed: msg.passed, stdout: msg.stdout, error: msg.error });
+  }
+
+  /**
+   * Loads heavy packages (e.g. pandas) into the worker up front. Done outside
+   * the per-run timeout so a multi-second first download can't be killed as a
+   * "hung" run. Safe to call before the first cell; a no-op if packages is empty.
+   */
+  async preload(packages: string[]): Promise<void> {
+    await this.init();
+    if (packages.length === 0) return;
+    const id = this.nextId++;
+    return new Promise<void>((resolve) => {
+      this.preloads.set(id, resolve);
+      this.worker?.postMessage({ type: "preload", id, packages });
+    });
   }
 
   /** Runs learner code then assertions; resolves with the outcome. */
@@ -91,6 +113,7 @@ export class PyodideRunner implements DrillRunner {
     this.worker?.terminate();
     for (const { timer } of this.pending.values()) clearTimeout(timer);
     this.pending.clear();
+    this.preloads.clear();
     this.spawn();
   }
 
@@ -100,5 +123,6 @@ export class PyodideRunner implements DrillRunner {
     this.readyPromise = null;
     for (const { timer } of this.pending.values()) clearTimeout(timer);
     this.pending.clear();
+    this.preloads.clear();
   }
 }

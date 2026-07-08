@@ -17,6 +17,8 @@ interface PyProxyLike {
 
 interface PyodideLike {
   runPythonAsync(code: string, options?: { globals?: unknown }): Promise<unknown>;
+  loadPackagesFromImports(code: string): Promise<unknown>;
+  loadPackage(names: string[]): Promise<unknown>;
   toPy(obj: unknown): PyProxyLike;
   setStdout(opts: { batched: (s: string) => void }): void;
   setStderr(opts: { batched: (s: string) => void }): void;
@@ -48,8 +50,29 @@ interface RunRequest {
   assertions: string;
 }
 
+interface PreloadRequest {
+  type: "preload";
+  id: number;
+  packages: string[];
+}
+
 ctx.onmessage = async (e: MessageEvent) => {
-  const msg = e.data as RunRequest;
+  const msg = e.data as RunRequest | PreloadRequest;
+
+  // Preload heavy packages (e.g. pandas) up front, outside the run timeout, so
+  // the first cell run isn't killed mid-download.
+  if (msg?.type === "preload") {
+    await ready;
+    let error: string | null = null;
+    try {
+      if (pyodide) await pyodide.loadPackage(msg.packages);
+    } catch (err) {
+      error = formatPyError(err);
+    }
+    ctx.postMessage({ type: "preloaded", id: msg.id, error });
+    return;
+  }
+
   if (!msg || msg.type !== "run") return;
 
   await ready;
@@ -65,6 +88,9 @@ ctx.onmessage = async (e: MessageEvent) => {
   let passed = false;
   let error: string | null = null;
   try {
+    // Auto-install any packages the code imports (e.g. pandas/numpy for the
+    // DataFrame packs) — a no-op once loaded, and free for stdlib/SQL drills.
+    await pyodide.loadPackagesFromImports(msg.code);
     await pyodide.runPythonAsync(msg.code, { globals: namespace });
     try {
       // Assertions share the learner's namespace, so they can read the

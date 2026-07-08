@@ -57,6 +57,10 @@ export interface DrillContent {
   // Which runtime executes the cells. Omitted = "python" (Pyodide, back-compat);
   // "sql" runs against DuckDB-wasm and cells assert on a result set, not a var.
   lang?: DrillLang;
+  // Python only: how the data is presented. "rows" (default) = a list of dicts
+  // named `rows`; "dataframe" = a pandas DataFrame named `df` (loads pandas into
+  // the worker). Drives the "you're given" copy and the access hints.
+  dataKind?: "rows" | "dataframe";
 }
 
 /**
@@ -114,6 +118,30 @@ export function sqlSetupFromRows(rows: DataRow[], tableName: string): string {
     .map(r => "  (" + cols.map(c => sqlLiteral(r[c])).join(", ") + ")")
     .join(",\n");
   return `CREATE OR REPLACE TABLE ${tableName} (${colDefs});\nINSERT INTO ${tableName} VALUES\n${values};`;
+}
+
+/**
+ * Build the pandas setup for a DataFrame drill from the same structured dataset
+ * the table renders — the pandas counterpart to pyRowsLiteral(). Emits the
+ * import + a `df = pd.DataFrame([...])` from the row dicts, one source of truth.
+ */
+export function pdDataFrameLiteral(rows: DataRow[], varName = "df"): string {
+  return `import pandas as pd\n${varName} = pd.DataFrame(${jsonRowsLiteral(rows)})`;
+}
+
+/** The row list as a Python list-of-dicts literal (JSON is valid Python here). */
+function jsonRowsLiteral(rows: DataRow[]): string {
+  const body = rows
+    .map(
+      r =>
+        "    {" +
+        Object.entries(r)
+          .map(([k, v]) => `${JSON.stringify(k)}: ${typeof v === "string" ? JSON.stringify(v) : v}`)
+          .join(", ") +
+        "}",
+    )
+    .join(",\n");
+  return `[\n${body},\n]`;
 }
 
 /**

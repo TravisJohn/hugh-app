@@ -45,6 +45,17 @@ type CellResult =
 const emitResult = (varName: string) => `
 import json as _json
 def _emit(_v):
+    try:
+        import pandas as _pd
+        if isinstance(_v, _pd.DataFrame):
+            print(_json.dumps({"kind": "table", "rows": _v.to_dict("records")}, default=str)); return
+        if isinstance(_v, _pd.Series):
+            if _v.index.equals(_pd.RangeIndex(len(_v))):
+                print(_json.dumps({"kind": "value", "value": _v.tolist()}, default=str)); return
+            _rows = [{"index": str(_k), "value": _val} for _k, _val in _v.items()]
+            print(_json.dumps({"kind": "table", "rows": _rows}, default=str)); return
+    except Exception:
+        pass
     if isinstance(_v, set):
         _v = sorted(_v, key=str)
     if isinstance(_v, list) and len(_v) > 0 and all(isinstance(_x, dict) for _x in _v):
@@ -105,14 +116,15 @@ function ResultTable({ rows }: { rows: DataRow[] }) {
  * so you can see which part of the table each step reaches for. Always visible —
  * your input is never a spoiler, so it shows in Test mode too.
  */
-function DataFrameTable({ dataset, focus, lang, tableName }: { dataset: DataRow[]; focus: string[]; lang: DrillLang; tableName: string }) {
+function DataFrameTable({ dataset, focus, lang, tableName, isPandas }: { dataset: DataRow[]; focus: string[]; lang: DrillLang; tableName: string; isPandas: boolean }) {
   const cols = columnsOf(dataset);
   const lit = (c: string) => focus.includes(c);
   const isSql = lang === "sql";
+  const label = isSql ? tableName : isPandas ? "df" : "rows";
   return (
     <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/50">
       <div className="flex items-center justify-between border-b border-slate-800 px-3 py-2 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
-        <span>Your data · {isSql ? tableName : "rows"}</span>
+        <span>Your data · {label}</span>
         <span className="font-mono normal-case tracking-normal">{dataset.length}×{cols.length}</span>
       </div>
       <div className="overflow-x-auto">
@@ -157,6 +169,12 @@ function DataFrameTable({ dataset, focus, lang, tableName }: { dataset: DataRow[
             Already loaded as the table <code className="rounded bg-slate-800/70 px-1 text-slate-300">{tableName}</code>.
             Query it with <code className="rounded bg-slate-800/70 px-1 text-slate-300">SELECT … FROM {tableName}</code>, and
             reference a column by its name, e.g. <code className="rounded bg-slate-800/70 px-1 text-slate-300">{cols[0] ?? "col"}</code>.
+          </>
+        ) : isPandas ? (
+          <>
+            Already loaded for you as <code className="rounded bg-slate-800/70 px-1 text-slate-300">df</code> — a pandas DataFrame.
+            Grab a column with <code className="rounded bg-slate-800/70 px-1 text-slate-300">df[&quot;{cols[0] ?? "col"}&quot;]</code>, and
+            filter with <code className="rounded bg-slate-800/70 px-1 text-slate-300">df[df[&quot;{cols[0] ?? "col"}&quot;] == …]</code>.
           </>
         ) : (
           <>
@@ -251,6 +269,7 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
   const dataset = SCENARIO.dataset;                // structured table → dataframe + key panels
   const lang: DrillLang = content.lang ?? "python"; // which runtime executes the cells
   const isSql = lang === "sql";
+  const isPandas = lang === "python" && content.dataKind === "dataframe"; // DataFrame packs
 
   const emptyCells = useCallback(
     (): CState[] => DRILL_CELLS.map(() => ({ code: "", status: "idle", attempts: 0, usedRef: false, overTime: false, error: null, practice: false })),
@@ -300,13 +319,12 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
     ? { id: focusCell.id, task: focusCell.task, solution: focusCell.solution }
     : null;
   const tableName = SCENARIO.tableName ?? "data";
+  const cols = dataset ? columnsOf(dataset).join(", ") : "";
   const datasetLabel = isSql
-    ? (dataset
-        ? `a SQL table named \`${tableName}\` (columns: ${columnsOf(dataset).join(", ")})`
-        : `a SQL table named \`${tableName}\``)
-    : (dataset
-        ? `a list of dicts named \`rows\` (columns: ${columnsOf(dataset).join(", ")})`
-        : "a Python list of dicts named `rows`");
+    ? (dataset ? `a SQL table named \`${tableName}\` (columns: ${cols})` : `a SQL table named \`${tableName}\``)
+    : isPandas
+      ? (dataset ? `a pandas DataFrame named \`df\` (columns: ${cols})` : "a pandas DataFrame named `df`")
+      : (dataset ? `a list of dicts named \`rows\` (columns: ${cols})` : "a Python list of dicts named `rows`");
 
   const openChatForCard = useCallback((id: string) => { setChatCardId(id); setChatOpen(true); }, []);
   const handleChatOpen = useCallback((v: boolean) => { setChatOpen(v); if (!v) setChatCardId(null); }, []);
@@ -360,9 +378,15 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
   useEffect(() => {
     const r: DrillRunner = isSql ? new DuckDBRunner() : new PyodideRunner();
     runnerRef.current = r;
-    r.init().then(() => setReady(true)).catch(e => setInitErr(String(e?.message ?? e)));
+    // For DataFrame packs, load pandas during boot (outside the run timeout) so
+    // the "ready" gate covers the ~few-second first download and cell runs stay
+    // fast. Non-pandas packs skip this entirely.
+    r.init()
+      .then(() => (isPandas && r instanceof PyodideRunner ? r.preload(["pandas"]) : undefined))
+      .then(() => setReady(true))
+      .catch(e => setInitErr(String(e?.message ?? e)));
     return () => r.destroy();
-  }, [isSql]);
+  }, [isSql, isPandas]);
 
   // Precompute each cell's answer once Python is up, by running the reference
   // solution and printing its result variable. Deterministic, off the critical
@@ -602,6 +626,21 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
                     set up so you can focus on the query.
                   </p>
                 </>
+              ) : isPandas ? (
+                <>
+                  <p>
+                    <code className="rounded bg-slate-800/70 px-1 text-sky-200/90">df</code> is already loaded for you — a pandas{" "}
+                    DataFrame of {dataset.length} rows (columns:{" "}
+                    <span className="text-slate-300">{columnsOf(dataset).join(", ")}</span>). Grab a column with{" "}
+                    <code className="rounded bg-slate-800/70 px-1 text-sky-200/90">df[&quot;{columnsOf(dataset)[0]}&quot;]</code> and
+                    filter with a boolean mask like{" "}
+                    <code className="rounded bg-slate-800/70 px-1 text-sky-200/90">df[df[&quot;{columnsOf(dataset)[0]}&quot;] == …]</code>.
+                  </p>
+                  <p className="mt-1.5 text-slate-500">
+                    It&apos;s a real pandas DataFrame (runs on pandas in your browser) — the tool you&apos;d actually reach for.
+                    In real work you&apos;d load it yourself; here it&apos;s set up so you can focus on the moves.
+                  </p>
+                </>
               ) : (
                 <>
                   <p>
@@ -651,7 +690,7 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
           {dataset && (
             <aside className="hidden lg:block">
               <div className="sticky top-[76px]">
-                <DataFrameTable dataset={dataset} focus={DRILL_CELLS[active]?.focus ?? []} lang={lang} tableName={tableName} />
+                <DataFrameTable dataset={dataset} focus={DRILL_CELLS[active]?.focus ?? []} lang={lang} tableName={tableName} isPandas={isPandas} />
               </div>
             </aside>
           )}
@@ -664,7 +703,7 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
             disabled={!ready}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-sky-500 px-5 py-3 font-medium text-white transition-colors hover:bg-sky-400 disabled:opacity-50"
           >
-            {ready ? <><Play size={16} /> Start drill</> : <><Loader2 size={16} className="animate-spin" /> Booting {isSql ? "SQL" : "Python"}…</>}
+            {ready ? <><Play size={16} /> Start drill</> : <><Loader2 size={16} className="animate-spin" /> Booting {isSql ? "SQL" : isPandas ? "Python + pandas" : "Python"}…</>}
           </button>
         ) : (
           <div className="space-y-4">
