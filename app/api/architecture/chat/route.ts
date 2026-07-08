@@ -3,8 +3,6 @@ import OpenAI from "openai";
 import { requireAdminApi } from "@/lib/auth/requireAdmin";
 import rawData from "@/lib/architecture/data.generated.json";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
 export const dynamic = "force-dynamic";
 
 interface ArchComponent {
@@ -67,6 +65,18 @@ export async function POST(request: NextRequest) {
   if (messages.length === 0) {
     return NextResponse.json({ error: "messages required" }, { status: 400 });
   }
+
+  // Instantiate the client per request (not at module scope) so the build never
+  // needs the key — this admin assistant is optional and OPENAI_API_KEY isn't
+  // set in every deployment. Missing key → a graceful 503, not a build crash.
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "The architecture assistant isn't configured on this deployment (missing OPENAI_API_KEY)." },
+      { status: 503 },
+    );
+  }
+  const openai = new OpenAI({ apiKey });
 
   try {
     const res = await openai.chat.completions.create({
