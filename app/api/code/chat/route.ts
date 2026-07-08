@@ -10,11 +10,13 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 interface Msg { role: "user" | "assistant"; content: string }
 
-const SYSTEM = `You are Hugh, a friendly, concise coding helper living beside a Python practice drill.
-- Keep it short: a sentence or two, plus a tiny snippet only when it genuinely helps.
-- The learner is practising for muscle memory, so nudge toward the idea first. If they explicitly ask for the full answer, just give it.
-- Stay on programming / data topics (mostly Python, pandas, SQL). If asked something off-topic, gently steer back.
-- Be encouraging and plain-spoken. No preambles, no lecturing.`;
+const SYSTEM = `You are Hugh, a friendly, concise coding helper beside a Python fluency drill.
+- Answer in one or two sentences. Add a tiny snippet only when it genuinely helps.
+- Give the SINGLE most idiomatic answer for THIS code's world — don't dump a list of alternatives unless the learner explicitly asks for options.
+- Never invent a different setup than the one described: if the data is a plain list of dicts, don't reach for pandas / DataFrames / .iloc. Match what's actually in front of them.
+- The learner is building muscle memory, so nudge toward the idea first; if they explicitly ask for the full answer, give it plainly.
+- Stay on programming / data topics. If asked something off-topic, gently steer back.
+- No preambles, no lecturing, no filler praise.`;
 
 export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
@@ -26,15 +28,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: msg }, { status: reason === "limit_reached" ? 429 : 403 });
   }
 
-  const body = (await request.json()) as { messages?: Msg[] };
+  const body = (await request.json()) as { messages?: Msg[]; context?: string };
   const messages = Array.isArray(body.messages) ? body.messages.slice(-12) : [];
   if (messages.length === 0) return NextResponse.json({ error: "messages required" }, { status: 400 });
+
+  // The client sends the current drill card (task + reference + dataset shape) so
+  // Hugh answers about the exact code in front of the learner, not a guess.
+  const context = typeof body.context === "string" ? body.context.slice(0, 1200) : "";
+  const system = context ? `${SYSTEM}\n\nWhat the learner is working on right now:\n${context}` : SYSTEM;
 
   try {
     const res = await anthropic.messages.create({
       model: "claude-haiku-4-5",
       max_tokens: 500,
-      system: SYSTEM,
+      system,
       messages,
     });
     const reply = res.content[0]?.type === "text" ? res.content[0].text : "";

@@ -1539,3 +1539,150 @@ scarce skill (judgment) only. Named surface: "The Case Room".
     button hits the new column.
   - *Verified:* tsc clean; `next build` compiles. Committed in 2 feature commits;
     branch not pushed / no PR yet.
+
+## Cloud Skills — new feature card (started 2026-07-07)
+- **PRD agreed.** A browsable, data/analytics-focused cloud-services reference with
+  a scoped assistant. Learner flow: pick cloud (AWS/GCP/Azure) → filter by logical
+  group → open a service → read the full technical rundown → ask a context-injected
+  assistant. Home gains a 4th card (Learn / Code / Cases / **Cloud Skills**), laid
+  out 2×2 to respect the no-scroll rule.
+- **Decisions (all confirmed with user):**
+  - *Content:* static curated JSON, GCP-swappable loader seam — mirrors the Case
+    Room (`lib/cases/loader.ts`). Zero runtime AI for browsing. Claude drafts JSON,
+    user reviews.
+  - *Scope:* data/analytics subset only (aligns with the topic domain gate), ~12
+    services per cloud across a canonical group taxonomy with cross-cloud
+    equivalents. NOT the full cloud catalog.
+  - *Assistant:* scoped to the current service + cloud, Haiku, usage-gated,
+    server-only — copy of `app/api/code/chat/route.ts` (`cloud/chat` feature key).
+  - *v1 depth:* browse + assistant only. No progress table, no quiz, no migration.
+- **Planned structure:** `public/cloud-data/{manifest.json, <provider>/<service>.json}`,
+  `lib/cloud/loader.ts`, `types/cloud.ts`, `app/cloud/page.tsx`,
+  `app/cloud/[provider]/[service]/page.tsx`, `components/cloud/*`,
+  `app/api/cloud/chat/route.ts`.
+- **Service list approved** (12 AWS / 12 GCP / 11 Azure = 35 stubs; Azure ADF
+  shared across integration + orchestration). 10 logical groups.
+- **Scaffold built & typechecks clean:** `types/cloud.ts`, `lib/cloud/loader.ts`,
+  `public/cloud-data/manifest.json` (all 35 stubs), `public/cloud-data/aws/s3.json`
+  (fully authored sample), `app/cloud/page.tsx` + `[provider]/[service]/page.tsx`
+  (unauthored ids show a "coming soon" panel, not 404),
+  `components/cloud/{CloudLanding,ServiceDetail,CloudAssistant}.tsx`,
+  `app/api/cloud/chat/route.ts` (Haiku, usage-gated, grounded in the service JSON).
+  Home is now 2×2 with a violet **Cloud Skills** card.
+- **Detail-page section template (finalized):** one-liner → What it is → **Where it
+  fits** (practical narrative + illustrative typical-pipeline diagram that
+  highlights the service; added at user's request to paint how it's used) → Core
+  concepts → Reach for it / Not for → Key facts & limits → How you pay → Gotchas →
+  On the other clouds (linked equivalents) → docs link.
+- **All 35 service JSONs authored** to the finalized template (S3 sample approved,
+  incl. the Where-it-fits section), batched by group for consistent cross-cloud
+  equivalents: Storage (S3, Cloud Storage, ADLS); Warehouse & Query (Redshift,
+  Athena, BigQuery, BigLake, Synapse Analytics, Synapse Serverless SQL); ETL &
+  Integration (Glue, Data Fusion, ADF); Big-Data Compute (EMR, Dataproc,
+  HDInsight); Streaming (Kinesis Data Streams, Managed Flink, Pub/Sub, Dataflow,
+  Event Hubs, Stream Analytics); Orchestration (MWAA, Cloud Composer; ADF shared);
+  Governance (Lake Formation, Dataplex, Purview); NoSQL (DynamoDB, Bigtable, Cosmos
+  DB); ML (SageMaker, Vertex AI, Azure ML); Serverless (Lambda, Cloud Functions,
+  Azure Functions).
+- **Verified:** validation script confirms 35 stubs ↔ 35 detail files, every
+  required section present, every cross-cloud equivalent link resolves to a real
+  file, filenames/providers self-consistent; `tsc --noEmit` clean.
+- **Next:** logged-in visual pass through /cloud (tabs, group filter, a detail page,
+  the assistant) → then commit + push + PR. No migration required (browse-only v1).
+
+### Cloud Skills — DE build-out + Pipeline map (2026-07-07, same branch)
+- **Catalog expanded 35 → 63 services** (~20 per cloud) for comprehensive
+  data-engineering coverage. +28 pages across 7 new concept rows: Relational/OLTP
+  (RDS / Cloud SQL / Azure SQL DB), In-Memory Cache (ElastiCache / Memorystore /
+  Azure Cache for Redis), BI (QuickSight / Looker / Power BI), Migration & CDC
+  (DMS / Datastream / Azure DMS), Bulk Transfer (DataSync / Storage Transfer /
+  Data Box), Lakehouse (Databricks on AWS/GCP/Azure), Serverless Workflows (Step
+  Functions / Cloud Workflows / Logic Apps), Managed Kafka (MSK / GCP Managed
+  Kafka; Azure→Event Hubs), Messaging (SQS / Cloud Tasks / Service Bus), Real-time
+  & Time-series (Timestream / Azure Data Explorer; GCP→BigQuery). All to the locked
+  template incl. Where-it-fits.
+- **Holistic Pipeline map view** (`components/cloud/CloudPipelineMap.tsx`): every
+  service laid out by pipeline stage (Ingest → Store → Process → Orchestrate →
+  Serve → Govern) × cloud, filterable to one cloud or All. `CloudLanding` gained a
+  Browse ↔ Pipeline-map toggle. Driven by a new `stages: Stage[]` field on the
+  manifest stubs (types: `STAGES`, `Stage`, `STAGE_META`); 6 new logical groups
+  added (relational, cache, olap, movement, messaging, bi) → 16 total.
+- **Verified:** validation script confirms 63 stubs ↔ 63 detail files, all sections
+  present, every cross-cloud equivalent link resolves, every stage×provider map
+  cell is populated (no gaps); `tsc --noEmit` clean.
+
+## Code pillar - drill data panels (spike/code-drill)
+- **Problem:** the working data (`rows`) sat in one `<pre>` at the top of the drill and scrolled out of view; shown as raw list-of-dicts, not a dataframe.
+- **Left rail - dataframe (always on):** `Scenario.dataset` (structured rows) is now the single source of truth; `setupCode` is derived from it via `pyRowsLiteral`. Rendered as a sticky table beside the cells; the active cell's `focus` columns highlight. Never hidden - input isn't a spoiler.
+- **Right rail - "the key" (Practice only):** per active cell, focus-column values -> operation -> result. Result is computed live in Pyodide at boot (`print(repr(<var>))`), never authored, so it always matches the reference.
+- **Practice/Test = the existing Reference toggle:** ON shows key rail + solution lines; OFF hides both (data table stays), keeping the from-memory rep honest.
+- New drill helpers: `pyRowsLiteral`, `resultVarOf`, `columnsOf`, type `DataRow`. Layout falls back to the old single-column `<pre>` when a drill has no `dataset` (generated drills). Page renders 200; `tsc` clean on touched files.
+- **Open:** list/dict results (e.g. `eu`, `by_team`) show as raw `repr` - needs a friendlier format (row count / mini grouped bars). Still no AI, no background work - packs are fully static.
+
+### Drill panels - iteration 2 (feedback)
+- **Data table now follows the learner:** the sticky rails were dead because the root `<div>` had `overflow-hidden`, which silently kills `position: sticky`. Swapped to `overflow-x-clip` (clips sideways bleed without creating a scroll container) - table + panel now stay in view while scrolling cells.
+- **Right panel reworked: chips/result viz -> code narrative.** New optional `DrillCell.narrative` field: a plain-language, outside-in "how to read this code" for each of the 14 cells. Panel now shows the solution line + narrative + the live-computed result as a small "produces" footer. Still gated to Practice via the Reference toggle.
+
+### Drill panels - iteration 3 (sticky, for real this time)
+- **Root cause of the rails still not following:** the grid had `items-start`, which sizes each column to its own content. That left the short side columns only as tall as their card, so the sticky child had zero travel room and scrolled off with it. Removed `items-start` so columns stretch to full row height (the default) - sticky rails now track the scroll. (The earlier overflow-hidden -> overflow-x-clip fix was necessary too; this was the second half.)
+- **Wider "Reading the code" panel:** right column 290px -> 380px, left 210px -> 220px, `main` widened `max-w-6xl` -> `max-w-7xl` to keep the center cells roomy.
+
+### Drill panels - iteration 4 (step-by-step logic)
+- Added `DrillCell.steps` (new `CellStep = { do, code? }`): each one-liner decomposed into ordered logical moves - output first, then iterate, then condition/operation. Authored for all 14 cells.
+- Right panel now reads: solution code -> "The logic, step by step" (numbered, each move + its code fragment) -> "In plain English" (narrative) -> produces (live result). Reinforces the single-line-rep design: understand the logic of small, digestible code.
+
+### Drill panels - iteration 5 (result-as-dataframe + practice untimed)
+- **"Produces" now renders list-of-dicts as a mini dataframe.** Precompute prints a JSON envelope instead of raw repr: a list of flat dicts -> {kind:"table",rows}, everything else -> {kind:"value"}. Sets are sorted to a stable list; default=str keeps it total. `eu`/`big`/`ranked` show as tables; scalars/dicts stay compact. New `CellResult` type + `ResultTable`. Validated the emit across int/float/dict/set/list-of-dicts.
+- **Timer off in Practice.** The speed clock (and overtime flag) now runs only in Test mode (Reference off). Active cells in Practice show a calm "practice - untimed" label instead of the speed bar. Round 1 defaults to Practice (untimed read-through); toggling Reference off or starting Round 2 switches to timed Test.
+
+### Hugh chat refinements (iteration 6)
+- **Grounded responses.** /api/code/chat now takes an optional `context` (dataset shape + current card's task + reference solution); system prompt tightened to give ONE idiomatic answer in THIS code's world and to never assume pandas/DataFrames when the data is a plain list of dicts. Fixes the earlier ".iloc"/three-alternatives dump.
+- **Per-card "Ask Hugh" icon.** Each cell action bar has an Ask button that opens the chat scoped to that step (grounds Hugh + sets the pin target).
+- **Code-mode composer.** Chat composer has a Code2 toggle that swaps the textarea for a CodeMirror (Python) editor - learner writes a snippet in their question; on send it's wrapped in a ```python fence. Mirrors the Ask feature's Code Mode.
+- **Pin thoughts to a card + delete.** Any chat message can be pinned to the focused card; pinned thoughts render on the card with a trash/remove button. Persisted to localStorage keyed per pack (swappable to Supabase later).
+- **Light markdown rendering** (fenced code + inline code + bold) so replies stop showing literal backticks. CodeChat is now controlled by DrillMock but stays uncontrolled/context-free on the landing (all new props optional).
+
+### Hugh chat: grounding verified + Supabase-backed pins (iteration 7)
+- **Grounding confirmed end-to-end.** Seeded the local test user, forged the @supabase/ssr session cookie, and hit /api/code/chat with the `top = max(...)` question + card context. HTTP 200; reply gave two valid plain-Python alternatives (sorted()[0], manual loop) and called max() most idiomatic — NO pandas/.iloc. The earlier off-base suggestion is gone.
+- **Pins moved from localStorage to Supabase.** New migration 026_pinned_thoughts (user_id, pack_id, card_id, text; owner-only RLS). New /api/code/pins route (GET list / POST add / DELETE remove), service-role client scoped by user_id, no LLM/usage gate. DrillMock now loads pins on mount and mutates optimistically (temp id → real id on save; drop on failure). DrillLoader passes a stable packId (pack / topic: / sample). Route smoke-tested pre-migration: GET 200 {pins:[]}, POST 502 — degrades gracefully.
+- **ACTION REQUIRED:** apply migration 026 in the Supabase dashboard before pins persist (no CLI/psql/connection string locally). Until applied, pinning no-ops (optimistic pin drops on the 502).
+- **Pins verified against the live table (026 applied).** Full cycle as the test user: GET 200 {pins:[]} -> POST 200 (real UUID) -> GET 200 (present) -> DELETE 200 -> GET 200 (empty). Supabase-backed pins are live.
+
+### Code landing redesign (iteration 8)
+- Reshaped CodeLanding (/code/start) into the real entry page: explainer of what Code practice is → **Language pills** (Python active; SQL/R "soon") → **Coding patterns** grid → **Play** section.
+- `data-essentials` retained as the live default, badged "Warm-up · start here". Placeholder pattern cards (disabled, "Soon"): Clean & shape data (ETL), Explore a dataset, Build a chart, Linear regression, Forecasting — to be authored as static packs this afternoon.
+- Play environment = a disabled "Soon" card (free-form sandbox, built later; older /code ladder game left as-is, not wired in).
+- Verified authenticated (test-user cookie): 200, all sections present. tsc clean.
+
+### Drill polish (iteration 9)
+- **Removed the "Nice" feedback.** No more low-tier "Nice!" toast (comboLabel returns null under a 3-combo) and no "nice" hype voice line (skipped in useDrillAudio.speak). Streak celebrations (Great!/On fire!/Unstoppable!), chime, and confetti stay.
+- **Background music now cycles the playlist.** Was picking one track and looping it forever; now advances through FOCUS_TRACKS on `ended` and wraps around (starts at a random track).
+- **Per-card practice restored.** Redo on a card now hides its help — reference line AND the right key panel go invisible so you can try it cold; both reappear the moment you submit (Run & check) or peek (Reveal). New CState.practice flag; refVisible and showKeyRail respect it.
+
+### Drill clarity: state the given setup (iteration 10)
+- Fixed a real confusion (learner assumed `rows` was a pandas DataFrame). Added a "You're given" briefing to the scenario: names the provided variable (`rows`), its type (list of dicts, NOT a DataFrame), columns, the r["col"]/for-r-in-rows access convention, and an honest note that in real work you'd load the data yourself. Derived from the dataset — free for any pure-Python pack.
+- Kept the always-visible access footnote on the data table (reworded to "Already loaded for you as rows…") for cold per-card practice.
+- Design note for the pattern library: a future pandas pack should flip this copy to "DataFrame `df`, df[\"col\"]" — candidate for a per-pack dataKind field.
+
+### Analytics-pattern packs authored (iteration 11)
+- Filled the five Python pattern placeholders on `/code/start` with real static packs in `lib/code/packs.ts` (same `DrillContent` shape, no runtime AI, pure-Python/stdlib so they boot instantly in the base Pyodide worker — no numpy/pandas/matplotlib). Scope: Python only; SQL and R deferred to a later build.
+  - **Clean & shape data** (`clean-shape`, 11 reps, independent) — a deliberately messy table (stray spaces, mixed case, string-numbers, a zero): strip, lowercase, `int()` cast, filter, dedupe, boolean-normalise, dict-rebuild (`{**r, …}`), project+rename.
+  - **Explore a dataset** (`explore`, 11 reps, independent) — first-look profile: min/max/range, mean, `statistics.median`, top record, distinct count, share, count-above-mean, group-average (sums+counts dicts → divide), ranked leaderboard.
+  - **Build a chart** (`build-chart`, 11 reps, independent) — the *data prep* behind a visual (no matplotlib): label/height series, (x,y) tuples, grouped totals, percentages, running total, 0–1 scaling, ASCII bars (`"#" * n`), histogram binning (`//10*10`), peak annotation, ranked bars.
+  - **Linear regression** (`linear-regression`, 11 reps, **cumulative**) — OLS from scratch: xs/ys → means → slope (covariance/variance via `zip`) → intercept → predict → fitted → residuals → SSE → R². Data sits slightly off the line so residuals/R² (0.6) are meaningful.
+  - **Forecasting** (`forecasting`, 11 reps, independent) — time-series moves: series, diffs (`zip(s, s[1:])`), growth %, 3-mo moving average, naive/drift/MA forecasts, simple exponential smoothing (α=0.5 recurrence), MAE, peak month, cumulative YTD.
+- **Every solution + hidden assert verified in CPython** before shipping (66 cells, all pass) via a harness that mirrors DrillMock's exec model (setup + priors-if-cumulative + solution → assert). Floats asserted with `abs(x-e)<1e-9` / rounding; datasets chosen for clean numbers.
+- **`resultVarOf` hardened** (`lib/code/drillContent.ts`): was "first `=`", now "last top-level (column-0) bare-name assignment" — so multi-statement cells (helper `s = …` then the real result, or accumulator declared before its loop) preview the correct variable in the KeyPanel. Skips indented / `+=` / `a[i] =` / `a, b =` / `==`. Existing packs + SAMPLE_DRILL unaffected (verified). The two running-total cells declare the accumulator before the output list so the intended `cum` resolves.
+- **Landing:** removed the disabled placeholder grid + now-unused icon imports; all six packs (warm-up + five patterns) render as live cards. `tsc` clean.
+
+### SQL packs + multi-language runtime seam (iteration 12)
+- Added **SQL** as a second drill language (Travis: SQL now, R deferred; trim each language to the reps that fit it). Engine: **DuckDB-wasm** (real analytics SQL — window functions, `regr_*`, `median`; loads from jsDelivr in its own worker, keeping the zero-backend/zero-AI model).
+- **Runtime seam (the architecture change):**
+  - `types/code.ts`: `DrillLang = "python" | "sql"` and a `DrillRunner` interface (`init/run/destroy`) both engines satisfy. `PyodideRunner` now `implements DrillRunner`.
+  - `lib/code/duckdbClient.ts`: new `DuckDBRunner`. A cell is a SELECT; `run(code, check)` executes setup DDL + the query, marshals the result set (BigInt/HUGEINT → number, coercion-hardened), and validates it against the cell's expected rows (`check` = expected JSON; empty `check` = precompute path returning the result table). Result comes back in the shared `{kind,…}` envelope so `ResultTable`/KeyPanel render unchanged. `dynamic import()` so duckdb-wasm only downloads when a SQL drill opens (Python drills stay lean).
+  - `drillContent.ts`: `DrillContent.lang`, `Scenario.tableName`, and `sqlSetupFromRows()` (CREATE OR REPLACE TABLE + INSERT from the same structured dataset — mirrors `pyRowsLiteral`, idempotent so re-running setup per cell is safe).
+  - `DrillMock`: picks the runner by `lang`; precompute + init-error + "you're given" / data-table copy + boot label all branch python/sql; `CmEditor` gains a `lang` prop (SQL highlighting via the already-installed `@codemirror/lang-sql`).
+  - Landing: language pills are now **selectable** (Python / SQL live, R "soon"); the pattern grid filters to the active language. SQL packs use a Database icon + "SQL" tag.
+- **Content — 5 SQL packs, 45 cells (`lib/code/sqlPacks.ts`), every query + expected result verified against real DuckDB (`duckdb` 1.5.4) before shipping:** clean-shape (TRIM/LOWER/CAST/WHERE/DISTINCT/CASE), explore (MIN/MAX/AVG/MEDIAN/COUNT DISTINCT/GROUP BY/subquery), build-chart (window `SUM/AVG/MAX OVER`, bucketing, `RANK`), linear-regression (DuckDB `regr_slope`/`regr_intercept`/`regr_r2`/`corr` — the idiomatic SQL way), forecasting (`LAG` diffs/growth, moving-average frame, cumulative). Each table carries an `id` for deterministic `ORDER BY`. Exp-smoothing/drift trimmed (awkward in SQL).
+- **Verified:** `duckdb` Python proves all 45 SQL cells; a Node test proves the runner's normalize/compare model (BigInt aggregates, float rounding, NULLs, mismatch detection); `tsc` clean; **`next build` succeeds** (dynamic duckdb import bundles fine). **Still needs a real-browser smoke-test** of the DuckDB-wasm boot + live marshaling — the one thing not verifiable headlessly (content and compare logic are proven; `normalize` is hardened for HUGEINT wrappers).
+- **Deps:** added `@duckdb/duckdb-wasm`. R/webR still deferred.

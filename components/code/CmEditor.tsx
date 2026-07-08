@@ -3,9 +3,11 @@
 import { memo, useMemo, useRef } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { python } from "@codemirror/lang-python";
+import { sql } from "@codemirror/lang-sql";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { keymap } from "@codemirror/view";
 import { Prec } from "@codemirror/state";
+import type { DrillLang } from "@/types/code";
 
 interface Props {
   value: string;
@@ -15,10 +17,12 @@ interface Props {
   onSubmit?: () => void;
   /** Editor font size in px (accessibility). Defaults to 13. */
   fontSize?: number;
+  /** Which language grammar to highlight. Defaults to Python. */
+  lang?: DrillLang;
 }
 
-// Defined once at module scope so the editor isn't rebuilt on every render.
-const baseExtensions = [python()];
+// The language grammar extension, memoised per language at module scope.
+const langExtension = (lang: DrillLang) => (lang === "sql" ? sql() : python());
 
 /**
  * Thin CodeMirror 6 wrapper shared by the learner editor and Hugh's ghost
@@ -29,15 +33,15 @@ const baseExtensions = [python()];
  * reconcile CodeMirror on each of those — the source of the typing lag. With
  * stable handler props from the parent, only the edited cell's editor re-renders.
  */
-function CmEditor({ value, onChange, readOnly = false, onSubmit, fontSize = 13 }: Props) {
+function CmEditor({ value, onChange, readOnly = false, onSubmit, fontSize = 13, lang = "python" }: Props) {
   // Call the latest onSubmit via a ref so the keymap extension stays stable.
   const submitRef = useRef(onSubmit);
   submitRef.current = onSubmit;
 
   const extensions = useMemo(() => {
-    if (!onSubmit) return baseExtensions;
+    if (!onSubmit) return [langExtension(lang)];
     return [
-      python(),
+      langExtension(lang),
       Prec.highest(
         keymap.of([
           { key: "Shift-Enter", run: () => { submitRef.current?.(); return true; } },
@@ -45,7 +49,7 @@ function CmEditor({ value, onChange, readOnly = false, onSubmit, fontSize = 13 }
       ),
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!onSubmit]);
+  }, [!!onSubmit, lang]);
 
   return (
     <CodeMirror

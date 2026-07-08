@@ -43,3 +43,22 @@ export interface RunResult {
   /** Error text when execution or an assertion fails; null on success. */
   error: string | null;
 }
+
+/** The languages a drill can be authored in (each backed by its own runtime). */
+export type DrillLang = "python" | "sql";
+
+/**
+ * The uniform contract every drill runtime satisfies, so DrillMock can drive
+ * Python (Pyodide) or SQL (DuckDB-wasm) through one code path. `run` executes
+ * `code` then validates it with `check`:
+ *  - Python: `check` is assert code run in the same namespace (raises → fail).
+ *  - SQL: `check` is the expected result set as JSON (deep-equal → pass); an
+ *    empty `check` just runs `code` and returns its result table (used to
+ *    precompute the "Produces" panel).
+ * Either way `stdout` carries the result as the shared `{kind,…}` envelope.
+ */
+export interface DrillRunner {
+  init(): Promise<void>;
+  run(code: string, check: string): Promise<RunResult>;
+  destroy(): void;
+}

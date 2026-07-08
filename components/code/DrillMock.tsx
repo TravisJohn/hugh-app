@@ -5,28 +5,234 @@ import Link from "next/link";
 import {
   ArrowLeft, Play, Check, Loader2, Volume2, VolumeX,
   Music, Music2, RotateCcw, Eye, EyeOff, Trophy, Zap, RefreshCw, Minus, Plus,
-  Lightbulb, Clock,
+  Lightbulb, Clock, MessageCircle, Pin, Trash2,
 } from "lucide-react";
 import { PyodideRunner } from "@/lib/code/pyodideClient";
-import { timerSecondsFor, type DrillContent } from "@/lib/code/drillContent";
+import { DuckDBRunner } from "@/lib/code/duckdbClient";
+import {
+  timerSecondsFor, resultVarOf, columnsOf,
+  type DrillContent, type DrillCell, type DataRow,
+} from "@/lib/code/drillContent";
+import type { DrillLang, DrillRunner } from "@/types/code";
 import CmEditor from "./CmEditor";
 import ConfettiCanvas, { type ConfettiHandle } from "./ConfettiCanvas";
 import SwarmBackdrop from "./SwarmBackdrop";
-import CodeChat from "./CodeChat";
+import CodeChat, { RichText, type ChatCard } from "./CodeChat";
 import { useDrillAudio } from "@/hooks/useDrillAudio";
 
 type Status = "idle" | "running" | "pass" | "fail";
-interface CState { code: string; status: Status; attempts: number; usedRef: boolean; overTime: boolean; error: string | null }
+interface CState { code: string; status: Status; attempts: number; usedRef: boolean; overTime: boolean; error: string | null; practice: boolean }
+interface PinnedThought { id: string; text: string }
 
-function comboLabel(c: number): string {
+function comboLabel(c: number): string | null {
   if (c >= 6) return "Unstoppable!";
   if (c >= 5) return "On fire! 🔥";
   if (c >= 3) return "Great!";
-  return "Nice!";
+  return null; // no low-tier "Nice!" — only celebrate a real streak
 }
 
 // Each round tightens the clock — gentle first pass, faster every repeat.
 const LEVEL_SPEEDUP = 0.85;
+
+// A precomputed cell answer, ready to render: a list of flat dicts becomes a
+// table (it IS a dataframe), everything else stays a compact value.
+type CellResult =
+  | { kind: "table"; rows: DataRow[] }
+  | { kind: "value"; text: string };
+
+// Python that prints the result variable as a small JSON envelope we can render
+// richly. default=str keeps it total (sets are sorted first for a stable order).
+const emitResult = (varName: string) => `
+import json as _json
+def _emit(_v):
+    if isinstance(_v, set):
+        _v = sorted(_v, key=str)
+    if isinstance(_v, list) and len(_v) > 0 and all(isinstance(_x, dict) for _x in _v):
+        _out = {"kind": "table", "rows": _v}
+    else:
+        _out = {"kind": "value", "value": _v}
+    print(_json.dumps(_out, default=str))
+_emit(${varName})`;
+
+function parseResult(stdout: string): CellResult | null {
+  const last = stdout.trim().split("\n").pop();
+  if (!last) return null;
+  try {
+    const o = JSON.parse(last) as { kind?: string; rows?: unknown; value?: unknown };
+    if (o.kind === "table" && Array.isArray(o.rows)) return { kind: "table", rows: o.rows as DataRow[] };
+    if (o.kind === "value") {
+      const v = o.value;
+      return { kind: "value", text: v !== null && typeof v === "object" ? JSON.stringify(v) : String(v) };
+    }
+  } catch {
+    /* not our envelope — leave unshown */
+  }
+  return null;
+}
+
+/** A list-of-dicts result rendered as the little dataframe it actually is. */
+function ResultTable({ rows }: { rows: DataRow[] }) {
+  const cols = columnsOf(rows);
+  return (
+    <div className="overflow-x-auto rounded-lg border border-emerald-500/30 bg-emerald-500/5">
+      <table className="w-full border-collapse font-mono text-[11px]">
+        <thead>
+          <tr>
+            {cols.map(c => (
+              <th key={c} className="whitespace-nowrap px-2 py-1 text-left font-semibold text-emerald-300/80">{c}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i} className="border-t border-emerald-500/15">
+              {cols.map(c => (
+                <td key={c} className={`whitespace-nowrap px-2 py-0.5 text-emerald-200/80 ${typeof r[c] === "number" ? "text-right tabular-nums" : ""}`}>
+                  {r[c]}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/**
+ * The working data as a real dataframe, sticky beside the cells so it stays in
+ * view no matter how far you scroll. The active cell's `focus` columns light up,
+ * so you can see which part of the table each step reaches for. Always visible —
+ * your input is never a spoiler, so it shows in Test mode too.
+ */
+function DataFrameTable({ dataset, focus, lang, tableName }: { dataset: DataRow[]; focus: string[]; lang: DrillLang; tableName: string }) {
+  const cols = columnsOf(dataset);
+  const lit = (c: string) => focus.includes(c);
+  const isSql = lang === "sql";
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/50">
+      <div className="flex items-center justify-between border-b border-slate-800 px-3 py-2 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+        <span>Your data · {isSql ? tableName : "rows"}</span>
+        <span className="font-mono normal-case tracking-normal">{dataset.length}×{cols.length}</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse font-mono text-xs">
+          <thead>
+            <tr>
+              {cols.map(c => (
+                <th
+                  key={c}
+                  className={`px-2.5 py-1.5 text-left font-semibold ${lit(c) ? "bg-sky-500/15 text-sky-300" : "text-slate-500"}`}
+                >
+                  {c}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {dataset.map((row, i) => (
+              <tr key={i}>
+                {cols.map(c => (
+                  <td
+                    key={c}
+                    className={`whitespace-nowrap px-2.5 py-1 tabular-nums ${
+                      lit(c) ? "bg-sky-500/10 text-sky-200" : "text-slate-400"
+                    } ${typeof row[c] === "number" ? "text-right" : ""}`}
+                  >
+                    {row[c]}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {/* The access convention, always visible — so a card practised cold still
+          tells you the data is already there, its name, and how to read it (never
+          the answer). Python: a list of dicts (r["col"] in a loop). SQL: a table
+          you query with SELECT … FROM <name>. */}
+      <div className="border-t border-slate-800 px-3 py-2 text-[11px] leading-relaxed text-slate-500">
+        {isSql ? (
+          <>
+            Already loaded as the table <code className="rounded bg-slate-800/70 px-1 text-slate-300">{tableName}</code>.
+            Query it with <code className="rounded bg-slate-800/70 px-1 text-slate-300">SELECT … FROM {tableName}</code>, and
+            reference a column by its name, e.g. <code className="rounded bg-slate-800/70 px-1 text-slate-300">{cols[0] ?? "col"}</code>.
+          </>
+        ) : (
+          <>
+            Already loaded for you as <code className="rounded bg-slate-800/70 px-1 text-slate-300">rows</code> — a list of dicts
+            (your table). Loop it with <code className="rounded bg-slate-800/70 px-1 text-slate-300">for r in rows</code>, and read
+            a field with <code className="rounded bg-slate-800/70 px-1 text-slate-300">r[&quot;{cols[0] ?? "col"}&quot;]</code>.
+          </>
+        )}
+      </div>
+      {focus.length > 0 && (
+        <div className="border-t border-slate-800 px-3 py-1.5 text-[11px] text-slate-500">
+          This step reaches for <span className="font-semibold text-sky-300">{focus.join(" + ")}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The "reading the code" panel — a plain-language walkthrough of how the active
+ * cell's solution is built, read outside-in, with the live-computed result as a
+ * small confirmation. Narrates the reference, so it's gated by the Reference
+ * toggle: shows in Practice, hidden in Test.
+ */
+function KeyPanel({ cell, result }: { cell: DrillCell; result: CellResult | undefined }) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-800 bg-gradient-to-b from-slate-900/60 to-slate-950/40">
+      <div className="border-b border-slate-800 px-3 py-2 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+        Reading the code
+      </div>
+      <div className="space-y-3.5 p-4">
+        <pre className="overflow-x-auto rounded-lg border border-sky-500/20 bg-sky-950/20 p-2.5 font-mono text-[11.5px] leading-relaxed text-sky-200/80">{cell.solution}</pre>
+
+        {cell.steps && cell.steps.length > 0 && (
+          <div>
+            <div className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-500">The logic, step by step</div>
+            <ol className="space-y-2">
+              {cell.steps.map((s, i) => (
+                <li key={i} className="flex gap-2.5">
+                  <span className="mt-px flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-sky-500/20 text-[10px] font-bold text-sky-300">
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0">
+                    <span className="text-[13px] leading-snug text-slate-300">{s.do}</span>
+                    {s.code && (
+                      <code className="mt-1 block overflow-x-auto whitespace-nowrap rounded bg-slate-800/60 px-1.5 py-0.5 font-mono text-[11px] text-sky-200/75">
+                        {s.code}
+                      </code>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+
+        {cell.narrative && (
+          <div className="border-t border-slate-800 pt-3">
+            <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-500">In plain English</div>
+            <p className="text-[13px] leading-relaxed text-slate-300">{cell.narrative}</p>
+          </div>
+        )}
+        <div className="border-t border-slate-800 pt-2.5">
+          <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Produces</div>
+          {result?.kind === "table" ? (
+            <ResultTable rows={result.rows} />
+          ) : (
+            <code className="block overflow-x-auto whitespace-nowrap rounded bg-emerald-500/10 px-2 py-1 font-mono text-xs tabular-nums text-emerald-300">
+              {result?.kind === "value" ? result.text : "…"}
+            </code>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Notebook-drill loop for the "Code" pillar. The prompt + reference live OUTSIDE
@@ -39,12 +245,15 @@ const LEVEL_SPEEDUP = 0.85;
  * The drill content (scenario + cells) is passed in — either a generated drill
  * for the learning the user picked, or the sample fallback (see DrillLoader).
  */
-export default function DrillMock({ content }: { content: DrillContent }) {
+export default function DrillMock({ content, packId }: { content: DrillContent; packId: string }) {
   const { scenario: SCENARIO, cells: DRILL_CELLS } = content;
   const cumulative = content.cumulative !== false; // packs (false) run each cell on fresh setup
+  const dataset = SCENARIO.dataset;                // structured table → dataframe + key panels
+  const lang: DrillLang = content.lang ?? "python"; // which runtime executes the cells
+  const isSql = lang === "sql";
 
   const emptyCells = useCallback(
-    (): CState[] => DRILL_CELLS.map(() => ({ code: "", status: "idle", attempts: 0, usedRef: false, overTime: false, error: null })),
+    (): CState[] => DRILL_CELLS.map(() => ({ code: "", status: "idle", attempts: 0, usedRef: false, overTime: false, error: null, practice: false })),
     [DRILL_CELLS],
   );
   const timeFor = useCallback(
@@ -65,42 +274,150 @@ export default function DrillMock({ content }: { content: DrillContent }) {
   const [showRefs, setShowRefs] = useState(true); // global "with comments" toggle
   const [fontSize, setFontSize] = useState(15);   // accessibility: editor/prompt text size
   const [glowId, setGlowId]     = useState<string | null>(null); // cell glowing right after a pass
+  const [results, setResults]   = useState<Record<number, CellResult>>({}); // per-cell computed answer (key panel)
+  const [chatOpen, setChatOpen]     = useState(false);
+  const [chatCardId, setChatCardId] = useState<string | null>(null);        // card the chat is scoped to
+  const [pins, setPins]             = useState<Record<string, PinnedThought[]>>({}); // pinned thoughts, by cell id
 
-  const runnerRef = useRef<PyodideRunner | null>(null);
+  const runnerRef = useRef<DrillRunner | null>(null);
   const confetti  = useRef<ConfettiHandle>(null);
   const cellsRef  = useRef(cells); cellsRef.current = cells;
   const audio     = useDrillAudio();
 
   const allPassed = cells.every(c => c.status === "pass");
   const owned = allPassed && round === 2;
-  const refVisible = (i: number) => showRefs || cells[i].usedRef;
+  // Per-card practice: redoing a card hides its help (reference line + key panel)
+  // so you can try it cold, then help returns the moment you submit or peek.
+  const refVisible = (i: number) => (showRefs || cells[i].usedRef) && !cells[i].practice;
+  // The key panel rides the same Reference switch: shown in Practice, hidden in
+  // Test so the from-memory rep stays clean. The data table stays either way.
+  // Also hidden while the active card is being practised.
+  const showKeyRail = started && showRefs && !!dataset && !cells[active]?.practice;
+
+  // Chat grounding: the card its Ask icon was clicked from, else the active cell.
+  const focusCell = DRILL_CELLS.find(c => c.id === chatCardId) ?? DRILL_CELLS[active];
+  const focusCard: ChatCard | null = focusCell
+    ? { id: focusCell.id, task: focusCell.task, solution: focusCell.solution }
+    : null;
+  const tableName = SCENARIO.tableName ?? "data";
+  const datasetLabel = isSql
+    ? (dataset
+        ? `a SQL table named \`${tableName}\` (columns: ${columnsOf(dataset).join(", ")})`
+        : `a SQL table named \`${tableName}\``)
+    : (dataset
+        ? `a list of dicts named \`rows\` (columns: ${columnsOf(dataset).join(", ")})`
+        : "a Python list of dicts named `rows`");
+
+  const openChatForCard = useCallback((id: string) => { setChatCardId(id); setChatOpen(true); }, []);
+  const handleChatOpen = useCallback((v: boolean) => { setChatOpen(v); if (!v) setChatCardId(null); }, []);
+
+  // Pinned thoughts live in Supabase (per user, per pack) so they follow the
+  // learner across devices. Load once; mutate optimistically and reconcile ids.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/code/pins?pack=${encodeURIComponent(packId)}`);
+        if (!res.ok) return; // not signed in / offline — start empty
+        const data = (await res.json()) as { pins?: { id: string; card_id: string; text: string }[] };
+        if (cancelled || !data.pins) return;
+        const grouped: Record<string, PinnedThought[]> = {};
+        for (const p of data.pins) (grouped[p.card_id] ??= []).push({ id: p.id, text: p.text });
+        setPins(grouped);
+      } catch { /* leave empty */ }
+    })();
+    return () => { cancelled = true; };
+  }, [packId]);
+
+  const addPin = useCallback(async (cardId: string, text: string) => {
+    const tempId = `tmp-${Date.now()}`;
+    setPins(prev => ({ ...prev, [cardId]: [...(prev[cardId] ?? []), { id: tempId, text }] }));
+    try {
+      const res = await fetch("/api/code/pins", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pack_id: packId, card_id: cardId, text }),
+      });
+      const data = (await res.json()) as { pin?: { id: string } };
+      setPins(prev => ({
+        ...prev,
+        [cardId]: (prev[cardId] ?? []).flatMap(p =>
+          p.id !== tempId ? [p] : data.pin ? [{ id: data.pin.id, text }] : [], // drop the optimistic pin if the save failed
+        ),
+      }));
+    } catch {
+      setPins(prev => ({ ...prev, [cardId]: (prev[cardId] ?? []).filter(p => p.id !== tempId) }));
+    }
+  }, [packId]);
+
+  const removePin = useCallback(async (cardId: string, pinId: string) => {
+    setPins(prev => ({ ...prev, [cardId]: (prev[cardId] ?? []).filter(p => p.id !== pinId) }));
+    if (pinId.startsWith("tmp-")) return; // never persisted; nothing to delete server-side
+    try { await fetch(`/api/code/pins?id=${encodeURIComponent(pinId)}`, { method: "DELETE" }); }
+    catch { /* best-effort — it's already gone from the UI */ }
+  }, []);
 
   useEffect(() => {
-    const r = new PyodideRunner();
+    const r: DrillRunner = isSql ? new DuckDBRunner() : new PyodideRunner();
     runnerRef.current = r;
     r.init().then(() => setReady(true)).catch(e => setInitErr(String(e?.message ?? e)));
     return () => r.destroy();
-  }, []);
+  }, [isSql]);
+
+  // Precompute each cell's answer once Python is up, by running the reference
+  // solution and printing its result variable. Deterministic, off the critical
+  // path, and only ever shown in the (gated) key panel — never authored by hand.
+  useEffect(() => {
+    if (!ready || !dataset) return;
+    const runner = runnerRef.current;
+    if (!runner) return;
+    let cancelled = false;
+    (async () => {
+      for (let i = 0; i < DRILL_CELLS.length; i++) {
+        let res;
+        if (isSql) {
+          // SQL: run setup + the reference query; the runner returns the result
+          // table itself (no "check"), which IS the "Produces" preview.
+          res = await runner.run(SCENARIO.setupCode + "\n" + DRILL_CELLS[i].solution, "");
+        } else {
+          const varName = resultVarOf(DRILL_CELLS[i]);
+          if (!varName) continue;
+          const priors = cumulative ? DRILL_CELLS.slice(0, i).map(c => c.solution).join("\n") : "";
+          res = await runner.run(SCENARIO.setupCode + "\n" + priors + "\n" + DRILL_CELLS[i].solution, emitResult(varName));
+        }
+        if (cancelled) return;
+        if (res.passed && res.stdout) {
+          const parsed = parseResult(res.stdout);
+          if (parsed) setResults(prev => ({ ...prev, [i]: parsed }));
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [ready, dataset, DRILL_CELLS, cumulative, SCENARIO.setupCode, isSql]);
 
   useEffect(() => { setTimeLeft(timeFor(active, round)); }, [active, round]);
 
   // Ran out of time on the active cell → flag it (red) so it's clear which cells
   // weren't done in time. Never blocks; passing it still turns it green.
+  // Practice is untimed, so overtime can only apply in Test mode.
   useEffect(() => {
-    if (!started || timeLeft !== 0) return;
+    if (!started || showRefs || timeLeft !== 0) return;
     setCells(prev => prev.map((c, idx) =>
       idx === active && c.status !== "pass" && !c.overTime ? { ...c, overTime: true } : c));
-  }, [timeLeft, started, active]);
+  }, [timeLeft, started, active, showRefs]);
 
+  // The speed clock only runs in Test mode (Reference off) — Practice is a
+  // pressure-free read-through, so no countdown there.
   useEffect(() => {
-    if (!started || allPassed) return;
+    if (!started || allPassed || showRefs) return;
     const id = setInterval(() => setTimeLeft(t => Math.max(0, t - 1)), 1000);
     return () => clearInterval(id);
-  }, [started, active, allPassed]);
+  }, [started, active, allPassed, showRefs]);
 
   // Speed meter low → reveal this cell's reference (never punishes).
   const revealRef = useCallback((i: number) => {
-    setCells(prev => prev.map((c, idx) => (idx === i && !c.usedRef ? { ...c, usedRef: true } : c)));
+    // Peeking reveals help and ends practice mode for that card.
+    setCells(prev => prev.map((c, idx) => (idx === i ? { ...c, usedRef: true, practice: false } : c)));
   }, []);
 
   useEffect(() => {
@@ -122,7 +439,8 @@ export default function DrillMock({ content }: { content: DrillContent }) {
     if (!runner || !ready) return;
     const snap = cellsRef.current;
     if (snap[i].status === "running" || snap[i].status === "pass") return;
-    setCells(prev => prev.map((c, idx) => (idx === i ? { ...c, status: "running", error: null } : c)));
+    // Submitting ends practice mode, so help returns alongside the result.
+    setCells(prev => prev.map((c, idx) => (idx === i ? { ...c, status: "running", error: null, practice: false } : c)));
 
     const priors = cumulative ? snap.slice(0, i).map(c => c.code).join("\n") : "";
     const preamble = SCENARIO.setupCode + "\n" + priors + "\n";
@@ -142,8 +460,11 @@ export default function DrillMock({ content }: { content: DrillContent }) {
       setCombo(nextCombo);
       confetti.current?.fire(nextCombo);
       audio.celebrate(nextCombo);
-      setToast(comboLabel(nextCombo));
-      window.setTimeout(() => setToast(null), 1300);
+      const label = comboLabel(nextCombo);
+      if (label) {
+        setToast(label);
+        window.setTimeout(() => setToast(null), 1300);
+      }
       const passedId = DRILL_CELLS[i].id;
       setGlowId(passedId);
       window.setTimeout(() => setGlowId(g => (g === passedId ? null : g)), 1200);
@@ -179,13 +500,17 @@ export default function DrillMock({ content }: { content: DrillContent }) {
   function nextRound() { const r = round + 1; setRound(r); setShowRefs(false); setCells(emptyCells()); setActive(0); setCombo(0); setTimeLeft(timeFor(0, r)); }
   function restart() { setRound(1); setShowRefs(true); setCells(emptyCells()); setActive(0); setCombo(0); setTimeLeft(timeFor(0, 1)); }
   function redoCell(i: number) {
-    setCells(prev => prev.map((c, idx) => (idx === i ? { code: "", status: "idle", attempts: 0, usedRef: false, overTime: false, error: null } : c)));
+    // Redo = practise this card cold: clear it and hide its help until submit/peek.
+    setCells(prev => prev.map((c, idx) => (idx === i ? { code: "", status: "idle", attempts: 0, usedRef: false, overTime: false, error: null, practice: true } : c)));
     setActive(i);
     setTimeLeft(timeFor(i, round));
   }
 
+  // No overflow-hidden on the root: it clips nothing (the backdrop is fixed) but
+  // it WOULD break the sticky data/key rails. overflow-x-clip keeps sideways
+  // bleed in check without creating a scroll container that kills sticky.
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#0A0F1E] text-slate-200">
+    <div className="relative min-h-screen overflow-x-clip bg-[#0A0F1E] text-slate-200">
       <SwarmBackdrop />
       <ConfettiCanvas ref={confetti} />
 
@@ -250,32 +575,96 @@ export default function DrillMock({ content }: { content: DrillContent }) {
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto max-w-3xl px-6 py-8">
+      <main className={`relative z-10 mx-auto px-6 py-8 ${dataset ? "max-w-7xl" : "max-w-3xl"}`}>
         {/* Scenario — the strategic frame */}
         <div className="mb-6 rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
           <div className="mb-1 text-[11px] font-semibold uppercase tracking-widest text-sky-400">The goal</div>
           <h1 className="font-serif text-xl font-bold text-white">{SCENARIO.title}</h1>
           <p className="mt-1 text-sm italic text-slate-400">{SCENARIO.role}</p>
           <p className="mt-2 text-sm leading-relaxed text-slate-300">{SCENARIO.goal}</p>
-          <div className="mt-3 text-xs text-slate-500">Your data:</div>
-          <pre className="mt-1.5 overflow-x-auto rounded-lg border border-slate-800 bg-slate-950/60 p-3 text-xs text-slate-400">
+
+          {/* "You're given" — state the provided variable, its type, and how to
+              read it, so learners don't guess or assume. Derived from the dataset,
+              so any pure-Python pack gets it for free. */}
+          {dataset && (
+            <div className="mt-4 rounded-lg border border-slate-800 bg-slate-950/40 p-3.5 text-xs leading-relaxed text-slate-400">
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500">You&apos;re given</div>
+              {isSql ? (
+                <>
+                  <p>
+                    The table <code className="rounded bg-slate-800/70 px-1 text-sky-200/90">{tableName}</code> is already loaded — {dataset.length}{" "}
+                    rows (columns: <span className="text-slate-300">{columnsOf(dataset).join(", ")}</span>). Query it with{" "}
+                    <code className="rounded bg-slate-800/70 px-1 text-sky-200/90">SELECT … FROM {tableName}</code>. Each cell is one{" "}
+                    <code className="rounded bg-slate-800/70 px-1 text-sky-200/90">SELECT</code> that must return the asked-for result.
+                  </p>
+                  <p className="mt-1.5 text-slate-500">
+                    It runs on DuckDB (in your browser). In real work you&apos;d create and load the table yourself; here it&apos;s
+                    set up so you can focus on the query.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p>
+                    <code className="rounded bg-slate-800/70 px-1 text-sky-200/90">rows</code> is already loaded for you — a list of{" "}
+                    {dataset.length} dicts, one per record (columns:{" "}
+                    <span className="text-slate-300">{columnsOf(dataset).join(", ")}</span>). Read a field with{" "}
+                    <code className="rounded bg-slate-800/70 px-1 text-sky-200/90">r[&quot;{columnsOf(dataset)[0]}&quot;]</code> inside a{" "}
+                    <code className="rounded bg-slate-800/70 px-1 text-sky-200/90">for r in rows</code> loop.
+                  </p>
+                  <p className="mt-1.5 text-slate-500">
+                    It&apos;s a plain Python list of dicts — not a pandas DataFrame. In real work you&apos;d load the data yourself;
+                    here it&apos;s set up so you can focus on the moves.
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+          {/* Raw setup only when there's no structured table to show it better. */}
+          {!dataset && (
+            <>
+              <div className="mt-3 text-xs text-slate-500">Your data:</div>
+              <pre className="mt-1.5 overflow-x-auto rounded-lg border border-slate-800 bg-slate-950/60 p-3 text-xs text-slate-400">
 {SCENARIO.setupCode}
-          </pre>
+              </pre>
+            </>
+          )}
         </div>
 
         {initError && (
           <div className="mb-4 rounded-lg border border-red-500/40 bg-red-950/20 p-3 text-sm text-red-300">
-            Couldn&apos;t start Python: {initError}
+            Couldn&apos;t start {isSql ? "SQL" : "Python"}: {initError}
           </div>
         )}
 
+        {/* No items-start: columns must stretch to full row height, otherwise the
+            short side columns give their sticky children no room to travel. */}
+        <div
+          className={`grid gap-5 ${
+            dataset
+              ? showKeyRail
+                ? "lg:grid-cols-[220px_minmax(0,1fr)_380px]"
+                : "lg:grid-cols-[220px_minmax(0,1fr)]"
+              : ""
+          }`}
+        >
+          {/* LEFT · the dataframe, always in view (sticky), column-highlighted */}
+          {dataset && (
+            <aside className="hidden lg:block">
+              <div className="sticky top-[76px]">
+                <DataFrameTable dataset={dataset} focus={DRILL_CELLS[active]?.focus ?? []} lang={lang} tableName={tableName} />
+              </div>
+            </aside>
+          )}
+
+          {/* CENTER · start button, then the cells */}
+          <div className="min-w-0">
         {!started ? (
           <button
             onClick={start}
             disabled={!ready}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-sky-500 px-5 py-3 font-medium text-white transition-colors hover:bg-sky-400 disabled:opacity-50"
           >
-            {ready ? <><Play size={16} /> Start drill</> : <><Loader2 size={16} className="animate-spin" /> Booting Python…</>}
+            {ready ? <><Play size={16} /> Start drill</> : <><Loader2 size={16} className="animate-spin" /> Booting {isSql ? "SQL" : "Python"}…</>}
           </button>
         ) : (
           <div className="space-y-4">
@@ -312,7 +701,7 @@ export default function DrillMock({ content }: { content: DrillContent }) {
                       <span className="flex items-center gap-1 font-semibold text-red-400">
                         <Clock size={12} /> over time
                       </span>
-                    ) : isActive ? (
+                    ) : isActive && !showRefs ? (
                       <div className="flex items-center gap-2">
                         <div className="h-1 w-28 overflow-hidden rounded-full bg-slate-800">
                           <div
@@ -322,6 +711,8 @@ export default function DrillMock({ content }: { content: DrillContent }) {
                         </div>
                         <span className="text-slate-500">speed</span>
                       </div>
+                    ) : isActive ? (
+                      <span className="text-[11px] text-slate-600">practice · untimed</span>
                     ) : null}
                   </div>
 
@@ -355,6 +746,7 @@ export default function DrillMock({ content }: { content: DrillContent }) {
                       onSubmit={runHandlers[i]}
                       readOnly={st.status === "pass"}
                       fontSize={fontSize}
+                      lang={lang}
                     />
                   </div>
 
@@ -363,8 +755,15 @@ export default function DrillMock({ content }: { content: DrillContent }) {
                       {st.status === "fail" && <span className="text-amber-400">✗ {st.error}</span>}
                     </div>
                     <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => openChatForCard(cell.id)}
+                        className="flex items-center gap-1 text-xs text-slate-500 hover:text-sky-300"
+                        title="Ask Hugh about this step"
+                      >
+                        <MessageCircle size={12} /> Ask
+                      </button>
                       {(st.status === "pass" || st.attempts > 0) && (
-                        <button onClick={() => redoCell(i)} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300">
+                        <button onClick={() => redoCell(i)} title="Practise this card again with the help hidden" className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300">
                           <RefreshCw size={12} /> Redo
                         </button>
                       )}
@@ -384,6 +783,29 @@ export default function DrillMock({ content }: { content: DrillContent }) {
                       </button>
                     </div>
                   </div>
+
+                  {/* Pinned thoughts — notes the learner pinned from the chat */}
+                  {(pins[cell.id]?.length ?? 0) > 0 && (
+                    <div className="space-y-1.5 border-t border-slate-800/60 px-4 py-2.5">
+                      <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+                        <Pin size={10} /> Pinned thoughts
+                      </div>
+                      {pins[cell.id].map(p => (
+                        <div key={p.id} className="flex items-start gap-2 rounded-lg border border-slate-800 bg-slate-900/40 px-2.5 py-1.5">
+                          <div className="min-w-0 flex-1 text-[12px] leading-relaxed text-slate-300">
+                            <RichText text={p.text} />
+                          </div>
+                          <button
+                            onClick={() => removePin(cell.id, p.id)}
+                            className="mt-0.5 shrink-0 text-slate-600 hover:text-red-400"
+                            title="Remove this pinned thought"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -435,6 +857,17 @@ export default function DrillMock({ content }: { content: DrillContent }) {
             )}
           </div>
         )}
+          </div>{/* /center */}
+
+          {/* RIGHT · the key panel — data → operation → result, Practice only */}
+          {showKeyRail && dataset && DRILL_CELLS[active] && (
+            <aside className="hidden lg:block">
+              <div className="sticky top-[76px]">
+                <KeyPanel cell={DRILL_CELLS[active]} result={results[active]} />
+              </div>
+            </aside>
+          )}
+        </div>{/* /grid */}
       </main>
 
       {toast && (
@@ -445,7 +878,13 @@ export default function DrillMock({ content }: { content: DrillContent }) {
         </div>
       )}
 
-      <CodeChat />
+      <CodeChat
+        open={chatOpen}
+        onOpenChange={handleChatOpen}
+        focusCard={focusCard}
+        datasetLabel={datasetLabel}
+        onPin={addPin}
+      />
     </div>
   );
 }

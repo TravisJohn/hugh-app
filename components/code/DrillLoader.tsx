@@ -79,7 +79,8 @@ export default function DrillLoader({ pack, topic, context, focus }: { pack?: st
           Couldn&apos;t build a custom drill just now — here&apos;s a sample to practise on.
         </div>
       )}
-      <DrillMock content={content} />
+      {/* Stable id so pinned thoughts attach to the right drill (pack, topic, or sample). */}
+      <DrillMock content={content} packId={pack ?? (topic ? `topic:${topic}` : "sample")} />
     </>
   );
 }

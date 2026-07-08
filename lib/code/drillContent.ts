@@ -8,12 +8,26 @@
 // /api/code/generate-drill from the learning/topic the user picked; both share
 // the DrillContent shape so DrillMock renders either identically.
 
+import type { DrillLang } from "@/types/code";
+
+/** A row of the working dataset — flat, JSON-ish, one dict per record. */
+export type DataRow = Record<string, string | number>;
+
+/** One logical move in building a cell's one-liner, mapped to its code fragment. */
+export interface CellStep {
+  do: string;     // the logical move, plain language (imperative)
+  code?: string;  // the slice of the solution this step corresponds to
+}
+
 export interface DrillCell {
   id: string;
   task: string;        // what to produce, in plain language
   why: string;         // the essence — why this step matters
   solution: string;    // reference — the answer to replicate
   assertions: string;  // hidden asserts on the produced variable
+  focus?: string[];    // dataset columns this step touches (highlighted in the table)
+  narrative?: string;  // plain-language "how to read this code", outside-in
+  steps?: CellStep[];  // the one-liner decomposed into ordered logical moves
 }
 
 export interface Scenario {
@@ -21,7 +35,15 @@ export interface Scenario {
   role: string;
   goal: string;
   outcome: string;
-  setupCode: string;   // read-only setup; must define `rows` (a list of dicts)
+  setupCode: string;   // read-only setup; Python defines `rows`, SQL builds a table
+  // Structured mirror of setupCode's data, so the drill can render a real
+  // dataframe table (and highlight columns) instead of raw code. When present,
+  // derive setupCode from it via pyRowsLiteral()/sqlSetupFromRows() to keep one
+  // source of truth. Absent on generated drills — the UI falls back to text.
+  dataset?: DataRow[];
+  // SQL only: the table name the dataset is loaded into (e.g. "sales"). Drives
+  // the "you're given" copy and lets cells query `FROM <tableName>`.
+  tableName?: string;
 }
 
 export interface DrillContent {
@@ -32,6 +54,9 @@ export interface DrillContent {
   // independent bite-size reps — every cell runs against the fresh setup only.
   // Omitted / true = cumulative (back-compat); false = independent.
   cumulative?: boolean;
+  // Which runtime executes the cells. Omitted = "python" (Pyodide, back-compat);
+  // "sql" runs against DuckDB-wasm and cells assert on a result set, not a var.
+  lang?: DrillLang;
 }
 
 /**
@@ -41,6 +66,73 @@ export interface DrillContent {
  */
 export function timerSecondsFor(cell: DrillCell): number {
   return Math.max(22, Math.min(110, Math.round(16 + cell.solution.length / 1.8)));
+}
+
+/**
+ * Render a structured dataset as the Python `rows = [...]` literal used for
+ * setup. Keeps the table and the executed setup in sync from one source.
+ */
+export function pyRowsLiteral(rows: DataRow[], varName = "rows"): string {
+  const body = rows
+    .map(
+      r =>
+        "    {" +
+        Object.entries(r)
+          .map(([k, v]) => `${JSON.stringify(k)}: ${typeof v === "string" ? JSON.stringify(v) : v}`)
+          .join(", ") +
+        "}",
+    )
+    .join(",\n");
+  return `${varName} = [\n${body},\n]`;
+}
+
+/**
+ * SQL column type for a value — VARCHAR for strings, INTEGER for whole numbers,
+ * DOUBLE otherwise. Enough for the small, clean datasets the packs use.
+ */
+function sqlType(v: string | number): string {
+  if (typeof v === "string") return "VARCHAR";
+  return Number.isInteger(v) ? "INTEGER" : "DOUBLE";
+}
+
+/** A SQL literal for a value — quoted+escaped string, or a bare number. */
+function sqlLiteral(v: string | number): string {
+  return typeof v === "string" ? `'${v.replace(/'/g, "''")}'` : String(v);
+}
+
+/**
+ * Build the DuckDB setup DDL (CREATE TABLE + INSERT) for a SQL drill from the
+ * same structured dataset the table renders — one source of truth, mirroring
+ * pyRowsLiteral() for Python. Uses CREATE OR REPLACE so re-running setup before
+ * every cell is idempotent. Column types are inferred from the first row.
+ */
+export function sqlSetupFromRows(rows: DataRow[], tableName: string): string {
+  if (rows.length === 0) return `CREATE OR REPLACE TABLE ${tableName} (id INTEGER);`;
+  const cols = Object.keys(rows[0]);
+  const colDefs = cols.map(c => `${c} ${sqlType(rows[0][c])}`).join(", ");
+  const values = rows
+    .map(r => "  (" + cols.map(c => sqlLiteral(r[c])).join(", ") + ")")
+    .join(",\n");
+  return `CREATE OR REPLACE TABLE ${tableName} (${colDefs});\nINSERT INTO ${tableName} VALUES\n${values};`;
+}
+
+/**
+ * The variable a cell produces — the name the "key" panel prints (and the same
+ * one the hidden asserts check). A cell may set up a helper first (e.g. `s = …`)
+ * before the line that actually produces its answer, so we take the LAST
+ * top-level (column-0) bare-name assignment, not the first. Indented lines,
+ * augmented (`+=`), subscript (`a[i] =`), tuple (`a, b =`), and comparison
+ * (`==`) assignments are skipped, so accumulator loops resolve to the name
+ * declared before the loop.
+ */
+export function resultVarOf(cell: DrillCell): string | null {
+  const matches = [...cell.solution.matchAll(/^([A-Za-z_]\w*)\s*=(?!=)/gm)];
+  return matches.length ? matches[matches.length - 1][1] : null;
+}
+
+/** Column names of a dataset, in first-row order. */
+export function columnsOf(dataset: DataRow[]): string[] {
+  return dataset.length ? Object.keys(dataset[0]) : [];
 }
 
 export const SAMPLE_DRILL: DrillContent = {

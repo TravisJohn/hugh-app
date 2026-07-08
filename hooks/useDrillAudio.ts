@@ -23,13 +23,20 @@ export function useDrillAudio() {
   soundOnRef.current = soundOn;
 
   useEffect(() => {
-    // Pick one focus track for the session; loop it quietly.
-    const track = FOCUS_TRACKS[(Math.random() * FOCUS_TRACKS.length) | 0];
-    const el = new Audio(track);
-    el.loop = true;
+    if (FOCUS_TRACKS.length === 0) return;
+    // Play THROUGH the playlist and wrap around, rather than looping one track
+    // over and over. Start at a random track for variety between sessions.
+    let idx = (Math.random() * FOCUS_TRACKS.length) | 0;
+    const el = new Audio(FOCUS_TRACKS[idx]);
     el.volume = 0.22;
+    const onEnded = () => {
+      idx = (idx + 1) % FOCUS_TRACKS.length;
+      el.src = FOCUS_TRACKS[idx];
+      el.play().catch(() => {});
+    };
+    el.addEventListener("ended", onEnded);
     musicRef.current = el;
-    return () => { el.pause(); musicRef.current = null; };
+    return () => { el.removeEventListener("ended", onEnded); el.pause(); musicRef.current = null; };
   }, []);
 
   /** Call once from a click so audio is unlocked. */
@@ -84,6 +91,7 @@ export function useDrillAudio() {
     const name = combo >= 6 && Math.random() < 0.5
       ? EXTRA_LINES[(Math.random() * EXTRA_LINES.length) | 0]
       : HYPE_BY_COMBO[Math.min(combo, HYPE_BY_COMBO.length - 1)];
+    if (!name || name === "nice") return; // no low-tier "nice" line — too repetitive
     const a = new Audio(`/audio/hype/${name}.mp3`);
     a.volume = 0.9;
     a.play().catch(() => {});

@@ -1,4 +1,4 @@
-import type { RunResult } from "@/types/code";
+import type { DrillRunner, RunResult } from "@/types/code";
 
 /**
  * Main-thread wrapper around the Pyodide worker. Owns the worker lifecycle,
@@ -22,7 +22,7 @@ interface PendingRun {
   timer: ReturnType<typeof setTimeout>;
 }
 
-export class PyodideRunner {
+export class PyodideRunner implements DrillRunner {
   private worker: Worker | null = null;
   private readyPromise: Promise<void> | null = null;
   private resolveReady: (() => void) | null = null;
