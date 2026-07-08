@@ -9,6 +9,27 @@ const HYPE_BY_COMBO: string[] = ["nice", "great", "great", "fire", "fire", "unst
 const EXTRA_LINES = ["boom", "rolling"];
 
 /**
+ * Ramp an audio element's volume to zero over `ms`, then pause it. The element
+ * is a detached HTMLAudioElement, so it keeps playing (and fading) even after
+ * the component that owned it unmounts — which is exactly what lets the music
+ * fade out gracefully when the user hits Back instead of cutting off abruptly.
+ */
+function fadeOutAndPause(el: HTMLAudioElement, ms = 450) {
+  const startVol = el.volume;
+  const steps = 24;
+  let i = 0;
+  const timer = setInterval(() => {
+    i += 1;
+    el.volume = Math.max(0, startVol * (1 - i / steps));
+    if (i >= steps) {
+      clearInterval(timer);
+      el.pause();
+      el.volume = startVol; // restore in case the element is ever reused
+    }
+  }, ms / steps);
+}
+
+/**
  * Throwaway-mock audio: a synth "chime" (WebAudio, no asset) that rises in pitch
  * with the combo, a spoken hype line per correct cell, and looping background
  * music reused from the Pomodoro focus tracks. All gated behind a first user
@@ -36,7 +57,7 @@ export function useDrillAudio() {
     };
     el.addEventListener("ended", onEnded);
     musicRef.current = el;
-    return () => { el.removeEventListener("ended", onEnded); el.pause(); musicRef.current = null; };
+    return () => { el.removeEventListener("ended", onEnded); fadeOutAndPause(el); musicRef.current = null; };
   }, []);
 
   /** Call once from a click so audio is unlocked. */
