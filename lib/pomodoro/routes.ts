@@ -2,13 +2,15 @@
 
 // Routes where the timer (and music) disappear entirely: focused assessments, the
 // admin/tools area (not a study context), the Code activity (its own focused mode,
-// not part of the learn flow), and the coming-soon Converse. The Converse route
-// doesn't exist yet — future-proofed.
+// not part of the learn flow), the Notes workspace (which has its OWN self-contained
+// timer, so the learn-flow one must not bleed in), and the coming-soon Converse.
+// The Converse route doesn't exist yet — future-proofed.
 export function isSilentRoute(path: string): boolean {
   return /^\/admin(\/|$)/.test(path)
     || /^\/review\//.test(path)
     || /^\/mastery\//.test(path)
     || /^\/code(\/|$)/.test(path)
+    || /^\/notes(\/|$)/.test(path)
     || /^\/converse(\/|$)/.test(path);
 }
 

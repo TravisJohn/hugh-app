@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { GripVertical, Pause, Play, Square, X } from "lucide-react";
 import { formatMmSs } from "@/hooks/usePomodoro";
 import { isSilentRoute, isAskRoute } from "@/lib/pomodoro/routes";
+import { playChime } from "@/lib/pomodoro/chime";
 import { usePomodoroContext } from "./PomodoroProvider";
 import PomodoroMusicControl from "./PomodoroMusicControl";
 
@@ -20,36 +21,6 @@ function readPos(): Pos | null {
 }
 function writePos(p: Pos | null) {
   try { if (p) localStorage.setItem(POS_KEY, JSON.stringify(p)); } catch { /* ignore */ }
-}
-
-// Gentle two-tone chime via Web Audio — no asset needed. Best-effort; browsers
-// allow it because the learner clicked to start the timer earlier.
-function playChime() {
-  try {
-    const w = window as unknown as {
-      AudioContext?: typeof AudioContext;
-      webkitAudioContext?: typeof AudioContext;
-    };
-    const Ctx = w.AudioContext ?? w.webkitAudioContext;
-    if (!Ctx) return;
-    const ctx = new Ctx();
-    const now = ctx.currentTime;
-    [880, 1318.5].forEach((freq, i) => {
-      const osc  = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.value = freq;
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      const t = now + i * 0.18;
-      gain.gain.setValueAtTime(0.0001, t);
-      gain.gain.linearRampToValueAtTime(0.16, t + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.38);
-      osc.start(t);
-      osc.stop(t + 0.42);
-    });
-    setTimeout(() => void ctx.close(), 1200);
-  } catch { /* audio not available — toast still shows */ }
 }
 
 /**

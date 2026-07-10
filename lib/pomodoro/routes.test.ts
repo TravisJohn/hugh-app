@@ -27,6 +27,13 @@ describe("isSilentRoute", () => {
     expect(isSilentRoute("/mastery/xyz")).toBe(true);
     expect(isSilentRoute("/converse")).toBe(true);
   });
+
+  it("silences /notes so the learn-flow timer can't leak into the Notes workspace", () => {
+    expect(isSilentRoute("/notes")).toBe(true);
+    expect(isSilentRoute("/notes/")).toBe(true);
+    // lookalike prefix must not be caught
+    expect(isSilentRoute("/notebooks")).toBe(false);
+  });
 });
 
 describe("isAskRoute", () => {
