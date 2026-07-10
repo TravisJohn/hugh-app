@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { GraduationCap, Code2, Trophy, Cloud } from "lucide-react";
+import { GraduationCap, Code2, Trophy, Cloud, NotebookPen } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import SignOutButton from "@/components/landing/SignOutButton";
@@ -172,6 +172,25 @@ export default async function HomePage() {
           </Link>
 
         </div>
+
+        {/* Notes — review a wrong answer with Hugh (personal utility) */}
+        <Link
+          href="/notes"
+          className="group flex w-full max-w-2xl shrink-0 items-center gap-3 rounded-xl border border-slate-700/70 bg-slate-900/40 px-4 py-3 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-rose-400/50 hover:bg-slate-900/60"
+        >
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-500/15 text-rose-400 transition-transform duration-300 group-hover:scale-110">
+            <NotebookPen size={18} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-slate-100">Notes</p>
+            <p className="truncate text-xs text-slate-500">
+              Drop a screenshot of a question you got wrong, jot your thinking, and let Hugh correct it.
+            </p>
+          </div>
+          <span className="shrink-0 text-xs font-semibold text-rose-400 transition-all group-hover:text-rose-300">
+            Open →
+          </span>
+        </Link>
       </main>
     </div>
   );

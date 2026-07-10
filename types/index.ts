@@ -186,3 +186,60 @@ export interface MilestoneEntry {
 export interface TrackWithStats extends Track {
   milestones: Pick<Milestone, 'id' | 'kanban_column'>[];
 }
+
+// ── Notes workspace ───────────────────────────────────────────────────────
+// Screenshot-driven learning notes with a per-note Coach chat. Mirrors the
+// tables in migration 027_notes.sql. All personal (one owner per row).
+
+// A tree branch — e.g. "GCP Data Engineer".
+export interface Notebook {
+  id:         string;
+  user_id:    string;
+  title:      string;
+  position:   number;
+  created_at: string;
+  updated_at: string;
+}
+
+// A leaf under a notebook — "Untitled" until renamed.
+export interface Note {
+  id:          string;
+  user_id:     string;
+  notebook_id: string;
+  title:       string;
+  position:    number;
+  created_at:  string;
+  updated_at:  string;
+}
+
+// An uploaded screenshot. `title` is a renameable label (default "Screenshot N").
+// `url` is a short-lived signed URL the API resolves at read time from
+// `storage_path`; it is never persisted.
+export interface NoteImage {
+  id:           string;
+  note_id:      string;
+  title:        string;
+  storage_path: string;
+  mime:         string;
+  created_at:   string;
+  url:          string | null;
+}
+
+// One line in a screenshot's chat thread. `user` = the learner's own thoughts,
+// `assistant` = Hugh's correction. Each message is tagged to the screenshot it's
+// about via `image_id` (threads are per screenshot, not per note).
+export type NoteMessageRole = 'user' | 'assistant';
+
+export interface NoteMessage {
+  id:         string;
+  note_id:    string;
+  image_id:   string | null;
+  role:       NoteMessageRole;
+  content:    string;
+  created_at: string;
+}
+
+// The tree the workspace loads on entry: notebooks each with their leaf notes.
+export interface NotebookWithNotes extends Notebook {
+  notes: Note[];
+}

@@ -103,6 +103,8 @@ IDLE → PLAYING_QUESTION → READY → RECORDING → REVIEWING → SUBMITTING �
 ### 4. No scroll on any screen
 Every screen must fit within the viewport height. Use `h-screen`, flex column layouts, and `min-h-0` on flex children to prevent overflow. If content risks overflowing, reduce padding or font sizes — never add scroll.
 
+**Exception — the Notes workspace (`/notes`).** Notes is a document-style tool for reviewing long screenshots and coaching threads, so its three panes (tree · screenshots · thread) each scroll *internally* while the page itself stays locked to the viewport (`h-screen`, no page scroll). This is the only screen permitted to scroll inside its panes.
+
 ### 5. Buttons appear only after audio finishes
 On the question screen, "Show Best Answer" and "I'm Ready" only render when state is `READY` (audio playback complete). This is enforced in `useAudioPlayer` via an `onEnded` callback that transitions state.
 
