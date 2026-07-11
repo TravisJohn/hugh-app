@@ -12,7 +12,7 @@ import {
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { Components } from "react-markdown";
+import { summaryMarkdownComponents, downloadMarkdown } from "@/lib/tracker/summaryMarkdown";
 import {
   type Milestone, type MilestoneEntry, type LearningPoint, type PointStatus,
   type MilestoneCoverage, KANBAN_COLUMN_LABELS,
@@ -20,20 +20,6 @@ import {
 import { normalizeCoverage, countByStatus } from "@/utils/coverage";
 import PointStatusControl from "@/components/learn/PointStatusControl";
 import PointTagSelect from "@/components/learn/PointTagSelect";
-
-// Compact markdown styling for the in-drawer summary document.
-const summaryMarkdownComponents: Components = {
-  h1: ({ children }) => <h1 className="mb-2 text-base font-bold text-slate-100">{children}</h1>,
-  h2: ({ children }) => <h2 className="mt-3 mb-1.5 text-xs font-bold uppercase tracking-widest text-green-400/80">{children}</h2>,
-  h3: ({ children }) => <h3 className="mt-2 mb-1 text-sm font-semibold text-slate-200">{children}</h3>,
-  p:  ({ children }) => <p className="mb-2 text-sm leading-relaxed text-slate-300">{children}</p>,
-  ul: ({ children }) => <ul className="mb-2 ml-4 list-disc space-y-1">{children}</ul>,
-  ol: ({ children }) => <ol className="mb-2 ml-4 list-decimal space-y-1">{children}</ol>,
-  li: ({ children }) => <li className="text-sm leading-snug text-slate-300">{children}</li>,
-  strong: ({ children }) => <strong className="font-semibold text-slate-100">{children}</strong>,
-  em: ({ children }) => <em className="italic text-slate-400">{children}</em>,
-  hr: () => <hr className="my-3 border-slate-700/60" />,
-};
 
 interface Props {
   milestone:        Milestone | null;
@@ -364,16 +350,7 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
 
   function downloadSummary() {
     if (!summaryDoc || !milestone) return;
-    const slug = milestone.title.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase();
-    const blob = new Blob([summaryDoc], { type: "text/markdown;charset=utf-8" });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement("a");
-    a.href     = url;
-    a.download = `${slug || "milestone"}-summary.md`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    downloadMarkdown(milestone.title, summaryDoc);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {

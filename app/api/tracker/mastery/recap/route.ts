@@ -1,0 +1,94 @@
+import { type NextRequest, NextResponse } from "next/server";
+import Anthropic from "@anthropic-ai/sdk";
+import { createClient } from "@/lib/supabase/server";
+import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
+import { checkUsageAllowed, logUsage } from "@/lib/usage";
+import type { MasteryTranscriptTurn } from "@/types";
+import { masteryRecapPrompt } from "@/lib/claude/prompts";
+
+export const dynamic = "force-dynamic";
+
+// Guided Reflection recap (Phase 30 — UNMARKED). After an ungraded reflection
+// conversation, Hugh writes a short, warm recap of what the learner talked
+// through. There is NO score and NO pass/fail — this route never touches
+// mastery_validated or mastery_score. Cheap route → Haiku.
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+const MAX_TURNS = 40;
+const MAX_TURN_CHARS = 4_000;
+
+function sanitizeTranscript(input: unknown): MasteryTranscriptTurn[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .filter((t): t is { role: unknown; text: unknown } => typeof t === "object" && t !== null)
+    .map((t) => ({
+      role: t.role === "coach" ? ("coach" as const) : ("learner" as const),
+      text: typeof t.text === "string" ? t.text.slice(0, MAX_TURN_CHARS) : "",
+    }))
+    .filter((t) => t.text.trim().length > 0)
+    .slice(0, MAX_TURNS);
+}
+
+export async function POST(request: NextRequest) {
+  const userId = await getAuthenticatedUserId(request);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { allowed, reason } = await checkUsageAllowed(userId);
+  if (!allowed) {
+    const msg = reason === "limit_reached"
+      ? "Monthly usage limit reached."
+      : "Your access has been restricted.";
+    return NextResponse.json({ error: msg }, { status: reason === "limit_reached" ? 429 : 403 });
+  }
+
+  const body = (await request.json()) as { milestoneId?: string; transcript?: unknown };
+  const { milestoneId } = body;
+  if (!milestoneId) {
+    return NextResponse.json({ error: "milestoneId is required" }, { status: 400 });
+  }
+
+  const transcript = sanitizeTranscript(body.transcript);
+
+  const supabase = await createClient();
+
+  // Ownership + title for the recap prompt.
+  const { data: milestone } = await supabase
+    .from("milestones")
+    .select("id, title, tracks!track_id!inner(user_id)")
+    .eq("id", milestoneId)
+    .single();
+
+  const owner = (milestone as unknown as { tracks?: { user_id: string } } | null)?.tracks?.user_id;
+  if (!milestone || owner !== userId) {
+    return NextResponse.json({ error: "Milestone not found" }, { status: 404 });
+  }
+
+  const prompt = masteryRecapPrompt({
+    milestoneTitle: (milestone as { title: string }).title,
+    transcript,
+  });
+
+  try {
+    const completion = await anthropic.messages.create({
+      model:      "claude-haiku-4-5", // short, low-stakes generation
+      max_tokens: 300,
+      messages:   [{ role: "user", content: prompt }],
+    });
+    const recap = completion.content[0]?.type === "text" ? completion.content[0].text.trim() : "";
+    void logUsage({
+      userId,
+      feature:   "mastery/recap",
+      tokensIn:  completion.usage.input_tokens,
+      tokensOut: completion.usage.output_tokens,
+    });
+
+    if (!recap) {
+      return NextResponse.json({ error: "Could not produce a recap." }, { status: 502 });
+    }
+    return NextResponse.json({ recap });
+  } catch (err) {
+    console.error("[mastery/recap] Anthropic error:", err);
+    return NextResponse.json({ error: "Failed to write the recap." }, { status: 502 });
+  }
+}

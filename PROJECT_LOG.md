@@ -1741,3 +1741,135 @@ Travis wanted a per-conversation summary, reachable from the top-right corner of
 - **Model / key:** uses the **same `OPENAI_API_KEY`** as the Coach, but the thread is text-only so it runs **`gpt-4o-mini`** (cheap, no vision, no Storage read) vs the Coach's `gpt-4o`. Same per-request-client + graceful-503 pattern.
 - **Note on providers:** the Notes feature is the one corner of Hugh on **OpenAI** (Coach `gpt-4o` + this summary `gpt-4o-mini`); the rest of the app is Anthropic Claude. Both Notes AI routes read `OPENAI_API_KEY`.
 - **Verified:** `tsc` clean, ESLint clean, unit tests green (14). Needs a browser check of the summarize round-trip (real OpenAI call not verifiable headlessly).
+
+## Phase 29 — Realtime "Prove Your Mastery" coach 🎙️
+Branch `feat/mastery-realtime` (off `main`). Redesign the mastery session
+(`/mastery/[milestoneId]`) from a scripted 3-exchange loop (Anthropic script →
+ElevenLabs TTS → Web Speech → manual "Done talking" button) into a **continuous,
+low-latency OpenAI Realtime spoken conversation** — no per-turn scripts, no button.
+
+**Env var added:** `MASTERY_REALTIME_ENABLED` (server-side, default `false`).
+Reuses `OPENAI_API_KEY`. NOTE: `.env.example` is gitignored (`.env*`), so this
+PROJECT_LOG entry is the committed record of the flag.
+
+**Architecture (app is the source of truth):**
+- The Realtime coach CONDUCTS the discussion — `create_response:true` (the deliberate
+  inverse of the parked interview flow): it drives adaptive follow-ups based on what
+  the learner actually said, allows barge-in, one question at a time.
+- The coach owns NO state: it never scores and never announces pass/fail. It signals
+  completion only via a `conclude_assessment` tool (idempotent — first call wins; any
+  fabricated score in the args is ignored). App-enforced hard caps (max follow-ups /
+  duration / inactivity) are the backstop; `user_ended` when the learner ends.
+- **Grounded final scoring stays on Anthropic Sonnet** (`/api/tracker/mastery/evaluate`),
+  which re-derives the AUTHORITATIVE criteria server-side (never trusts the client),
+  scores only what's in the transcript, and returns a **schema-validated** versioned
+  result. Malformed model output is rejected, never persisted.
+- **Criteria = card learning_points + summary** (authoritative) + **diary as capped,
+  clearly-labelled supporting context** (never authoritative, `MAX_DIARY_CHARS`).
+
+**Persistence (no migration):** the versioned `MasteryResultV1` JSON is stored in the
+existing `milestones.mastery_feedback` (TEXT — ample); `mastery_score` holds the number,
+`mastery_validated` the pass flag. Only concise fields + short grounded evidence excerpts
+are stored — the full transcript is NOT persisted (no schema support, and by design).
+Old records stay compatible: `parseStoredMasteryFeedback` reads plain-text, malformed
+JSON, and versioned JSON without breaking.
+
+**Files created:** `lib/mastery/{realtimeConfig,criteria,masteryInstructions,result,caps,realtimeSession}.ts`
+(+ criteria/masteryInstructions/result/realtimeSession tests), `hooks/useMasteryRealtime.ts`,
+`app/api/tracker/mastery/realtime-session/route.ts`, `app/api/tracker/mastery/evaluate/route.ts`,
+`app/mastery/[milestoneId]/MasteryRealtimeClient.tsx`.
+**Files changed:** `app/mastery/[milestoneId]/page.tsx` (flag branch + `?classic=1` escape hatch),
+`types/index.ts`, `.env.example` (local only), `PROJECT_LOG.md`. **Old `MasteryClient.tsx`
+untouched** — the scripted flow is the flag-off fallback and the intentional `?classic=1` mode.
+
+**Safeguards:** versioned JSON; defensive UI parse; idempotent conclusion; stale-event guard;
+end-reason passed to the evaluator; schema-validated output; transcript-grounded evidence;
+NO silent fallback mid-session (error + Retry + explicit classic-mode link).
+
+**Still on Anthropic:** all mastery scoring (Sonnet). **Still on ElevenLabs + Web Speech:**
+the classic scripted flow (unchanged). **Verified:** tsc/ESLint clean, 30 unit tests green,
+build + secret scan (below). **Not yet done:** live browser run with the flag on + a real
+OPENAI_API_KEY (WebRTC/audio/barge-in can't be exercised headlessly).
+
+## Phase 30 — Mastery reinvented as a "Guided Reflection Session" (UNMARKED) 🪞
+Branch `feat/mastery-realtime` (continues Phase 29). The Realtime voice mechanism
+(Phase 29) was loved; the *structure* (rubric-probe → grounded Sonnet score →
+pass/fail → `mastery_validated`) didn't fit how the learner actually wants to use it.
+This phase keeps the live OpenAI voice and **removes the grading entirely** while the
+new shape is tested.
+
+**PRD**
+- **Goal:** an ungraded, guided reflection conversation. Opening `/mastery/[id]` shows a
+  markdown **summary of everything discussed under that card** (key ideas highlighted) in
+  a right-hand panel that stays on screen to *guide* the talk. The live coach opens the
+  floor for the learner's **spoken reflection** and drives every follow-up from what they
+  actually say — grounded in that same summary. No score, no pass/fail.
+- **Core features:** (1) guiding summary panel — reuses the existing `summary_doc`, generates
+  it only if missing; (2) live guided coach grounded in the summary, seeded by the spoken
+  first-turn reflection; (3) summary is **editable in-place AND regenerable by Hugh** (gaps
+  the learner finds); (4) unmarked end → short non-judgmental AI **recap** + download markdown
+  + back to board + optional "send card to review". Summary persists across the review round-trip.
+- **Out of scope for this test:** scoring, pass/fail, `mastery_validated` changes, the
+  `/evaluate` route (left in place but no longer called from the realtime flow).
+- **Success:** open a mastered card → clean highlighted summary → talk it through with the
+  coach following the reflection → edit/regenerate/download the summary → finish with a
+  friendly recap. Zero grading anywhere.
+
+**Architecture (reuse the Phase-29 plumbing; change framing + layout + ending)**
+- **Kept as-is:** `realtimeSession.ts` (WebRTC transport), `realtimeConfig.ts` caps,
+  `useMasteryRealtime` transport/timers, the ephemeral-secret mint pattern. The transport's
+  `conclude_assessment` branches go dormant (the tool is no longer minted) — harmless.
+- **Coach:** new `buildGuidedCoachInstructions()` — frames a guided reflection (not an
+  assessment), embeds `summary_doc` as the shared on-screen reference, opens by inviting the
+  learner's own reflection, follows what they say, **no scoring / no conclude tool**. Session
+  ends via `user_ended` / caps / inactivity.
+- **Summary:** reuses `POST /api/tracker/milestones/[id]/summary` (generate/regenerate) +
+  new `PUT` (persist a hand-edited doc). Reuse-if-present: `page.tsx` passes `summary_doc`;
+  the client generates only when it's missing.
+- **Recap:** new `POST /api/tracker/mastery/recap` — transcript → short friendly recap
+  (Haiku, no schema, no score).
+- **Review round-trip:** reuses the existing column PATCH + `review_validated` (migration 011).
+  `summary_doc` already lives on the milestone row, so it persists across the round-trip.
+  **No new migration.**
+- **Rule-4 exception (approved):** the right-hand summary panel scrolls internally, like the
+  `/notes` panes. Mid-session the panel is read-only reference; edit/regenerate happen from the
+  intro and recap screens (avoids re-injecting a changed doc into the live coach mid-stream).
+- **DRY:** `summaryMarkdownComponents` + markdown-download extracted to `lib/tracker/summaryMarkdown.tsx`,
+  shared by `MilestoneDrawer` and the mastery client.
+
+**Files created:** `lib/tracker/summaryMarkdown.tsx`, `app/mastery/[milestoneId]/SummaryPanel.tsx`,
+`app/api/tracker/mastery/recap/route.ts`, `lib/claude/masteryRecap.test.ts`, `vitest.config.ts`
+(minimal `@/*` alias — value-imports of `@/…` never resolved in tests before; only type-only did).
+**Files changed:** `masteryInstructions.ts` (+`buildGuidedCoachInstructions` + tests),
+`realtime-session/route.ts` (guided instructions from `summary_doc`; dropped the conclude tool),
+`milestones/[id]/summary/route.ts` (+`PUT` to save a hand-edited doc), `lib/claude/prompts.ts`
+(+`masteryRecapPrompt`), `realtimeConfig.ts` (looser cost-only caps: 15 min / 24 turns / 120 s),
+`MasteryRealtimeClient.tsx` (rewritten two-pane, unmarked), `page.tsx` (passes `summary_doc`),
+`MilestoneDrawer.tsx` (uses the shared helper). **Untouched:** `MasteryClient.tsx` (classic
+`?classic=1` fallback), `realtimeSession.ts` (conclude branches now dormant — harmless),
+`evaluate/route.ts` + `MasteryResultV1` (parked, no longer called from the realtime flow).
+
+**Verified:** tsc clean, ESLint clean, Vitest green for the touched suites (mastery + recap;
+the 6 pre-existing `lib/code/packs.test.ts` failures are unrelated — SQL-pack content, reproduce
+without any of these changes), `next build` compiles successfully with all three mastery routes
+registered. **Not yet done:** live browser run with `MASTERY_REALTIME_ENABLED=true` + a real
+`OPENAI_API_KEY` (WebRTC/audio + the two-pane live layout can't be exercised headlessly).
+
+**Status:** BUILT + browser-confirmed working (2026-07-11).
+
+**Refinement pass (2026-07-11, after first live run):**
+- **Noise robustness:** replaced the default `server_vad` with a tuned `TURN_DETECTION`
+  (threshold 0.6, `silence_duration_ms` 900, `prefix_padding_ms` 300, `interrupt_response: false`)
+  so ambient noise no longer registers as speech or barges in on the coach, and a thinking
+  pause isn't cut off. Single source in `realtimeConfig.ts`, echoed to the client via the
+  credentials payload so `realtimeSession.onDataChannelOpen` re-asserts the identical config.
+- **No live transcript:** the scrolling turn-by-turn transcript is gone from the live screen —
+  it was distracting and mis-rendered other languages, and made the learner feel rushed. The
+  live view is now a calm breathing "orb" + status label; the transcript is still captured
+  silently and feeds the end recap. Transcription language pinned to `en` (`TRANSCRIPTION_LANGUAGE`)
+  so it stops guessing other languages. New `MasteryTurnDetection` type; `LiveOrb` component.
+- Follow-up tweak (same day): kept barge-in ON (`interrupt_response: true`) for the natural
+  conversational feel Travis preferred, and raised `threshold` 0.6 → **0.75** so the high VAD
+  threshold — not disabling barge-in — is what stops background noise from triggering it.
+- Tradeoffs noted: language is pinned to English (one-line change in `realtimeConfig.ts` if ever
+  multilingual). tsc/ESLint/Vitest/build all green.

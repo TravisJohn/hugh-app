@@ -114,3 +114,54 @@ export async function POST(
     return NextResponse.json({ error: "Failed to generate summary" }, { status: 502 });
   }
 }
+
+// PUT: persist a learner-EDITED summary document (Phase 30 — the Guided Reflection
+// panel lets the learner hand-edit the summary when they spot a gap). No LLM call;
+// this simply saves the provided markdown as the new summary_doc.
+const MAX_SUMMARY_CHARS = 20_000;
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const userId = await getAuthenticatedUserId(request);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id } = await params;
+  const body = (await request.json().catch(() => ({}))) as { summaryDoc?: unknown };
+  const doc = typeof body.summaryDoc === "string" ? body.summaryDoc.trim() : "";
+
+  if (!doc) {
+    return NextResponse.json({ error: "summaryDoc is required" }, { status: 400 });
+  }
+  if (doc.length > MAX_SUMMARY_CHARS) {
+    return NextResponse.json({ error: "Summary is too long" }, { status: 413 });
+  }
+
+  const supabase = await createClient();
+
+  // Ownership check via the parent track.
+  const { data: ms } = await supabase
+    .from("milestones")
+    .select("id, tracks!track_id!inner(user_id)")
+    .eq("id", id)
+    .single();
+
+  const owner = (ms as unknown as { tracks?: { user_id: string } } | null)?.tracks?.user_id;
+  if (!ms || owner !== userId) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const generatedAt = new Date().toISOString();
+  const { error } = await supabase
+    .from("milestones")
+    .update({ summary_doc: doc, summary_doc_at: generatedAt })
+    .eq("id", id);
+
+  if (error) {
+    console.error("[tracker/summary PUT] DB error:", error.message);
+    return NextResponse.json({ error: "Failed to save summary" }, { status: 500 });
+  }
+
+  return NextResponse.json({ summaryDoc: doc, generatedAt });
+}
