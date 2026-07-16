@@ -6,7 +6,7 @@ import "server-only";
 // and the coarse caps it needs to enforce client-side.
 
 // Speech-to-speech model that CONDUCTS the mastery conversation.
-export const REALTIME_MODEL = "gpt-realtime";
+export const REALTIME_MODEL = "gpt-realtime-mini";
 
 // Explicit transcription model for the learner's speech (never a default) so the
 // transcript that feeds the recap is deterministic. Transcription still runs, but

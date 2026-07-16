@@ -38,6 +38,11 @@ const DRIFT_STREAK   = 2;   // consecutive off-topic turns before the drift nudg
 const LENGTH_CAP     = 10;  // user messages before the soft "long session" backstop
 const OFFER_COOLDOWN = 4;   // user messages to stay quiet after a "keep chatting"
 
+// Assistant turns without a fresh snippet before the "Mirror this snippet" button
+// politely closes — otherwise it lingers pointing at a snippet several exchanges
+// back once the chat has moved on to something else non-code.
+const MIRROR_OFFER_EXPIRY = 3;
+
 const WELCOME = (topic: string) =>
   `Hi! I'm Hugh, and I'm here to help you learn about **${topic}**. Ask me anything — concepts, examples, how things work, or where to start.`;
 
@@ -54,6 +59,7 @@ export default function ChatWindow({ topic, goalId, milestoneId, milestoneTitle,
   // mirrored (drives the "Mirror this snippet" button — offer-first, never an
   // automatic flip). `codeMode` swaps the composer for the CodeMirror editor.
   const [offer, setOffer]         = useState<string | null>(null);
+  const [offerAge, setOfferAge]   = useState(0); // assistant turns since offer, w/o a fresh snippet
   const [codeMode, setCodeMode]   = useState(false);
   const [codeLang, setCodeLang]   = useState("python");
   const [codeDraft, setCodeDraft] = useState("");
@@ -160,8 +166,18 @@ export default function ChatWindow({ topic, goalId, milestoneId, milestoneTitle,
       setIsOffTrack(offTopic);
 
       // Snippet attached → offer the mirror step (offer-first, not auto-switch).
+      // Otherwise, if an offer is still pending, age it out once the conversation
+      // has moved on for a few turns — see MIRROR_OFFER_EXPIRY.
       if (data.codeExample) {
         setOffer(data.codeExample.language || "python");
+        setOfferAge(0);
+      } else if (offer) {
+        if (offerAge + 1 >= MIRROR_OFFER_EXPIRY) {
+          setOffer(null);
+          setOfferAge(0);
+        } else {
+          setOfferAge(offerAge + 1);
+        }
       }
 
       // Track consecutive off-topic turns so drift can trigger the wrap-up nudge.
@@ -215,6 +231,7 @@ export default function ChatWindow({ topic, goalId, milestoneId, milestoneTitle,
     setCodeMode(false);
     setCodeDraft("");
     setOffer(null);
+    setOfferAge(0);
     void postMessage(content, false);
   }
 
@@ -229,6 +246,7 @@ export default function ChatWindow({ topic, goalId, milestoneId, milestoneTitle,
   // from a blank editor; language defaults to Python but is theirs to switch.
   function openCodeAuthoring() {
     setOffer(null);
+    setOfferAge(0);
     setCodeAuthoring(true);
     setCodeLang("python");
     setCodeDraft("");

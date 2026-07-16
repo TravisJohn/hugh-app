@@ -149,7 +149,7 @@ export default function NoteThread({
 
             {coaching && (
               <div className="flex items-center gap-2 pl-1 text-xs text-violet-400">
-                <Loader2 size={14} className="animate-spin" /> Hugh is reading your screenshot…
+                <Loader2 size={14} className="animate-spin" /> Hugh is reading the screenshot and your thoughts…
               </div>
             )}
           </div>
@@ -184,6 +184,10 @@ export default function NoteThread({
                 Coach
               </button>
             </div>
+            <p className="mt-2 text-[11px] leading-relaxed text-slate-600">
+              Build your thoughts first, then ask Hugh for a Coach — he reads the
+              screenshot together with everything you&apos;ve written here to spot the gap.
+            </p>
           </div>
         </>
       )}

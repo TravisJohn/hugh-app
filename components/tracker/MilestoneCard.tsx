@@ -45,7 +45,10 @@ export default function MilestoneCard({
   const showStopSign = needsReview || needsMastery;
 
   // Auto mode shows Hugh's guidance badge; Manual mode shows reorder arrows.
-  const showBadge  = priorityMode === "auto"   && priorityRank != null;
+  // Both are backlog-only concepts — a card keeps its priority_rank after
+  // leaving the backlog, so without the isBacklog check it would still show
+  // the badge in review/done, stacking on top of the unverified stop sign.
+  const showBadge  = priorityMode === "auto"   && priorityRank != null && !!isBacklog;
   const showArrows = priorityMode === "manual" && !!isBacklog;
 
   // Self-assessment summary surfaced top-right — even in review/done columns the

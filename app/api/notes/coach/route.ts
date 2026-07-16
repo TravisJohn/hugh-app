@@ -68,6 +68,14 @@ export async function POST(request: NextRequest) {
       max_tokens: 1024,
       messages,
     });
+    // Visibility into OpenAI's automatic prompt caching (no code lever to pull —
+    // it kicks in on its own once the shared system+image prefix clears ~1024
+    // tokens). Cheap to leave in: one log line, no impact on the response.
+    console.log(
+      `[notes/coach] prompt_tokens=${res.usage?.prompt_tokens ?? "?"} ` +
+      `cached_tokens=${res.usage?.prompt_tokens_details?.cached_tokens ?? 0}`,
+    );
+
     const reply = res.choices[0]?.message?.content?.trim();
     if (!reply) {
       return NextResponse.json({ error: "The Coach couldn't respond just now. Try again." }, { status: 502 });
