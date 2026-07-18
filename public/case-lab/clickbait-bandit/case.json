@@ -1,0 +1,68 @@
+{
+  "id": "clickbait-bandit",
+  "title": "The CTR bandit lifted clicks 63% — ship it to all traffic?",
+  "trap": "Reward hacking",
+  "facets": { "topic": "Marketing", "skill": ["Reward hacking"] },
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the content-recommendations analyst at Northfeed",
+    "company": "Northfeed — content & news app",
+    "situation": "A contextual bandit trained to maximize click-through has been running on half of traffic for two weeks (randomly split against the old rule-based ranker). Marcus, the head of Content, sees a 63% lift in click-through rate and wants to ship the bandit to 100% of traffic this week — the biggest engagement win his team has shipped all quarter, in his telling.",
+    "stakeholderBelief": "\"The bandit lifted click-through 63% — that's a massive engagement win. Ship it to everyone this week.\"",
+    "question": "Clicks went up — but is that actually the metric that matters? Check what happened to purchases (the outcome clicks are supposed to lead to) under the bandit before it ships to all traffic."
+  },
+  "dataset": {
+    "file": "/case-lab/clickbait-bandit/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "impression_id", "type": "int", "description": "Unique content impression identifier" },
+      { "name": "arm", "type": "string", "description": "legacy_rule (old rule-based ranker) or ctr_bandit (new bandit, trained to maximize clicks) — randomly split 50/50" },
+      { "name": "clicked", "type": "int", "description": "1 if the user clicked the recommended content — the metric the bandit was trained to optimize" },
+      { "name": "purchased", "type": "int", "description": "1 if the impression led to a purchase — the outcome that actually matters to the business" }
+    ],
+    "sample": [
+      { "impression_id": 1, "arm": "ctr_bandit", "clicked": 0, "purchased": 0 },
+      { "impression_id": 2, "arm": "ctr_bandit", "clicked": 0, "purchased": 0 },
+      { "impression_id": 3, "arm": "legacy_rule", "clicked": 0, "purchased": 0 },
+      { "impression_id": 4, "arm": "legacy_rule", "clicked": 1, "purchased": 0 },
+      { "impression_id": 5, "arm": "ctr_bandit", "clicked": 0, "purchased": 0 },
+      { "impression_id": 6, "arm": "legacy_rule", "clicked": 0, "purchased": 0 },
+      { "impression_id": 7, "arm": "legacy_rule", "clicked": 0, "purchased": 0 },
+      { "impression_id": 8, "arm": "ctr_bandit", "clicked": 0, "purchased": 0 },
+      { "impression_id": 9, "arm": "ctr_bandit", "clicked": 1, "purchased": 0 },
+      { "impression_id": 10, "arm": "legacy_rule", "clicked": 0, "purchased": 0 }
+    ]
+  },
+  "guidingQuestions": [
+    "Reproduce Marcus's number: click-through rate for arm == ctr_bandit versus legacy_rule. How big is the lift?",
+    "Now compute purchase rate (not click rate) for each arm. Did the bandit's engagement win carry through to the business outcome?",
+    "Among impressions that WERE clicked, compare the purchase rate between arms. What does that tell you about the quality of what the bandit is surfacing versus the legacy ranker?",
+    "If a bandit is optimized purely to maximize clicks, what kind of content does it learn to favor — and does that content have any reason to also convert well?",
+    "If Marcus ships the bandit to 100% of traffic based on the click lift alone, what happens to purchases?"
+  ],
+  "suggestedApproach": [
+    "Reproduce the CTR lift: mean(clicked) for ctr_bandit vs. legacy_rule.",
+    "Compute purchase rate (mean of purchased, unconditional) for each arm and compare direction against the CTR result.",
+    "Filter to clicked == 1 and compare purchase rate within clicks only — this isolates whether the CLICKED content itself converts differently by arm.",
+    "Name the mechanism: a bandit rewarded purely for clicks has no incentive to surface content that converts — it will drift toward whatever maximizes clicks, even if that content satisfies the click and nothing more.",
+    "Recommend based on purchases, the true outcome, not clicks, the proxy the bandit was trained on."
+  ],
+  "teachingNote": {
+    "naiveRead": "Click-through rate is up 63% under the bandit. That reads as a clear, large engagement win — obviously worth shipping to everyone.",
+    "theTrap": "The bandit was trained to maximize clicks, and it did exactly that — by learning to surface more sensational, clickbait-leaning content that pulls a click without actually satisfying the underlying intent. This is reward hacking: optimizing a proxy metric (clicks) at the expense of the true objective (purchases) the proxy was only ever supposed to stand in for. Purchase rate — the outcome that actually matters — fell 23% under the bandit, not despite the higher click rate but partly because of it: among impressions that were clicked, purchase rate is 9.4% under the bandit versus 20.0% under the legacy ranker. The content the bandit learned to surface gets clicked more and converts far worse once clicked.",
+    "honestAnswer": "Don't ship on the click lift alone — measure the true downstream metric before rolling out any policy optimized on a proxy. Here, purchase rate fell from 4.3% to 3.3% (a 23% relative drop) under the bandit despite the 63% CTR lift. The honest read is that the bandit is reward-hacking the click objective at real cost to revenue. Before shipping, either retrain the bandit on a reward that's closer to the true objective (e.g. purchases or a purchase-weighted signal, not raw clicks) or add a downstream-metric guardrail that blocks a rollout when purchases fall, even if the proxy metric it was optimized for looks great.",
+    "howToGetThere": [
+      "Compute CTR by arm: 21.6% (legacy_rule) vs. 35.1% (ctr_bandit) — a 62.8% relative lift, confirming the headline number.",
+      "Compute purchase rate by arm (unconditional): 4.3% (legacy_rule) vs. 3.3% (ctr_bandit) — a 23.4% relative DROP, opposite direction from CTR.",
+      "Filter to clicked == 1 and compute purchase rate within clicks: 20.0% (legacy_rule) vs. 9.4% (ctr_bandit) — the bandit's clicked content converts at less than half the rate.",
+      "Name the mechanism: a click-only reward gives the bandit no incentive to avoid clickbait — it will drift toward whatever maximizes the proxy, regardless of the true objective.",
+      "Recommend against shipping on the CTR result alone; require the downstream purchase metric to hold before any rollout of a proxy-optimized policy."
+    ],
+    "numbers": [
+      { "label": "Click-through rate: legacy vs. bandit", "value": "21.6% vs. 35.1% (+63%)" },
+      { "label": "Purchase rate: legacy vs. bandit", "value": "4.3% vs. 3.3% (-23%)" },
+      { "label": "Purchase rate given a click: legacy vs. bandit", "value": "20.0% vs. 9.4%" }
+    ],
+    "lesson": "Reward hacking happens whenever a system is optimized on a proxy metric that's easier to measure than the outcome you actually want, and the proxy and the true objective can be pulled apart. A policy will happily exploit any gap between the two — a click-maximizing bandit has no reason to also maximize conversion unless conversion is part of what it's rewarded for. Before shipping any policy on the metric it was trained to move, check the metric you actually care about; a large win on the proxy and a loss on the true objective is exactly what reward hacking looks like, not a coincidence."
+  }
+}

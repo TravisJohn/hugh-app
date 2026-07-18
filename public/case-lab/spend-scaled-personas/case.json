@@ -1,0 +1,73 @@
+{
+  "id": "spend-scaled-personas",
+  "title": "K-means found 4 shopper personas — build campaigns around them?",
+  "trap": "Feature scaling in clustering",
+  "facets": { "topic": "Retail", "skill": ["Feature scaling in clustering"] },
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the lifecycle analyst at Willowmere",
+    "company": "Willowmere — DTC home & lifestyle retailer",
+    "situation": "Priya, the CRM lead, ran k-means on the customer table — visit frequency, session depth, and total spend — and got a clean 4-cluster split. She's named them (\"Whales\", \"Regulars\", \"Occasionals\", \"Window Shoppers\") and wants to build four distinct lifecycle campaigns around the personas before next month's send calendar locks.",
+    "stakeholderBelief": "\"The clustering found 4 real shopper personas with different behavior patterns. Let's build a distinct campaign for each — different messaging, different cadence, different offer.\"",
+    "question": "Do these 4 clusters actually represent different shopping *behaviors* worth different messaging — or are they just a dollar-amount split dressed up as personas? Check what's really separating the clusters before four campaigns get built around them."
+  },
+  "dataset": {
+    "file": "/case-lab/spend-scaled-personas/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "customer_id", "type": "int", "description": "Unique customer identifier" },
+      { "name": "channel", "type": "string", "description": "paid, organic, or referral — acquisition channel (not used in clustering, for context)" },
+      { "name": "visit_frequency", "type": "float", "description": "Average site visits per month" },
+      { "name": "session_depth", "type": "float", "description": "Average pages viewed per session" },
+      { "name": "total_spend", "type": "float", "description": "Lifetime spend in dollars" },
+      { "name": "naive_cluster", "type": "int", "description": "Priya's cluster label (0-3) — k-means(k=4) run directly on the raw visit_frequency/session_depth/total_spend columns, no scaling" },
+      { "name": "honest_cluster", "type": "int", "description": "K-means run on the same 3 features after standardizing each to mean 0 / unit variance, with k chosen by silhouette score" }
+    ],
+    "sample": [
+      { "customer_id": 1, "channel": "organic", "visit_frequency": 6.7, "session_depth": 9.5, "total_spend": 56.59, "naive_cluster": 0, "honest_cluster": 2 },
+      { "customer_id": 2, "channel": "paid", "visit_frequency": 11.0, "session_depth": 3.7, "total_spend": 126.68, "naive_cluster": 0, "honest_cluster": 0 },
+      { "customer_id": 3, "channel": "organic", "visit_frequency": 5.0, "session_depth": 10.6, "total_spend": 33.2, "naive_cluster": 0, "honest_cluster": 2 },
+      { "customer_id": 4, "channel": "organic", "visit_frequency": 4.4, "session_depth": 10.6, "total_spend": 49.45, "naive_cluster": 0, "honest_cluster": 2 },
+      { "customer_id": 5, "channel": "organic", "visit_frequency": 11.5, "session_depth": 2.5, "total_spend": 179.38, "naive_cluster": 0, "honest_cluster": 0 },
+      { "customer_id": 6, "channel": "organic", "visit_frequency": 6.1, "session_depth": 10.7, "total_spend": 166.66, "naive_cluster": 0, "honest_cluster": 2 },
+      { "customer_id": 7, "channel": "paid", "visit_frequency": 1.0, "session_depth": 8.4, "total_spend": 38.73, "naive_cluster": 0, "honest_cluster": 2 },
+      { "customer_id": 8, "channel": "organic", "visit_frequency": 5.2, "session_depth": 9.4, "total_spend": 92.94, "naive_cluster": 0, "honest_cluster": 2 },
+      { "customer_id": 9, "channel": "referral", "visit_frequency": 13.8, "session_depth": 3.4, "total_spend": 32.97, "naive_cluster": 0, "honest_cluster": 0 },
+      { "customer_id": 10, "channel": "organic", "visit_frequency": 10.6, "session_depth": 1.5, "total_spend": 70.83, "naive_cluster": 0, "honest_cluster": 0 }
+    ]
+  },
+  "guidingQuestions": [
+    "Profile Priya's 4 clusters (naive_cluster): mean visit_frequency, session_depth, and total_spend in each. What actually separates cluster 0 from cluster 3?",
+    "Compare the spread (standard deviation) of total_spend against visit_frequency and session_depth. Which column has the biggest numbers, and could that alone decide who ends up in which cluster under plain Euclidean distance?",
+    "Within each naive cluster, how much does visit_frequency or session_depth actually vary? If they're nearly identical across all 4 clusters, what is the clustering really keying on?",
+    "Standardize the three features yourself (or use honest_cluster, already run that way) and re-profile. Does a genuine behavioral split appear that wasn't visible in the naive clusters?",
+    "If the four personas are really just a spend split, what does Priya's plan — four different behavioral campaigns — actually buy her over a much simpler high/low spend cut?"
+  ],
+  "suggestedApproach": [
+    "Group by naive_cluster and compute the mean of all three features per cluster — look for which feature actually varies across clusters.",
+    "Compare each feature's standard deviation in raw units — total_spend's scale should dwarf the other two by roughly two orders of magnitude.",
+    "Name the mechanism: unscaled k-means minimizes Euclidean distance, so the biggest-magnitude feature dominates the objective and effectively decides cluster membership on its own.",
+    "Re-profile using honest_cluster (features standardized before clustering) and check whether visit_frequency/session_depth now separate meaningfully between clusters.",
+    "Contrast what each clustering actually tells Priya: the naive clusters recover a spend ranking she already had; the honest clusters recover a real behavioral split she didn't."
+  ],
+  "teachingNote": {
+    "naiveRead": "Four clean clusters come out of k-means, and Priya names them by imagined behavior — whales, regulars, occasionals, window shoppers. It reads like real segmentation: distinct groups, ready for four different campaigns.",
+    "theTrap": "total_spend lives on a completely different scale than visit_frequency and session_depth — dollars in the hundreds or thousands versus visit counts and page counts under 30. Unscaled Euclidean distance is dominated by whichever feature has the biggest numbers, so k-means effectively clusters on total_spend alone and ignores the other two almost entirely. Group the naive clusters and the pattern is obvious: visit_frequency averages roughly 9-10 in *every single cluster*, and session_depth roughly 6-7 in every cluster — behavior barely moves at all. What moves is spend: roughly $95, $316, $767, and $2,098 across the four clusters. Priya didn't discover four personas; she re-derived a spend ranking she could have gotten from four `total_spend` quartiles, and gave it behavioral-sounding names it doesn't earn.",
+    "honestAnswer": "Standardize the three features first (mean 0, unit variance) so no column can dominate on raw scale, then re-cluster. A real 2-3 group structure appears, and it lines up with actual behavior this time: one cluster averages ~14 visits/month with shallow ~3-page sessions (frequent skimmers), another averages ~6 visits/month with deep ~9-page sessions (infrequent but thorough shoppers), plus a small high-spend outlier group. This split shares almost nothing with the spend-based naive clusters (they barely overlap) and matches genuine behavioral difference almost perfectly. Tell Priya: don't ship four campaigns off the naive clusters — they're a spend ranking in a persona costume. If she wants behavior-based messaging, cluster on standardized features, or simplest of all, build the two campaigns directly off the honest split (skimmers vs. thorough shoppers) rather than off spend tier.",
+    "howToGetThere": [
+      "Profile naive_cluster: group by cluster, average visit_frequency, session_depth, total_spend.",
+      "Notice visit_frequency (~9-10) and session_depth (~6-7) are nearly flat across all 4 naive clusters — only total_spend moves, from ~$95 to ~$2,098.",
+      "Check the raw standard deviations: total_spend's spread is roughly two orders of magnitude bigger than the other two features' — enough to dominate unscaled Euclidean distance on its own.",
+      "Standardize all three features to mean 0 / unit variance and re-cluster (or use the pre-computed honest_cluster column); pick k by silhouette score.",
+      "Re-profile the honest clusters: visit_frequency and session_depth now clearly separate (~14 vs ~6, ~3 vs ~9) — a real behavioral split, largely independent of spend."
+    ],
+    "numbers": [
+      { "label": "Visit frequency range across the 4 naive clusters", "value": "9.0 – 10.3 (flat)" },
+      { "label": "Total spend range across the 4 naive clusters", "value": "$95 – $2,098 (20x)" },
+      { "label": "Agreement: naive cluster vs. spend quartile (ARI)", "value": "clusters are ordered almost entirely by spend tier" },
+      { "label": "Agreement: honest cluster vs. true behavioral split (ARI)", "value": "0.87 — strong recovery" },
+      { "label": "Agreement: honest cluster vs. spend quartile (ARI)", "value": "0.01 — essentially independent" }
+    ],
+    "lesson": "K-means (and most distance-based clustering) minimizes distance in whatever units your columns happen to be in — it has no idea that $2,000 and 2 visits aren't comparable magnitudes. Any unscaled feature with a big numeric range will quietly dominate the clustering and everything else becomes noise, no matter how meaningful those other features are. Always standardize features before distance-based clustering, and always profile the resulting clusters against your inputs before naming them — if one raw column perfectly orders your clusters, you haven't found a persona, you've found that column."
+  }
+}

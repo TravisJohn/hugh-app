@@ -1,0 +1,73 @@
+{
+  "id": "clusters-are-trial-status",
+  "title": "Clustering revealed a high-risk churn group — target it with an intervention?",
+  "trap": "Redundant clustering",
+  "facets": { "topic": "Product", "skill": ["Redundant clustering"] },
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the growth analyst at Quillwork",
+    "company": "Quillwork — note-taking & productivity app",
+    "situation": "Data science clustered accounts on session_length_min, actions_per_session, and exports_count and found 3 distinct groups. Devon, the head of Growth, is treating one cluster as a \"newly discovered at-risk group\" and wants to build a dedicated re-engagement email flow around it, separate from the existing trial/paid lifecycle emails.",
+    "stakeholderBelief": "\"The clustering found a real at-risk group we didn't know about. Let's build a new re-engagement flow specifically for it.\"",
+    "question": "Is this cluster actually new information — or is it just account_status (trial / expired_trial / paid, already in the CRM) wearing a data-science label? Check whether the cluster tells Devon anything he didn't already know before a new email flow gets built around it."
+  },
+  "dataset": {
+    "file": "/case-lab/clusters-are-trial-status/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "account_id", "type": "int", "description": "Unique account identifier" },
+      { "name": "account_status", "type": "string", "description": "expired_trial, trial, or paid — already tracked in the CRM" },
+      { "name": "session_length_min", "type": "float", "description": "Average session length in minutes — gated by account status usage limits" },
+      { "name": "actions_per_session", "type": "float", "description": "Average actions taken per session — gated by account status" },
+      { "name": "exports_count", "type": "int", "description": "Exports in the last 30 days — export is a paid-only/limited-trial feature" },
+      { "name": "onboarding_completion_pct", "type": "float", "description": "Percent of the onboarding checklist completed (0-100), not gated by account status" },
+      { "name": "retained_90d", "type": "int", "description": "1 if the account was still active 90 days later — the outcome a re-engagement flow should be targeting" },
+      { "name": "cluster", "type": "int", "description": "K-means(k=3) cluster label from clustering on session_length_min/actions_per_session/exports_count (standardized)" }
+    ],
+    "sample": [
+      { "account_id": 1, "account_status": "paid", "session_length_min": 27.5, "actions_per_session": 14.2, "exports_count": 5, "onboarding_completion_pct": 66.5, "retained_90d": 0, "cluster": 0 },
+      { "account_id": 2, "account_status": "paid", "session_length_min": 25.2, "actions_per_session": 19.5, "exports_count": 10, "onboarding_completion_pct": 34.4, "retained_90d": 0, "cluster": 0 },
+      { "account_id": 3, "account_status": "expired_trial", "session_length_min": 3.7, "actions_per_session": 3.0, "exports_count": 1, "onboarding_completion_pct": 52.3, "retained_90d": 1, "cluster": 1 },
+      { "account_id": 4, "account_status": "paid", "session_length_min": 26.3, "actions_per_session": 18.4, "exports_count": 7, "onboarding_completion_pct": 75.2, "retained_90d": 0, "cluster": 0 },
+      { "account_id": 5, "account_status": "trial", "session_length_min": 12.4, "actions_per_session": 7.0, "exports_count": 1, "onboarding_completion_pct": 56.8, "retained_90d": 0, "cluster": 2 },
+      { "account_id": 6, "account_status": "trial", "session_length_min": 10.9, "actions_per_session": 8.8, "exports_count": 1, "onboarding_completion_pct": 68.5, "retained_90d": 0, "cluster": 2 },
+      { "account_id": 7, "account_status": "paid", "session_length_min": 27.1, "actions_per_session": 17.5, "exports_count": 5, "onboarding_completion_pct": 100.0, "retained_90d": 1, "cluster": 0 },
+      { "account_id": 8, "account_status": "expired_trial", "session_length_min": 2.3, "actions_per_session": 1.8, "exports_count": 0, "onboarding_completion_pct": 46.3, "retained_90d": 0, "cluster": 1 },
+      { "account_id": 9, "account_status": "trial", "session_length_min": 8.2, "actions_per_session": 5.4, "exports_count": 0, "onboarding_completion_pct": 50.9, "retained_90d": 1, "cluster": 2 },
+      { "account_id": 10, "account_status": "expired_trial", "session_length_min": 0.5, "actions_per_session": 1.9, "exports_count": 0, "onboarding_completion_pct": 43.9, "retained_90d": 0, "cluster": 1 }
+    ]
+  },
+  "guidingQuestions": [
+    "Cross-tab cluster against account_status. How closely does each cluster line up with a single status?",
+    "Group by account_status and separately by cluster, and compute retained_90d in each group. Does either one meaningfully separate who's retained?",
+    "If cluster and account_status tell you almost the same thing, what does a 'new at-risk group built from the cluster' actually add over what's already in the CRM?",
+    "Now correlate onboarding_completion_pct with retained_90d, and compare that to how well account_status or cluster predicts it.",
+    "If Devon wants a genuinely new, actionable re-engagement signal, which column should the new flow actually target?"
+  ],
+  "suggestedApproach": [
+    "Cross-tab cluster vs. account_status and note how tightly each cluster maps to one status — or compute an agreement metric directly.",
+    "Compute the retention rate within each account_status group, then within each cluster group, and compare — are either of them differentiating?",
+    "Name the mechanism: session_length_min, actions_per_session, and exports_count are all gated by account status by product design, so clustering on them can only rediscover status.",
+    "Correlate onboarding_completion_pct (a column not used in the clustering) against retained_90d, and compare the strength of that relationship to account_status's.",
+    "Recommend where the real signal is, and what a genuinely new re-engagement flow should be built on instead of the cluster."
+  ],
+  "teachingNote": {
+    "naiveRead": "The clustering surfaced 3 groups data science hadn't explicitly labeled before. One reads as \"at risk,\" and it feels like a genuine discovery worth building a dedicated flow around.",
+    "theTrap": "session_length_min, actions_per_session, and exports_count are all directly gated by account_status — expired trials are capped hard, active trials are capped moderately, paid accounts have full access. Clustering on three columns that are themselves consequences of account status can't discover anything account_status didn't already tell you: the cluster label matches account_status with an adjusted Rand index of 0.999, essentially identical. And crucially, neither account_status nor the cluster predicts who's retained 90 days later — the retention rate is flat at about 20-22% across every status and every cluster. The \"newly discovered at-risk group\" isn't a discovery; it's expired_trial wearing a data-science label, and it doesn't even predict the thing Devon wants to act on.",
+    "honestAnswer": "Don't build a new flow around the cluster — it's redundant with account_status, which is already in the CRM. The real, non-redundant signal was sitting in a column the clustering didn't use: onboarding_completion_pct correlates with retained_90d at about 0.34, meaningfully higher than anything account_status or the cluster offers (both ≈ 0 lift on retention). Tell Devon: skip the cluster-based segment, and instead target accounts with low onboarding_completion_pct for the re-engagement flow — that's the genuinely new, actionable signal, not something the lifecycle emails already segment on by status.",
+    "howToGetThere": [
+      "Cross-tab or compute adjusted Rand index between cluster and account_status: ≈ 0.999 — essentially the same variable.",
+      "Compute retained_90d rate by account_status and by cluster separately: both flat at ≈ 20-22% — neither differentiates who's retained.",
+      "Name the mechanism: the three clustered features are all status-gated by product design, so clustering on them can only rediscover status.",
+      "Correlate onboarding_completion_pct (not used in the clustering) against retained_90d: ≈ 0.34 — a real, independent signal.",
+      "Recommend targeting onboarding_completion_pct directly for the new re-engagement flow instead of the redundant cluster."
+    ],
+    "numbers": [
+      { "label": "Agreement: cluster vs. account_status (ARI)", "value": "0.999 — essentially the same variable" },
+      { "label": "90-day retention by status (expired / trial / paid)", "value": "20.4% / 21.1% / 21.7% (flat)" },
+      { "label": "90-day retention by cluster (0 / 1 / 2)", "value": "21.7% / 20.4% / 21.1% (flat)" },
+      { "label": "Correlation: onboarding_completion_pct vs. retention", "value": "0.34 — the real signal" }
+    ],
+    "lesson": "Clustering on features that are themselves downstream of a variable you already know can only rediscover that variable — it isn't a new segment just because a model produced it. Before calling a cluster a \"discovery,\" check its agreement with variables you already track (status, tier, plan) and check whether it actually predicts the outcome you care about, not just whether it looks different in a chart. The real signal is often sitting quietly in a column nobody clustered on."
+  }
+}

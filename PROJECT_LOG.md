@@ -1910,3 +1910,58 @@ to check `cumulative` is an explicit boolean and `setupCode` is non-trivial, and
 assertions-format check lang-aware (`assert ...` for Python, valid JSON for SQL). 44/44 pass now.
 
 tsc clean, `next build` clean, full Vitest suite green (156/156).
+
+## Case Lab — Unsupervised Learning + Reinforcement Learning batch (2026-07-18)
+
+Doubled Case Lab from 18 to **38 cases**: added 20 new long-form cases across **10 new skill
+archetypes** (5 unsupervised-learning, 5 reinforcement-learning) — a genuinely new skill family,
+not just new industry dressing on the existing 8 causal-inference skills (Simpson's, Confounding,
+Selection bias, Survivorship, Self-selection, Reverse causality, Regression to the mean,
+Seasonality). Plan (10 archetypes × 2 cases each) was proposed and approved by Travis before
+building, since designing valid ML trap archetypes that still fit the existing naive-vs-honest
+DGP format was the risky/novel part.
+
+**UL archetypes:** feature-scaling dominance in clustering (`spend-scaled-personas`,
+`seat-count-clusters`), anomaly-score precision (`fraud-anomaly-flags`, `server-anomaly-flags`),
+explained variance ≠ relevance (`health-score-pca`, `engagement-score-pca`), cluster instability
+(`persona-reruns`, `ticket-cluster-drift`), redundant clustering / no new information
+(`clusters-are-plan-tier`, `clusters-are-trial-status`).
+
+**RL archetypes (framed as logged bandit/contextual-bandit data — fits the static-CSV takeaway
+format without needing a live simulator):** off-policy evaluation bias (`recommender-bandit-logs`,
+`pricing-bandit-logs`), reward hacking (`clickbait-bandit`, `one-touch-routing-bandit`),
+non-stationarity (`ad-bidding-drift`, `inventory-routing-drift`), hidden exploration cost
+(`creative-bandit-regret`, `subject-line-bandit-regret`), bandit traffic-allocation Simpson's
+paradox (`checkout-bandit-simpson`, `push-notification-bandit-simpson`).
+
+**Authoring approach (offline, matches the existing DGP pattern — no `author-longform.mjs`
+pipeline exists yet, still hand/AI-authored per case):** each case got a real seeded
+numpy/pandas/**scikit-learn** DGP script (`scripts/case-lab-src/<id>/dgp.py`) that actually fits
+the relevant model (KMeans, IsolationForest, PCA) and prints real naive-vs-honest statistics —
+scikit-learn is authoring-time only, never ships to the product (the learner analyses the
+takeaway CSV in their own tools, same as every existing case). Several DGPs needed real tuning
+against actual model output, not just hand-picked numbers, e.g.:
+- `server-anomaly-flags`: first pass had 99% precision (too clean) because `new_process_count`
+  was too clean a discriminator; had legitimate hosts "mimic" compromised hosts' profile on 3 of
+  4 features to force real overlap → 48% precision.
+- `persona-reruns`/`ticket-cluster-drift`: bootstrap-resampling k-means at N=12,000 was almost
+  perfectly stable (law of large numbers smooths resampling noise at that N) — switched to
+  same-data/different-random-init with `n_init=1` and searched seed pairs for genuine local-optima
+  disagreement (72-85% cross-run agreement).
+- `creative-bandit-regret`/`subject-line-bandit-regret`: needed a slower sigmoid ramp + larger
+  daily sample to get a clean "first 2 weeks behind baseline, full period ahead" signal without
+  day-to-day noise flipping the sign.
+
+**New files:** 20× `public/case-lab/<id>/{case.json,data.csv}` (all public, zero runtime AI, same
+rails as the Case Room), 20× `scripts/case-lab-src/<id>/dgp.py` (committed for reproducibility),
+20 new stubs appended to `public/case-lab/manifest.json` via a one-off script (manifest has no
+automated builder — hand-maintained like `case.json`).
+
+**Verified:** a standalone Node validator (schema completeness, CSV header/row-count matches
+declared `dataset.columns`/`dataset.rows`, sample-row keys match columns, facets consistency
+between `case.json` and the manifest stub) — 38/38 pass. tsc clean, `next build` clean, full
+Vitest suite unaffected (Case Lab has no dedicated test suite — content is server-read JSON, no
+logic to unit test). Browser-verified via Playwright logged in as the seeded test user: `/cases/lab`
+feed shows "38 of 38 cases" with the new skill/topic filter pills populated correctly, and a
+10-case spot-check spanning every archetype (one per UL/RL family) confirmed each page's h1,
+download CTA, and reveal-teaching-note CTA render with no page errors.

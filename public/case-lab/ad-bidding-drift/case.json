@@ -1,0 +1,69 @@
+{
+  "id": "ad-bidding-drift",
+  "title": "The learned bidder beats the fixed rule by $2.93/auction — keep it live?",
+  "trap": "Non-stationarity",
+  "facets": { "topic": "Marketing", "skill": ["Non-stationarity"] },
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the bidding-strategy analyst at Cobalt Ads",
+    "company": "Cobalt Ads — programmatic ad-bidding platform",
+    "situation": "A learned bidding model has been running against a simple fixed-rule bidder for several months, randomly split per auction. A new competitor entered the auction pool partway through that window. Looking at the full-window average, Ren, the bidding lead, sees the learned bidder earning $2.93 more profit per auction than the fixed rule and wants to make it the permanent default.",
+    "stakeholderBelief": "\"Averaged over the whole test window, the learned bidder earns $2.93 more per auction than the fixed rule. It's clearly the better model — make it the permanent default.\"",
+    "question": "Has the learned bidder's edge held up through the whole test window, or was it strong before something changed and weak (or gone) after? Split the result by time period before making it the permanent default."
+  },
+  "dataset": {
+    "file": "/case-lab/ad-bidding-drift/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "auction_id", "type": "int", "description": "Unique auction identifier" },
+      { "name": "period", "type": "string", "description": "pre or post — before or after a new competitor entered the auction pool partway through the test window" },
+      { "name": "arm", "type": "string", "description": "learned_bidder or fixed_rule — which bidding strategy this auction used, randomly split 50/50 within each period" },
+      { "name": "profit_per_auction", "type": "float", "description": "Profit earned on this auction in dollars — the reward" }
+    ],
+    "sample": [
+      { "auction_id": 1, "period": "pre", "arm": "fixed_rule", "profit_per_auction": 5.85 },
+      { "auction_id": 2, "period": "post", "arm": "learned_bidder", "profit_per_auction": 9.89 },
+      { "auction_id": 3, "period": "pre", "arm": "learned_bidder", "profit_per_auction": 18.4 },
+      { "auction_id": 4, "period": "pre", "arm": "fixed_rule", "profit_per_auction": 9.37 },
+      { "auction_id": 5, "period": "pre", "arm": "fixed_rule", "profit_per_auction": 3.42 },
+      { "auction_id": 6, "period": "pre", "arm": "learned_bidder", "profit_per_auction": 5.0 },
+      { "auction_id": 7, "period": "pre", "arm": "fixed_rule", "profit_per_auction": 4.64 },
+      { "auction_id": 8, "period": "post", "arm": "learned_bidder", "profit_per_auction": 3.98 },
+      { "auction_id": 9, "period": "pre", "arm": "fixed_rule", "profit_per_auction": 11.6 },
+      { "auction_id": 10, "period": "post", "arm": "learned_bidder", "profit_per_auction": 0.36 }
+    ]
+  },
+  "guidingQuestions": [
+    "Reproduce Ren's number: mean profit_per_auction for arm == learned_bidder minus fixed_rule, pooled across the whole dataset.",
+    "Now compute the same gap separately within period == \"pre\" and within period == \"post\". Does the gap look the same in both?",
+    "What share of the data is \"pre\" versus \"post\"? How would that affect a pooled average if the two periods tell different stories?",
+    "The competitor's entry is what defines the pre/post split. Why would a model tuned on pre-competitor auction dynamics lose its edge once those dynamics change?",
+    "If Ren is deciding what to run GOING FORWARD (i.e. in the current, post-competitor environment), which number should actually drive that decision — the pooled average, or the post-period one?"
+  ],
+  "suggestedApproach": [
+    "Reproduce the pooled gap: mean(profit_per_auction) for learned_bidder minus fixed_rule across all rows.",
+    "Split by period and recompute the gap within \"pre\" and within \"post\" separately.",
+    "Check the share of rows in each period — note that \"pre\" is the majority, so it dominates the pooled average.",
+    "Name the mechanism: the learned bidder was tuned on pre-competitor auction dynamics; once the competitor enters and win prices/margins shift, a model fit to the old regime doesn't automatically adapt.",
+    "Recommend based on the post-period gap — the regime the bidder will actually operate in going forward — not the pooled average, which is mostly measuring a regime that no longer exists."
+  ],
+  "teachingNote": {
+    "naiveRead": "Averaged across the whole test window, the learned bidder earns $2.93 more profit per auction than the fixed rule. That reads as a clear, sustained edge — obviously make it the permanent default.",
+    "theTrap": "The test window isn't one stable environment — a new competitor entered the auction partway through, changing win prices and margins for everyone. Split by period and the story flips: in the pre-competitor period, the learned bidder has a large genuine edge (+$4.99/auction). But in the post-competitor period — the regime the bidder will actually operate in going forward — that edge is gone; the fixed rule is actually slightly ahead (learned bidder -$0.62/auction relative to fixed). The learned bidder was tuned to auction dynamics that no longer exist. Because \"pre\" makes up 65% of the test window, the pooled average is dominated by a period that's now history, and it's masking the fact that the bidder's advantage has already evaporated.",
+    "honestAnswer": "Split any reward comparison by time period whenever the environment might have shifted, and weight the decision toward the most recent, most relevant regime — not the pooled average. Here, the honest post-period gap is essentially zero (slightly negative for the learned bidder), meaning it offers no advantage in the current auction environment and may be a net negative. Tell Ren: don't make the learned bidder the permanent default off the pooled number. Either retrain it on post-competitor data before deciding, or run a fresh, post-competitor-only comparison — the $2.93 pooled edge is mostly a photograph of a market that no longer exists.",
+    "howToGetThere": [
+      "Compute the pooled gap: mean(profit_per_auction | learned_bidder) minus mean(... | fixed_rule) across all rows ≈ +$2.93.",
+      "Split by period: pre-period gap ≈ +$4.99 (learned bidder well ahead); post-period gap ≈ -$0.62 (fixed rule slightly ahead).",
+      "Check period composition: \"pre\" is 65% of the data, so it dominates the pooled average and hides the post-period reversal.",
+      "Name the mechanism: a new competitor entering the auction shifts win prices/margins — a model tuned to the old dynamics doesn't automatically transfer to the new regime.",
+      "Recommend using the post-period (current-regime) gap for a go-forward decision, not the pooled average."
+    ],
+    "numbers": [
+      { "label": "Pooled reward gap (learned − fixed)", "value": "+$2.93/auction" },
+      { "label": "Pre-competitor period gap", "value": "+$4.99/auction (learned bidder ahead)" },
+      { "label": "Post-competitor period gap", "value": "-$0.62/auction (fixed rule slightly ahead)" },
+      { "label": "Share of test window that is pre-competitor", "value": "65%" }
+    ],
+    "lesson": "A policy's average reward over a test window is only meaningful if the environment stayed the same throughout it — and in live systems (auctions, markets, user behavior), it frequently doesn't. Non-stationarity means a policy's advantage measured in one regime doesn't automatically carry into the next one, especially for models tuned tightly to the conditions they were trained or tested under. Whenever there's a known or suspected regime change in your test window, split the result by time period before trusting a pooled average — and weight your decision toward the regime you'll actually be operating in going forward, not the one that dominates the historical average."
+  }
+}

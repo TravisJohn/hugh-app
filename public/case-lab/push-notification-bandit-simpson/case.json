@@ -1,0 +1,69 @@
+{
+  "id": "push-notification-bandit-simpson",
+  "title": "The new notification timing gets a higher open rate overall — switch everyone to it?",
+  "trap": "Bandit traffic-allocation paradox",
+  "facets": { "topic": "Marketing", "skill": ["Bandit traffic-allocation paradox"] },
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the lifecycle-marketing analyst at Dayspring",
+    "company": "Dayspring — mobile fitness app",
+    "situation": "A contextual policy rolled a new push-notification send time out more aggressively to weekday-active users before ramping weekend-only users. Looking at overall open rate across all notifications, Sana, the lifecycle lead, sees the new timing beating the old one and wants to switch every user to the new send time this week.",
+    "stakeholderBelief": "\"Across all notifications, the new send time gets a higher open rate than the old one. Let's switch everyone to it this week.\"",
+    "question": "Did the new timing actually open better within the weekday-active cohort and within the weekend-only cohort, or does the overall number just reflect how the rollout allocated traffic? Split the comparison by cohort before switching everyone."
+  },
+  "dataset": {
+    "file": "/case-lab/push-notification-bandit-simpson/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "notification_id", "type": "int", "description": "Unique push notification send identifier" },
+      { "name": "user_cohort", "type": "string", "description": "weekday_active or weekend_only — the user's usage pattern" },
+      { "name": "arm", "type": "string", "description": "new_timing or old_timing — which send time this notification used (allocated unevenly by cohort — weekday_active got new_timing far more often than weekend_only did)" },
+      { "name": "opened", "type": "int", "description": "1 if the notification was opened — the reward" }
+    ],
+    "sample": [
+      { "notification_id": 1, "user_cohort": "weekend_only", "arm": "old_timing", "opened": 0 },
+      { "notification_id": 2, "user_cohort": "weekday_active", "arm": "new_timing", "opened": 0 },
+      { "notification_id": 3, "user_cohort": "weekend_only", "arm": "old_timing", "opened": 1 },
+      { "notification_id": 4, "user_cohort": "weekday_active", "arm": "new_timing", "opened": 1 },
+      { "notification_id": 5, "user_cohort": "weekday_active", "arm": "new_timing", "opened": 1 },
+      { "notification_id": 6, "user_cohort": "weekday_active", "arm": "old_timing", "opened": 1 },
+      { "notification_id": 7, "user_cohort": "weekday_active", "arm": "old_timing", "opened": 0 },
+      { "notification_id": 8, "user_cohort": "weekday_active", "arm": "new_timing", "opened": 0 },
+      { "notification_id": 9, "user_cohort": "weekday_active", "arm": "new_timing", "opened": 1 },
+      { "notification_id": 10, "user_cohort": "weekday_active", "arm": "new_timing", "opened": 1 }
+    ]
+  },
+  "guidingQuestions": [
+    "Reproduce Sana's number: mean opened for arm == new_timing versus old_timing, pooled across all notifications. How big is the win?",
+    "What share of notifications got new_timing within weekday_active versus within weekend_only? Was the new timing allocated evenly across cohorts?",
+    "Now compute the new_timing vs. old_timing open-rate gap SEPARATELY within weekday_active and within weekend_only. Does the new timing actually win in either cohort?",
+    "Compare weekday_active's overall open rate to weekend_only's, regardless of timing. Which cohort opens more, and how does that interact with which timing got more traffic in which cohort?",
+    "If the new timing loses within every cohort but wins pooled, what is the pooled number actually measuring?"
+  ],
+  "suggestedApproach": [
+    "Reproduce the pooled gap: mean(opened) for new_timing minus old_timing across all notifications.",
+    "Check the share of new_timing within weekday_active notifications and within weekend_only notifications separately — look for an uneven allocation.",
+    "Split the open-rate comparison by cohort: compute the new_timing vs. old_timing gap within weekday_active only, then within weekend_only only.",
+    "Compare baseline open rates by cohort to see whether one cohort opens substantially more than the other regardless of timing.",
+    "Explain how an uneven traffic split across a higher- and lower-opening cohort can flip the pooled sign relative to every individual cohort — classic Simpson's paradox."
+  ],
+  "teachingNote": {
+    "naiveRead": "Pooled across all notifications, the new send timing gets a higher open rate than the old one. That reads as a clear win — obviously switch everyone to it.",
+    "theTrap": "The rollout policy didn't allocate the new timing evenly: weekday-active users got new_timing 72% of the time, while weekend-only users got it only 28% of the time (a weekday-first ramp). Weekday-active users also open notifications far more than weekend-only users regardless of timing. Split the comparison by cohort and the new timing actually LOSES in both: -1.7 points for weekday-active and -4.0 points for weekend-only. But because the new timing's traffic is disproportionately weekday-active (the higher-opening cohort) and the old timing's traffic is disproportionately weekend-only (the lower-opening cohort), the pooled comparison mixes a favorable cohort for the new timing with an unfavorable one for the old timing — and the pooled number flips positive even though the new timing never actually wins anywhere. This is Simpson's paradox, driven here by unequal bandit/rollout allocation rather than a random split.",
+    "honestAnswer": "Always split a bandit or rollout comparison by the segments traffic was allocated across, especially when the allocation itself wasn't uniform. Here, the honest, cohort-level answer is that the old timing gets a higher open rate for both weekday-active (-1.7 points for new_timing) and weekend-only (-4.0 points for new_timing) users — the pooled +3.8 point 'win' is entirely a traffic-mix artifact of the weekday-first rollout, not a real effect of the new timing. Tell Sana: don't switch everyone to the new timing. If anything, the data argues for keeping the old send time, or investigating why the new timing underperforms in both cohorts before rolling it out anywhere.",
+    "howToGetThere": [
+      "Compute the pooled gap: mean(opened | new_timing) minus mean(opened | old_timing) across all notifications ≈ +3.8 points.",
+      "Check new_timing's share by cohort: 72% for weekday_active vs. 28% for weekend_only — a strongly uneven allocation from the rollout policy.",
+      "Split the gap by cohort: weekday_active ≈ -1.7 points (old_timing wins), weekend_only ≈ -4.0 points (old_timing wins) — new_timing loses in both cohorts.",
+      "Compare cohort baseline open rates: weekday_active opens meaningfully more than weekend_only regardless of timing — the cohort new_timing got more of is simply a higher-opening cohort.",
+      "Conclude: the pooled 'win' is a mix-shift artifact of unequal traffic allocation, not a real effect of the new timing — Simpson's paradox."
+    ],
+    "numbers": [
+      { "label": "Pooled open-rate gap (new_timing − old_timing)", "value": "+3.8 points" },
+      { "label": "new_timing share of traffic: weekday_active vs. weekend_only", "value": "72% vs. 28%" },
+      { "label": "Open-rate gap within weekday_active", "value": "-1.7 points (old_timing wins)" },
+      { "label": "Open-rate gap within weekend_only", "value": "-4.0 points (old_timing wins)" }
+    ],
+    "lesson": "A bandit or phased rollout that allocates traffic unevenly across segments — even for reasonable operational reasons, like ramping the most active users first — can produce a pooled result that reverses what's true in every individual segment, the same Simpson's paradox mechanism as any confounded observational comparison. Whenever an arm's traffic share differs across a variable that also affects the outcome, split the comparison by that variable before trusting the pooled number. A policy that loses in every segment cannot be a real winner overall — the pooled 'win' is measuring the traffic mix, not the policy."
+  }
+}

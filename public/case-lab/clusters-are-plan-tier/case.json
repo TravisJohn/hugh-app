@@ -1,0 +1,73 @@
+{
+  "id": "clusters-are-plan-tier",
+  "title": "Clustering discovered a high-value segment — target it for upsell?",
+  "trap": "Redundant clustering",
+  "facets": { "topic": "Sales", "skill": ["Redundant clustering"] },
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the RevOps analyst at Ashgrove",
+    "company": "Ashgrove — B2B project-management SaaS",
+    "situation": "Data science clustered accounts on api_calls_per_month, seat_count, and feature_count and found 3 distinct segments. Priya, the VP of Sales, is excited — she's calling one cluster a \"newly discovered high-value segment\" and wants to build a dedicated upsell motion targeting it next quarter, on top of the existing plan-tier-based outreach.",
+    "stakeholderBelief": "\"The clustering discovered a real high-value segment we didn't know about before. Let's build a new, dedicated upsell motion around it.\"",
+    "question": "Is this cluster actually new information — or is it just plan_tier (which sales already has in the CRM) wearing a data-science label? Check whether the cluster tells Priya anything she didn't already know before a new motion gets built around it."
+  },
+  "dataset": {
+    "file": "/case-lab/clusters-are-plan-tier/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "account_id", "type": "int", "description": "Unique account identifier" },
+      { "name": "plan_tier", "type": "string", "description": "free, pro, or enterprise — the account's current pricing tier (already tracked in the CRM)" },
+      { "name": "api_calls_per_month", "type": "float", "description": "API calls in the last 30 days — gated by plan tier limits" },
+      { "name": "seat_count", "type": "float", "description": "Number of seats on the account — gated by plan tier limits" },
+      { "name": "feature_count", "type": "float", "description": "Distinct product features the account has access to — gated by plan tier" },
+      { "name": "feature_request_count", "type": "int", "description": "Feature requests the account has filed in the product (not gated by plan tier)" },
+      { "name": "upgraded_next_quarter", "type": "int", "description": "1 if the account upgraded to a higher tier the following quarter — the outcome a new upsell motion should be targeting" },
+      { "name": "cluster", "type": "int", "description": "K-means(k=3) cluster label from clustering on api_calls_per_month/seat_count/feature_count (standardized)" }
+    ],
+    "sample": [
+      { "account_id": 1, "plan_tier": "enterprise", "api_calls_per_month": 65684.0, "seat_count": 48.0, "feature_count": 17.0, "feature_request_count": 2, "upgraded_next_quarter": 1, "cluster": 1 },
+      { "account_id": 2, "plan_tier": "free", "api_calls_per_month": 629.0, "seat_count": 2.0, "feature_count": 3.0, "feature_request_count": 3, "upgraded_next_quarter": 0, "cluster": 2 },
+      { "account_id": 3, "plan_tier": "pro", "api_calls_per_month": 7013.0, "seat_count": 9.0, "feature_count": 9.0, "feature_request_count": 1, "upgraded_next_quarter": 0, "cluster": 0 },
+      { "account_id": 4, "plan_tier": "free", "api_calls_per_month": 844.0, "seat_count": 5.0, "feature_count": 1.0, "feature_request_count": 1, "upgraded_next_quarter": 0, "cluster": 2 },
+      { "account_id": 5, "plan_tier": "pro", "api_calls_per_month": 9764.0, "seat_count": 9.0, "feature_count": 8.0, "feature_request_count": 1, "upgraded_next_quarter": 0, "cluster": 0 },
+      { "account_id": 6, "plan_tier": "free", "api_calls_per_month": 797.0, "seat_count": 1.0, "feature_count": 4.0, "feature_request_count": 1, "upgraded_next_quarter": 0, "cluster": 2 },
+      { "account_id": 7, "plan_tier": "free", "api_calls_per_month": 717.0, "seat_count": 1.0, "feature_count": 3.0, "feature_request_count": 1, "upgraded_next_quarter": 0, "cluster": 2 },
+      { "account_id": 8, "plan_tier": "free", "api_calls_per_month": 755.0, "seat_count": 6.0, "feature_count": 3.0, "feature_request_count": 1, "upgraded_next_quarter": 0, "cluster": 2 },
+      { "account_id": 9, "plan_tier": "enterprise", "api_calls_per_month": 66560.0, "seat_count": 47.0, "feature_count": 17.0, "feature_request_count": 2, "upgraded_next_quarter": 0, "cluster": 1 },
+      { "account_id": 10, "plan_tier": "free", "api_calls_per_month": 452.0, "seat_count": 3.0, "feature_count": 3.0, "feature_request_count": 1, "upgraded_next_quarter": 1, "cluster": 2 }
+    ]
+  },
+  "guidingQuestions": [
+    "Cross-tab cluster against plan_tier. How closely does each cluster line up with a single plan tier?",
+    "Group by plan_tier and separately by cluster, and compute the upgraded_next_quarter rate in each group. Does either one meaningfully separate who upgrades?",
+    "If cluster and plan_tier tell you almost the same thing, what does a 'new segment built from the cluster' actually add over what sales already has in the CRM?",
+    "Now correlate feature_request_count with upgraded_next_quarter, and compare that to how well plan_tier or cluster predicts it.",
+    "If Priya wants a genuinely new, actionable upsell signal, which column should the new motion actually target?"
+  ],
+  "suggestedApproach": [
+    "Cross-tab cluster vs. plan_tier and note how tightly each cluster maps to one tier — or compute an agreement metric directly.",
+    "Compute the upgrade rate within each plan_tier group, then within each cluster group, and compare — are either of them differentiating?",
+    "Name the mechanism: api_calls_per_month, seat_count, and feature_count are all gated by plan tier by product design, so clustering on them can only rediscover plan tier.",
+    "Correlate feature_request_count (a column not used in the clustering) against upgraded_next_quarter, and compare the strength of that relationship to plan_tier's.",
+    "Recommend where the real signal is, and what a genuinely new upsell motion should be built on instead of the cluster."
+  ],
+  "teachingNote": {
+    "naiveRead": "The clustering surfaced 3 segments data science hadn't explicitly labeled before. One reads as \"high value,\" and it feels like a genuine discovery worth building a new motion around.",
+    "theTrap": "api_calls_per_month, seat_count, and feature_count are all directly gated by plan_tier — free, pro, and enterprise accounts get different limits by product design. Clustering on three columns that are themselves just consequences of plan tier can't discover anything plan_tier didn't already tell you: the cluster label matches plan_tier with an adjusted Rand index of 0.97, essentially a 1-to-1 relabeling. And crucially, neither plan_tier nor the cluster actually predicts who upgrades next quarter — the upgrade rate is flat at about 12-13% across every tier and every cluster. The \"high-value segment\" isn't a discovery; it's the enterprise tier wearing a data-science label, and it doesn't even predict the thing Priya wants to act on.",
+    "honestAnswer": "Don't build a new motion around the cluster — it's redundant with plan_tier, which sales already has. The real, non-redundant signal was sitting in a column the clustering didn't use: feature_request_count correlates with upgraded_next_quarter at about 0.28, meaningfully higher than anything plan_tier or the cluster offers (both ≈ 0 lift on upgrade rate). Tell Priya: skip the cluster-based segment, and instead target accounts with elevated feature_request_count for the upsell motion — that's the genuinely new, actionable signal, and it's not something the CRM already surfaces by plan tier.",
+    "howToGetThere": [
+      "Cross-tab or compute adjusted Rand index between cluster and plan_tier: ≈ 0.97 — nearly a 1-to-1 relabeling.",
+      "Compute upgraded_next_quarter rate by plan_tier and by cluster separately: both flat at ≈ 12-13% — neither differentiates who upgrades.",
+      "Name the mechanism: the three clustered features are all plan-tier-gated by product design, so clustering on them can only rediscover tier.",
+      "Correlate feature_request_count (not used in the clustering) against upgraded_next_quarter: ≈ 0.28 — a real, independent signal.",
+      "Recommend targeting feature_request_count directly for the new upsell motion instead of the redundant cluster."
+    ],
+    "numbers": [
+      { "label": "Agreement: cluster vs. plan_tier (ARI)", "value": "0.97 — essentially the same variable" },
+      { "label": "Upgrade rate by plan_tier (free / pro / enterprise)", "value": "12.0% / 12.8% / 12.8% (flat)" },
+      { "label": "Upgrade rate by cluster (0 / 1 / 2)", "value": "12.8% / 12.8% / 11.9% (flat)" },
+      { "label": "Correlation: feature_request_count vs. upgrade", "value": "0.28 — the real signal" }
+    ],
+    "lesson": "Clustering on features that are themselves downstream of a variable you already know can only rediscover that variable — it isn't a new segment just because a model produced it. Before calling a cluster a \"discovery,\" check its agreement with variables you already track (plan tier, industry, company size) and check whether it actually predicts the outcome you care about, not just whether it looks different in a chart. The real signal is often sitting quietly in a column nobody clustered on."
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "id": "engagement-score-pca",
+  "title": "PC1 explains 99% of the engagement variance — score users on it?",
+  "trap": "Explained variance ≠ relevance",
+  "facets": { "topic": "Marketing", "skill": ["Explained variance ≠ relevance"] },
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the lifecycle/growth analyst at Fernglow",
+    "company": "Fernglow — media & content streaming app",
+    "situation": "Nadia, the growth lead, ran PCA over four engagement metrics — page_views, purchase_count, email_opens, days_since_signup — to build a single \"engagement score.\" PC1 explains 99% of the variance, and she wants to rank every user by it, targeting the bottom of the ranking with a win-back campaign next week.",
+    "stakeholderBelief": "\"PC1 captures 99% of the variance across our four engagement metrics — it's basically our engagement score already built. Let's rank users on it and win back the bottom tier.\"",
+    "question": "Does PC1 actually identify the users at risk of not coming back — the ones a win-back campaign should target? Check what PC1 is really measuring, and how well it (or any of the four raw metrics) predicts 90-day retention, before targeting goes out on it."
+  },
+  "dataset": {
+    "file": "/case-lab/engagement-score-pca/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "user_id", "type": "int", "description": "Unique user identifier" },
+      { "name": "days_since_signup", "type": "int", "description": "Days since the user signed up (1-365)" },
+      { "name": "page_views", "type": "float", "description": "Total page views in the last 90 days" },
+      { "name": "purchase_count", "type": "int", "description": "Purchases/subscriptions completed in the last 90 days (0-10)" },
+      { "name": "email_opens", "type": "int", "description": "Marketing emails opened in the last 90 days (0-20)" },
+      { "name": "retained_90d", "type": "int", "description": "1 if the user was still active 90 days later — the outcome a win-back campaign should be targeting" },
+      { "name": "pc1_score", "type": "float", "description": "The user's score on the first principal component, computed from PCA fit on the four raw (unscaled) metrics above" }
+    ],
+    "sample": [
+      { "user_id": 1, "days_since_signup": 215, "page_views": 50.0, "purchase_count": 0, "email_opens": 5, "retained_90d": 0, "pc1_score": -823.54 },
+      { "user_id": 2, "days_since_signup": 154, "page_views": 394.0, "purchase_count": 5, "email_opens": 2, "retained_90d": 1, "pc1_score": -479.6 },
+      { "user_id": 3, "days_since_signup": 131, "page_views": 251.0, "purchase_count": 1, "email_opens": 9, "retained_90d": 0, "pc1_score": -622.62 },
+      { "user_id": 4, "days_since_signup": 338, "page_views": 299.0, "purchase_count": 1, "email_opens": 9, "retained_90d": 1, "pc1_score": -574.42 },
+      { "user_id": 5, "days_since_signup": 139, "page_views": 150.0, "purchase_count": 2, "email_opens": 3, "retained_90d": 1, "pc1_score": -723.61 },
+      { "user_id": 6, "days_since_signup": 100, "page_views": 764.0, "purchase_count": 3, "email_opens": 5, "retained_90d": 1, "pc1_score": -109.65 },
+      { "user_id": 7, "days_since_signup": 320, "page_views": 57.0, "purchase_count": 1, "email_opens": 5, "retained_90d": 0, "pc1_score": -816.44 },
+      { "user_id": 8, "days_since_signup": 22, "page_views": 481.0, "purchase_count": 3, "email_opens": 2, "retained_90d": 0, "pc1_score": -392.72 },
+      { "user_id": 9, "days_since_signup": 162, "page_views": 248.0, "purchase_count": 2, "email_opens": 3, "retained_90d": 1, "pc1_score": -625.59 },
+      { "user_id": 10, "days_since_signup": 114, "page_views": 181.0, "purchase_count": 3, "email_opens": 9, "retained_90d": 1, "pc1_score": -692.63 }
+    ]
+  },
+  "guidingQuestions": [
+    "Correlate pc1_score with page_views, purchase_count, email_opens, and days_since_signup individually. Which raw column does PC1 actually track?",
+    "Correlate pc1_score with retained_90d. Is that relationship strong enough to target a win-back campaign on?",
+    "Now correlate each of the four raw metrics with retained_90d individually. Which one is the real predictor?",
+    "Compare the ranges of the four columns. Which one has, by far, the biggest scale — and what does that do to a PCA fit on unscaled features?",
+    "If Nadia targets the bottom of the PC1 ranking for win-back, what kind of user will actually get targeted — and who gets missed?"
+  ],
+  "suggestedApproach": [
+    "Correlate pc1_score against each of the four raw inputs to see which one it's really summarizing.",
+    "Correlate pc1_score against retained_90d directly — that's the number that matters for targeting, not the explained-variance figure.",
+    "Correlate each raw metric against retained_90d separately, and compare those correlations to PC1's.",
+    "Check the scale of each input column — page_views should dwarf the other three, explaining why PCA loaded almost entirely onto it.",
+    "Conclude which metric should actually drive the win-back targeting, and why 'explains the most variance' isn't the same question as 'predicts who comes back.'"
+  ],
+  "teachingNote": {
+    "naiveRead": "PC1 explains 99% of the variance across the four engagement metrics. That reads like PC1 has distilled almost everything worth knowing about a user into one number — ready to rank and target on.",
+    "theTrap": "PCA finds the direction of maximum *variance*, with no idea which column predicts the outcome you actually care about. page_views ranges into the thousands while purchase_count tops out at 10 and email_opens at 20 — page_views' raw variance is so much larger that PC1 loads almost entirely onto it (loading ≈ 1.00 on page_views, ≈ 0 on everything else). PC1 isn't an engagement score; it's page_views wearing a disguise. And page_views barely relates to 90-day retention (correlation ≈ -0.01) — retention is actually driven by purchase_count (correlation ≈ 0.38, by far the strongest signal), with email_opens a weak secondary factor (≈ 0.06). The metric that 'explains the most variance' is nearly useless for predicting who comes back.",
+    "honestAnswer": "Don't target the win-back campaign off PC1. Correlate each raw metric against retained_90d directly: purchase_count is the strongest single predictor (≈ 0.38 — more purchases, much higher retention), email_opens is a weak secondary signal (≈ 0.06), and both page_views and PC1 are essentially uncorrelated with retention (≈ -0.01 either way). If Nadia wants a defensible target list, rank by purchase_count directly (or standardize all four metrics before running PCA, so page_views can't dominate) — not by an unscaled PC1 that's quietly just re-reporting page views. As built, targeting the bottom of the PC1 ranking would pull in low-page-view users regardless of whether they've actually purchased, while missing plenty of low-purchase users who browse a lot and still won't come back.",
+    "howToGetThere": [
+      "Fit PCA on the four raw (unscaled) metrics; check explained_variance_ratio_ — PC1 alone captures ≈ 99%.",
+      "Inspect PC1's loadings: page_views ≈ 1.00, the other three ≈ 0 — PC1 is essentially page_views restated.",
+      "Correlate pc1_score with retained_90d directly: ≈ -0.01 — no real relationship, despite the huge variance share.",
+      "Correlate each raw metric with retained_90d: purchase_count ≈ 0.38 (strongest), email_opens ≈ 0.06, page_views ≈ -0.01.",
+      "Compare column scales: page_views ranges into the thousands vs. single digits/tens for the others — explaining why unscaled PCA collapsed onto it."
+    ],
+    "numbers": [
+      { "label": "PC1 explained variance", "value": "99%" },
+      { "label": "PC1's loading on page_views", "value": "≈ 1.00 (all other loadings ≈ 0)" },
+      { "label": "Correlation: PC1 vs. 90-day retention", "value": "≈ -0.01" },
+      { "label": "Correlation: purchase_count vs. 90-day retention", "value": "≈ 0.38 (strongest predictor)" },
+      { "label": "Correlation: email_opens vs. 90-day retention", "value": "≈ 0.06" }
+    ],
+    "lesson": "Explained variance measures how much a component captures about the *spread* of your inputs, not whether it relates to the outcome you actually care about — and PCA is scale-sensitive, so an unscaled feature with a big numeric range will dominate the first component regardless of its real-world importance. Before ranking or targeting users on a component, correlate it against the actual outcome, and check whether one raw input's scale is doing all the work. A score that summarizes 99% of the data's variance can still summarize none of what you need to know."
+  }
+}

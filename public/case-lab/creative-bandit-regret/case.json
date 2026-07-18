@@ -1,0 +1,69 @@
+{
+  "id": "creative-bandit-regret",
+  "title": "The bandit's average conversion rate beats the old creative — was it worth running?",
+  "trap": "Hidden exploration cost",
+  "facets": { "topic": "Marketing", "skill": ["Hidden exploration cost"] },
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the paid-social analyst at Brightloop",
+    "company": "Brightloop — social ad creative tool",
+    "situation": "A creative bandit ran for 40 days against the old, previously-best creative (the fixed baseline). Looking at the full campaign's pooled conversion rate, Talia, the growth marketer, sees the bandit narrowly beat the baseline overall and is ready to call the experiment a clean win and keep running bandits on every future campaign, no further questions asked.",
+    "stakeholderBelief": "\"Averaged over the full 40-day campaign, the bandit's conversion rate beat the old creative. It's a win — let's run a bandit on every campaign from now on, same as this one.\"",
+    "question": "Was the bandit actually ahead the whole campaign, or did it lose ground early while exploring and only pull ahead later? Look at the campaign week by week — not just the pooled total — before deciding bandits are a reliable win in every case."
+  },
+  "dataset": {
+    "file": "/case-lab/creative-bandit-regret/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "impression_id", "type": "int", "description": "Unique impression identifier" },
+      { "name": "day", "type": "int", "description": "Campaign day, 1-40" },
+      { "name": "policy", "type": "string", "description": "bandit (exploring multiple creatives, converging over time) or baseline (the old best-known creative, run unchanged the whole campaign)" },
+      { "name": "converted", "type": "int", "description": "1 if the impression converted — the reward" }
+    ],
+    "sample": [
+      { "impression_id": 1, "day": 1, "policy": "bandit", "converted": 0 },
+      { "impression_id": 2, "day": 1, "policy": "bandit", "converted": 0 },
+      { "impression_id": 3, "day": 1, "policy": "bandit", "converted": 0 },
+      { "impression_id": 4, "day": 1, "policy": "bandit", "converted": 0 },
+      { "impression_id": 5, "day": 1, "policy": "bandit", "converted": 0 },
+      { "impression_id": 6, "day": 1, "policy": "bandit", "converted": 0 },
+      { "impression_id": 7, "day": 1, "policy": "bandit", "converted": 0 },
+      { "impression_id": 8, "day": 1, "policy": "bandit", "converted": 0 },
+      { "impression_id": 9, "day": 1, "policy": "bandit", "converted": 0 },
+      { "impression_id": 10, "day": 1, "policy": "bandit", "converted": 0 }
+    ]
+  },
+  "guidingQuestions": [
+    "Reproduce Talia's number: mean converted for policy == bandit versus baseline, pooled across the full 40 days. How big is the win?",
+    "Group by day (or bin into weeks) and compute each policy's conversion rate over time. Does the bandit lead from day 1, or does the picture change as the campaign progresses?",
+    "For the first two weeks specifically, compare the bandit's conversion rate to the baseline's. Who's ahead?",
+    "If the campaign had been cut short at day 14 instead of running the full 40 days, what would the result have looked like?",
+    "Estimate how many conversions the bandit gave up during its exploration phase, compared to if the eventual best creative had simply been run from day 1."
+  ],
+  "suggestedApproach": [
+    "Reproduce the pooled gap: mean(converted) for bandit minus baseline across all rows.",
+    "Group by day and policy, compute daily (or weekly, to smooth noise) conversion rates, and plot or tabulate the gap over time.",
+    "Isolate the first two weeks (days 1-14) and compare the bandit's and baseline's conversion rate specifically in that window.",
+    "Note the day (or week) the bandit's rate first overtakes the baseline's, and consider what a campaign of only that length would have shown.",
+    "Estimate cumulative regret: for each day, how far below the bandit's eventual best rate was that day's actual rate, summed over the exploration period — that's forgone reward the pooled average doesn't show."
+  ],
+  "teachingNote": {
+    "naiveRead": "Pooled over the full 40-day campaign, the bandit's conversion rate beats the old creative. That reads as a clean, unambiguous win — good enough to make bandits the new default for every campaign.",
+    "theTrap": "A pooled average blends the bandit's exploration phase (when it's testing several creatives, some worse than the baseline) with its exploitation phase (once it's converged on the best one). Split by week and the picture is very different: in the first two weeks, the bandit's conversion rate is meaningfully BELOW the baseline (4.9% vs. 8.6% — a real loss), because it's still testing weaker creatives. It only pulls decisively ahead from around week 3 onward, once it's converged. The pooled 40-day average is a genuine net win, but it completely hides that the campaign spent its first two weeks actively losing ground — a fact that matters enormously if a shorter campaign, a tighter budget, or an impatient stakeholder would have called it off before the bandit caught up.",
+    "honestAnswer": "Look at the reward trajectory over time, not just the pooled total, before generalizing \"bandits win\" to every future campaign. Here, the bandit gave up roughly 350 conversions worth of reward during the exploration ramp relative to if the eventual best creative had simply run from day 1 (cumulative regret against the best-known creative) — a real cost the pooled average absorbs and hides. The honest takeaway is conditional: bandits are worth running when the campaign is long enough (and the traffic large enough) to amortize the exploration cost — this one was, just barely, by day 40. For shorter campaigns, smaller budgets, or campaigns evaluated early, the exploration cost may not pay back in time, and a simpler A/B test or the safe baseline creative may be the better call. Tell Talia: don't default to bandits on every future campaign without checking whether this campaign's length was what made the payback happen.",
+    "howToGetThere": [
+      "Compute the pooled gap: mean(converted | bandit) minus mean(converted | baseline) across all 40 days ≈ +1.5 points — a real but modest net win.",
+      "Group by week: weeks 1-2 show the bandit meaningfully behind (4.9% vs. 8.6%, a -3.7 point gap); the gap turns positive and grows from around week 3 onward.",
+      "Note that 15 of the 40 days show the bandit below the baseline — the losing days are concentrated early, not scattered randomly.",
+      "Estimate cumulative regret vs. the eventual best-known creative rate: roughly 350 forgone conversions during the exploration ramp — real cost invisible in the pooled total.",
+      "Conclude: the net win depended on the campaign running long enough to amortize the exploration cost; a shorter campaign would have shown a loss."
+    ],
+    "numbers": [
+      { "label": "Pooled 40-day conversion gap (bandit − baseline)", "value": "+1.5 points (a real, modest net win)" },
+      { "label": "First-2-weeks conversion gap", "value": "-3.7 points (bandit behind)" },
+      { "label": "Days the bandit trailed the baseline", "value": "15 of 40, concentrated early" },
+      { "label": "Forgone conversions during exploration (cumulative regret)", "value": "≈ 350" }
+    ],
+    "lesson": "A pooled average reward over a bandit's run blends its exploration cost and its exploitation payoff into one number, and a positive pooled result doesn't mean the policy was ahead the whole time — it can mean a real early loss was more than made up for later. Before generalizing a bandit's win to \"bandits always work here,\" check the reward trajectory over time and estimate cumulative regret against the eventual best arm: that's the exploration cost the pooled average is hiding. Whether that cost pays back depends on how long the policy gets to run — the same bandit that wins over 40 days would have shown a clear loss if judged at day 14."
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "id": "checkout-bandit-simpson",
+  "title": "The new checkout UI converts better overall — make it the default?",
+  "trap": "Bandit traffic-allocation paradox",
+  "facets": { "topic": "Product", "skill": ["Bandit traffic-allocation paradox"] },
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the checkout-experience analyst at Coastline Goods",
+    "company": "Coastline Goods — DTC e-commerce",
+    "situation": "A contextual policy rolled the new checkout UI out more aggressively on mobile first, before ramping desktop. Looking at overall conversion across all traffic, Priya, the head of Product, sees the new UI converting higher than the old one and wants to make it the permanent default for all devices.",
+    "stakeholderBelief": "\"Across all traffic, the new checkout UI converts better than the old one. Let's make it the default everywhere.\"",
+    "question": "Did the new UI actually convert better within mobile and within desktop, or does the overall number just reflect how traffic was allocated? Split the comparison by device before making it the default."
+  },
+  "dataset": {
+    "file": "/case-lab/checkout-bandit-simpson/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "session_id", "type": "int", "description": "Unique checkout session identifier" },
+      { "name": "device", "type": "string", "description": "mobile or desktop" },
+      { "name": "arm", "type": "string", "description": "new_ui or old_ui — which checkout UI this session was shown (allocated unevenly by device — mobile got new_ui far more often than desktop did)" },
+      { "name": "converted", "type": "int", "description": "1 if the session completed checkout — the reward" }
+    ],
+    "sample": [
+      { "session_id": 1, "device": "mobile", "arm": "new_ui", "converted": 0 },
+      { "session_id": 2, "device": "mobile", "arm": "new_ui", "converted": 0 },
+      { "session_id": 3, "device": "mobile", "arm": "new_ui", "converted": 0 },
+      { "session_id": 4, "device": "desktop", "arm": "old_ui", "converted": 0 },
+      { "session_id": 5, "device": "mobile", "arm": "new_ui", "converted": 0 },
+      { "session_id": 6, "device": "mobile", "arm": "new_ui", "converted": 0 },
+      { "session_id": 7, "device": "desktop", "arm": "new_ui", "converted": 0 },
+      { "session_id": 8, "device": "mobile", "arm": "new_ui", "converted": 0 },
+      { "session_id": 9, "device": "desktop", "arm": "new_ui", "converted": 0 },
+      { "session_id": 10, "device": "desktop", "arm": "old_ui", "converted": 0 }
+    ]
+  },
+  "guidingQuestions": [
+    "Reproduce Priya's number: mean converted for arm == new_ui versus old_ui, pooled across all sessions. How big is the win?",
+    "What share of sessions got new_ui on mobile versus on desktop? Was the new UI allocated evenly across devices?",
+    "Now compute the new_ui vs. old_ui conversion gap SEPARATELY within mobile and within desktop. Does the new UI actually win in either segment?",
+    "Compare mobile's overall conversion rate to desktop's, regardless of UI. Which device converts higher, and how does that interact with which UI got more traffic on which device?",
+    "If the new UI loses within every device segment but wins pooled, what is the pooled number actually measuring?"
+  ],
+  "suggestedApproach": [
+    "Reproduce the pooled gap: mean(converted) for new_ui minus old_ui across all sessions.",
+    "Check the share of new_ui within mobile sessions and within desktop sessions separately — look for an uneven allocation.",
+    "Split the conversion comparison by device: compute the new_ui vs. old_ui gap within mobile only, then within desktop only.",
+    "Compare baseline conversion rates by device to see whether one device converts substantially higher than the other regardless of UI.",
+    "Explain how an uneven traffic split across a higher- and lower-converting segment can flip the pooled sign relative to every individual segment — classic Simpson's paradox."
+  ],
+  "teachingNote": {
+    "naiveRead": "Pooled across all sessions, the new checkout UI converts better than the old one. That reads as a clear win — obviously make it the default everywhere.",
+    "theTrap": "The rollout policy didn't allocate the new UI evenly: mobile sessions got new_ui 76% of the time, while desktop sessions got it only 25% of the time (a mobile-first ramp). Mobile also converts substantially higher than desktop regardless of which UI is shown. Split the comparison by device and the new UI actually LOSES in both: -0.7 points on mobile and -1.9 points on desktop. But because the new UI's traffic is disproportionately mobile (the higher-converting segment) and the old UI's traffic is disproportionately desktop (the lower-converting segment), the pooled comparison mixes a favorable segment for the new UI with an unfavorable one for the old UI — and the pooled number flips positive even though the new UI never actually wins anywhere. This is Simpson's paradox, driven here by unequal bandit/rollout traffic allocation rather than a random split.",
+    "honestAnswer": "Always split a bandit or rollout comparison by the segments traffic was allocated across, especially when the allocation itself wasn't uniform. Here, the honest, segment-level answer is that the old UI converts better on both mobile (-0.7 points for new_ui) and desktop (-1.9 points for new_ui) — the pooled +1.1 point 'win' is entirely a traffic-mix artifact of the mobile-first rollout, not a real effect of the new UI. Tell Priya: don't make the new UI the default. If anything, the data argues for keeping the old UI, or investigating why the new UI underperforms on both platforms before shipping it anywhere.",
+    "howToGetThere": [
+      "Compute the pooled gap: mean(converted | new_ui) minus mean(converted | old_ui) across all sessions ≈ +1.1 points.",
+      "Check new_ui's share by device: 76% on mobile vs. 25% on desktop — a strongly uneven allocation from the rollout policy.",
+      "Split the gap by device: mobile ≈ -0.7 points (old_ui wins), desktop ≈ -1.9 points (old_ui wins) — new_ui loses in both segments.",
+      "Compare device baseline conversion: mobile converts meaningfully higher than desktop regardless of UI — the segment new_ui got more of is simply an easier-converting segment.",
+      "Conclude: the pooled 'win' is a mix-shift artifact of unequal traffic allocation, not a real effect of the new UI — Simpson's paradox."
+    ],
+    "numbers": [
+      { "label": "Pooled conversion gap (new_ui − old_ui)", "value": "+1.1 points" },
+      { "label": "new_ui share of traffic: mobile vs. desktop", "value": "76% vs. 25%" },
+      { "label": "Conversion gap within mobile", "value": "-0.7 points (old_ui wins)" },
+      { "label": "Conversion gap within desktop", "value": "-1.9 points (old_ui wins)" }
+    ],
+    "lesson": "A bandit or phased rollout that allocates traffic unevenly across segments — even for good operational reasons, like ramping mobile first — can produce a pooled result that reverses what's true in every individual segment, the same Simpson's paradox mechanism as any confounded observational comparison. Whenever an arm's traffic share differs across a variable that also affects the outcome, split the comparison by that variable before trusting the pooled number. A policy that loses in every segment cannot be a real winner overall — the pooled 'win' is measuring the traffic mix, not the policy."
+  }
+}

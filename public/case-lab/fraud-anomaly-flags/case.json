@@ -1,0 +1,74 @@
+{
+  "id": "fraud-anomaly-flags",
+  "title": "The anomaly model flagged 1% as fraud — freeze those accounts?",
+  "trap": "Anomaly-score precision",
+  "facets": { "topic": "Finance", "skill": ["Anomaly-score precision"] },
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the risk analyst at Pinpoint Pay",
+    "company": "Pinpoint Pay — fintech payments processor",
+    "situation": "The fraud team runs an isolation forest over every transaction — amount, device, time of day, billing/shipping country match — and flags the most unusual 1% for review. Marco, the Head of Risk, wants to skip manual review this week and auto-freeze every flagged account before a backlog builds up. He's treating \"flagged\" as functionally the same as \"fraud.\"",
+    "stakeholderBelief": "\"The model flagged the top 1% as anomalous. That's our fraud list — let's auto-freeze those accounts and stop the bleeding today.\"",
+    "question": "How much of the flagged 1% is actually fraud? Before anyone auto-freezes an account, work out what fraction of the anomaly flag is real fraud versus unusual-but-legitimate activity — and who's in that second group."
+  },
+  "dataset": {
+    "file": "/case-lab/fraud-anomaly-flags/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "transaction_id", "type": "int", "description": "Unique transaction identifier" },
+      { "name": "customer_type", "type": "string", "description": "normal, frequent_traveler, or bulk_purchaser — a known account archetype (not visible to the anomaly model)" },
+      { "name": "amount", "type": "float", "description": "Transaction amount in dollars" },
+      { "name": "is_new_device", "type": "int", "description": "1 if this transaction came from a device not seen on the account before" },
+      { "name": "hour_of_day", "type": "int", "description": "Local hour (0-23) the transaction occurred" },
+      { "name": "country_mismatch", "type": "int", "description": "1 if billing and shipping country differ" },
+      { "name": "confirmed_fraud", "type": "int", "description": "1 if this transaction was later confirmed as fraud through investigation/chargeback — the ground truth" },
+      { "name": "flagged_anomalous", "type": "int", "description": "1 if an isolation forest fit on amount/is_new_device/hour_of_day/country_mismatch flagged this transaction as anomalous (top ~1% by anomaly score)" }
+    ],
+    "sample": [
+      { "transaction_id": 1, "customer_type": "normal", "amount": 56.1, "is_new_device": 1, "hour_of_day": 17, "country_mismatch": 0, "confirmed_fraud": 0, "flagged_anomalous": 0 },
+      { "transaction_id": 2, "customer_type": "normal", "amount": 39.69, "is_new_device": 1, "hour_of_day": 0, "country_mismatch": 0, "confirmed_fraud": 0, "flagged_anomalous": 0 },
+      { "transaction_id": 3, "customer_type": "normal", "amount": 86.32, "is_new_device": 0, "hour_of_day": 7, "country_mismatch": 0, "confirmed_fraud": 0, "flagged_anomalous": 0 },
+      { "transaction_id": 4, "customer_type": "normal", "amount": 42.68, "is_new_device": 0, "hour_of_day": 19, "country_mismatch": 0, "confirmed_fraud": 0, "flagged_anomalous": 0 },
+      { "transaction_id": 5, "customer_type": "normal", "amount": 94.92, "is_new_device": 0, "hour_of_day": 17, "country_mismatch": 0, "confirmed_fraud": 0, "flagged_anomalous": 0 },
+      { "transaction_id": 6, "customer_type": "frequent_traveler", "amount": 163.52, "is_new_device": 0, "hour_of_day": 3, "country_mismatch": 0, "confirmed_fraud": 0, "flagged_anomalous": 0 },
+      { "transaction_id": 7, "customer_type": "normal", "amount": 60.29, "is_new_device": 0, "hour_of_day": 11, "country_mismatch": 0, "confirmed_fraud": 0, "flagged_anomalous": 0 },
+      { "transaction_id": 8, "customer_type": "normal", "amount": 30.4, "is_new_device": 0, "hour_of_day": 19, "country_mismatch": 0, "confirmed_fraud": 0, "flagged_anomalous": 0 },
+      { "transaction_id": 9, "customer_type": "bulk_purchaser", "amount": 141.65, "is_new_device": 0, "hour_of_day": 16, "country_mismatch": 0, "confirmed_fraud": 0, "flagged_anomalous": 0 },
+      { "transaction_id": 10, "customer_type": "normal", "amount": 60.29, "is_new_device": 0, "hour_of_day": 11, "country_mismatch": 0, "confirmed_fraud": 0, "flagged_anomalous": 0 }
+    ]
+  },
+  "guidingQuestions": [
+    "How many transactions are flagged_anomalous, and how many are confirmed_fraud overall? Could the flag possibly capture all of the fraud and nothing else?",
+    "Among flagged_anomalous transactions, what fraction are also confirmed_fraud? That fraction is the flag's real precision — write it down before reading further.",
+    "Break down flagged_anomalous transactions by customer_type. What share are frequent_traveler or bulk_purchaser rather than normal?",
+    "Why would a frequent traveler or bulk purchaser look just as unusual to the model as a fraud case — check their amount, is_new_device, hour_of_day, and country_mismatch patterns against confirmed_fraud's.",
+    "If Marco auto-freezes every flagged account, how many legitimate customers get locked out for every real fraud case caught?"
+  ],
+  "suggestedApproach": [
+    "Count flagged_anomalous and confirmed_fraud independently — note they're not the same size, so the flag can't be a perfect fraud detector by construction.",
+    "Cross-tab flagged_anomalous against confirmed_fraud to get true/false positives; compute precision (fraud among flagged) and recall (flagged among fraud).",
+    "Group flagged transactions by customer_type and see how much of the flagged bucket is frequent_traveler/bulk_purchaser rather than fraud.",
+    "Compare feature patterns (amount, is_new_device, hour_of_day, country_mismatch) between confirmed_fraud and the legitimate-but-flagged customer types — they should look similar, which is exactly why the model can't tell them apart.",
+    "Translate precision into an operational number: for every account Marco freezes off this list, roughly how many are legitimate customers versus real fraud?"
+  ],
+  "teachingNote": {
+    "naiveRead": "The model flagged the most unusual 1% of transactions. \"Anomalous\" sounds like \"fraud,\" and Marco wants to treat the flagged list as the fraud list and auto-freeze every account on it today.",
+    "theTrap": "An isolation forest has no concept of fraud — it only knows \"far from typical.\" Fraud is unusual (big amount, new device, odd hour, mismatched country), but so are two entirely legitimate customer types: frequent travelers (new device abroad, odd local hour, gift shipped to another country) and bulk purchasers (unusually large orders). The model can't distinguish \"unusual because criminal\" from \"unusual because legitimate but atypical\" — both push the same features in the same direction. Of the 120 transactions flagged, only about 52% are confirmed fraud; the rest are innocent travelers and bulk buyers who simply look statistically unusual for a good reason. And the flag only catches about a third of all confirmed fraud — most fraud isn't unusual enough on these features to make the top 1%.",
+    "honestAnswer": "Treat the anomaly flag as a triage signal, not a verdict. Precision on the flagged bucket is about 52% (roughly half the flagged accounts are legitimate), and recall is about 33% (the flag misses two-thirds of actual fraud). Auto-freezing every flagged account would lock out a large number of real customers — frequent travelers and bulk purchasers by name — for every fraud case correctly caught, with real support and churn cost. The honest move is to route flagged transactions to manual review (or a secondary check using data the model doesn't see, like account tenure or prior confirmed activity) rather than auto-freezing, and to accept that a low-precision flag at this contamination threshold is a starting filter, not a fraud determination.",
+    "howToGetThere": [
+      "Count flagged_anomalous (120) vs confirmed_fraud (186) — different totals, so the flag can't simply equal the fraud list.",
+      "Cross-tab flagged_anomalous vs confirmed_fraud: true positives / (true positives + false positives) = precision ≈ 0.52; true positives / total fraud = recall ≈ 0.33.",
+      "Break flagged transactions down by customer_type: more than half are frequent_traveler or bulk_purchaser, not fraud.",
+      "Compare feature distributions: legitimate travelers/bulk purchasers have elevated is_new_device, odd hour_of_day, and country_mismatch rates close to fraud's — which is exactly why an unsupervised model can't separate them.",
+      "State the operational cost: for every ~2 accounts frozen off the flagged list, roughly 1 is a legitimate customer."
+    ],
+    "numbers": [
+      { "label": "Flagged as anomalous (top ~1%)", "value": "120 transactions" },
+      { "label": "Confirmed fraud (total)", "value": "186 transactions" },
+      { "label": "Precision of the flag (fraud among flagged)", "value": "≈ 52%" },
+      { "label": "Recall of the flag (flagged among fraud)", "value": "≈ 33%" },
+      { "label": "Share of flagged transactions that are legit travelers/bulk buyers", "value": "≈ 56%" }
+    ],
+    "lesson": "Unsupervised anomaly detection finds statistical outliers, not fraud — those are only the same thing if nothing legitimate is also unusual, which is almost never true in real customer data. Before acting on an anomaly flag, always measure its precision and recall against confirmed ground truth (even on a small labeled sample), and profile who else shows up in the flagged bucket. A flag with real informational value can still be far too imprecise to act on directly — the right response is usually to route it to a cheaper secondary check, not to treat 'unusual' as a verdict."
+  }
+}

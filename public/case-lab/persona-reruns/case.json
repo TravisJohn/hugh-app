@@ -1,0 +1,70 @@
+{
+  "id": "persona-reruns",
+  "title": "We found 4 stable customer personas — commit next quarter's budget by persona?",
+  "trap": "Cluster instability",
+  "facets": { "topic": "Marketing", "skill": ["Cluster instability"] },
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the marketing analyst at Millbrook",
+    "company": "Millbrook — DTC apparel brand",
+    "situation": "Owen, the CMO, ran k-means (k=4, chosen from an elbow plot) on engagement_score and value_score, got 4 clean-looking personas, and named them for the media plan. He wants to lock in next quarter's ad budget split by persona size before the planning deadline — and asked you to just confirm the persona sizes are right.",
+    "stakeholderBelief": "\"We ran the clustering and found 4 real personas. Let's commit next quarter's ad budget split to match their sizes — this is settled, just confirm the numbers.\"",
+    "question": "Are these 4 personas actually stable — the same clustering you'd get if you re-ran it tomorrow — or did one particular run just happen to draw those boundaries? Check whether the persona assignment survives a re-run before budget gets locked to it."
+  },
+  "dataset": {
+    "file": "/case-lab/persona-reruns/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "customer_id", "type": "int", "description": "Unique customer identifier" },
+      { "name": "engagement_score", "type": "float", "description": "Composite engagement score, 0-100" },
+      { "name": "value_score", "type": "float", "description": "Composite value score, roughly $10-3,000" },
+      { "name": "cluster_run1", "type": "int", "description": "K-means(k=4) cluster label from the first run, fit on engagement_score/value_score (standardized)" },
+      { "name": "cluster_run2", "type": "int", "description": "K-means(k=4) cluster label from a second run — same data, same k, only the random initialization differs (like re-running the job on a different day without a pinned seed). Labels are pre-matched to run1's numbering for comparison." }
+    ],
+    "sample": [
+      { "customer_id": 1, "engagement_score": 33.5, "value_score": 303.29, "cluster_run1": 0, "cluster_run2": 2 },
+      { "customer_id": 2, "engagement_score": 77.5, "value_score": 666.17, "cluster_run1": 3, "cluster_run2": 3 },
+      { "customer_id": 3, "engagement_score": 41.9, "value_score": 113.59, "cluster_run1": 0, "cluster_run2": 0 },
+      { "customer_id": 4, "engagement_score": 79.9, "value_score": 720.4, "cluster_run1": 3, "cluster_run2": 3 },
+      { "customer_id": 5, "engagement_score": 28.9, "value_score": 279.19, "cluster_run1": 0, "cluster_run2": 2 },
+      { "customer_id": 6, "engagement_score": 45.9, "value_score": 237.44, "cluster_run1": 0, "cluster_run2": 0 },
+      { "customer_id": 7, "engagement_score": 100.0, "value_score": 562.01, "cluster_run1": 1, "cluster_run2": 3 },
+      { "customer_id": 8, "engagement_score": 26.9, "value_score": 74.22, "cluster_run1": 0, "cluster_run2": 0 },
+      { "customer_id": 9, "engagement_score": 65.3, "value_score": 451.12, "cluster_run1": 1, "cluster_run2": 1 },
+      { "customer_id": 10, "engagement_score": 100.0, "value_score": 521.14, "cluster_run1": 1, "cluster_run2": 1 }
+    ]
+  },
+  "guidingQuestions": [
+    "What share of customers have the same cluster_run1 and cluster_run2? (Labels are already matched, so a direct equality check is valid.)",
+    "For customers who DID change cluster between runs, where do they sit in engagement_score/value_score space — near the middle of the pack, or out at the extremes?",
+    "Plot (or describe) engagement_score vs. value_score. Do you see 4 visually distinct, well-separated groups, or more of a continuous cloud?",
+    "If you had to guess how many *real* separated groups are in this data by eye, would you say 4?",
+    "If Owen locks next quarter's ad budget to the 4 persona sizes from cluster_run1, and the real underlying data hasn't changed at all — what happens when someone re-runs the same clustering next month?"
+  ],
+  "suggestedApproach": [
+    "Compute the share of customers where cluster_run1 == cluster_run2 — this is the reproducibility rate.",
+    "Isolate the customers who switched clusters and check where they sit relative to the boundary between clusters — likely clustered near cluster boundaries, not randomly scattered.",
+    "Visualize (or bucket) engagement_score against value_score and look for whether 4 genuinely separated blobs exist, or one continuous, overlapping cloud.",
+    "Consider what k actually fits: does the data support a cleaner, smaller number of groups than 4?",
+    "State the real risk in business terms: an ad-budget split locked to cluster sizes that reshuffle ~15% of customers on a re-run with the exact same underlying population."
+  ],
+  "teachingNote": {
+    "naiveRead": "K-means ran, 4 clusters came out, they got named, and the sizes look final enough to lock next quarter's budget split against.",
+    "theTrap": "K-means is a local-search algorithm: it starts from a random set of initial cluster centers and converges to whichever partition is nearest that starting point, not necessarily the one globally best partition. When the underlying data doesn't have 4 cleanly separated groups — here, it's really closer to 2 broad, overlapping groups, and k=4 was chosen from an elbow-plot ritual rather than genuine structure — the two \"extra\" clusters get carved out of that continuous cloud roughly wherever the random initialization happens to land. Re-run the exact same clustering on the exact same data, with only the random seed different, and 15% of customers land in a different cluster than before. The clusters aren't measuring something real and stable about each customer; a meaningful chunk of the \"persona\" label is just which random start the algorithm happened to get.",
+    "honestAnswer": "Before locking a budget split to cluster sizes, check reproducibility: re-run the clustering (different seed, same data) and measure how many customers keep the same cluster. Here, only 85% do (adjusted Rand index ≈ 0.68 between the two runs) — genuine instability, not noise you can ignore. The honest move is either to stabilize the clustering (many more random restarts and take a consensus/majority-vote label, or fit on standardized data with a k chosen by a stability-aware method rather than a single elbow plot) or, more simply, to check whether the data actually supports 4 groups at all — here it doesn't; the real structure is closer to 2 broad segments. Tell Owen: don't lock next quarter's budget to a 4-way split that a different Tuesday's random seed would have drawn differently. Either stabilize the method or reduce to the segment count the data actually supports.",
+    "howToGetThere": [
+      "Re-run k-means(k=4) on the identical dataset with only the random seed changed; match cluster labels between the two runs by maximum overlap (Hungarian algorithm).",
+      "Compute the share of customers with the same matched cluster in both runs: ≈ 85% — meaning 15% reshuffle.",
+      "Compute the adjusted Rand index between the two runs' labels: ≈ 0.68 — meaningfully below 1.0, confirming real instability, not just label-numbering noise.",
+      "Visualize engagement_score vs. value_score: the data forms one broad, overlapping cloud rather than 4 visually separated blobs.",
+      "Conclude: k=4 doesn't reflect genuine structure in this data; treat cluster identity here as unstable rather than a fixed customer trait."
+    ],
+    "numbers": [
+      { "label": "Customers with the same cluster across two re-runs", "value": "≈ 85%" },
+      { "label": "Customers reassigned to a different cluster", "value": "≈ 15% (~1,800 of 12,000)" },
+      { "label": "Adjusted Rand index between the two runs", "value": "≈ 0.68 (well below 1.0)" },
+      { "label": "Genuinely separated groups visible in the data", "value": "≈ 2, not 4" }
+    ],
+    "lesson": "K-means always returns an answer, even when the data doesn't have the number of clean, separated groups you asked for — and that answer can depend heavily on the random starting point rather than on real structure. Before treating a clustering result as a stable customer attribute (worth budget, campaigns, or roadmap decisions), re-run it and measure agreement. If the same data produces meaningfully different clusters from run to run, the instability is telling you something important: either stabilize the method (more restarts, consensus clustering) or reduce k to the number of groups the data actually supports."
+  }
+}

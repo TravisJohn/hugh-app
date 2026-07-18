@@ -1,0 +1,74 @@
+{
+  "id": "server-anomaly-flags",
+  "title": "The anomaly detector flagged these hosts as compromised — take them offline?",
+  "trap": "Anomaly-score precision",
+  "facets": { "topic": "Data Engineering", "skill": ["Anomaly-score precision"] },
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the platform reliability analyst at Palisade",
+    "company": "Palisade — cloud infrastructure & DevOps platform",
+    "situation": "The security team runs an isolation forest over daily host snapshots — CPU spikes, outbound connections, off-hours activity, new processes — and flags the most unusual 1% for review. Renata, the security lead, wants to skip the review queue this week and auto-quarantine every flagged host tonight, worried a live incident is spreading.",
+    "stakeholderBelief": "\"The model flagged these hosts as anomalous — that's our compromise list. Quarantine them all tonight before it spreads.\"",
+    "question": "How much of the flagged 1% is actually compromised? Before anything gets quarantined, work out what fraction of the anomaly flag is real compromise versus scheduled jobs behaving normally — and which hosts are which."
+  },
+  "dataset": {
+    "file": "/case-lab/server-anomaly-flags/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "snapshot_id", "type": "int", "description": "Unique daily host-snapshot identifier" },
+      { "name": "host_type", "type": "string", "description": "normal, batch_job_host, or backup_host — the host's known role (not visible to the anomaly model)" },
+      { "name": "cpu_spike_pct", "type": "float", "description": "Peak CPU utilization percent that day" },
+      { "name": "outbound_connections", "type": "int", "description": "Count of distinct outbound network connections that day" },
+      { "name": "off_hours_activity", "type": "int", "description": "1 if significant activity occurred outside business hours" },
+      { "name": "new_process_count", "type": "int", "description": "Count of processes that hadn't run on this host before" },
+      { "name": "confirmed_compromised", "type": "int", "description": "1 if this host was later confirmed compromised through incident response — the ground truth" },
+      { "name": "flagged_anomalous", "type": "int", "description": "1 if an isolation forest fit on cpu_spike_pct/outbound_connections/off_hours_activity/new_process_count flagged this snapshot as anomalous (top ~1% by anomaly score)" }
+    ],
+    "sample": [
+      { "snapshot_id": 1, "host_type": "batch_job_host", "cpu_spike_pct": 63.9, "outbound_connections": 7, "off_hours_activity": 1, "new_process_count": 0, "confirmed_compromised": 0, "flagged_anomalous": 0 },
+      { "snapshot_id": 2, "host_type": "batch_job_host", "cpu_spike_pct": 75.5, "outbound_connections": 14, "off_hours_activity": 1, "new_process_count": 2, "confirmed_compromised": 0, "flagged_anomalous": 0 },
+      { "snapshot_id": 3, "host_type": "normal", "cpu_spike_pct": 13.0, "outbound_connections": 7, "off_hours_activity": 0, "new_process_count": 1, "confirmed_compromised": 0, "flagged_anomalous": 0 },
+      { "snapshot_id": 4, "host_type": "normal", "cpu_spike_pct": 15.9, "outbound_connections": 6, "off_hours_activity": 0, "new_process_count": 0, "confirmed_compromised": 0, "flagged_anomalous": 0 },
+      { "snapshot_id": 5, "host_type": "normal", "cpu_spike_pct": 14.9, "outbound_connections": 3, "off_hours_activity": 0, "new_process_count": 0, "confirmed_compromised": 0, "flagged_anomalous": 0 },
+      { "snapshot_id": 6, "host_type": "backup_host", "cpu_spike_pct": 16.3, "outbound_connections": 166, "off_hours_activity": 0, "new_process_count": 2, "confirmed_compromised": 0, "flagged_anomalous": 0 },
+      { "snapshot_id": 7, "host_type": "normal", "cpu_spike_pct": 9.8, "outbound_connections": 7, "off_hours_activity": 0, "new_process_count": 0, "confirmed_compromised": 0, "flagged_anomalous": 0 },
+      { "snapshot_id": 8, "host_type": "normal", "cpu_spike_pct": 15.4, "outbound_connections": 6, "off_hours_activity": 0, "new_process_count": 0, "confirmed_compromised": 0, "flagged_anomalous": 0 },
+      { "snapshot_id": 9, "host_type": "batch_job_host", "cpu_spike_pct": 70.1, "outbound_connections": 5, "off_hours_activity": 1, "new_process_count": 1, "confirmed_compromised": 0, "flagged_anomalous": 0 },
+      { "snapshot_id": 10, "host_type": "backup_host", "cpu_spike_pct": 7.9, "outbound_connections": 165, "off_hours_activity": 0, "new_process_count": 0, "confirmed_compromised": 0, "flagged_anomalous": 0 }
+    ]
+  },
+  "guidingQuestions": [
+    "How many snapshots are flagged_anomalous, and how many are confirmed_compromised overall? Could the flag possibly be a perfect compromise list?",
+    "Among flagged_anomalous snapshots, what fraction are also confirmed_compromised? That's the flag's real precision.",
+    "Break down flagged_anomalous snapshots by host_type. What share are batch_job_host or backup_host rather than genuinely unexplained?",
+    "Compare cpu_spike_pct and outbound_connections for batch_job_host and backup_host against confirmed_compromised hosts — why would a scheduled job look just as unusual to the model as a compromise?",
+    "If Renata quarantines every flagged host tonight, how many production batch and backup jobs get taken offline for every real compromise caught?"
+  ],
+  "suggestedApproach": [
+    "Count flagged_anomalous and confirmed_compromised independently — note they're different sizes, so the flag can't be a perfect detector by construction.",
+    "Cross-tab flagged_anomalous against confirmed_compromised to get true/false positives; compute precision (compromise among flagged) and recall (flagged among compromise).",
+    "Group flagged snapshots by host_type and see how much of the flagged bucket is batch_job_host/backup_host rather than genuinely anomalous.",
+    "Compare cpu_spike_pct, outbound_connections, and off_hours_activity between confirmed_compromised hosts and the legitimate batch/backup archetypes — notice how similar the profiles look.",
+    "Translate precision into an operational number: for every host Renata quarantines off this list, roughly how many are production jobs versus real compromise?"
+  ],
+  "teachingNote": {
+    "naiveRead": "The model flagged the most unusual 1% of daily host snapshots. \"Anomalous\" reads as \"compromised,\" and Renata wants to treat the flagged list as the incident list and quarantine every host on it tonight.",
+    "theTrap": "An isolation forest has no concept of compromise — it only knows \"far from typical.\" Real compromise looks unusual (CPU spikes, many outbound connections, off-hours activity, new processes), but so do two completely legitimate host roles: batch-job hosts (scheduled heavy CPU work, often off-hours) and backup hosts (a large burst of outbound connections during transfer windows). Worse, in this data, compromise deliberately resembles one of those two legitimate footprints on most metrics — real evasive behavior looks like a heavy scheduled job, not like something standing apart. The model separates mainly on new_process_count, and even there, legitimate batch/backup hosts restart workers and spin up occasional new processes too, so the separation is noisy. Of the 120 flagged snapshots, only about 48% are confirmed compromise; nearly 70% of the flagged bucket is batch or backup hosts doing their scheduled job.",
+    "honestAnswer": "Treat the anomaly flag as a triage signal, not an incident verdict. Precision on the flagged bucket is about 48% (roughly half the flagged hosts are legitimate), and recall is about 36% (the flag misses about two-thirds of confirmed compromise, because well-disguised compromise sits inside the normal range of at least one legitimate archetype). Auto-quarantining every flagged host tonight would take a large share of production batch and backup jobs offline for every real compromise caught. The honest move is to route flagged snapshots to a human review step that checks context the model doesn't see — a scheduled job calendar, backup window logs, change-management records — before quarantining, and to invest in features that actually separate compromise from scheduled work (e.g. process hash reputation, known job IDs) rather than trusting an unsupervised flag at face value.",
+    "howToGetThere": [
+      "Count flagged_anomalous (120) vs confirmed_compromised (160) — different totals, so the flag can't simply equal the incident list.",
+      "Cross-tab flagged_anomalous vs confirmed_compromised: true positives / (true positives + false positives) = precision ≈ 0.48; true positives / total compromised = recall ≈ 0.36.",
+      "Break flagged snapshots down by host_type: nearly 70% are batch_job_host or backup_host, not compromise.",
+      "Compare feature distributions: batch/backup hosts have elevated cpu_spike_pct or outbound_connections and off_hours_activity that overlap heavily with confirmed_compromised hosts, because compromise here was designed to mimic one of those two footprints.",
+      "State the operational cost: for roughly every 2 hosts quarantined off this list, about 1 is a legitimate scheduled job."
+    ],
+    "numbers": [
+      { "label": "Flagged as anomalous (top ~1%)", "value": "120 snapshots" },
+      { "label": "Confirmed compromised (total)", "value": "160 snapshots" },
+      { "label": "Precision of the flag (compromise among flagged)", "value": "≈ 48%" },
+      { "label": "Recall of the flag (flagged among compromise)", "value": "≈ 36%" },
+      { "label": "Share of flagged snapshots that are legit batch/backup hosts", "value": "≈ 69%" }
+    ],
+    "lesson": "Unsupervised anomaly detection finds statistical outliers, not incidents — those are only the same thing if nothing legitimate is unusual too, and in real infrastructure, scheduled heavy jobs are unusual by design. Before acting on an anomaly flag, measure its precision and recall against confirmed ground truth, and check who else lives in the flagged bucket. A model with genuine signal can still be far too imprecise to act on directly at machine speed — route it to a review step with context the model can't see, rather than treating 'anomalous' as 'compromised.'"
+  }
+}

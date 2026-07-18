@@ -6,7 +6,12 @@
       "title": "Discount-code orders are 3x bigger — blast more codes to grow baskets?",
       "company": "Cartwheel — online homeware retailer",
       "trap": "Reverse causality",
-      "facets": { "topic": "Finance", "skill": ["Reverse causality"] },
+      "facets": {
+        "topic": "Finance",
+        "skill": [
+          "Reverse causality"
+        ]
+      },
       "estMinutes": 25,
       "rows": 12000,
       "releaseDate": "2026-07-06",
@@ -17,7 +22,12 @@
       "title": "Enterprise accounts are our most loyal — should we bet the GTM on them?",
       "company": "Northwind — B2B SaaS",
       "trap": "Survivorship bias",
-      "facets": { "topic": "Finance", "skill": ["Survivorship bias"] },
+      "facets": {
+        "topic": "Finance",
+        "skill": [
+          "Survivorship bias"
+        ]
+      },
       "estMinutes": 25,
       "rows": 12000,
       "releaseDate": "2026-07-06",
@@ -28,7 +38,12 @@
       "title": "Checklist-completers retain at nearly double — make it mandatory?",
       "company": "Plotline — project-planning app",
       "trap": "Self-selection",
-      "facets": { "topic": "Product", "skill": ["Self-selection"] },
+      "facets": {
+        "topic": "Product",
+        "skill": [
+          "Self-selection"
+        ]
+      },
       "estMinutes": 25,
       "rows": 12000,
       "releaseDate": "2026-07-06",
@@ -39,7 +54,12 @@
       "title": "Weekly sessions rose after the redesign — did engagement go up?",
       "company": "Fathom — personal-finance app",
       "trap": "Simpson's paradox",
-      "facets": { "topic": "Product", "skill": ["Simpson's paradox"] },
+      "facets": {
+        "topic": "Product",
+        "skill": [
+          "Simpson's paradox"
+        ]
+      },
       "estMinutes": 25,
       "rows": 12000,
       "releaseDate": "2026-07-06",
@@ -50,7 +70,13 @@
       "title": "SLA breaches jumped after the Airflow 2 migration — roll it back?",
       "company": "Switchyard — data infrastructure",
       "trap": "Confounding / selection bias",
-      "facets": { "topic": "Orchestration", "skill": ["Selection bias", "Confounding"] },
+      "facets": {
+        "topic": "Orchestration",
+        "skill": [
+          "Selection bias",
+          "Confounding"
+        ]
+      },
       "estMinutes": 25,
       "rows": 12000,
       "releaseDate": "2026-07-06",
@@ -61,7 +87,12 @@
       "title": "Auto-retries pushed task success to 94% — did retries fix reliability?",
       "company": "Orbit — marketing-analytics SaaS",
       "trap": "Simpson's paradox",
-      "facets": { "topic": "Orchestration", "skill": ["Simpson's paradox"] },
+      "facets": {
+        "topic": "Orchestration",
+        "skill": [
+          "Simpson's paradox"
+        ]
+      },
       "estMinutes": 25,
       "rows": 12000,
       "releaseDate": "2026-07-06",
@@ -72,7 +103,13 @@
       "title": "Migrated queries run 60% faster — should we move everything?",
       "company": "Beacon — product-analytics platform",
       "trap": "Confounding / selection bias",
-      "facets": { "topic": "Data Engineering", "skill": ["Confounding", "Selection bias"] },
+      "facets": {
+        "topic": "Data Engineering",
+        "skill": [
+          "Confounding",
+          "Selection bias"
+        ]
+      },
       "estMinutes": 25,
       "rows": 12000,
       "releaseDate": "2026-07-06",
@@ -83,7 +120,12 @@
       "title": "Incidents fell on the tables we validated — did validation work?",
       "company": "Corva — logistics data platform",
       "trap": "Regression to the mean",
-      "facets": { "topic": "Data Engineering", "skill": ["Regression to the mean"] },
+      "facets": {
+        "topic": "Data Engineering",
+        "skill": [
+          "Regression to the mean"
+        ]
+      },
       "estMinutes": 25,
       "rows": 12000,
       "releaseDate": "2026-07-06",
@@ -94,7 +136,13 @@
       "title": "Did the win-back email actually lift retention?",
       "company": "Lumen — habit-tracking app",
       "trap": "Confounding / selection bias",
-      "facets": { "topic": "Marketing", "skill": ["Confounding", "Selection bias"] },
+      "facets": {
+        "topic": "Marketing",
+        "skill": [
+          "Confounding",
+          "Selection bias"
+        ]
+      },
       "estMinutes": 25,
       "rows": 12000,
       "releaseDate": "2026-07-05",
@@ -105,7 +153,13 @@
       "title": "Do support tickets cause churn — should we cut the team?",
       "company": "Meridian — B2B SaaS",
       "trap": "Confounding / reverse causality",
-      "facets": { "topic": "Support", "skill": ["Confounding", "Reverse causality"] },
+      "facets": {
+        "topic": "Support",
+        "skill": [
+          "Confounding",
+          "Reverse causality"
+        ]
+      },
       "estMinutes": 25,
       "rows": 12000,
       "releaseDate": "2026-07-04",
@@ -116,7 +170,12 @@
       "title": "The new checkout converts worse overall — roll it back?",
       "company": "Kettle — DTC e-commerce",
       "trap": "Simpson's paradox",
-      "facets": { "topic": "Product", "skill": ["Simpson's paradox"] },
+      "facets": {
+        "topic": "Product",
+        "skill": [
+          "Simpson's paradox"
+        ]
+      },
       "estMinutes": 25,
       "rows": 12000,
       "releaseDate": "2026-07-03",
@@ -127,7 +186,12 @@
       "title": "Team A's win rate beats Team B — is B underperforming?",
       "company": "Vantage — B2B sales",
       "trap": "Simpson's paradox",
-      "facets": { "topic": "Sales", "skill": ["Simpson's paradox"] },
+      "facets": {
+        "topic": "Sales",
+        "skill": [
+          "Simpson's paradox"
+        ]
+      },
       "estMinutes": 25,
       "rows": 12000,
       "releaseDate": "2026-07-02",
@@ -138,7 +202,12 @@
       "title": "We coached our worst reps and they improved — does coaching work?",
       "company": "Ridgeline — B2B sales",
       "trap": "Regression to the mean",
-      "facets": { "topic": "Sales", "skill": ["Regression to the mean"] },
+      "facets": {
+        "topic": "Sales",
+        "skill": [
+          "Regression to the mean"
+        ]
+      },
       "estMinutes": 25,
       "rows": 12000,
       "releaseDate": "2026-07-01",
@@ -149,7 +218,12 @@
       "title": "We remodeled our worst-rated stores and ratings rebounded — did it work?",
       "company": "Foundry Goods — retail",
       "trap": "Regression to the mean",
-      "facets": { "topic": "Retail", "skill": ["Regression to the mean"] },
+      "facets": {
+        "topic": "Retail",
+        "skill": [
+          "Regression to the mean"
+        ]
+      },
       "estMinutes": 25,
       "rows": 12000,
       "releaseDate": "2026-06-30",
@@ -160,7 +234,12 @@
       "title": "Users who run 50+ workflows never churn — push everyone to 50?",
       "company": "Cadence — workflow SaaS",
       "trap": "Survivorship bias",
-      "facets": { "topic": "Product", "skill": ["Survivorship bias"] },
+      "facets": {
+        "topic": "Product",
+        "skill": [
+          "Survivorship bias"
+        ]
+      },
       "estMinutes": 25,
       "rows": 12000,
       "releaseDate": "2026-06-29",
@@ -171,7 +250,13 @@
       "title": "Referrers are worth 1.8x — should we push referrals to grow LTV?",
       "company": "Tally — personal-finance app",
       "trap": "Survivorship / self-selection",
-      "facets": { "topic": "Marketing", "skill": ["Survivorship bias", "Self-selection"] },
+      "facets": {
+        "topic": "Marketing",
+        "skill": [
+          "Survivorship bias",
+          "Self-selection"
+        ]
+      },
       "estMinutes": 25,
       "rows": 12000,
       "releaseDate": "2026-06-28",
@@ -182,7 +267,12 @@
       "title": "Revenue jumped 64% after the November loyalty launch — did it work?",
       "company": "Harbor — online marketplace",
       "trap": "Seasonality confound",
-      "facets": { "topic": "Marketing", "skill": ["Seasonality"] },
+      "facets": {
+        "topic": "Marketing",
+        "skill": [
+          "Seasonality"
+        ]
+      },
       "estMinutes": 30,
       "rows": 12000,
       "releaseDate": "2026-06-27",
@@ -193,11 +283,336 @@
       "title": "Conversion rose after the December site-speed deploy — did the deploy do it?",
       "company": "Verve — online retailer",
       "trap": "Seasonality confound",
-      "facets": { "topic": "Product", "skill": ["Seasonality"] },
+      "facets": {
+        "topic": "Product",
+        "skill": [
+          "Seasonality"
+        ]
+      },
       "estMinutes": 30,
       "rows": 40000,
       "releaseDate": "2026-06-26",
       "blurb": "Conversion jumped ~8 points the month a speed improvement shipped — in December. Two years of sessions are in the file. Is it the deploy or the season?"
+    },
+    {
+      "id": "spend-scaled-personas",
+      "title": "K-means found 4 shopper personas — build campaigns around them?",
+      "company": "Willowmere — DTC home & lifestyle retailer",
+      "trap": "Feature scaling in clustering",
+      "facets": {
+        "topic": "Retail",
+        "skill": [
+          "Feature scaling in clustering"
+        ]
+      },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-18",
+      "blurb": "K-means found 4 shopper personas from visit frequency, session depth, and spend. But one column has a 20x bigger scale than the other two — check what's actually driving the clusters before four campaigns get built."
+    },
+    {
+      "id": "seat-count-clusters",
+      "title": "Usage clustering found 5 personas — target onboarding by persona?",
+      "company": "Ledgerline — team collaboration SaaS",
+      "trap": "Feature scaling in clustering",
+      "facets": {
+        "topic": "Product",
+        "skill": [
+          "Feature scaling in clustering"
+        ]
+      },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-18",
+      "blurb": "Usage clustering found 5 personas for onboarding — but did it find behavior, or just account size? One unscaled column can decide a whole clustering on its own."
+    },
+    {
+      "id": "fraud-anomaly-flags",
+      "title": "The anomaly model flagged 1% as fraud — freeze those accounts?",
+      "company": "Pinpoint Pay — fintech payments processor",
+      "trap": "Anomaly-score precision",
+      "facets": {
+        "topic": "Finance",
+        "skill": [
+          "Anomaly-score precision"
+        ]
+      },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-18",
+      "blurb": "An isolation forest flagged the top 1% as fraud. Before anyone auto-freezes an account, check how much of that flag is actually fraud — and who else looks just as unusual."
+    },
+    {
+      "id": "server-anomaly-flags",
+      "title": "The anomaly detector flagged these hosts as compromised — take them offline?",
+      "company": "Palisade — cloud infrastructure & DevOps platform",
+      "trap": "Anomaly-score precision",
+      "facets": {
+        "topic": "Data Engineering",
+        "skill": [
+          "Anomaly-score precision"
+        ]
+      },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-18",
+      "blurb": "The anomaly detector flagged these hosts as compromised. Before quarantine, check how many are just scheduled batch jobs and backups doing their job at 3am."
+    },
+    {
+      "id": "health-score-pca",
+      "title": "PC1 explains 99.9% of the variance — build the health score on it?",
+      "company": "Anchorage — customer-success SaaS platform",
+      "trap": "Explained variance ≠ relevance",
+      "facets": {
+        "topic": "Product",
+        "skill": [
+          "Explained variance ≠ relevance"
+        ]
+      },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-18",
+      "blurb": "PC1 explains 99.9% of the variance across four health metrics — sounds like the whole picture in one score. Check whether it actually predicts who churns."
+    },
+    {
+      "id": "engagement-score-pca",
+      "title": "PC1 explains 99% of the engagement variance — score users on it?",
+      "company": "Fernglow — media & content streaming app",
+      "trap": "Explained variance ≠ relevance",
+      "facets": {
+        "topic": "Marketing",
+        "skill": [
+          "Explained variance ≠ relevance"
+        ]
+      },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-18",
+      "blurb": "PC1 explains 99% of the engagement variance — ready to rank and target users on it. Check whether it predicts who actually comes back."
+    },
+    {
+      "id": "persona-reruns",
+      "title": "We found 4 stable customer personas — commit next quarter's budget by persona?",
+      "company": "Millbrook — DTC apparel brand",
+      "trap": "Cluster instability",
+      "facets": {
+        "topic": "Marketing",
+        "skill": [
+          "Cluster instability"
+        ]
+      },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-18",
+      "blurb": "4 personas came out of one k-means run, and the budget split is about to lock to their sizes. Re-run it and see how many customers land somewhere else."
+    },
+    {
+      "id": "ticket-cluster-drift",
+      "title": "Ticket clustering found 4 issue types — route tickets by cluster ID?",
+      "company": "Norwell — B2B helpdesk software",
+      "trap": "Cluster instability",
+      "facets": {
+        "topic": "Support",
+        "skill": [
+          "Cluster instability"
+        ]
+      },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-18",
+      "blurb": "Ticket clustering found 4 issue types, and support-ops wants to route by cluster ID. Re-run the same clustering and see how many tickets change queues."
+    },
+    {
+      "id": "clusters-are-plan-tier",
+      "title": "Clustering discovered a high-value segment — target it for upsell?",
+      "company": "Ashgrove — B2B project-management SaaS",
+      "trap": "Redundant clustering",
+      "facets": {
+        "topic": "Sales",
+        "skill": [
+          "Redundant clustering"
+        ]
+      },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-18",
+      "blurb": "Clustering \"discovered\" a high-value segment worth a new upsell motion. Check whether it's just the enterprise tier wearing a data-science label."
+    },
+    {
+      "id": "clusters-are-trial-status",
+      "title": "Clustering revealed a high-risk churn group — target it with an intervention?",
+      "company": "Quillwork — note-taking & productivity app",
+      "trap": "Redundant clustering",
+      "facets": {
+        "topic": "Product",
+        "skill": [
+          "Redundant clustering"
+        ]
+      },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-18",
+      "blurb": "Clustering revealed a \"new\" at-risk group worth its own re-engagement flow. Check whether it's just account status restated — and where the real signal is hiding."
+    },
+    {
+      "id": "recommender-bandit-logs",
+      "title": "Variant B gets a higher average reward in the logs — roll it out to everyone?",
+      "company": "Streamloop — video streaming platform",
+      "trap": "Off-policy evaluation bias",
+      "facets": {
+        "topic": "Product",
+        "skill": [
+          "Off-policy evaluation bias"
+        ]
+      },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-18",
+      "blurb": "Variant B's click rate is 20 points higher in the logs — but it was also shown to the most engaged users first. Correct for who actually saw each variant before rolling out."
+    },
+    {
+      "id": "pricing-bandit-logs",
+      "title": "The discount-price arm shows higher revenue per session in the logs — roll it out everywhere?",
+      "company": "Redbrick Market — online grocery delivery",
+      "trap": "Off-policy evaluation bias",
+      "facets": {
+        "topic": "Retail",
+        "skill": [
+          "Off-policy evaluation bias"
+        ]
+      },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-18",
+      "blurb": "The discount arm earns $14 more per session in the logs. Check who actually got shown the discount before believing it — the honest number might have the wrong sign."
+    },
+    {
+      "id": "clickbait-bandit",
+      "title": "The CTR bandit lifted clicks 63% — ship it to all traffic?",
+      "company": "Northfeed — content & news app",
+      "trap": "Reward hacking",
+      "facets": {
+        "topic": "Marketing",
+        "skill": [
+          "Reward hacking"
+        ]
+      },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-18",
+      "blurb": "A CTR bandit lifted clicks 63%. Check what happened to purchases — the metric the clicks were only ever supposed to lead to."
+    },
+    {
+      "id": "one-touch-routing-bandit",
+      "title": "The routing bandit lifted first-touch resolution 41% — roll it out support-wide?",
+      "company": "Havenline — customer support platform",
+      "trap": "Reward hacking",
+      "facets": {
+        "topic": "Support",
+        "skill": [
+          "Reward hacking"
+        ]
+      },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-18",
+      "blurb": "A routing bandit lifted first-touch resolution 41%. Check the reopen rate before believing those tickets actually got fixed."
+    },
+    {
+      "id": "ad-bidding-drift",
+      "title": "The learned bidder beats the fixed rule by $2.93/auction — keep it live?",
+      "company": "Cobalt Ads — programmatic ad-bidding platform",
+      "trap": "Non-stationarity",
+      "facets": {
+        "topic": "Marketing",
+        "skill": [
+          "Non-stationarity"
+        ]
+      },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-18",
+      "blurb": "A learned bidder beats the fixed rule by $2.93/auction averaged over the quarter — but a competitor entered partway through. Split by period before making it permanent."
+    },
+    {
+      "id": "inventory-routing-drift",
+      "title": "The RL router beats the heuristic by 5.5 points of on-time rate — make it permanent?",
+      "company": "Palletworks — logistics & warehouse operations",
+      "trap": "Non-stationarity",
+      "facets": {
+        "topic": "Orchestration",
+        "skill": [
+          "Non-stationarity"
+        ]
+      },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-18",
+      "blurb": "An RL router beats the old heuristic by 5.5 points of on-time rate for the quarter — including the holiday surge. Check whether the edge survives the surge itself."
+    },
+    {
+      "id": "creative-bandit-regret",
+      "title": "The bandit's average conversion rate beats the old creative — was it worth running?",
+      "company": "Brightloop — social ad creative tool",
+      "trap": "Hidden exploration cost",
+      "facets": {
+        "topic": "Marketing",
+        "skill": [
+          "Hidden exploration cost"
+        ]
+      },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-18",
+      "blurb": "A creative bandit's average conversion rate beat the old ad over 40 days. Check the first two weeks separately before calling bandits an automatic win."
+    },
+    {
+      "id": "subject-line-bandit-regret",
+      "title": "The subject-line bandit's average open rate beats the old template — was it worth running?",
+      "company": "Pathwell — sales engagement SaaS",
+      "trap": "Hidden exploration cost",
+      "facets": {
+        "topic": "Sales",
+        "skill": [
+          "Hidden exploration cost"
+        ]
+      },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-18",
+      "blurb": "A subject-line bandit's average open rate beat the old template over 40 days. Check the first two weeks before turning it on for every sequence."
+    },
+    {
+      "id": "checkout-bandit-simpson",
+      "title": "The new checkout UI converts better overall — make it the default?",
+      "company": "Coastline Goods — DTC e-commerce",
+      "trap": "Bandit traffic-allocation paradox",
+      "facets": {
+        "topic": "Product",
+        "skill": [
+          "Bandit traffic-allocation paradox"
+        ]
+      },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-18",
+      "blurb": "The new checkout UI converts better overall — but it was also shown to mobile far more than desktop. Split by device before making it the default."
+    },
+    {
+      "id": "push-notification-bandit-simpson",
+      "title": "The new notification timing gets a higher open rate overall — switch everyone to it?",
+      "company": "Dayspring — mobile fitness app",
+      "trap": "Bandit traffic-allocation paradox",
+      "facets": {
+        "topic": "Marketing",
+        "skill": [
+          "Bandit traffic-allocation paradox"
+        ]
+      },
+      "estMinutes": 25,
+      "rows": 12000,
+      "releaseDate": "2026-07-18",
+      "blurb": "The new notification timing gets a higher open rate overall — but weekday-active users saw it far more than weekend users. Split by cohort before switching everyone."
     }
   ]
 }

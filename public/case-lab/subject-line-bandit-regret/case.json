@@ -1,0 +1,69 @@
+{
+  "id": "subject-line-bandit-regret",
+  "title": "The subject-line bandit's average open rate beats the old template — was it worth running?",
+  "trap": "Hidden exploration cost",
+  "facets": { "topic": "Sales", "skill": ["Hidden exploration cost"] },
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the sales-ops analyst at Pathwell",
+    "company": "Pathwell — sales engagement SaaS",
+    "situation": "A subject-line bandit ran for 40 send-days against the team's old, previously-best-performing template (the fixed baseline). Looking at the full sequence's pooled open rate, Ben, the sales-ops lead, sees the bandit narrowly beat the old template overall and wants to turn on bandit-generated subject lines for every outbound sequence going forward, no further testing.",
+    "stakeholderBelief": "\"Averaged over the full 40-day send window, the bandit's open rate beat our old template. It's a win — let's turn on bandit subject lines for every sequence from now on.\"",
+    "question": "Was the bandit actually ahead the whole send window, or did it lose ground early while testing weaker subject lines and only pull ahead later? Look week by week — not just the pooled total — before turning it on for every sequence."
+  },
+  "dataset": {
+    "file": "/case-lab/subject-line-bandit-regret/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "email_id", "type": "int", "description": "Unique email send identifier" },
+      { "name": "send_day", "type": "int", "description": "Day of the send window, 1-40" },
+      { "name": "policy", "type": "string", "description": "bandit (exploring multiple subject lines, converging over time) or baseline (the old best-known template, sent unchanged the whole window)" },
+      { "name": "opened", "type": "int", "description": "1 if the email was opened — the reward" }
+    ],
+    "sample": [
+      { "email_id": 1, "send_day": 1, "policy": "bandit", "opened": 0 },
+      { "email_id": 2, "send_day": 1, "policy": "bandit", "opened": 0 },
+      { "email_id": 3, "send_day": 1, "policy": "bandit", "opened": 0 },
+      { "email_id": 4, "send_day": 1, "policy": "bandit", "opened": 0 },
+      { "email_id": 5, "send_day": 1, "policy": "bandit", "opened": 0 },
+      { "email_id": 6, "send_day": 1, "policy": "bandit", "opened": 0 },
+      { "email_id": 7, "send_day": 1, "policy": "bandit", "opened": 0 },
+      { "email_id": 8, "send_day": 1, "policy": "bandit", "opened": 0 },
+      { "email_id": 9, "send_day": 1, "policy": "bandit", "opened": 0 },
+      { "email_id": 10, "send_day": 1, "policy": "bandit", "opened": 0 }
+    ]
+  },
+  "guidingQuestions": [
+    "Reproduce Ben's number: mean opened for policy == bandit versus baseline, pooled across the full 40-day window. How big is the win?",
+    "Group by send_day (or bin into weeks) and compute each policy's open rate over time. Does the bandit lead from day 1, or does the picture change as the window progresses?",
+    "For the first two weeks specifically, compare the bandit's open rate to the baseline's. Who's ahead?",
+    "If the sequence had been evaluated at day 14 instead of running the full 40 days, what would the result have looked like?",
+    "Estimate how many opens the bandit gave up during its exploration phase, compared to if the eventual best subject line had simply been sent from day 1."
+  ],
+  "suggestedApproach": [
+    "Reproduce the pooled gap: mean(opened) for bandit minus baseline across all rows.",
+    "Group by send_day and policy, compute daily (or weekly, to smooth noise) open rates, and tabulate the gap over time.",
+    "Isolate the first two weeks (days 1-14) and compare the bandit's and baseline's open rate specifically in that window.",
+    "Note roughly when the bandit's rate overtakes the baseline's, and consider what a 2-week sequence would have shown.",
+    "Estimate cumulative regret: for each day, how far below the bandit's eventual best rate was that day's actual rate, summed over the exploration period — that's forgone opens the pooled average doesn't show."
+  ],
+  "teachingNote": {
+    "naiveRead": "Pooled over the full 40-day send window, the bandit's open rate beats the old template. That reads as a clean, unambiguous win — good enough to turn bandit subject lines on for every sequence going forward.",
+    "theTrap": "A pooled average blends the bandit's exploration phase (testing several subject lines, some worse than the old template) with its exploitation phase (once it's converged on the best one). Split by week and the picture is very different: in the first two weeks, the bandit's open rate is meaningfully BELOW the baseline (4.6% vs. 8.4% — a real loss), because it's still testing weaker subject lines. It only pulls decisively ahead from around week 3 onward, once it converges. The pooled 40-day average is a genuine net win, but it completely hides that the sequence spent its first two weeks actively losing opens — a fact that matters enormously for a shorter sequence, a smaller list, or a rep who checks results after two weeks and gives up.",
+    "honestAnswer": "Look at the reward trajectory over time, not just the pooled total, before generalizing \"the bandit wins\" to every future sequence. Here, the bandit gave up roughly 355 opens' worth of reward during the exploration ramp relative to if the eventual best subject line had simply been sent from day 1 (cumulative regret against the best-known template) — a real cost the pooled average absorbs and hides. The honest takeaway is conditional: bandits are worth running when the sequence is long enough (and the list large enough) to amortize the exploration cost — this one was, just barely, by day 40. For shorter sequences, smaller lists, or sequences judged early, the exploration cost may not pay back in time, and the safe, known-good template may be the better call. Tell Ben: don't default to bandit subject lines on every sequence without checking whether this sequence's length was what made the payback happen.",
+    "howToGetThere": [
+      "Compute the pooled gap: mean(opened | bandit) minus mean(opened | baseline) across all 40 days ≈ +1.4 points — a real but modest net win.",
+      "Group by week: weeks 1-2 show the bandit meaningfully behind (4.6% vs. 8.4%, a -3.8 point gap); the gap turns positive and grows from around week 3 onward.",
+      "Note that 16 of the 40 days show the bandit below the baseline — the losing days are concentrated early, not scattered randomly.",
+      "Estimate cumulative regret vs. the eventual best-known subject line rate: roughly 355 forgone opens during the exploration ramp — real cost invisible in the pooled total.",
+      "Conclude: the net win depended on the sequence running long enough to amortize the exploration cost; a 2-week sequence would have shown a loss."
+    ],
+    "numbers": [
+      { "label": "Pooled 40-day open-rate gap (bandit − baseline)", "value": "+1.4 points (a real, modest net win)" },
+      { "label": "First-2-weeks open-rate gap", "value": "-3.8 points (bandit behind)" },
+      { "label": "Days the bandit trailed the baseline", "value": "16 of 40, concentrated early" },
+      { "label": "Forgone opens during exploration (cumulative regret)", "value": "≈ 355" }
+    ],
+    "lesson": "A pooled average reward over a bandit's run blends its exploration cost and its exploitation payoff into one number, and a positive pooled result doesn't mean the policy was ahead the whole time — it can mean a real early loss was more than made up for later. Before generalizing a bandit's win to \"this always works,\" check the reward trajectory over time and estimate cumulative regret against the eventual best arm: that's the exploration cost the pooled average is hiding. Whether that cost pays back depends on how long the policy gets to run — the same bandit that wins over 40 days would have shown a clear loss if judged at day 14."
+  }
+}

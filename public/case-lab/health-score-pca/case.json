@@ -1,0 +1,73 @@
+{
+  "id": "health-score-pca",
+  "title": "PC1 explains 99.9% of the variance — build the health score on it?",
+  "trap": "Explained variance ≠ relevance",
+  "facets": { "topic": "Product", "skill": ["Explained variance ≠ relevance"] },
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the customer-success analyst at Anchorage",
+    "company": "Anchorage — customer-success SaaS platform",
+    "situation": "Sam, the CS Ops lead, ran PCA over four account metrics — session_count, feature_adoption_count, support_tickets, tenure_months — to build a single customer-health score. The first principal component explains 99.9% of the variance, which Sam reads as \"nearly all the signal in these four columns, captured in one number.\" He wants to launch a health-score dashboard next week with PC1 as the score, triggering CSM outreach when it drops.",
+    "stakeholderBelief": "\"PC1 captures 99.9% of the variance across our four health metrics — that's basically the whole picture in one score. Let's put it on the dashboard and alert CSMs when it falls.\"",
+    "question": "Does PC1 actually predict churn — the thing a health score is supposed to warn about? Check what PC1 is really measuring, and how well it (or any of the four raw metrics) tracks who actually churns, before it goes on the dashboard."
+  },
+  "dataset": {
+    "file": "/case-lab/health-score-pca/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "account_id", "type": "int", "description": "Unique account identifier" },
+      { "name": "tenure_months", "type": "int", "description": "Months since the account signed up (1-60)" },
+      { "name": "session_count", "type": "float", "description": "Total product sessions in the last 90 days" },
+      { "name": "feature_adoption_count", "type": "int", "description": "Count of distinct core features the account has used (0-10)" },
+      { "name": "support_tickets", "type": "int", "description": "Support tickets opened in the last 90 days" },
+      { "name": "churned", "type": "int", "description": "1 if the account churned this quarter — the outcome a health score should predict" },
+      { "name": "pc1_score", "type": "float", "description": "The account's score on the first principal component, computed from PCA fit on the four raw (unscaled) metrics above" }
+    ],
+    "sample": [
+      { "account_id": 1, "tenure_months": 45, "session_count": 126.0, "feature_adoption_count": 2, "support_tickets": 2, "churned": 1, "pc1_score": -511.06 },
+      { "account_id": 2, "tenure_months": 51, "session_count": 111.0, "feature_adoption_count": 5, "support_tickets": 1, "churned": 0, "pc1_score": -526.06 },
+      { "account_id": 3, "tenure_months": 7, "session_count": 148.0, "feature_adoption_count": 1, "support_tickets": 1, "churned": 0, "pc1_score": -489.07 },
+      { "account_id": 4, "tenure_months": 10, "session_count": 729.0, "feature_adoption_count": 2, "support_tickets": 1, "churned": 0, "pc1_score": 91.93 },
+      { "account_id": 5, "tenure_months": 28, "session_count": 264.0, "feature_adoption_count": 2, "support_tickets": 1, "churned": 1, "pc1_score": -373.06 },
+      { "account_id": 6, "tenure_months": 34, "session_count": 179.0, "feature_adoption_count": 4, "support_tickets": 0, "churned": 1, "pc1_score": -458.06 },
+      { "account_id": 7, "tenure_months": 46, "session_count": 1065.0, "feature_adoption_count": 6, "support_tickets": 2, "churned": 0, "pc1_score": 427.94 },
+      { "account_id": 8, "tenure_months": 23, "session_count": 116.0, "feature_adoption_count": 6, "support_tickets": 0, "churned": 0, "pc1_score": -521.06 },
+      { "account_id": 9, "tenure_months": 3, "session_count": 682.0, "feature_adoption_count": 4, "support_tickets": 2, "churned": 0, "pc1_score": 44.93 },
+      { "account_id": 10, "tenure_months": 13, "session_count": 350.0, "feature_adoption_count": 6, "support_tickets": 3, "churned": 1, "pc1_score": -287.07 }
+    ]
+  },
+  "guidingQuestions": [
+    "Correlate pc1_score with session_count, feature_adoption_count, support_tickets, and tenure_months individually. Which raw column does PC1 actually track?",
+    "Correlate pc1_score with churned. How strong is that relationship — strong enough to trigger a CSM alert on?",
+    "Now correlate each of the four raw metrics with churned individually. Which one actually predicts churn best?",
+    "Compare the numeric ranges of the four input columns (a quick .describe() or min/max). Which one has, by far, the largest scale — and what does that do to a PCA fit on unscaled features?",
+    "If Sam builds the health-score dashboard on pc1_score as planned, what will actually happen when a heavily-used but feature-poor, ticket-heavy account is about to churn?"
+  ],
+  "suggestedApproach": [
+    "Correlate pc1_score against each of the four raw inputs to see which one it's really summarizing.",
+    "Correlate pc1_score against churned directly — this is the number that matters for a health score, not the explained-variance figure.",
+    "Correlate each raw metric against churned separately, and compare those correlations to PC1's.",
+    "Check the scale of each input column — session_count's range should dwarf the other three, explaining why PCA (which is scale-sensitive, just like clustering) loaded almost entirely onto it.",
+    "Conclude which metric(s) should actually drive the health score, and why 'explains the most variance' isn't the same question as 'predicts the outcome we care about.'"
+  ],
+  "teachingNote": {
+    "naiveRead": "PC1 explains 99.9% of the variance across the four metrics. That sounds like PC1 has captured nearly everything worth knowing about an account in one number — an obvious candidate for a single health score.",
+    "theTrap": "PCA finds the direction of maximum *variance* in the data, with no idea which of your columns matters for the outcome you actually care about. session_count ranges up into the thousands while feature_adoption_count tops out at 10 and support_tickets at 20 — session_count's raw variance is so much larger than the other three combined that PC1 loads almost entirely onto it (loading ≈ 1.0 on session_count, ≈ 0 on everything else). PC1 isn't a composite health score; it's session_count wearing a disguise. And session_count barely relates to churn at all (correlation ≈ 0.00) — churn is actually driven by feature_adoption_count (correlation ≈ -0.39, the strongest single signal) and, to a lesser extent, support_tickets (≈ +0.19). The metric that 'explains the most variance' turns out to be nearly useless for the thing the dashboard is supposed to predict.",
+    "honestAnswer": "Don't build the health score on PC1. Correlate each raw metric against churned directly: feature_adoption_count is the strongest single predictor (≈ -0.39 — more features adopted, much lower churn), support_tickets is a secondary risk signal (≈ +0.19), and both session_count and PC1 are essentially uncorrelated with churn (≈ 0.00 either way). If Sam wants a defensible health score, build it from feature_adoption_count and support_tickets directly (or standardize all four metrics before running PCA, so no single large-scale column can dominate) — not from an unscaled PC1 that's quietly just re-reporting session count. As built, the dashboard would flag heavily-used accounts as 'healthy' right up until they churn, and miss the low-adoption, high-ticket accounts actually at risk.",
+    "howToGetThere": [
+      "Fit PCA on the four raw (unscaled) metrics; check explained_variance_ratio_ — PC1 alone captures ≈ 99.9%.",
+      "Inspect PC1's loadings: session_count ≈ 1.0, the other three ≈ 0 — PC1 is essentially session_count restated.",
+      "Correlate pc1_score with churned directly: ≈ 0.00 — no real relationship, despite the huge variance share.",
+      "Correlate each raw metric with churned: feature_adoption_count ≈ -0.39 (strongest), support_tickets ≈ +0.19, session_count ≈ 0.00.",
+      "Compare column scales: session_count ranges into the thousands vs. single digits/tens for the others — explaining why unscaled PCA collapsed onto it."
+    ],
+    "numbers": [
+      { "label": "PC1 explained variance", "value": "99.9%" },
+      { "label": "PC1's loading on session_count", "value": "≈ 1.00 (all other loadings ≈ 0)" },
+      { "label": "Correlation: PC1 vs. churn", "value": "≈ 0.00" },
+      { "label": "Correlation: feature_adoption_count vs. churn", "value": "≈ -0.39 (strongest predictor)" },
+      { "label": "Correlation: support_tickets vs. churn", "value": "≈ +0.19" }
+    ],
+    "lesson": "Explained variance tells you how much a component captures about the *spread* of your inputs — it says nothing about whether that component relates to the outcome you actually care about. PCA is also scale-sensitive: an unscaled feature with a much bigger numeric range will dominate the first component regardless of its real-world importance, exactly like unscaled clustering. Before turning a component into a metric people act on, correlate it against the actual outcome, and check whether one raw input's scale is doing all the work. A number that summarizes 99.9% of the data's variance can still summarize 0% of what you need to know."
+  }
+}

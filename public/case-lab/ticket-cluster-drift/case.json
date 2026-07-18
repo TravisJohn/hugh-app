@@ -1,0 +1,70 @@
+{
+  "id": "ticket-cluster-drift",
+  "title": "Ticket clustering found 4 issue types — route tickets by cluster ID?",
+  "trap": "Cluster instability",
+  "facets": { "topic": "Support", "skill": ["Cluster instability"] },
+  "estMinutes": 25,
+  "scenario": {
+    "role": "You're the support-ops analyst at Norwell",
+    "company": "Norwell — B2B helpdesk software",
+    "situation": "The support-ops team clustered incoming tickets on two features derived from ticket text — urgency_score and complexity_score — into 4 \"issue type\" clusters (k=4, chosen from an elbow plot), and wants to auto-route new tickets by cluster ID starting Monday, skipping the current keyword-based router entirely.",
+    "stakeholderBelief": "\"We clustered tickets into 4 issue types. Let's route by cluster ID starting Monday — it's more accurate than the old keyword rules.\"",
+    "question": "Is the 4-cluster issue-type assignment stable enough to route tickets by — the same clustering you'd get if you re-ran the job tomorrow — or would a re-run send tickets to different queues? Check reproducibility before the router switches over."
+  },
+  "dataset": {
+    "file": "/case-lab/ticket-cluster-drift/data.csv",
+    "rows": 12000,
+    "columns": [
+      { "name": "ticket_id", "type": "int", "description": "Unique support ticket identifier" },
+      { "name": "urgency_score", "type": "float", "description": "Text-derived urgency score, 0-100" },
+      { "name": "complexity_score", "type": "float", "description": "Text-derived complexity score, 0-100" },
+      { "name": "cluster_run1", "type": "int", "description": "K-means(k=4) cluster label from the first run, fit on urgency_score/complexity_score (standardized)" },
+      { "name": "cluster_run2", "type": "int", "description": "K-means(k=4) cluster label from a second run — same tickets, same k, only the random initialization differs. Labels are pre-matched to run1's numbering for comparison." }
+    ],
+    "sample": [
+      { "ticket_id": 1, "urgency_score": 100.0, "complexity_score": 100.0, "cluster_run1": 0, "cluster_run2": 0 },
+      { "ticket_id": 2, "urgency_score": 59.9, "complexity_score": 48.1, "cluster_run1": 1, "cluster_run2": 3 },
+      { "ticket_id": 3, "urgency_score": 40.8, "complexity_score": 45.4, "cluster_run1": 2, "cluster_run2": 2 },
+      { "ticket_id": 4, "urgency_score": 43.3, "complexity_score": 39.8, "cluster_run1": 2, "cluster_run2": 2 },
+      { "ticket_id": 5, "urgency_score": 16.5, "complexity_score": 17.6, "cluster_run1": 2, "cluster_run2": 1 },
+      { "ticket_id": 6, "urgency_score": 81.8, "complexity_score": 56.5, "cluster_run1": 3, "cluster_run2": 3 },
+      { "ticket_id": 7, "urgency_score": 94.8, "complexity_score": 59.8, "cluster_run1": 3, "cluster_run2": 0 },
+      { "ticket_id": 8, "urgency_score": 28.5, "complexity_score": 37.7, "cluster_run1": 2, "cluster_run2": 2 },
+      { "ticket_id": 9, "urgency_score": 27.0, "complexity_score": 36.9, "cluster_run1": 2, "cluster_run2": 2 },
+      { "ticket_id": 10, "urgency_score": 40.7, "complexity_score": 42.1, "cluster_run1": 2, "cluster_run2": 2 }
+    ]
+  },
+  "guidingQuestions": [
+    "What share of tickets have the same cluster_run1 and cluster_run2? (Labels are already matched, so a direct equality check is valid.)",
+    "For tickets that changed cluster between runs, where do urgency_score and complexity_score sit — near the middle of the data, or out at the extremes?",
+    "Plot (or describe) urgency_score vs. complexity_score. Do 4 visually distinct groups actually appear, or a continuous, overlapping cloud?",
+    "If routing switches to cluster_run1 tomorrow and someone re-runs the exact same clustering job next week, how many tickets would land in a different queue than they did today?",
+    "What would a support-ops team need to see before trusting cluster ID as a routing key instead of the current keyword rules?"
+  ],
+  "suggestedApproach": [
+    "Compute the share of tickets where cluster_run1 == cluster_run2 — the reproducibility rate.",
+    "Isolate tickets that switched clusters and check whether they sit near cluster boundaries rather than scattered randomly.",
+    "Visualize (or bucket) urgency_score against complexity_score and look for 4 genuinely separated groups versus one overlapping cloud.",
+    "Consider whether the data actually supports 4 groups, or a smaller number.",
+    "Frame the operational risk: a ticket router that sends roughly 1 in 4 tickets to a different queue than it would have a week earlier, with nothing in the ticket having changed."
+  ],
+  "teachingNote": {
+    "naiveRead": "K-means found 4 clean issue-type clusters, and they look ready to route on — swap the keyword rules for cluster ID and let the model decide the queue.",
+    "theTrap": "K-means converges to whichever partition is nearest its random starting point, not necessarily one true global answer — and when the underlying data doesn't actually contain 4 cleanly separated groups (this ticket population is really closer to 2 broad, overlapping flavors, with k=4 picked from an elbow-plot ritual rather than real structure), the extra clusters get carved out of the overlapping middle wherever the random initialization happens to land. Re-run the identical clustering on the identical tickets, changing only the random seed, and 28% of tickets land in a different cluster than before. Cluster ID here isn't measuring a stable property of the ticket — a large share of it is just which random start the algorithm happened to get that day.",
+    "honestAnswer": "Before routing on cluster ID, check reproducibility: re-run the clustering (different seed, same tickets) and measure agreement. Here only about 72% of tickets keep the same cluster (adjusted Rand index ≈ 0.49 between runs) — real instability, not rounding noise, and far too shaky to hand routing decisions to. The honest move is either to stabilize the method (many more random restarts with a consensus/majority-vote label, or a routing model trained with labeled ground truth instead of unsupervised clusters) or to check whether the ticket population actually supports 4 issue types — here it looks closer to 2. Tell the team: don't cut over the router to cluster_run1 as-is. A router that reshuffles a quarter of its own decisions on a re-run, with nothing about the tickets having changed, will misroute constantly and be nearly impossible to debug.",
+    "howToGetThere": [
+      "Re-run k-means(k=4) on the identical ticket data with only the random seed changed; match cluster labels between runs by maximum overlap (Hungarian algorithm).",
+      "Compute the share of tickets with the same matched cluster in both runs: ≈ 72% — meaning 28% reshuffle.",
+      "Compute the adjusted Rand index between the two runs: ≈ 0.49 — well below 1.0, confirming real instability.",
+      "Visualize urgency_score vs. complexity_score: the population forms one broad, overlapping cloud rather than 4 visually separated groups.",
+      "Conclude: k=4 doesn't reflect genuine structure here; cluster ID is not a stable enough signal to route production tickets on as-is."
+    ],
+    "numbers": [
+      { "label": "Tickets with the same cluster across two re-runs", "value": "≈ 72%" },
+      { "label": "Tickets reassigned to a different cluster", "value": "≈ 28% (~3,400 of 12,000)" },
+      { "label": "Adjusted Rand index between the two runs", "value": "≈ 0.49 (well below 1.0)" },
+      { "label": "Genuinely separated groups visible in the data", "value": "≈ 2, not 4" }
+    ],
+    "lesson": "K-means always returns exactly k clusters, whether or not the data actually contains k separated groups — and when it doesn't, the extra boundaries are drawn wherever the random initialization lands, not by any real structure. Before making an operational decision (routing, budget, targeting) depend on a clustering result, re-run it with a different seed and measure agreement. Low reproducibility isn't a bug to shrug off — it's the clustering telling you the number of groups you asked for isn't the number of groups that's actually there."
+  }
+}
