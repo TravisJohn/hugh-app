@@ -1873,3 +1873,40 @@ registered. **Not yet done:** live browser run with `MASTERY_REALTIME_ENABLED=tr
   threshold — not disabling barge-in — is what stops background noise from triggering it.
 - Tradeoffs noted: language is pinned to English (one-line change in `realtimeConfig.ts` if ever
   multilingual). tsc/ESLint/Vitest/build all green.
+
+## Code pillar — Automation, Airflow, RAG packs (2026-07-18)
+
+Three new curated Python practice packs on `/code/start`, alongside the existing pandas/SQL
+packs: `lib/code/automationPacks.ts` (11 independent stdlib reps — retry/timing decorators,
+pathlib, batching, safe parsing, a `@contextmanager` job logger), `lib/code/airflowPacks.ts`
+(10 cumulative reps building one 5-task DAG), `lib/code/ragPacks.ts` (10 cumulative reps
+building a retrieval pipeline from scratch — toy embedding, cosine similarity, ranking, a
+grounded prompt). All use `dataKind: "rows"` (plain list-of-dicts) rather than pandas — these
+are scripting/orchestration/retrieval constructs, not tabular analysis. Wired into `PACKS` in
+`packs.ts`; no landing-page changes needed (cards render from the pack registry automatically).
+
+**Airflow constraint:** real `apache-airflow` can't run in Pyodide (scheduler + metadata DB +
+heavy deps), so `setupCode` defines a ~100-line shim — `DAG`, `BaseOperator`/`PythonOperator`,
+`>>`/`<<`/`__rrshift__` dependency chaining (including list fan-out/fan-in), and the `@task`
+TaskFlow decorator — that mirrors Airflow's real public authoring API closely enough that
+genuine Airflow syntax runs and its dependency graph can be asserted on. Teaches the authoring
+syntax, not the scheduler. This was the one design decision flagged to Travis before building;
+approved.
+
+**Verified two ways before shipping:** (1) every solution + hidden assert run standalone in
+real CPython (`python`, not the WindowsApps `python3` stub) — RAG's toy embedding vocabulary
+was chosen so query/doc cosine scores land on exact 0.0/1.0 with no floating-point ties. (2) A
+Playwright script logged in as the seeded test user, opened each pack at `/code/drill?pack=...`,
+pasted each real solution into the CodeMirror editor cell-by-cell (scoped to the
+`border-sky-500` active-cell container — `.cm-content` alone matches stale passed cells too),
+and clicked "Run & check" against the live Pyodide worker. All 31 cells across the three packs
+passed end-to-end in the browser, including the Airflow pack's "Round 1 done" completion screen
+with correct outcome copy.
+
+**Also fixed:** `lib/code/packs.test.ts` had 6 pre-existing failures (noted in the mastery-realtime
+entry above as "unrelated") from assuming every pack is non-cumulative and every `setupCode`
+contains `=` — both false since the `linear-regression`/`forecasting`/SQL packs shipped. Updated
+to check `cumulative` is an explicit boolean and `setupCode` is non-trivial, and made the
+assertions-format check lang-aware (`assert ...` for Python, valid JSON for SQL). 44/44 pass now.
+
+tsc clean, `next build` clean, full Vitest suite green (156/156).

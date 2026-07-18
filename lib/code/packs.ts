@@ -5,13 +5,19 @@
 // fluency through repetition, not solving a novel problem — so cells usually
 // don't build on each other (`cumulative: false`). Add packs by adding entries.
 //
-// The Python packs are authored in **pandas** (`dataKind: "dataframe"`) — the
-// tool analysts actually reach for — so `df` is a real pandas DataFrame loaded
-// into the Pyodide worker on demand. The SQL packs (DuckDB) live in sqlPacks.ts.
+// The Python data-analysis packs are authored in **pandas** (`dataKind:
+// "dataframe"`) — the tool analysts actually reach for — so `df` is a real
+// pandas DataFrame loaded into the Pyodide worker on demand. Packs about
+// scripting/orchestration/retrieval rather than tabular analysis (automation,
+// airflow, rag) use plain `dataKind: "rows"` instead — pandas doesn't fit
+// what they're teaching. The SQL packs (DuckDB) live in sqlPacks.ts.
 
 import { pdDataFrameLiteral, type DataRow, type DrillContent } from "./drillContent";
 import type { DrillLang } from "@/types/code";
 import { SQL_PACKS } from "./sqlPacks";
+import { AUTOMATION_PACKS } from "./automationPacks";
+import { AIRFLOW_PACKS } from "./airflowPacks";
+import { RAG_PACKS } from "./ragPacks";
 
 export interface DrillPack {
   id: string;        // URL slug: /code/drill?pack=<id>
@@ -634,7 +640,13 @@ const PYTHON_PACKS: DrillPack[] = [
   },
 ];
 
-export const PACKS: DrillPack[] = [...PYTHON_PACKS, ...SQL_PACKS];
+export const PACKS: DrillPack[] = [
+  ...PYTHON_PACKS,
+  ...AUTOMATION_PACKS,
+  ...AIRFLOW_PACKS,
+  ...RAG_PACKS,
+  ...SQL_PACKS,
+];
 
 export function getPack(id: string): DrillPack | undefined {
   return PACKS.find(p => p.id === id);

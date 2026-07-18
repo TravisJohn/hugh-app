@@ -23,19 +23,23 @@ describe("practice packs", () => {
         expect(pack.content.cells.length).toBeGreaterThanOrEqual(4);
       });
 
-      it("is independent (bite-size reps don't build on each other)", () => {
-        expect(pack.content.cumulative).toBe(false);
+      it("cumulative is an explicit boolean (independent reps vs. a pack that builds up)", () => {
+        expect(typeof pack.content.cumulative).toBe("boolean");
       });
 
-      it("setup defines a dataset and every cell is fully specified with a unique id", () => {
-        expect(/=/.test(pack.content.scenario.setupCode)).toBe(true);
+      it("setup is non-trivial and every cell is fully specified with a unique id", () => {
+        expect(pack.content.scenario.setupCode.trim().length).toBeGreaterThan(0);
         const ids = pack.content.cells.map(c => c.id);
         expect(new Set(ids).size).toBe(ids.length);
         for (const c of pack.content.cells) {
           for (const f of [c.id, c.task, c.why, c.solution, c.assertions]) {
             expect(typeof f === "string" && f.trim() !== "").toBe(true);
           }
-          expect(c.assertions).toContain("assert");
+          if (pack.content.lang === "sql") {
+            expect(() => JSON.parse(c.assertions)).not.toThrow();
+          } else {
+            expect(c.assertions).toContain("assert");
+          }
         }
       });
     });
