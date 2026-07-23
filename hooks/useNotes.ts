@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as api from "@/lib/notes/api";
-import type { Note, NoteImage, NoteMessage, NotebookWithNotes } from "@/types";
+import type { Note, NoteImage, NoteImageFlag, NoteMessage, NotebookWithNotes } from "@/types";
 
 // Single source of truth for the Notes workspace (mirrors the useInterview rule:
 // one hook owns session state, components receive state + handlers via props).
@@ -41,6 +41,7 @@ export interface UseNotes {
   // screenshots + their threads
   addImage: (file: File) => Promise<void>;
   renameImage: (id: string, title: string) => Promise<void>;
+  flagImage: (id: string, flag: NoteImageFlag | null) => Promise<void>;
   removeImage: (id: string) => Promise<void>;
   saveThought: (content: string) => Promise<void>;
   runCoach: () => Promise<void>;
@@ -244,6 +245,13 @@ export function useNotes(): UseNotes {
     } catch (e) { fail(e); }
   }, [fail]);
 
+  const flagImage = useCallback(async (id: string, flag: NoteImageFlag | null) => {
+    try {
+      const img = await api.setImageFlag(id, flag);
+      setImages((xs) => xs.map((x) => (x.id === id ? { ...x, flag: img.flag } : x)));
+    } catch (e) { fail(e); }
+  }, [fail]);
+
   const removeImage = useCallback(async (id: string) => {
     try {
       await api.deleteImage(id);
@@ -297,6 +305,6 @@ export function useNotes(): UseNotes {
     selectNote, selectImage, clearError,
     addNotebook, renameNotebook, removeNotebook,
     addNote, renameNote, removeNote,
-    addImage, renameImage, removeImage, saveThought, runCoach, runSummary,
+    addImage, renameImage, flagImage, removeImage, saveThought, runCoach, runSummary,
   };
 }

@@ -1,4 +1,4 @@
-import type { Notebook, Note, NoteImage, NoteMessage, NotebookWithNotes } from "@/types";
+import type { Notebook, Note, NoteImage, NoteImageFlag, NoteMessage, NotebookWithNotes } from "@/types";
 
 // Thin client-side wrappers around the /api/notes/* routes. Kept separate from
 // the useNotes hook so the hook is pure state orchestration and these are the
@@ -101,6 +101,18 @@ export async function renameImage(id: string, title: string): Promise<NoteImage>
 
 export async function deleteImage(id: string): Promise<void> {
   await jsonOrThrow(await fetch(`/api/notes/images?id=${encodeURIComponent(id)}`, { method: "DELETE" }));
+}
+
+// Set (or clear, with null) a screenshot's red/yellow/green signal.
+export async function setImageFlag(id: string, flag: NoteImageFlag | null): Promise<NoteImage> {
+  const { image } = await jsonOrThrow<{ image: NoteImage }>(
+    await fetch("/api/notes/images", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, flag }),
+    }),
+  );
+  return image;
 }
 
 // ── Messages / Coach (per screenshot) ─────────────────────────────────────────

@@ -2,7 +2,7 @@
 
 import { useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { ImagePlus, Trash2, Loader2, ImageOff, Plus } from "lucide-react";
-import type { NoteImage } from "@/types";
+import type { NoteImage, NoteImageFlag } from "@/types";
 
 interface Props {
   hasNote:         boolean;
@@ -12,7 +12,44 @@ interface Props {
   onSelectImage:   (id: string) => void;
   onUpload:        (file: File) => void;
   onRenameImage:   (id: string, title: string) => void;
+  onFlagImage:     (id: string, flag: NoteImageFlag | null) => void;
   onRemoveImage:   (id: string) => void;
+}
+
+const FLAG_ORDER: NoteImageFlag[] = ["red", "yellow", "green"];
+const FLAG_DOT: Record<NoteImageFlag, string> = {
+  red:    "bg-red-500",
+  yellow: "bg-yellow-400",
+  green:  "bg-emerald-500",
+};
+const FLAG_RING: Record<NoteImageFlag, string> = {
+  red:    "ring-red-500",
+  yellow: "ring-yellow-400",
+  green:  "ring-emerald-500",
+};
+const FLAG_LABEL: Record<NoteImageFlag, string> = {
+  red:    "Red — needs more work",
+  yellow: "Yellow — getting there",
+  green:  "Green — solid",
+};
+
+// Three-way red/yellow/green picker: click a dot to set it, click the active
+// one again to clear. Purely a manual signal the learner sets for themselves.
+function FlagPicker({ value, onChange }: { value: NoteImageFlag | null; onChange: (v: NoteImageFlag | null) => void }) {
+  return (
+    <div className="flex items-center gap-1">
+      {FLAG_ORDER.map((f) => (
+        <button
+          key={f}
+          type="button"
+          title={FLAG_LABEL[f]}
+          onClick={() => onChange(value === f ? null : f)}
+          className={`h-3.5 w-3.5 rounded-full transition-transform hover:scale-110 ${FLAG_DOT[f]}
+            ${value === f ? `ring-2 ring-offset-2 ring-offset-[#0A0F1E] ${FLAG_RING[f]}` : "opacity-40 hover:opacity-80"}`}
+        />
+      ))}
+    </div>
+  );
 }
 
 // Inline-editable screenshot title: double-click to rename, Enter/blur commits,
@@ -56,7 +93,7 @@ function EditableTitle({ value, onCommit }: { value: string; onCommit: (v: strin
 // Selecting a screenshot here drives the per-screenshot thread in the right pane.
 export default function ImagePanel({
   hasNote, images, selectedImageId, uploading,
-  onSelectImage, onUpload, onRenameImage, onRemoveImage,
+  onSelectImage, onUpload, onRenameImage, onFlagImage, onRemoveImage,
 }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -139,6 +176,9 @@ export default function ImagePanel({
       {/* Selected screenshot's title + actions */}
       <header className="flex shrink-0 items-center gap-3 border-b border-slate-800 px-4 py-2">
         {selected && <EditableTitle value={selected.title} onCommit={(v) => onRenameImage(selected.id, v)} />}
+        {selected && (
+          <FlagPicker value={selected.flag} onChange={(f) => onFlagImage(selected.id, f)} />
+        )}
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
@@ -185,6 +225,12 @@ export default function ImagePanel({
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={img.url ?? ""} alt={img.title} className="h-full w-full object-cover" />
+            {img.flag && (
+              <span
+                title={FLAG_LABEL[img.flag]}
+                className={`absolute left-0.5 top-0.5 h-2 w-2 rounded-full ring-1 ring-black/40 ${FLAG_DOT[img.flag]}`}
+              />
+            )}
             <span
               onClick={(e) => { e.stopPropagation(); onRemoveImage(img.id); }}
               title="Delete screenshot"

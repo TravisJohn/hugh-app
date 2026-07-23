@@ -80,6 +80,7 @@ export default function NotesWorkspace() {
             onSelectImage={n.selectImage}
             onUpload={n.addImage}
             onRenameImage={n.renameImage}
+            onFlagImage={n.flagImage}
             onRemoveImage={n.removeImage}
           />
           <NoteThread

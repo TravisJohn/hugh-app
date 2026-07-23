@@ -1965,3 +1965,69 @@ logic to unit test). Browser-verified via Playwright logged in as the seeded tes
 feed shows "38 of 38 cases" with the new skill/topic filter pills populated correctly, and a
 10-case spot-check spanning every archetype (one per UL/RL family) confirmed each page's h1,
 download CTA, and reveal-teaching-note CTA render with no page errors.
+
+## Code pillar — practice tracking (badges + no-streak heatmap) (2026-07-18)
+
+Answers "have I tried this pattern, and do I still have it" — no persistence existed for Code
+drills before this (verified: `DrillMock`'s per-cell state was React-only, reset every visit).
+Plan (tier definitions, heatmap metric, staleness threshold, "owned" bar) was proposed and
+approved by Travis via AskUserQuestion before building.
+
+**New table `code_drill_attempts`** (migration `029`, not yet applied to the live DB — see
+below): one row per cell check, **append-only** (mirrors `case_attempts`'s pattern, not an
+upsert, so full history survives for the heatmap) — `user_id`, `pack_id`, `cell_id`, `passed`,
+`used_ref` (was the hint visible when this attempt resolved — persists `DrillMock`'s existing
+in-memory `usedRef`/`helped` signal). Owner-RLS, written through the normal RLS-bound client
+(`app/api/code/attempts/route.ts`, POSTed fire-and-forget from `DrillMock.runCell` right where
+`res.passed` resolves — never awaited, never blocks the run flow).
+
+**Pure logic in `lib/code/progress.ts`** (16 Vitest cases): `computePackProgress` derives a
+5-tier badge per pack from the attempts log — not-started / in-progress / complete / owned (every
+cell's *latest* pass was hint-free) / review-due (fully passed but the last pass is 30+ days old,
+overriding complete/owned since staleness is the whole point of the badge). A later fail never
+erases an earlier pass; a later hint-free pass upgrades an earlier helped one. `buildHeatmap`
+buckets attempts (pass or fail, per Travis's call — practicing counts, not just succeeding) into
+a fixed 112-day trailing window, UTC-day bucketed (accepted simplification — no access to the
+learner's timezone server-side).
+
+**Wiring:** `app/code/start/page.tsx` (already a server component, already had `verifyUserAccess`)
+now also selects `code_drill_attempts` for the user and computes both the per-pack summaries and
+the heatmap, passing them as props into `CodeLanding` (which stays a plain prop-in client
+renderer) — same fetch-then-pass-props shape as `app/cases/page.tsx` reading `case_attempts`. If
+the select errors (table not migrated yet), everything falls back to empty — no crash, matches
+`code_drills`'s "degrades gracefully" convention. New `ProgressHeatmap.tsx` (GitHub-style grid,
+explicitly no streak counter/"don't break the chain" framing — just "practiced on N of the last
+112 days"); `PackBadge` inline in `CodeLanding.tsx`, one pill per pack card.
+
+**Verified:** tsc clean, full Vitest suite green (172/172, +16 new), `next build` clean.
+Browser-verified pre-migration (graceful-degradation path only — see below): every pack card
+correctly shows "Not started", the heatmap renders its empty state ("No practice logged yet"),
+and running a drill cell produces zero console/page errors even though the insert 500s
+server-side (the fire-and-forget POST swallows it).
+
+**Not yet done:** migration `029` needs to be applied to the live Supabase project — no
+`SUPABASE_ACCESS_TOKEN` (for `scripts/run-migration.ts`) or direct DB connection was available
+this session, same gap noted for `023_case_room.sql` earlier. Until applied, the feature is fully
+inert-but-safe (attempts silently fail to log, every pack reads "Not started"). Once applied, the
+full loop (an attempt persisting → a badge changing) still needs a live check — everything
+verified this session was the pre-migration fallback path only.
+
+## Notes — red/yellow/green screenshot flag (2026-07-23)
+
+A manual triage signal Travis can stamp on a screenshot inside `/notes` (e.g. red = still shaky,
+green = solid) — a plain label, no scoring or coaching logic reads it.
+
+**Migration `030_note_image_flag.sql`** (not yet applied to the live DB — same
+`SUPABASE_ACCESS_TOKEN` gap as `029`): `note_images.flag TEXT CHECK (flag IN ('red','yellow','green'))`,
+nullable (unset = no flag).
+
+**Wiring:** `NoteImage.flag: NoteImageFlag | null` in `types/index.ts`. `PATCH /api/notes/images`
+now accepts an optional `flag` alongside the existing `title` (either or both; `flag: null` clears
+it) — one route, no new endpoint. `lib/notes/api.ts` adds `setImageFlag`; `useNotes` adds
+`flagImage`. `ImagePanel.tsx` renders a three-dot `FlagPicker` in the selected-screenshot header
+(click a dot to set, click the active one again to clear) plus a small corner dot on each
+thumbnail so the flag reads at a glance without opening the screenshot.
+
+**Verified:** tsc clean, full Vitest suite green (172/172, unchanged — no new logic worth a unit
+test, this is CRUD wiring mirroring the existing rename-image path), `next build` clean.
+Migration `030` applied by Travis directly.

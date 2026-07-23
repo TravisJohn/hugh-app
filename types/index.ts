@@ -297,7 +297,11 @@ export interface Note {
 
 // An uploaded screenshot. `title` is a renameable label (default "Screenshot N").
 // `url` is a short-lived signed URL the API resolves at read time from
-// `storage_path`; it is never persisted.
+// `storage_path`; it is never persisted. `flag` is a manual red/yellow/green
+// signal the learner stamps on it (e.g. red = still shaky) — a label only,
+// nothing reads it for scoring.
+export type NoteImageFlag = 'red' | 'yellow' | 'green';
+
 export interface NoteImage {
   id:           string;
   note_id:      string;
@@ -306,6 +310,7 @@ export interface NoteImage {
   mime:         string;
   created_at:   string;
   url:          string | null;
+  flag:         NoteImageFlag | null;
 }
 
 // One line in a screenshot's chat thread. `user` = the learner's own thoughts,

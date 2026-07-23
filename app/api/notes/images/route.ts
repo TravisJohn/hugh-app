@@ -19,12 +19,13 @@ const ALLOWED_MIME: Record<string, string> = {
   "image/gif": "gif",
 };
 
-const IMAGE_COLS = "id, note_id, title, storage_path, mime, created_at";
+const IMAGE_COLS = "id, note_id, title, storage_path, mime, created_at, flag";
+const FLAGS = new Set(["red", "yellow", "green"]);
 
 // Attach a fresh signed URL to each image row (best-effort per row).
 async function withSignedUrls(
   db: ReturnType<typeof createServiceClient>,
-  rows: Array<Pick<NoteImage, "id" | "note_id" | "title" | "storage_path" | "mime" | "created_at">>,
+  rows: Array<Pick<NoteImage, "id" | "note_id" | "title" | "storage_path" | "mime" | "created_at" | "flag">>,
 ): Promise<NoteImage[]> {
   return Promise.all(
     rows.map(async (r) => {
@@ -129,21 +130,32 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PATCH /api/notes/images { id, title } → rename a screenshot.
+// PATCH /api/notes/images { id, title? , flag? } → rename and/or flag a screenshot.
+// `flag` is one of 'red' | 'yellow' | 'green' | null (null clears it).
 export async function PATCH(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return unauth();
 
-  const body = (await request.json().catch(() => ({}))) as { id?: string; title?: string };
+  const body = (await request.json().catch(() => ({}))) as { id?: string; title?: string; flag?: string | null };
   const id = body.id?.trim();
   const title = body.title?.trim().slice(0, 200);
-  if (!id || !title) return NextResponse.json({ error: "id and title required" }, { status: 400 });
+  const hasFlag = Object.prototype.hasOwnProperty.call(body, "flag");
+  if (hasFlag && body.flag !== null && !FLAGS.has(body.flag ?? "")) {
+    return NextResponse.json({ error: "flag must be red, yellow, green or null" }, { status: 400 });
+  }
+  if (!id || (!title && !hasFlag)) {
+    return NextResponse.json({ error: "id and (title or flag) required" }, { status: 400 });
+  }
+
+  const update: { title?: string; flag?: string | null } = {};
+  if (title) update.title = title;
+  if (hasFlag) update.flag = body.flag ?? null;
 
   try {
     const db = createServiceClient();
     const { data, error } = await db
       .from("note_images")
-      .update({ title })
+      .update(update)
       .eq("id", id)
       .eq("user_id", userId)
       .select(IMAGE_COLS)
@@ -154,8 +166,8 @@ export async function PATCH(request: NextRequest) {
     const [image] = await withSignedUrls(db, [data]);
     return NextResponse.json({ image });
   } catch (e) {
-    console.error("[notes/images] rename failed:", e);
-    return NextResponse.json({ error: "Couldn't rename that image." }, { status: 502 });
+    console.error("[notes/images] update failed:", e);
+    return NextResponse.json({ error: "Couldn't update that image." }, { status: 502 });
   }
 }
 
