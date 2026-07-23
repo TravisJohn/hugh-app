@@ -3,18 +3,22 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft, ArrowRight, Braces, Lock, Flame, Play, Database,
+  ArrowLeft, ArrowRight, Braces, Lock, Flame, Play, Database, Zap, RotateCcw,
 } from "lucide-react";
 import SwarmBackdrop from "./SwarmBackdrop";
 import CodeChat from "./CodeChat";
+import ProgressHeatmap from "./ProgressHeatmap";
 import { PACKS } from "@/lib/code/packs";
 import type { DrillLang } from "@/types/code";
+import type { PackProgressSummary, PackTier, HeatmapDay } from "@/lib/code/progress";
 
-// The Code landing: what this is → the language you're drilling → the coding
-// pattern to practise → a free-form play space. Curated patterns are static packs
-// (lib/code/packs.ts, DrillContent shape) — no runtime AI. `data-essentials` is
-// the live warm-up; the rest are the analytics-pattern packs (clean, explore,
-// chart, regression, forecasting). SQL and R patterns come in a later build.
+// The Code landing: what this is → the language you're drilling → your practice
+// history (heatmap) → the coding pattern to practise, badged with where you left
+// off → a free-form play space. Curated patterns are static packs (lib/code/packs.ts,
+// DrillContent shape) — no runtime AI. `data-essentials` is the live warm-up; the
+// rest are the analytics-pattern packs. SQL and R patterns come in a later build.
+// `progress`/`heatmap` come from app/code/start/page.tsx (server-computed from
+// code_drill_attempts) — this component stays a plain prop-in renderer.
 
 const LANGUAGES: { id: DrillLang | "r"; label: string; ready: boolean }[] = [
   { id: "python", label: "Python", ready: true },
@@ -24,7 +28,37 @@ const LANGUAGES: { id: DrillLang | "r"; label: string; ready: boolean }[] = [
 
 const WARMUP_ID = "data-essentials";
 
-export default function CodeLanding() {
+const BADGE_STYLES: Record<PackTier, string> = {
+  "not-started": "border border-dashed border-slate-700 text-slate-500",
+  "in-progress": "bg-sky-500/15 text-sky-300",
+  "complete": "bg-emerald-500/15 text-emerald-300",
+  "owned": "bg-violet-500/15 text-violet-300",
+  "review-due": "bg-amber-500/15 text-amber-300",
+};
+
+function PackBadge({ progress }: { progress: PackProgressSummary }) {
+  const cls = `inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${BADGE_STYLES[progress.tier]}`;
+  switch (progress.tier) {
+    case "not-started":
+      return <span className={cls}>Not started</span>;
+    case "in-progress":
+      return <span className={cls}>{progress.cellsPassed}/{progress.cellsTotal} done</span>;
+    case "complete":
+      return <span className={cls}>Complete</span>;
+    case "owned":
+      return <span className={cls}><Zap size={10} /> Owned</span>;
+    case "review-due":
+      return <span className={cls}><RotateCcw size={10} /> Review due</span>;
+  }
+}
+
+export default function CodeLanding({
+  progress,
+  heatmap,
+}: {
+  progress?: Record<string, PackProgressSummary>;
+  heatmap?: HeatmapDay[];
+}) {
   const [activeLang, setActiveLang] = useState<DrillLang>("python");
   const packs = PACKS.filter(p => p.lang === activeLang);
   return (
@@ -78,6 +112,14 @@ export default function CodeLanding() {
           </div>
         </section>
 
+        {/* Practice history — no streaks, just an honest record of when you showed up */}
+        {heatmap && heatmap.length > 0 && (
+          <section className="mt-9">
+            <div className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-slate-500">Your practice</div>
+            <ProgressHeatmap days={heatmap} />
+          </section>
+        )}
+
         {/* Coding patterns */}
         <section className="mt-9">
           <div className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-slate-500">Coding patterns</div>
@@ -85,6 +127,7 @@ export default function CodeLanding() {
             {packs.map(pack => {
               const isWarmup = pack.id === WARMUP_ID;
               const Icon = pack.lang === "sql" ? Database : Braces;
+              const packProgress = progress?.[pack.id];
               return (
                 <Link
                   key={pack.id}
@@ -106,6 +149,11 @@ export default function CodeLanding() {
                   </div>
                   <h2 className="text-lg font-semibold text-white">{pack.title}</h2>
                   <p className="mt-1 text-sm text-slate-400">{pack.blurb}</p>
+                  {packProgress && (
+                    <div className="mt-3">
+                      <PackBadge progress={packProgress} />
+                    </div>
+                  )}
                   <span className="mt-4 flex items-center gap-1 text-xs font-semibold text-emerald-400 opacity-0 transition-opacity group-hover:opacity-100">
                     Start practising <ArrowRight size={12} />
                   </span>

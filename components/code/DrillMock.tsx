@@ -20,6 +20,18 @@ import SwarmBackdrop from "./SwarmBackdrop";
 import CodeChat, { RichText, type ChatCard } from "./CodeChat";
 import { useDrillAudio } from "@/hooks/useDrillAudio";
 
+// Fire-and-forget: log one cell check for the practice-history badges/heatmap.
+// Never awaited by the run flow, and a failure here (including the table not
+// existing yet) is silently swallowed — this is a nice-to-have, not a
+// dependency of the drill actually working.
+function logAttempt(packId: string, cellId: string, passed: boolean, usedRef: boolean) {
+  fetch("/api/code/attempts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ packId, cellId, passed, usedRef }),
+  }).catch(() => {});
+}
+
 type Status = "idle" | "running" | "pass" | "fail";
 interface CState { code: string; status: Status; attempts: number; usedRef: boolean; overTime: boolean; error: string | null; practice: boolean }
 interface PinnedThought { id: string; text: string }
@@ -478,6 +490,7 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
         ? { ...c, status: res.passed ? "pass" : "fail", attempts: c.attempts + 1, error: res.passed ? null : (res.error ?? "Not quite yet.") }
         : c,
     ));
+    logAttempt(packId, DRILL_CELLS[i].id, res.passed, helped);
 
     if (res.passed) {
       const nextCombo = helped ? 0 : combo + 1;
@@ -499,7 +512,7 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
     } else if (snap[i].attempts + 1 >= 2 && !showRefs) {
       revealRef(i);
     }
-  }, [ready, combo, showRefs, audio, revealRef]);
+  }, [ready, combo, showRefs, audio, revealRef, packId]);
 
   // Stable per-cell handlers so the memoized CmEditors don't re-render en masse.
   // runCell's identity changes with combo/showRefs, so call it through a ref to
