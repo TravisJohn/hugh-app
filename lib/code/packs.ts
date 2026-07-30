@@ -10,7 +10,9 @@
 // pandas DataFrame loaded into the Pyodide worker on demand. Packs about
 // scripting/orchestration/retrieval rather than tabular analysis (automation,
 // airflow, rag) use plain `dataKind: "rows"` instead — pandas doesn't fit
-// what they're teaching. The SQL packs (DuckDB) live in sqlPacks.ts.
+// what they're teaching. The SQL packs (DuckDB) live in sqlPacks.ts. The
+// dataset-less Python-fundamentals warm-up ("Let's Do This!", 9 parts) lives
+// in letsDoThisPacks.ts and is prepended to PACKS below.
 
 import { pdDataFrameLiteral, type DataRow, type DrillContent } from "./drillContent";
 import type { DrillLang } from "@/types/code";
@@ -30,117 +32,6 @@ export interface DrillPack {
   lang: DrillLang;   // which language pill this pack lives under
   content: DrillContent;
 }
-
-// One source of truth for each working table — the pandas setup is derived from
-// it (pdDataFrameLiteral), and the drill renders it with column highlighting.
-const ESSENTIALS_ROWS: DataRow[] = [
-  { name: "Ann",  team: "A", sales: 30, region: "EU" },
-  { name: "Ben",  team: "B", sales: 50, region: "NA" },
-  { name: "Cara", team: "A", sales: 20, region: "EU" },
-  { name: "Dan",  team: "B", sales: 70, region: "APAC" },
-  { name: "Eve",  team: "A", sales: 20, region: "NA" },
-  { name: "Finn", team: "B", sales: 50, region: "EU" },
-];
-
-const DATA_ESSENTIALS: DrillContent = {
-  dataKind: "dataframe",
-  cumulative: false,
-  scenario: {
-    title: "Data essentials — the everyday pandas moves",
-    role: "Fast reps on the pandas operations you reach for constantly. Not a puzzle — the real DataFrame idioms, from memory.",
-    goal: "Each cell is one small, standard move on the same `df`. They're independent — write each from memory. The point is fluency: repeat until the pandas syntax is automatic.",
-    outcome: "That's the core pandas toolkit — select, filter, aggregate, groupby, sort. Run it again from memory to lock it in.",
-    setupCode: pdDataFrameLiteral(ESSENTIALS_ROWS),
-    dataset: ESSENTIALS_ROWS,
-  },
-  cells: [
-    { id: "total", task: "Create total — the sum of the sales column.", why: "A column is a Series; .sum() aggregates it in one vectorised call — no loop.",
-      focus: ["sales"], solution: `total = df["sales"].sum()`, assertions: `assert total == 240`,
-      narrative: `df["sales"] selects the sales column as a Series, and .sum() collapses it to a single total. Column-first, then an aggregate — the shape of most pandas summaries.`,
-      steps: [
-        { do: "Select the sales column", code: `df["sales"]` },
-        { do: "Sum it", code: `.sum()` },
-      ] },
-    { id: "n", task: "Create n — how many rows the DataFrame has.", why: "len(df) counts rows — the quick reflex for sizing a table.",
-      focus: [], solution: `n = len(df)`, assertions: `assert n == 6`,
-      narrative: `len(df) returns the number of rows, just like on a list — the fastest way to check how big your table is.`,
-      steps: [{ do: "Count the rows", code: `len(df)` }] },
-    { id: "eu", task: `Create eu — only the rows where region is "EU".`, why: "Boolean-mask filtering: a condition builds a True/False Series that selects rows.",
-      focus: ["region"], solution: `eu = df[df["region"] == "EU"]`, assertions: `assert len(eu) == 3 and set(eu["region"]) == {"EU"}`,
-      narrative: `df["region"] == "EU" makes a boolean Series (True where the region matches). Indexing the DataFrame with that mask, df[...], keeps only the True rows — the pandas way to filter.`,
-      steps: [
-        { do: "Build a boolean mask", code: `df["region"] == "EU"` },
-        { do: "Select the rows it marks", code: `df[ ... ]` },
-      ] },
-    { id: "names", task: "Create names — just the name column.", why: "Selecting one column returns a Series — the everyday projection.",
-      focus: ["name"], solution: `names = df["name"]`, assertions: `assert list(names) == ["Ann", "Ben", "Cara", "Dan", "Eve", "Finn"]`,
-      narrative: `df["name"] pulls a single column out as a Series — the labelled 1-D array pandas hands back for one column.`,
-      steps: [{ do: "Select the name column", code: `df["name"]` }] },
-    { id: "big", task: "Create big — the rows where sales is 50 or more.", why: "Same mask shape, numeric threshold — the reflex for a filtered slice.",
-      focus: ["sales"], solution: `big = df[df["sales"] >= 50]`, assertions: `assert len(big) == 3`,
-      narrative: `Identical to the region filter, only the test changes: df["sales"] >= 50 marks the high rows, and df[...] keeps them.`,
-      steps: [
-        { do: "Mask rows over the threshold", code: `df["sales"] >= 50` },
-        { do: "Select them", code: `df[ ... ]` },
-      ] },
-    { id: "avg", task: "Create avg — the mean of the sales column.", why: ".mean() on a column — the built-in average, no manual sum/len.",
-      focus: ["sales"], solution: `avg = df["sales"].mean()`, assertions: `assert avg == 40`,
-      narrative: `Where stdlib makes you divide a sum by a count, pandas gives you .mean() directly on the Series — total over count, done for you.`,
-      steps: [
-        { do: "Select the sales column", code: `df["sales"]` },
-        { do: "Take its mean", code: `.mean()` },
-      ] },
-    { id: "top", task: "Create top — the whole row with the highest sales.", why: "idxmax() finds the winning row's label; .loc fetches that row.",
-      focus: ["sales"], solution: `top = df.loc[df["sales"].idxmax()]`, assertions: `assert top["name"] == "Dan"`,
-      narrative: `df["sales"].idxmax() returns the index label of the biggest sales; df.loc[...] then looks that row up, so top is the whole record, not just the number.`,
-      steps: [
-        { do: "Find the top row's label", code: `df["sales"].idxmax()` },
-        { do: "Fetch that row", code: `df.loc[ ... ]` },
-      ] },
-    { id: "by_team", task: "Create by_team — total sales per team.", why: "groupby is why pandas exists — split by a key, aggregate each group, in one line.",
-      focus: ["team", "sales"], solution: `by_team = df.groupby("team")["sales"].sum()`, assertions: `assert by_team.to_dict() == {"A": 70, "B": 170}`,
-      narrative: `df.groupby("team") splits the rows into groups by team; ["sales"].sum() totals sales within each. The hand-rolled accumulator loop collapses to this one expression.`,
-      steps: [
-        { do: "Split into groups by team", code: `df.groupby("team")` },
-        { do: "Sum sales in each group", code: `["sales"].sum()` },
-      ] },
-    { id: "counts", task: "Create counts — how many rows each team has.", why: "value_counts() tallies occurrences of each value in a column.",
-      focus: ["team"], solution: `counts = df["team"].value_counts()`, assertions: `assert counts.to_dict() == {"A": 3, "B": 3}`,
-      narrative: `df["team"].value_counts() counts how often each team appears — the one-call way to get a frequency table for a column.`,
-      steps: [
-        { do: "Select the team column", code: `df["team"]` },
-        { do: "Count each value", code: `.value_counts()` },
-      ] },
-    { id: "regions", task: "Create regions — the distinct regions, sorted alphabetically.", why: ".unique() dedupes a column; sorted() orders the result.",
-      focus: ["region"], solution: `regions = sorted(df["region"].unique())`, assertions: `assert list(regions) == ["APAC", "EU", "NA"]`,
-      narrative: `df["region"].unique() returns the distinct region values; wrapping it in sorted() puts them in order — dedupe, then sort.`,
-      steps: [
-        { do: "Get the distinct regions", code: `df["region"].unique()` },
-        { do: "Sort them", code: `sorted( ... )` },
-      ] },
-    { id: "ranked", task: "Create ranked — the rows sorted by sales, highest first.", why: "sort_values orders a DataFrame by a column — ascending flag flips it.",
-      focus: ["sales"], solution: `ranked = df.sort_values("sales", ascending=False)`, assertions: `assert list(ranked["name"].head(2)) == ["Dan", "Ben"]`,
-      narrative: `df.sort_values("sales", ascending=False) returns the rows reordered by sales, biggest first, without changing the original — the pandas sort.`,
-      steps: [
-        { do: "Sort by the sales column", code: `df.sort_values("sales", ...)` },
-        { do: "Highest first", code: `ascending=False` },
-      ] },
-    { id: "eu_total", task: `Create eu_total — total sales for the "EU" region only.`, why: "Filter then aggregate: mask the rows, select the column, sum it.",
-      focus: ["region", "sales"], solution: `eu_total = df[df["region"] == "EU"]["sales"].sum()`, assertions: `assert eu_total == 100`,
-      narrative: `Chain the moves: df[df["region"] == "EU"] keeps the EU rows, ["sales"] takes that column, and .sum() totals it — filter, project, aggregate in one line.`,
-      steps: [
-        { do: "Filter to EU rows", code: `df[df["region"] == "EU"]` },
-        { do: "Take sales and sum", code: `["sales"].sum()` },
-      ] },
-    { id: "teams", task: "Create teams — how many distinct teams appear.", why: "nunique() counts distinct values in a column — the tidy one-liner.",
-      focus: ["team"], solution: `teams = df["team"].nunique()`, assertions: `assert teams == 2`,
-      narrative: `df["team"].nunique() counts the distinct teams directly — pandas' built-in for "how many different values".`,
-      steps: [
-        { do: "Select the team column", code: `df["team"]` },
-        { do: "Count distinct values", code: `.nunique()` },
-      ] },
-  ],
-};
 
 // ── Pack 2: Clean & shape data ─────────────────────────────────────────────
 const CLEAN_ROWS: DataRow[] = [
@@ -593,14 +484,6 @@ const FORECASTING: DrillContent = {
 };
 
 const PYTHON_PACKS: DrillPack[] = [
-  {
-    id: "data-essentials",
-    title: "Data essentials",
-    blurb: "The everyday pandas moves — select, filter, groupby, sort. 13 quick reps.",
-    tag: "pandas",
-    lang: "python",
-    content: DATA_ESSENTIALS,
-  },
   {
     id: "clean-shape",
     title: "Clean & shape data",
