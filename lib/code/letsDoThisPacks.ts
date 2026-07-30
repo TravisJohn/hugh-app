@@ -1136,6 +1136,233 @@ result = app.routes[("DELETE", "/items/{item_id}")](2)`,
   ],
 };
 
+// Extends the MiniAPI stand-in with a Router (APIRouter equivalent),
+// App.include_router (mounting a router under a prefix), and a minimal
+// exception-handler registry + dispatch method (App.handle), so the routing
+// and error-handling patterns are real, typed-from-memory Python too.
+const MINI_API_ROUTING_SETUP = `class Router:
+    def __init__(self):
+        self.routes = {}
+
+    def route(self, method, path):
+        def decorator(fn):
+            self.routes[(method, path)] = fn
+            return fn
+        return decorator
+
+    def get(self, path):
+        return self.route("GET", path)
+
+    def post(self, path):
+        return self.route("POST", path)
+
+    def put(self, path):
+        return self.route("PUT", path)
+
+    def delete(self, path):
+        return self.route("DELETE", path)
+
+
+class App:
+    def __init__(self):
+        self.routes = {}
+        self.exception_handlers = {}
+
+    def route(self, method, path):
+        def decorator(fn):
+            self.routes[(method, path)] = fn
+            return fn
+        return decorator
+
+    def get(self, path):
+        return self.route("GET", path)
+
+    def post(self, path):
+        return self.route("POST", path)
+
+    def put(self, path):
+        return self.route("PUT", path)
+
+    def delete(self, path):
+        return self.route("DELETE", path)
+
+    def include_router(self, router, prefix=""):
+        for (method, path), fn in router.routes.items():
+            self.routes[(method, prefix + path)] = fn
+
+    def exception_handler(self, exc_type):
+        def decorator(fn):
+            self.exception_handlers[exc_type] = fn
+            return fn
+        return decorator
+
+    def handle(self, method, path, *args, **kwargs):
+        try:
+            return self.routes[(method, path)](*args, **kwargs)
+        except Exception as e:
+            handler = self.exception_handlers.get(type(e))
+            if handler:
+                return handler(e)
+            raise
+
+
+app = App()`;
+
+// ── Part 9 · API Routing, Async & Errors ────────────────────────────────────
+const API_ROUTING_ASYNC_ERRORS: DrillContent = {
+  cumulative: false,
+  scenario: {
+    title: "Let's Do This! — API Routing, Async & Errors",
+    role: "Part 9 — the final part of the fundamentals series. async/await, splitting routes across routers, custom exception handlers, and headers/dependencies.",
+    goal: "The async cells use a plain top-level `await` (no asyncio.run()) — this drill runs inside an environment that already has an event loop going, same as a real async web app, so that's the pattern that actually applies. The rest use `app`/`Router`, the same FastAPI-style stand-in from Part 8, extended with routers and exception handling.",
+    outcome: "That's the series complete: async/await (including running two calls concurrently with gather), splitting routes into an APIRouter and mounting it under a prefix, custom exception handlers, reading headers, and the dependency-injection pattern.",
+    setupCode: MINI_API_ROUTING_SETUP,
+  },
+  cells: [
+    { id: "af_define_run", task: "Create result — call an async function fetch_data() that returns 42, using await directly.",
+      why: "async def marks a function as a coroutine; await is how you actually run it and get its result — the two always go together.",
+      solution: `async def fetch_data():
+    return 42
+
+result = await fetch_data()`,
+      assertions: `assert result == 42`,
+      narrative: `fetch_data() on its own just creates a coroutine object — it doesn't run yet. await is what actually drives it to completion and hands back its return value.`,
+      steps: [{ do: "Define a coroutine function", code: `async def fetch_data(): return 42` }, { do: "Run it and get the result", code: `await fetch_data()` }] },
+    { id: "af_await", task: "Create total — await two separate async helper calls (get_a returns 10, get_b returns 20) and sum their results.",
+      why: "Multiple awaits in sequence run one after another — each one fully finishes before the next starts, just like ordinary synchronous calls would.",
+      solution: `async def get_a():
+    return 10
+
+async def get_b():
+    return 20
+
+a = await get_a()
+b = await get_b()
+total = a + b`,
+      assertions: `assert total == 30`,
+      narrative: `await get_a() completes before the line await get_b() even runs — sequential awaits don't give you concurrency by themselves, just the ability to pause without blocking the whole program.`,
+      steps: [{ do: "Await the first", code: `a = await get_a()` }, { do: "Then the second", code: `b = await get_b()` }] },
+    { id: "af_gather", task: `Create results — run two async calls CONCURRENTLY with asyncio.gather instead of sequential awaits, collecting both results.`,
+      why: "asyncio.gather schedules multiple coroutines to run concurrently and waits for all of them — the way you actually get a speedup from async code.",
+      solution: `import asyncio
+
+async def get_a():
+    return "a"
+
+async def get_b():
+    return "b"
+
+results = await asyncio.gather(get_a(), get_b())`,
+      assertions: `assert list(results) == ["a", "b"]`,
+      narrative: `asyncio.gather(get_a(), get_b()) starts BOTH coroutines right away instead of one after the other, and await on the gather call resumes once both have finished — results holds each one's return value, in the order they were passed in.`,
+      steps: [{ do: "Start both concurrently", code: `asyncio.gather(get_a(), get_b())` }, { do: "Wait for both to finish", code: `await asyncio.gather(...)` }] },
+    { id: "ar_basic_router", task: `Create result — a Router (APIRouter equivalent) with a GET /ping route returning "pong", registered on the router (not on app directly), called directly.`,
+      why: "A Router collects related routes on its own — separate from app — so a large API can be split into files by feature instead of one giant module.",
+      solution: `router = Router()
+
+@router.get("/ping")
+def ping():
+    return "pong"
+
+result = router.routes[("GET", "/ping")]()`,
+      assertions: `assert result == "pong"`,
+      narrative: `Router() supports the exact same @router.get(...) decorator as app — routes registered on it live in router.routes, completely separate from app.routes, until you explicitly mount it.`,
+      steps: [{ do: "Build a standalone router", code: `router = Router()` }, { do: "Register a route on it", code: `@router.get("/ping")` }] },
+    { id: "ar_include_router", task: `Register the router's routes onto app under the prefix "/api", so GET /ping becomes GET /api/ping — call it through app.routes.`,
+      why: "app.include_router(router, prefix=...) is how a router's routes actually become reachable — mounted under a path prefix, all at once.",
+      solution: `router = Router()
+
+@router.get("/ping")
+def ping():
+    return "pong"
+
+app.include_router(router, prefix="/api")
+result = app.routes[("GET", "/api/ping")]()`,
+      assertions: `assert result == "pong"`,
+      narrative: `include_router copies every route from router.routes into app.routes, prepending the prefix to each path — "/ping" on the router becomes "/api/ping" on the app, without touching the handler itself.`,
+      steps: [{ do: "Build the router with its own routes", code: `router.get("/ping")` }, { do: "Mount it under a prefix", code: `app.include_router(router, prefix="/api")` }] },
+    { id: "ar_multi_prefix", task: `Register two different routers (users_router with GET /, items_router with GET /) onto app under "/users" and "/items" — call both through app.`,
+      why: "This is the real payoff of routers — the SAME path (\"/\") on two different routers ends up as two DIFFERENT, non-colliding routes once each is mounted under its own prefix.",
+      solution: `users_router = Router()
+items_router = Router()
+
+@users_router.get("/")
+def list_users():
+    return ["Ann", "Ben"]
+
+@items_router.get("/")
+def list_items():
+    return ["Widget", "Gadget"]
+
+app.include_router(users_router, prefix="/users")
+app.include_router(items_router, prefix="/items")
+
+users = app.routes[("GET", "/users/")]()
+items = app.routes[("GET", "/items/")]()`,
+      assertions: `assert users == ["Ann", "Ben"] and items == ["Widget", "Gadget"]`,
+      narrative: `Both routers register a route at the SAME path, "/" — but mounting one under "/users" and the other under "/items" means they land at two entirely distinct app.routes keys, exactly how a real users.py/items.py router split works.`,
+      steps: [{ do: "Two routers, each with its own root route", code: `users_router.get("/"), items_router.get("/")` }, { do: "Mounted under different prefixes", code: `include_router(..., prefix="/users"), include_router(..., prefix="/items")` }] },
+    { id: "ceh_basic", task: `Register a custom exception handler on app for a NotFoundError, returning {"error": "not found"} — trigger it via a route that raises NotFoundError, called through app.handle().`,
+      why: "@app.exception_handler(ExcType) lets you turn a raised exception into a clean, deliberate response instead of a raw 500 crash.",
+      solution: `class NotFoundError(Exception):
+    pass
+
+@app.exception_handler(NotFoundError)
+def handle_not_found(exc):
+    return {"error": "not found"}
+
+@app.get("/missing")
+def missing():
+    raise NotFoundError()
+
+result = app.handle("GET", "/missing")`,
+      assertions: `assert result == {"error": "not found"}`,
+      narrative: `app.handle(...) calls the route, and when it raises NotFoundError, catches it and looks up the matching handler by exception TYPE — handle_not_found runs instead of the exception propagating and crashing the request.`,
+      steps: [{ do: "Register a handler for this exception type", code: `@app.exception_handler(NotFoundError)` }, { do: "A route that raises it", code: `def missing(): raise NotFoundError()` }] },
+    { id: "ceh_with_message", task: `Register a handler that includes the exception's own message in the response, for a ValidationError("bad input") raised by a route.`,
+      why: "The handler receives the actual exception instance — str(exc) lets the response include whatever detail the raise site provided, not just a generic message.",
+      solution: `class ValidationError(Exception):
+    pass
+
+@app.exception_handler(ValidationError)
+def handle_validation(exc):
+    return {"error": str(exc)}
+
+@app.post("/validate")
+def validate():
+    raise ValidationError("bad input")
+
+result = app.handle("POST", "/validate")`,
+      assertions: `assert result == {"error": "bad input"}`,
+      narrative: `raise ValidationError("bad input") attaches "bad input" as the exception's message; the handler receives that exact instance as exc, and str(exc) reads the message straight back out for the response.`,
+      steps: [{ do: "Raise with a specific message", code: `raise ValidationError("bad input")` }, { do: "Read it back in the handler", code: `def handle_validation(exc): return {"error": str(exc)}` }] },
+    { id: "hd_headers", task: `Register GET /whoami that reads an Authorization header from a headers: dict parameter, defaulting to "anonymous" if missing, call it with headers={} (empty).`,
+      why: "Real FastAPI headers arrive as a dict-like mapping — reading one with .get(key, default) is the same safe pattern as any other dict lookup.",
+      solution: `@app.get("/whoami")
+def whoami(headers: dict):
+    return {"user": headers.get("Authorization", "anonymous")}
+
+result = app.routes[("GET", "/whoami")]({})`,
+      assertions: `assert result == {"user": "anonymous"}`,
+      narrative: `headers is just a dict here — .get("Authorization", "anonymous") reads the header if present, or falls back cleanly when it isn't, exactly like reading any optional dict key.`,
+      steps: [{ do: "Accept headers as a parameter", code: `def whoami(headers: dict):` }, { do: "Read one with a safe default", code: `headers.get("Authorization", "anonymous")` }] },
+    { id: "hd_dependency", task: `Create result — a reusable dependency function get_current_user(headers) that a route calls to reuse shared logic (in real FastAPI, Depends(get_current_user) does this call for you automatically) — for headers={"Authorization": "tj"}.`,
+      why: "A 'dependency' is just an ordinary function containing logic you don't want to repeat in every route — FastAPI's Depends(fn) is really just 'call fn and hand me what it returns'.",
+      solution: `def get_current_user(headers: dict):
+    return headers.get("Authorization", "anonymous")
+
+@app.get("/profile")
+def profile(headers: dict):
+    user = get_current_user(headers)
+    return {"user": user}
+
+result = app.routes[("GET", "/profile")]({"Authorization": "tj"})`,
+      assertions: `assert result == {"user": "tj"}`,
+      narrative: `get_current_user is a plain function — nothing framework-specific about it. profile() calling it directly is exactly what real FastAPI does automatically when you write user: str = Depends(get_current_user) in the signature instead.`,
+      steps: [{ do: "Extract the shared logic into its own function", code: `def get_current_user(headers: dict): return headers.get("Authorization", "anonymous")` }, { do: "Have the route call it", code: `user = get_current_user(headers)` }] },
+  ],
+};
+
 export const LETS_DO_THIS_PACKS: DrillPack[] = [
   {
     id: "lets-do-this-values-types",
@@ -1200,5 +1427,13 @@ export const LETS_DO_THIS_PACKS: DrillPack[] = [
     tag: "basics",
     lang: "python",
     content: API_REQUESTS_RESPONSES,
+  },
+  {
+    id: "lets-do-this-api-routing",
+    title: "Let's Do This! — API Routing, Async & Errors",
+    blurb: "async/await, APIRouter + include_router, custom exception handlers, headers & dependencies. Part 9 (final) of the fundamentals series.",
+    tag: "basics",
+    lang: "python",
+    content: API_ROUTING_ASYNC_ERRORS,
   },
 ];
