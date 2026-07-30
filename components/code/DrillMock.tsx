@@ -282,6 +282,10 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
   const lang: DrillLang = content.lang ?? "python"; // which runtime executes the cells
   const isSql = lang === "sql";
   const isPandas = lang === "python" && content.dataKind === "dataframe"; // DataFrame packs
+  // Which Pyodide packages to load during boot (outside the per-run timeout) —
+  // a pack can ask for more than pandas (e.g. scikit-learn for the ML packs).
+  const bootPackages = content.preloadPackages ?? (isPandas ? ["pandas"] : []);
+  const bootLabel = isSql ? "SQL" : bootPackages.length ? `Python + ${bootPackages.join(" + ")}` : "Python";
 
   const emptyCells = useCallback(
     (): CState[] => DRILL_CELLS.map(() => ({ code: "", status: "idle", attempts: 0, usedRef: false, overTime: false, error: null, practice: false })),
@@ -336,7 +340,11 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
     ? (dataset ? `a SQL table named \`${tableName}\` (columns: ${cols})` : `a SQL table named \`${tableName}\``)
     : isPandas
       ? (dataset ? `a pandas DataFrame named \`df\` (columns: ${cols})` : "a pandas DataFrame named `df`")
-      : (dataset ? `a list of dicts named \`rows\` (columns: ${cols})` : "a Python list of dicts named `rows`");
+      : dataset
+        ? `a list of dicts named \`rows\` (columns: ${cols})`
+        : SCENARIO.setupCode.trim()
+          ? "a Python list of dicts named `rows`"
+          : "no shared data — each rep is a self-contained snippet";
 
   const openChatForCard = useCallback((id: string) => { setChatCardId(id); setChatOpen(true); }, []);
   const handleChatOpen = useCallback((v: boolean) => { setChatOpen(v); if (!v) setChatCardId(null); }, []);
@@ -390,11 +398,11 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
   useEffect(() => {
     const r: DrillRunner = isSql ? new DuckDBRunner() : new PyodideRunner();
     runnerRef.current = r;
-    // For DataFrame packs, load pandas during boot (outside the run timeout) so
-    // the "ready" gate covers the ~few-second first download and cell runs stay
-    // fast. Non-pandas packs skip this entirely.
+    // Load heavy packages during boot (outside the run timeout) so the "ready"
+    // gate covers the first multi-second download and cell runs stay fast.
+    // Packs that need nothing extra (bootPackages empty) skip this entirely.
     r.init()
-      .then(() => (isPandas && r instanceof PyodideRunner ? r.preload(["pandas"]) : undefined))
+      .then(() => (bootPackages.length && r instanceof PyodideRunner ? r.preload(bootPackages) : undefined))
       .then(() => setReady(true))
       .catch(e => setInitErr(String(e?.message ?? e)));
     return () => r.destroy();
@@ -671,10 +679,12 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
               )}
             </div>
           )}
-          {/* Raw setup only when there's no structured table to show it better. */}
-          {!dataset && (
+          {/* Raw setup only when there's no structured table to show it better,
+              and only when there IS setup code — pure-syntax packs with no
+              shared state (each cell self-contained) have nothing to show here. */}
+          {!dataset && SCENARIO.setupCode.trim() && (
             <>
-              <div className="mt-3 text-xs text-slate-500">Your data:</div>
+              <div className="mt-3 text-xs text-slate-500">Setup:</div>
               <pre className="mt-1.5 overflow-x-auto rounded-lg border border-slate-800 bg-slate-950/60 p-3 text-xs text-slate-400">
 {SCENARIO.setupCode}
               </pre>
@@ -716,7 +726,7 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
             disabled={!ready}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-sky-500 px-5 py-3 font-medium text-white transition-colors hover:bg-sky-400 disabled:opacity-50"
           >
-            {ready ? <><Play size={16} /> Start drill</> : <><Loader2 size={16} className="animate-spin" /> Booting {isSql ? "SQL" : isPandas ? "Python + pandas" : "Python"}…</>}
+            {ready ? <><Play size={16} /> Start drill</> : <><Loader2 size={16} className="animate-spin" /> Booting {bootLabel}…</>}
           </button>
         ) : (
           <div className="space-y-4">
@@ -747,7 +757,7 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
                     <span className="font-mono text-slate-500">In [{i + 1}]</span>
                     {passed ? (
                       <span className="flex items-center gap-1 font-semibold text-emerald-400">
-                        <Check size={13} /> passed{st.usedRef || (round === 1) ? " · with reference" : " · from memory"}
+                        <Check size={13} /> passed{showRefs || st.usedRef ? " · with reference" : " · from memory"}
                       </span>
                     ) : overtime ? (
                       <span className="flex items-center gap-1 font-semibold text-red-400">

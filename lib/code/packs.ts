@@ -18,6 +18,9 @@ import { SQL_PACKS } from "./sqlPacks";
 import { AUTOMATION_PACKS } from "./automationPacks";
 import { AIRFLOW_PACKS } from "./airflowPacks";
 import { RAG_PACKS } from "./ragPacks";
+import { ML_PACKS } from "./mlPacks";
+import { LOOP_PACKS } from "./loopPacks";
+import { LETS_DO_THIS_PACKS } from "./letsDoThisPacks";
 
 export interface DrillPack {
   id: string;        // URL slug: /code/drill?pack=<id>
@@ -641,7 +644,10 @@ const PYTHON_PACKS: DrillPack[] = [
 ];
 
 export const PACKS: DrillPack[] = [
+  ...LETS_DO_THIS_PACKS,
   ...PYTHON_PACKS,
+  ...LOOP_PACKS,
+  ...ML_PACKS,
   ...AUTOMATION_PACKS,
   ...AIRFLOW_PACKS,
   ...RAG_PACKS,

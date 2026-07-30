@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, ArrowRight, Braces, Lock, Flame, Play, Database, Zap, RotateCcw,
@@ -15,10 +15,11 @@ import type { PackProgressSummary, PackTier, HeatmapDay } from "@/lib/code/progr
 // The Code landing: what this is → the language you're drilling → your practice
 // history (heatmap) → the coding pattern to practise, badged with where you left
 // off → a free-form play space. Curated patterns are static packs (lib/code/packs.ts,
-// DrillContent shape) — no runtime AI. `data-essentials` is the live warm-up; the
-// rest are the analytics-pattern packs. SQL and R patterns come in a later build.
-// `progress`/`heatmap` come from app/code/start/page.tsx (server-computed from
-// code_drill_attempts) — this component stays a plain prop-in renderer.
+// DrillContent shape) — no runtime AI. `lets-do-this-values-types` (the first of the
+// "Let's Do This!" fundamentals series, lib/code/letsDoThisPacks.ts) is the live
+// warm-up; the rest are the analytics-pattern packs. SQL and R patterns come in a
+// later build. `progress`/`heatmap` come from app/code/start/page.tsx (server-computed
+// from code_drill_attempts) — this component stays a plain prop-in renderer.
 
 const LANGUAGES: { id: DrillLang | "r"; label: string; ready: boolean }[] = [
   { id: "python", label: "Python", ready: true },
@@ -26,7 +27,7 @@ const LANGUAGES: { id: DrillLang | "r"; label: string; ready: boolean }[] = [
   { id: "r",      label: "R",      ready: false },
 ];
 
-const WARMUP_ID = "data-essentials";
+const WARMUP_ID = "lets-do-this-values-types";
 
 const BADGE_STYLES: Record<PackTier, string> = {
   "not-started": "border border-dashed border-slate-700 text-slate-500",
@@ -61,6 +62,26 @@ export default function CodeLanding({
 }) {
   const [activeLang, setActiveLang] = useState<DrillLang>("python");
   const packs = PACKS.filter(p => p.lang === activeLang);
+  const [cardIndex, setCardIndex] = useState(0);
+
+  // Switching language resets to the first pattern — the old index likely
+  // doesn't exist in the new language's (shorter or longer) pack list.
+  useEffect(() => { setCardIndex(0); }, [activeLang]);
+
+  // Left/right arrow keys page through patterns, same as the on-screen arrows —
+  // ignored while typing (e.g. into CodeChat) so it doesn't hijack text input.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const tag = (document.activeElement as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (document.activeElement as HTMLElement | null)?.isContentEditable) return;
+      if (e.key === "ArrowLeft") setCardIndex(i => Math.max(0, i - 1));
+      if (e.key === "ArrowRight") setCardIndex(i => Math.min(packs.length - 1, i + 1));
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [packs.length]);
+
+  const activePack = packs[cardIndex];
   return (
     <div className="relative min-h-screen overflow-x-clip bg-[#0A0F1E] text-slate-200">
       <SwarmBackdrop />
@@ -120,47 +141,94 @@ export default function CodeLanding({
           </section>
         )}
 
-        {/* Coding patterns */}
+        {/* Coding patterns — one at a time; arrow keys or the on-screen arrows
+            page through instead of scanning a stacked grid. */}
         <section className="mt-9">
-          <div className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-slate-500">Coding patterns</div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {packs.map(pack => {
-              const isWarmup = pack.id === WARMUP_ID;
-              const Icon = pack.lang === "sql" ? Database : Braces;
-              const packProgress = progress?.[pack.id];
-              return (
-                <Link
-                  key={pack.id}
-                  href={`/code/drill?pack=${encodeURIComponent(pack.id)}`}
-                  className="group flex flex-col rounded-2xl border border-slate-800 bg-slate-900/40 p-5 transition-all hover:-translate-y-0.5 hover:border-emerald-500/40 hover:bg-slate-900/70"
-                >
-                  <div className="mb-3 flex items-center gap-2">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400">
-                      <Icon size={18} />
-                    </span>
-                    {isWarmup ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-300">
-                        <Flame size={10} /> Warm-up · start here
-                      </span>
-                    ) : (
-                      <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[11px] font-medium text-slate-400">{pack.tag}</span>
-                    )}
-                    <span className="ml-auto text-xs text-slate-500">{pack.content.cells.length} reps</span>
-                  </div>
-                  <h2 className="text-lg font-semibold text-white">{pack.title}</h2>
-                  <p className="mt-1 text-sm text-slate-400">{pack.blurb}</p>
-                  {packProgress && (
-                    <div className="mt-3">
-                      <PackBadge progress={packProgress} />
-                    </div>
-                  )}
-                  <span className="mt-4 flex items-center gap-1 text-xs font-semibold text-emerald-400 opacity-0 transition-opacity group-hover:opacity-100">
-                    Start practising <ArrowRight size={12} />
-                  </span>
-                </Link>
-              );
-            })}
+          <div className="mb-3 flex items-center justify-between">
+            <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Coding patterns</div>
+            {packs.length > 0 && (
+              <div className="font-mono text-xs text-slate-500">{cardIndex + 1} / {packs.length}</div>
+            )}
           </div>
+
+          {activePack && (
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setCardIndex(i => Math.max(0, i - 1))}
+                disabled={cardIndex === 0}
+                aria-label="Previous pattern"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-800 text-slate-400 transition-colors hover:border-emerald-500/40 hover:text-emerald-300 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-slate-800 disabled:hover:text-slate-400"
+              >
+                <ArrowLeft size={18} />
+              </button>
+
+              {(() => {
+                const isWarmup = activePack.id === WARMUP_ID;
+                const Icon = activePack.lang === "sql" ? Database : Braces;
+                const packProgress = progress?.[activePack.id];
+                return (
+                  <Link
+                    key={activePack.id}
+                    href={`/code/drill?pack=${encodeURIComponent(activePack.id)}`}
+                    className="group flex min-w-0 flex-1 flex-col rounded-2xl border border-slate-800 bg-slate-900/40 p-6 transition-all hover:-translate-y-0.5 hover:border-emerald-500/40 hover:bg-slate-900/70"
+                  >
+                    <div className="mb-3 flex items-center gap-2">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400">
+                        <Icon size={18} />
+                      </span>
+                      {isWarmup ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-300">
+                          <Flame size={10} /> Warm-up · start here
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[11px] font-medium text-slate-400">{activePack.tag}</span>
+                      )}
+                      <span className="ml-auto text-xs text-slate-500">{activePack.content.cells.length} reps</span>
+                    </div>
+                    <h2 className="text-lg font-semibold text-white">{activePack.title}</h2>
+                    <p className="mt-1 text-sm text-slate-400">{activePack.blurb}</p>
+                    {packProgress && (
+                      <div className="mt-3">
+                        <PackBadge progress={packProgress} />
+                      </div>
+                    )}
+                    <span className="mt-4 flex items-center gap-1 text-xs font-semibold text-emerald-400 opacity-0 transition-opacity group-hover:opacity-100">
+                      Start practising <ArrowRight size={12} />
+                    </span>
+                  </Link>
+                );
+              })()}
+
+              <button
+                type="button"
+                onClick={() => setCardIndex(i => Math.min(packs.length - 1, i + 1))}
+                disabled={cardIndex === packs.length - 1}
+                aria-label="Next pattern"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-800 text-slate-400 transition-colors hover:border-emerald-500/40 hover:text-emerald-300 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-slate-800 disabled:hover:text-slate-400"
+              >
+                <ArrowRight size={18} />
+              </button>
+            </div>
+          )}
+
+          {/* Dots — click to jump straight to a pattern */}
+          {packs.length > 1 && (
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5">
+              {packs.map((p, i) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setCardIndex(i)}
+                  aria-label={`Go to ${p.title}`}
+                  title={p.title}
+                  className={`h-1.5 rounded-full transition-all ${
+                    i === cardIndex ? "w-5 bg-emerald-400" : "w-1.5 bg-slate-700 hover:bg-slate-500"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
         </section>
 
         {/* Play */}
