@@ -61,6 +61,11 @@ export interface DrillContent {
   // named `rows`; "dataframe" = a pandas DataFrame named `df` (loads pandas into
   // the worker). Drives the "you're given" copy and the access hints.
   dataKind?: "rows" | "dataframe";
+  // Extra Pyodide packages (by their Pyodide/PyPI name, e.g. "scikit-learn") to
+  // preload during boot, outside the per-run timeout — for packs whose cells
+  // import something heavier than pandas. Omitted = just ["pandas"] when
+  // dataKind is "dataframe", nothing otherwise (back-compat).
+  preloadPackages?: string[];
 }
 
 /**

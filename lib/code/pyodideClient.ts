@@ -15,8 +15,14 @@ type WorkerMessage =
   | { type: "preloaded"; id: number; error: string | null }
   | { type: "result"; id: number; passed: boolean; stdout: string; error: string | null };
 
-/** Max wall-clock for a single run before we assume an infinite loop. */
-const EXEC_TIMEOUT_MS = 6000;
+// Max wall-clock for a single run before we assume an infinite loop. 6s was
+// enough for pandas-only cells, but scikit-learn cells (model packs) measured
+// ~9s per run even with pandas/scikit-learn already preloaded — re-scanning
+// imports plus real fit/predict calls costs more than a pandas aggregation.
+// Undersizing this is worse than it looks: a timed-out run leaves the worker
+// mid-reset, so the NEXT run has to reload every package from scratch too —
+// which almost certainly times out again, in a loop that never recovers.
+const EXEC_TIMEOUT_MS = 15000;
 
 interface PendingRun {
   resolve: (r: RunResult) => void;
@@ -31,6 +37,7 @@ export class PyodideRunner implements DrillRunner {
   private nextId = 1;
   private pending = new Map<number, PendingRun>();
   private preloads = new Map<number, () => void>();
+  private lastPreload: string[] = [];
 
   /** Boots the worker + Pyodide. Idempotent — returns the same promise. */
   init(): Promise<void> {
@@ -81,6 +88,7 @@ export class PyodideRunner implements DrillRunner {
    */
   async preload(packages: string[]): Promise<void> {
     await this.init();
+    this.lastPreload = packages; // remembered so a hard reset can restore it
     if (packages.length === 0) return;
     const id = this.nextId++;
     return new Promise<void>((resolve) => {
@@ -108,13 +116,21 @@ export class PyodideRunner implements DrillRunner {
     });
   }
 
-  /** Terminates a hung worker and boots a fresh one (Pyodide reloads). */
+  /**
+   * Terminates a hung worker and boots a fresh one (Pyodide reloads). The new
+   * worker starts with nothing loaded, so without re-preloading, the very next
+   * run would have to load every package from scratch inside ITS OWN timeout —
+   * for a heavy pack (pandas/scikit-learn) that reliably times out too, in a
+   * loop that never recovers. Re-issuing the last preload (fire-and-forget,
+   * outside any run's timeout) is what breaks that loop.
+   */
   private hardReset(): void {
     this.worker?.terminate();
     for (const { timer } of this.pending.values()) clearTimeout(timer);
     this.pending.clear();
     this.preloads.clear();
     this.spawn();
+    if (this.lastPreload.length) void this.preload(this.lastPreload);
   }
 
   destroy(): void {
