@@ -908,6 +908,234 @@ category = classify(404)`,
   ],
 };
 
+// A tiny, fully self-contained stand-in for a web framework — real, typed-
+// from-memory decorator syntax (@app.get("/path")) that registers a plain
+// Python function in a dict, with no fastapi/starlette/pydantic-core import.
+// Shared setupCode for the two API-flavoured packs below, so `app` is given
+// once per cell (fresh every run) rather than redefined inside every solution.
+const MINI_API_SETUP = `class App:
+    def __init__(self):
+        self.routes = {}
+
+    def route(self, method, path):
+        def decorator(fn):
+            self.routes[(method, path)] = fn
+            return fn
+        return decorator
+
+    def get(self, path):
+        return self.route("GET", path)
+
+    def post(self, path):
+        return self.route("POST", path)
+
+    def put(self, path):
+        return self.route("PUT", path)
+
+    def delete(self, path):
+        return self.route("DELETE", path)
+
+
+app = App()`;
+
+// ── Part 8 · API Requests & Responses ───────────────────────────────────────
+const API_REQUESTS_RESPONSES: DrillContent = {
+  cumulative: false,
+  scenario: {
+    title: "Let's Do This! — API Requests & Responses",
+    role: "Part 8 of the fundamentals series. FastAPI-style patterns — decorators, path/query params, request bodies, response shaping — without a live server.",
+    goal: "You're given `app`, a tiny stand-in for FastAPI (same @app.get(\"/path\") decorator syntax) — real, typed-from-memory Python, just without an actual HTTP transport underneath. Register a route, then call it directly like FastAPI would, and check what comes back.",
+    outcome: "That's request/response shaping covered: JSON vs. text, response models (and why they filter fields), field metadata, path params, request bodies, query params with defaults, and PUT/DELETE.",
+    setupCode: MINI_API_SETUP,
+  },
+  cells: [
+    { id: "json_dict_route", task: `Register a route GET /health on app that returns {"status": "ok"}, then call it directly and store the result.`,
+      why: "Returning a plain dict is how a FastAPI handler produces a JSON response — no manual serialization call in the handler itself.",
+      solution: `@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+result = app.routes[("GET", "/health")]()`,
+      assertions: `assert result == {"status": "ok"}`,
+      narrative: `@app.get("/health") registers health under ("GET", "/health") in app.routes; calling that entry directly is standing in for "the framework receives a GET /health request and invokes your handler".`,
+      steps: [{ do: "Register the route", code: `@app.get("/health")\ndef health(): return {"status": "ok"}` }, { do: "Invoke it like the framework would", code: `app.routes[("GET", "/health")]()` }] },
+    { id: "json_text_response", task: `Register a route GET /ping that returns the plain string "pong" (a text response, not JSON) — call it and store the result.`,
+      why: "A handler can return plain text instead of a dict — FastAPI sends whatever you return, JSON isn't mandatory.",
+      solution: `@app.get("/ping")
+def ping():
+    return "pong"
+
+result = app.routes[("GET", "/ping")]()`,
+      assertions: `assert result == "pong"`,
+      narrative: `Nothing about the decorator changes — @app.get works the same whether the handler returns a dict, a string, or a model instance; it's the return TYPE that decides how the body gets shaped.`,
+      steps: [{ do: "Return plain text", code: `def ping(): return "pong"` }] },
+    { id: "json_serialize", task: `Create body — the JSON text FastAPI would actually send over the wire for {"status": "ok"}, using json.dumps.`,
+      why: "Behind the scenes, a returned dict IS run through something like json.dumps — worth seeing what that step actually produces.",
+      solution: `import json
+body = json.dumps({"status": "ok"})`,
+      assertions: `assert body == '{"status": "ok"}'`,
+      narrative: `json.dumps(...) converts a Python dict into its JSON text form — this is the literal string a client would receive as the HTTP response body.`,
+      steps: [{ do: "Serialize the dict to JSON text", code: `json.dumps({"status": "ok"})` }] },
+    { id: "rm_define", task: "Register GET /users/1 whose handler returns a UserOut dataclass instance (id=1, name=\"Ann\") — a 'response model' shape — call it and store the result.",
+      why: "A response model is a defined shape for what a route returns — here a plain @dataclass stands in for a Pydantic model, keeping the pattern real without the dependency.",
+      solution: `from dataclasses import dataclass
+
+@dataclass
+class UserOut:
+    id: int
+    name: str
+
+@app.get("/users/1")
+def get_user():
+    return UserOut(id=1, name="Ann")
+
+result = app.routes[("GET", "/users/1")]()`,
+      assertions: `assert result.id == 1 and result.name == "Ann"`,
+      narrative: `@dataclass generates __init__ (and equality) for UserOut automatically from its two annotated fields — the handler returns a real UserOut instance, not a bare dict, giving the response a defined shape.`,
+      steps: [{ do: "Define the response shape", code: `@dataclass\nclass UserOut: id: int; name: str` }, { do: "Return an instance of it", code: `return UserOut(id=1, name="Ann")` }] },
+    { id: "rm_to_dict", task: "Create body — a UserOut(id=1, name=\"Ann\") response-model instance converted to a plain dict, using dataclasses.asdict, ready for JSON serialization.",
+      why: "Before a response model instance can become JSON, it needs converting to a plain dict first — asdict() is the standard bridge.",
+      solution: `from dataclasses import dataclass, asdict
+
+@dataclass
+class UserOut:
+    id: int
+    name: str
+
+user = UserOut(id=1, name="Ann")
+body = asdict(user)`,
+      assertions: `assert body == {"id": 1, "name": "Ann"}`,
+      narrative: `asdict(user) walks the dataclass's fields and builds an ordinary dict from them — the same dict json.dumps() would then be able to serialize.`,
+      steps: [{ do: "Have the model instance", code: `UserOut(id=1, name="Ann")` }, { do: "Convert it to a plain dict", code: `asdict(user)` }] },
+    { id: "rm_filter_fields", task: "Create output — given a full internal user dict with a password field, build the safe UserOut instance that DROPS password — the real reason response models exist.",
+      why: "A response model isn't just documentation — it's how you guarantee a sensitive internal field (like a password hash) never accidentally reaches the client.",
+      solution: `from dataclasses import dataclass
+
+@dataclass
+class UserOut:
+    id: int
+    name: str
+
+internal = {"id": 1, "name": "Ann", "password": "hunter2"}
+output = UserOut(id=internal["id"], name=internal["name"])`,
+      assertions: `assert output.id == 1 and output.name == "Ann" and not hasattr(output, "password")`,
+      narrative: `UserOut only declares id and name, so constructing it from internal necessarily leaves password behind — output simply has nowhere to put it, which is the whole safety guarantee a response model gives you.`,
+      steps: [{ do: "The internal record has extra, sensitive fields", code: `internal = {"id": 1, "name": "Ann", "password": "hunter2"}` }, { do: "The output model only takes what it declares", code: `UserOut(id=internal["id"], name=internal["name"])` }] },
+    { id: "efi_field_meta", task: `Create meta — call a hand-rolled field(default, description, **constraints) helper to build metadata for a 'name' field: default="", description="The user's display name", min_length=1.`,
+      why: "Real Pydantic Field(...) attaches extra metadata (description, min_length, gt, ...) to a model field, used for both validation and OpenAPI docs — this helper captures the same idea as plain data.",
+      solution: `def field(default=None, description=None, **constraints):
+    return {"default": default, "description": description, **constraints}
+
+meta = field(default="", description="The user's display name", min_length=1)`,
+      assertions: `assert meta == {"default": "", "description": "The user's display name", "min_length": 1}`,
+      narrative: `**constraints scoops up any extra keyword (min_length=1 here) into a dict, merged alongside default and description — the same "everything about this field in one place" idea Field(...) gives you in real Pydantic.`,
+      steps: [{ do: "Capture named constraints generically", code: `def field(default=None, description=None, **constraints):` }, { do: "Attach one to a field", code: `field(default="", description="...", min_length=1)` }] },
+    { id: "efi_validate", task: `Create errors — a list of validation errors when checking the value "" against meta's min_length constraint (value length below min_length).`,
+      why: "Field metadata isn't just documentation — it's what a validator actually checks a value against before accepting it.",
+      solution: `def field(default=None, description=None, **constraints):
+    return {"default": default, "description": description, **constraints}
+
+meta = field(default="", description="Name", min_length=1)
+value = ""
+errors = []
+if "min_length" in meta and len(value) < meta["min_length"]:
+    errors.append("too short")`,
+      assertions: `assert errors == ["too short"]`,
+      narrative: `len(value) < meta["min_length"] is the exact rule the metadata described (min_length=1) applied against a real value ("") — this is the validation step Field(...) would trigger automatically in real Pydantic.`,
+      steps: [{ do: "Read the constraint back off the metadata", code: `meta["min_length"]` }, { do: "Check the value against it", code: `if len(value) < meta["min_length"]: errors.append("too short")` }] },
+    { id: "pp_basic", task: "Register GET /items/{item_id} whose handler takes item_id: int and returns {\"item_id\": item_id}, call it directly with item_id=42.",
+      why: "{item_id} in the path becomes a same-named function parameter — FastAPI extracts it straight from the URL and hands it in.",
+      solution: `@app.get("/items/{item_id}")
+def get_item(item_id: int):
+    return {"item_id": item_id}
+
+result = app.routes[("GET", "/items/{item_id}")](42)`,
+      assertions: `assert result == {"item_id": 42}`,
+      narrative: `The {item_id} placeholder in the path string and the item_id parameter in the function signature share a name on purpose — that's the whole mechanism, no extra wiring required.`,
+      steps: [{ do: "Name the placeholder in the path", code: `"/items/{item_id}"` }, { do: "Receive it as a same-named parameter", code: `def get_item(item_id: int):` }] },
+    { id: "pp_multi", task: "Register GET /users/{user_id}/orders/{order_id} with two path params, call it with user_id=7, order_id=99.",
+      why: "A path can carry more than one parameter — each {name} maps to its own same-named argument, in the order they appear.",
+      solution: `@app.get("/users/{user_id}/orders/{order_id}")
+def get_order(user_id: int, order_id: int):
+    return {"user_id": user_id, "order_id": order_id}
+
+result = app.routes[("GET", "/users/{user_id}/orders/{order_id}")](7, 99)`,
+      assertions: `assert result == {"user_id": 7, "order_id": 99}`,
+      narrative: `Two placeholders, two parameters — user_id and order_id are extracted independently from their own segment of the URL, nested routes like this are how you express "an order that belongs to a user".`,
+      steps: [{ do: "Two placeholders in the path", code: `"/users/{user_id}/orders/{order_id}"` }, { do: "Two matching parameters", code: `def get_order(user_id: int, order_id: int):` }] },
+    { id: "rb_basic", task: `Register POST /items accepting a request body (a dict with name and price) and returning it with an id added, call it with {"name": "Widget", "price": 9.99}.`,
+      why: "A POST handler's body is just another parameter — here a plain dict, standing in for the JSON payload a real client would send.",
+      solution: `@app.post("/items")
+def create_item(body: dict):
+    return {"id": 1, **body}
+
+result = app.routes[("POST", "/items")]({"name": "Widget", "price": 9.99})`,
+      assertions: `assert result == {"id": 1, "name": "Widget", "price": 9.99}`,
+      narrative: `{"id": 1, **body} builds a new dict starting with the generated id, then spreads every key from the incoming body on top — the shape a "created" response typically takes.`,
+      steps: [{ do: "Accept the body as a parameter", code: `def create_item(body: dict):` }, { do: "Add a generated field to it", code: `{"id": 1, **body}` }] },
+    { id: "rb_model_body", task: "Register POST /items/priced accepting the body as an ItemIn dataclass (name: str, price: float) instead of a raw dict, returning the name and a 10%-marked-up total.",
+      why: "A typed request body (a model, not a bare dict) gives you dot-access AND documents exactly what the client must send — the more realistic FastAPI pattern.",
+      solution: `from dataclasses import dataclass
+
+@dataclass
+class ItemIn:
+    name: str
+    price: float
+
+@app.post("/items/priced")
+def create_priced(body: ItemIn):
+    return {"name": body.name, "total": round(body.price * 1.1, 2)}
+
+result = app.routes[("POST", "/items/priced")](ItemIn(name="Widget", price=10.0))`,
+      assertions: `assert result == {"name": "Widget", "total": 11.0}`,
+      narrative: `body: ItemIn means the handler works with body.name / body.price directly, instead of the fragile body["name"] — the same ergonomic win a real Pydantic request-body model gives you.`,
+      steps: [{ do: "Type the body as a model, not a dict", code: `def create_priced(body: ItemIn):` }, { do: "Use its fields by attribute", code: `body.name, body.price` }] },
+    { id: "qp_basic_default", task: `Register GET /search with a query parameter q: str and an optional limit: int = 10 (a plain parameter with a default, not part of the {path}) — call it with q="cats" only.`,
+      why: "A parameter that ISN'T in the {path} template becomes a query parameter automatically — a default value makes it optional.",
+      solution: `@app.get("/search")
+def search(q: str, limit: int = 10):
+    return {"q": q, "limit": limit}
+
+result = app.routes[("GET", "/search")](q="cats")`,
+      assertions: `assert result == {"q": "cats", "limit": 10}`,
+      narrative: `"/search" has no {q} or {limit} placeholder, so both become query parameters — real requests would be GET /search?q=cats; leaving limit out entirely falls back to its default of 10.`,
+      steps: [{ do: "No placeholder for these in the path", code: `"/search"` }, { do: "So they're query params, one with a default", code: `def search(q: str, limit: int = 10):` }] },
+    { id: "qp_override", task: "Call the same /search handler, but this time explicitly override limit to 5 (q=\"cats\", limit=5).",
+      why: "Supplying a value for an optional query parameter overrides its default — exactly like ?q=cats&limit=5 in a real URL.",
+      solution: `@app.get("/search")
+def search(q: str, limit: int = 10):
+    return {"q": q, "limit": limit}
+
+result = app.routes[("GET", "/search")](q="cats", limit=5)`,
+      assertions: `assert result == {"q": "cats", "limit": 5}`,
+      narrative: `Passing limit=5 explicitly means the default (10) never gets used — the caller's value always wins, whether it arrives from a real query string or, here, a direct call.`,
+      steps: [{ do: "Explicitly supply the optional one", code: `search(q="cats", limit=5)` }] },
+    { id: "pd_put", task: `Register PUT /items/{item_id} that fully replaces an item, returning {"id": item_id, **body}, call it with item_id=3, body={"name": "New", "price": 5}.`,
+      why: "PUT conventionally means REPLACE — the handler takes both a path param (which item) and a body (its new full contents).",
+      solution: `@app.put("/items/{item_id}")
+def replace_item(item_id: int, body: dict):
+    return {"id": item_id, **body}
+
+result = app.routes[("PUT", "/items/{item_id}")](3, {"name": "New", "price": 5})`,
+      assertions: `assert result == {"id": 3, "name": "New", "price": 5}`,
+      narrative: `PUT combines a path parameter (item_id — which resource) with a request body (its complete replacement contents) — the same two ingredients as a POST, just meaning "overwrite" instead of "create".`,
+      steps: [{ do: "Identify the resource from the path", code: `item_id: int` }, { do: "Replace its contents from the body", code: `{"id": item_id, **body}` }] },
+    { id: "pd_delete", task: "Register DELETE /items/{item_id} that removes an item from a dict store and returns {\"deleted\": item_id}, call it with item_id=2 (store starts with items 1, 2, 3).",
+      why: "DELETE conventionally takes only a path parameter (which resource) — no body needed to remove something.",
+      solution: `store = {1: "a", 2: "b", 3: "c"}
+
+@app.delete("/items/{item_id}")
+def delete_item(item_id: int):
+    del store[item_id]
+    return {"deleted": item_id}
+
+result = app.routes[("DELETE", "/items/{item_id}")](2)`,
+      assertions: `assert result == {"deleted": 2} and store == {1: "a", 3: "c"}`,
+      narrative: `del store[item_id] removes the entry from the store as a side effect; the response just confirms what was deleted — DELETE handlers are usually this thin.`,
+      steps: [{ do: "Remove it from the store", code: `del store[item_id]` }, { do: "Confirm what was deleted", code: `return {"deleted": item_id}` }] },
+  ],
+};
+
 export const LETS_DO_THIS_PACKS: DrillPack[] = [
   {
     id: "lets-do-this-values-types",
@@ -964,5 +1192,13 @@ export const LETS_DO_THIS_PACKS: DrillPack[] = [
     tag: "basics",
     lang: "python",
     content: EXCEPTIONS_TYPING_STATUS,
+  },
+  {
+    id: "lets-do-this-api-requests",
+    title: "Let's Do This! — API Requests & Responses",
+    blurb: "FastAPI-style routes, response models, path/query params, request bodies, PUT/DELETE. Part 8 of the fundamentals series.",
+    tag: "basics",
+    lang: "python",
+    content: API_REQUESTS_RESPONSES,
   },
 ];
