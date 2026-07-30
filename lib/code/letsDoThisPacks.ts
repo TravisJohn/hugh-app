@@ -794,6 +794,120 @@ logger.info("invoice sent")`,
   ],
 };
 
+// ── Part 7 · Exceptions, Typing & Status Codes ──────────────────────────────
+const EXCEPTIONS_TYPING_STATUS: DrillContent = {
+  cumulative: false,
+  scenario: {
+    title: "Let's Do This! — Exceptions, Typing & Status Codes",
+    role: "Part 7 of the fundamentals series. try/except/finally, custom exceptions, type hints, and HTTP status codes — the last stretch of pure-Python groundwork before the API-flavoured packs.",
+    goal: "Each cell is one standard move. Independent reps; write each from memory.",
+    outcome: "That's error handling (catch, custom exception classes, finally's guarantee), type hints (basic, Optional, generics like List), and the HTTP status codes you'll return constantly, all covered.",
+    setupCode: "",
+  },
+  cells: [
+    { id: "ex_try_except", task: "Create result — \"caught\" after catching a ZeroDivisionError from 1/0 in a try/except.",
+      why: "try/except is how Python code survives an expected failure instead of crashing the whole program.",
+      solution: `try:
+    1 / 0
+    result = "no error"
+except ZeroDivisionError:
+    result = "caught"`,
+      assertions: `assert result == "caught"`,
+      narrative: `1 / 0 raises ZeroDivisionError immediately, so the line after it (result = "no error") never runs — control jumps straight to the matching except block instead.`,
+      steps: [{ do: "Something that can fail", code: `1 / 0` }, { do: "Catch that specific error", code: `except ZeroDivisionError: result = "caught"` }] },
+    { id: "ex_custom", task: `Create message — the string from a custom InsufficientFundsError raised with message "not enough balance", caught and its str() read back.`,
+      why: "Subclassing Exception lets you define your own, meaningfully-named error type instead of overloading a generic one.",
+      solution: `class InsufficientFundsError(Exception):
+    pass
+
+try:
+    raise InsufficientFundsError("not enough balance")
+except InsufficientFundsError as e:
+    message = str(e)`,
+      assertions: `assert message == "not enough balance"`,
+      narrative: `class InsufficientFundsError(Exception): inherits all of Exception's behaviour for free — raising it with a message and catching it with as e works identically to any built-in exception, just with a name that says what actually went wrong.`,
+      steps: [{ do: "Define a named error type", code: `class InsufficientFundsError(Exception): pass` }, { do: "Raise it with a message, then read it back", code: `raise InsufficientFundsError("not enough balance")\n... str(e)` }] },
+    { id: "ex_finally", task: `Create order — a list recording that "try", then "except", then "finally" ran, when the try block raises a ValueError.`,
+      why: "finally always runs — whether the try block succeeded, failed, or even returned early — the place for cleanup that must never be skipped.",
+      solution: `order = []
+try:
+    order.append("try")
+    raise ValueError("bad")
+except ValueError:
+    order.append("except")
+finally:
+    order.append("finally")`,
+      assertions: `assert order == ["try", "except", "finally"]`,
+      narrative: `The raise sends control to except (recording "except"), and only after that block finishes does finally run (recording "finally") — it executes on the way out no matter which path got there.`,
+      steps: [{ do: "Something raises", code: `raise ValueError("bad")` }, { do: "Handle it", code: `except ValueError: order.append("except")` }, { do: "Always runs last", code: `finally: order.append("finally")` }] },
+    { id: "ty_basic_hints", task: "Create result — call a type-hinted function add(a: int, b: int) -> int, with add(2, 3).",
+      why: "Type hints (: int, -> int) document the expected types for readers and tools (mypy, IDEs) — Python itself doesn't enforce them at runtime.",
+      solution: `def add(a: int, b: int) -> int:
+    return a + b
+
+result = add(2, 3)`,
+      assertions: `assert result == 5`,
+      narrative: `a: int and -> int are annotations, not runtime checks — add("x", "y") would still run and concatenate strings; the hints exist for humans and static analysis, not for Python's interpreter.`,
+      steps: [{ do: "Annotate the parameters and return type", code: `def add(a: int, b: int) -> int:` }, { do: "Call it normally", code: `add(2, 3)` }] },
+    { id: "ty_optional", task: `Create greeting — call a function greet(name: Optional[str] = None) -> str that returns "Hello, stranger" when name is None, else "Hello, {name}", called with no argument.`,
+      why: "Optional[str] documents that a parameter can be str OR None — the standard way to hint 'this might be absent'.",
+      solution: `from typing import Optional
+
+def greet(name: Optional[str] = None) -> str:
+    if name is None:
+        return "Hello, stranger"
+    return f"Hello, {name}"
+
+greeting = greet()`,
+      assertions: `assert greeting == "Hello, stranger"`,
+      narrative: `Optional[str] is shorthand for Union[str, None] — it tells a reader (and a type checker) that name might legitimately be None, matching the default value and the if name is None: branch that handles it.`,
+      steps: [{ do: "Hint 'str or None'", code: `name: Optional[str] = None` }, { do: "Handle the None case", code: `if name is None: return "Hello, stranger"` }] },
+    { id: "ty_list_hints", task: "Create total — call a function total_of(prices: List[float]) -> float, annotated with List, on [1.5, 2.5, 3.0].",
+      why: "List[float] hints not just 'a list', but a list OF a specific element type — more precise documentation than list alone.",
+      solution: `from typing import List
+
+def total_of(prices: List[float]) -> float:
+    return sum(prices)
+
+total = total_of([1.5, 2.5, 3.0])`,
+      assertions: `assert total == 7.0`,
+      narrative: `List[float] reads as "a list whose elements are floats" — the generic in brackets is what list by itself can't express, useful for anyone reading the signature without digging into the body.`,
+      steps: [{ do: "Hint a list of floats", code: `prices: List[float]` }, { do: "Call it", code: `total_of([1.5, 2.5, 3.0])` }] },
+    { id: "hs_common_codes", task: "Create codes — a dict mapping the 4 most common HTTP status codes to their meaning: 200 OK, 201 Created, 404 Not Found, 500 Internal Server Error.",
+      why: "These four codes cover the large majority of everyday API responses — knowing them cold (not looking them up) is worth the rep.",
+      solution: `codes = {
+    200: "OK",
+    201: "Created",
+    404: "Not Found",
+    500: "Internal Server Error",
+}`,
+      assertions: `assert codes == {200: "OK", 201: "Created", 404: "Not Found", 500: "Internal Server Error"}`,
+      narrative: `200 means the request succeeded and here's the data; 201 means something new was successfully created; 404 means the thing you asked for doesn't exist; 500 means the server itself broke, not your request.`,
+      steps: [{ do: "Success codes", code: `200: "OK", 201: "Created"` }, { do: "Error codes", code: `404: "Not Found", 500: "Internal Server Error"` }] },
+    { id: "hs_classify", task: `Create category — classify status code 404 into its class name ("Client Error") using integer division on the status code (4xx = Client Error, 5xx = Server Error, 2xx = Success).`,
+      why: "The first digit of an HTTP status code IS its category — status // 100 reads that digit directly, no string parsing needed.",
+      solution: `def classify(status):
+    if status // 100 == 2:
+        return "Success"
+    if status // 100 == 4:
+        return "Client Error"
+    if status // 100 == 5:
+        return "Server Error"
+    return "Other"
+
+category = classify(404)`,
+      assertions: `assert category == "Client Error"`,
+      narrative: `404 // 100 is 4 — integer division drops the last two digits, leaving just the leading class digit, which classify() then maps to a name.`,
+      steps: [{ do: "Extract the leading digit", code: `status // 100` }, { do: "Map it to a category", code: `if ... == 4: return "Client Error"` }] },
+    { id: "hs_created", task: "Create status — 201, the correct status code to return after successfully CREATING a new resource via POST (not 200).",
+      why: "200 vs 201 is a common mix-up — 201 specifically signals 'a new resource now exists', which matters to API clients that check for it.",
+      solution: `status = 201`,
+      assertions: `assert status == 201`,
+      narrative: `200 just means "OK, here's a response"; 201 more precisely means "OK, AND I created something new" — a POST that creates a record should return 201, not the more generic 200.`,
+      steps: [{ do: "The created-resource code", code: `201` }] },
+  ],
+};
+
 export const LETS_DO_THIS_PACKS: DrillPack[] = [
   {
     id: "lets-do-this-values-types",
@@ -842,5 +956,13 @@ export const LETS_DO_THIS_PACKS: DrillPack[] = [
     tag: "basics",
     lang: "python",
     content: FILES_ENVS_LOGGING,
+  },
+  {
+    id: "lets-do-this-exceptions-typing-status",
+    title: "Let's Do This! — Exceptions, Typing & Status Codes",
+    blurb: "try/except/finally, custom exceptions, type hints, HTTP status codes. Part 7 of the fundamentals series.",
+    tag: "basics",
+    lang: "python",
+    content: EXCEPTIONS_TYPING_STATUS,
   },
 ];
