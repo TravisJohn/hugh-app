@@ -197,6 +197,122 @@ except TypeError:
   ],
 };
 
+// ── Part 3 · Control Flow ───────────────────────────────────────────────────
+const CONTROL_FLOW: DrillContent = {
+  cumulative: false,
+  scenario: {
+    title: "Let's Do This! — Control Flow",
+    role: "Part 3 of the fundamentals series. If/elif/else branching, plus for and while loops — how a script decides and repeats.",
+    goal: "Each cell is one standard control-flow shape. Independent reps; write each from memory. (The everyday FOR-LOOP idioms — accumulate, filter, enumerate, zip — get their own deep-dive pack; these two are the basic shape.)",
+    outcome: "That's branching and repetition covered: if, if/else, a full if/elif/elif/else chain, a for loop over a list and over range(), and a while loop that counts down, accumulates, and breaks early.",
+    setupCode: "",
+  },
+  cells: [
+    { id: "if_basic", task: "Create msg — \"positive\" if n is greater than 0 (n = 5), using an if statement.",
+      why: "An if statement runs its body only when the condition is True — the most basic branch.",
+      solution: `n = 5
+if n > 0:
+    msg = "positive"`,
+      assertions: `assert msg == "positive"`,
+      narrative: `The indented block under if n > 0: only executes when that test is True — with n = 5, it always runs.`,
+      steps: [{ do: "Test the condition", code: `if n > 0:` }, { do: "Run the body when true", code: `msg = "positive"` }] },
+    { id: "if_nested", task: "Create category — \"large\" if n is over 100, checked with an if nested inside an outer positivity check (n = 150).",
+      why: "Nesting one if inside another lets you check a more specific condition only once the broader one already holds.",
+      solution: `n = 150
+category = "unknown"
+if n > 0:
+    if n > 100:
+        category = "large"`,
+      assertions: `assert category == "large"`,
+      narrative: `The outer if n > 0: gates entry; only inside it does the inner if n > 100: even get evaluated — two levels of indentation, two levels of condition.`,
+      steps: [{ do: "Default before checking", code: `category = "unknown"` }, { do: "Gate on positive, then on large", code: `if n > 0:\n    if n > 100: ...` }] },
+    { id: "elif_grade", task: "Create grade — \"A\" if score >= 90, \"B\" if score >= 80, else \"C\" (score = 85), using if/elif/else.",
+      why: "elif chains multiple exclusive conditions — only the FIRST one that's True runs, and the rest are skipped entirely.",
+      solution: `score = 85
+if score >= 90:
+    grade = "A"
+elif score >= 80:
+    grade = "B"
+else:
+    grade = "C"`,
+      assertions: `assert grade == "B"`,
+      narrative: `Python checks score >= 90 first (False for 85), then score >= 80 (True) — the moment one branch matches, the rest of the chain, including else, is skipped.`,
+      steps: [{ do: "Check the top tier first", code: `if score >= 90: ...` }, { do: "Fall through to the next", code: `elif score >= 80: ...` }, { do: "Catch everything else", code: `else: ...` }] },
+    { id: "else_parity", task: "Create parity — \"even\" if n is divisible by 2, else \"odd\" (n = 7), using if/else.",
+      why: "else is the catch-all — whatever doesn't satisfy the if, runs the else branch instead.",
+      solution: `n = 7
+if n % 2 == 0:
+    parity = "even"
+else:
+    parity = "odd"`,
+      assertions: `assert parity == "odd"`,
+      narrative: `n % 2 == 0 tests for no remainder on division by 2; for 7 that's False, so control falls straight to else — exactly one of the two branches ever runs.`,
+      steps: [{ do: "Test divisibility by 2", code: `if n % 2 == 0: ...` }, { do: "Otherwise", code: `else: parity = "odd"` }] },
+    { id: "elif_chain", task: "Create tier — \"gold\" if points >= 100, \"silver\" if points >= 50, \"bronze\" if points >= 10, else \"none\" (points = 60), using a full if/elif/elif/else chain.",
+      why: "A longer elif chain scales the same pattern to more than two outcomes — order matters, since checks run top to bottom.",
+      solution: `points = 60
+if points >= 100:
+    tier = "gold"
+elif points >= 50:
+    tier = "silver"
+elif points >= 10:
+    tier = "bronze"
+else:
+    tier = "none"`,
+      assertions: `assert tier == "silver"`,
+      narrative: `60 fails the >= 100 test, passes the >= 50 test — so tier becomes "silver" and the remaining elif/else are never even evaluated.`,
+      steps: [{ do: "Check thresholds top to bottom", code: `if ... >= 100: elif ... >= 50: elif ... >= 10:` }, { do: "Fall back if none matched", code: `else: tier = "none"` }] },
+    { id: "for_iterate", task: "Create total — the sum of [10, 20, 30], built with a for loop (not sum()).",
+      why: "A for loop over a list visits each element once, in order — the basic shape every accumulation builds on.",
+      solution: `nums = [10, 20, 30]
+total = 0
+for n in nums:
+    total += n`,
+      assertions: `assert total == 60`,
+      narrative: `for n in nums: binds n to each element in turn; total += n runs once per element, so total ends up holding the running sum.`,
+      steps: [{ do: "Start the running total", code: `total = 0` }, { do: "Add each element", code: `for n in nums: total += n` }] },
+    { id: "for_range", task: "Create doubled — [0, 2, 4, 6, 8], built with a for loop over range(5).",
+      why: "range(n) generates 0..n-1 without building a real list first — the standard way to loop a fixed number of times.",
+      solution: `doubled = []
+for i in range(5):
+    doubled.append(i * 2)`,
+      assertions: `assert doubled == [0, 2, 4, 6, 8]`,
+      narrative: `range(5) yields 0, 1, 2, 3, 4 one at a time; doubling each and appending builds the result list step by step.`,
+      steps: [{ do: "Loop 5 times", code: `for i in range(5):` }, { do: "Double and collect", code: `doubled.append(i * 2)` }] },
+    { id: "while_countdown", task: "Create steps — [3, 2, 1], built by counting down from 3 with a while loop.",
+      why: "A while loop repeats as long as its condition holds — unlike a for loop, YOU control when it stops.",
+      solution: `steps = []
+n = 3
+while n > 0:
+    steps.append(n)
+    n -= 1`,
+      assertions: `assert steps == [3, 2, 1]`,
+      narrative: `while n > 0: re-checks the condition before every pass; n -= 1 is what eventually makes it False — forget that line and the loop never ends.`,
+      steps: [{ do: "Loop while positive", code: `while n > 0:` }, { do: "Record it, then count down", code: `steps.append(n); n -= 1` }] },
+    { id: "while_condition", task: "Create total — keep adding 5 to total (starting at 0) while total is less than 20.",
+      why: "The condition can depend on the very value the loop body is changing — the loop stops itself once the target is reached.",
+      solution: `total = 0
+while total < 20:
+    total += 5`,
+      assertions: `assert total == 20`,
+      narrative: `Each pass adds 5 and re-tests total < 20; once total reaches 20 the condition goes False and the loop exits — no separate counter needed.`,
+      steps: [{ do: "Loop while under the target", code: `while total < 20:` }, { do: "Step toward it", code: `total += 5` }] },
+    { id: "while_break", task: "Create found — the first number in [4, 9, 15, 22, 7] greater than 10, found with a while loop and break.",
+      why: "break exits a while loop immediately, the same way it does a for loop — useful once a while loop has found what it needs.",
+      solution: `nums = [4, 9, 15, 22, 7]
+i = 0
+found = None
+while i < len(nums):
+    if nums[i] > 10:
+        found = nums[i]
+        break
+    i += 1`,
+      assertions: `assert found == 15`,
+      narrative: `i walks the index manually; the moment nums[i] clears 10 (at 15), found is set and break stops the loop right there — 22 and 7 are never examined.`,
+      steps: [{ do: "Walk the index while in range", code: `while i < len(nums):` }, { do: "Stop at the first match", code: `if nums[i] > 10: found = nums[i]; break` }] },
+  ],
+};
+
 export const LETS_DO_THIS_PACKS: DrillPack[] = [
   {
     id: "lets-do-this-values-types",
@@ -213,5 +329,13 @@ export const LETS_DO_THIS_PACKS: DrillPack[] = [
     tag: "basics",
     lang: "python",
     content: COLLECTIONS,
+  },
+  {
+    id: "lets-do-this-control-flow",
+    title: "Let's Do This! — Control Flow",
+    blurb: "If/elif/else branching, for and while loops. Part 3 of the fundamentals series.",
+    tag: "basics",
+    lang: "python",
+    content: CONTROL_FLOW,
   },
 ];
