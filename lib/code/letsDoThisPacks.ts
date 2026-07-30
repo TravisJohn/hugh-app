@@ -601,6 +601,199 @@ for v in evens_from(2):
   ],
 };
 
+// ── Part 6 · Files, Envs & Logging ──────────────────────────────────────────
+const FILES_ENVS_LOGGING: DrillContent = {
+  cumulative: false,
+  scenario: {
+    title: "Let's Do This! — Files, Envs & Logging",
+    role: "Part 6 of the fundamentals series. Reading/writing files, virtual environments, project layout, environment variables, and logging.",
+    goal: "File handling and environment variables run for real here. Virtual environments and directory structure are shell/filesystem concepts with no Python result to compute — those cells drill the exact commands and layout from memory as data instead.",
+    outcome: "That's the operational basics: read/write/append a file safely with `with`, know the venv create/activate/freeze commands cold, recall a standard project layout, read env vars with a safe default, and capture + format real log output.",
+    setupCode: "",
+  },
+  cells: [
+    { id: "file_write_read", task: `Create content — write "hello" to a file greeting.txt, then read it back.`,
+      why: "`with open(...) as f:` is the standard, safe way to touch a file — it closes automatically even if something goes wrong inside the block.",
+      solution: `with open("greeting.txt", "w") as f:
+    f.write("hello")
+
+with open("greeting.txt") as f:
+    content = f.read()`,
+      assertions: `assert content == "hello"`,
+      narrative: `"w" mode opens for writing (creating or overwriting the file); the second with reopens it in the default read mode and .read() pulls the whole contents back as one string.`,
+      steps: [{ do: "Write it", code: `with open("greeting.txt", "w") as f: f.write("hello")` }, { do: "Read it back", code: `with open("greeting.txt") as f: f.read()` }] },
+    { id: "file_append", task: `Create lines — write two lines with "w", append a third with "a", then read all three back as a stripped list.`,
+      why: "\"a\" mode adds to the end of an existing file instead of overwriting it — the mode for growing a log or record over time.",
+      solution: `with open("log.txt", "w") as f:
+    f.write("line1\\n")
+    f.write("line2\\n")
+
+with open("log.txt", "a") as f:
+    f.write("line3\\n")
+
+with open("log.txt") as f:
+    lines = [line.strip() for line in f.readlines()]`,
+      assertions: `assert lines == ["line1", "line2", "line3"]`,
+      narrative: `readlines() returns each line INCLUDING its trailing newline; .strip() in the comprehension removes it so the final list holds clean strings, not "line1\\n".`,
+      steps: [{ do: "Write two lines fresh", code: `open("log.txt", "w")` }, { do: "Append a third", code: `open("log.txt", "a")` }, { do: "Read and strip all three", code: `[line.strip() for line in f.readlines()]` }] },
+    { id: "file_context_manager", task: "Create closed — True, proving the file handle auto-closes after a `with` block ends (check f.closed).",
+      why: "The whole point of `with` is that it guarantees the file is closed on the way out of the block, even on an exception — worth confirming, not just trusting.",
+      solution: `with open("temp.txt", "w") as f:
+    f.write("x")
+
+closed = f.closed`,
+      assertions: `assert closed is True`,
+      narrative: `f is still a valid name after the with block ends (Python doesn't delete it), but its .closed attribute flips to True the instant the block exits — that's the resource-cleanup guarantee 'with' gives you for free.`,
+      steps: [{ do: "Use the file inside the block", code: `with open("temp.txt", "w") as f: ...` }, { do: "Check it after the block", code: `f.closed` }] },
+    { id: "venv_commands", task: "Create commands — a list of the 3 terminal commands, in order, to create a virtual environment named venv, activate it (macOS/Linux), and install from requirements.txt.",
+      why: "There's no Python result to compute for a venv — it's a filesystem/shell operation. Typing the exact commands from memory is what actually needs to be automatic.",
+      solution: `commands = [
+    "python -m venv venv",
+    "source venv/bin/activate",
+    "pip install -r requirements.txt",
+]`,
+      assertions: `assert commands == ["python -m venv venv", "source venv/bin/activate", "pip install -r requirements.txt"]`,
+      narrative: `python -m venv venv creates an isolated interpreter + packages folder named venv; source .../activate switches your shell to use it; pip install -r requirements.txt then populates it from a pinned list — create, activate, install, in that order, every time.`,
+      steps: [{ do: "Create the environment", code: `python -m venv venv` }, { do: "Activate it", code: `source venv/bin/activate` }, { do: "Install pinned dependencies", code: `pip install -r requirements.txt` }] },
+    { id: "venv_freeze", task: "Create command — the single command that writes your environment's installed packages to requirements.txt.",
+      why: "pip freeze is how you capture exactly what's installed, so a teammate (or CI) can reproduce the same environment.",
+      solution: `command = "pip freeze > requirements.txt"`,
+      assertions: `assert command == "pip freeze > requirements.txt"`,
+      narrative: `pip freeze prints every installed package and its exact pinned version; the > redirects that output into requirements.txt instead of the terminal.`,
+      steps: [{ do: "Capture installed packages", code: `pip freeze > requirements.txt` }] },
+    { id: "dir_layout", task: `Create structure — a nested dict representing a standard FastAPI project layout: an "app" folder containing "main.py", a "routers" folder, and a "models" folder (folders as nested dicts, files as None).`,
+      why: "Like venvs, a project's directory layout isn't something Python computes — recalling the conventional shape (app/main.py, app/routers/, app/models/) as data is the drill.",
+      solution: `structure = {
+    "app": {
+        "main.py": None,
+        "routers": {},
+        "models": {},
+    }
+}`,
+      assertions: `assert structure == {"app": {"main.py": None, "routers": {}, "models": {}}}`,
+      narrative: `None marks a leaf (a file); an empty dict marks a folder that would hold its own files — the same shape you'd see running \`tree\` on a real FastAPI project.`,
+      steps: [{ do: "The app package", code: `"app": { ... }` }, { do: "Its entrypoint and sub-packages", code: `"main.py": None, "routers": {}, "models": {}` }] },
+    { id: "dir_entrypoint", task: "Create entrypoint — the conventional dotted-module path used to run a FastAPI app defined as `app` inside app/main.py, in the form used by uvicorn (module:variable).",
+      why: "uvicorn's `module:variable` syntax is how it finds your app object — knowing the exact string for a standard layout saves a lookup every time you run the server.",
+      solution: `entrypoint = "app.main:app"`,
+      assertions: `assert entrypoint == "app.main:app"`,
+      narrative: `app.main:app reads as "the app module inside the app package" (app/main.py), colon "the variable named app inside it" — exactly what \`uvicorn app.main:app\` needs to boot the server.`,
+      steps: [{ do: "Dotted path to the module", code: `app.main` }, { do: "Colon, then the variable inside it", code: `:app` }] },
+    { id: "env_read", task: `Create db_host — read the DATABASE_HOST environment variable, defaulting to "localhost" if unset (it's unset here).`,
+      why: "os.environ.get(key, default) reads config from the environment without crashing when it's missing — the standard way to make a setting overridable but optional.",
+      solution: `import os
+db_host = os.environ.get("DATABASE_HOST", "localhost")`,
+      assertions: `assert db_host == "localhost"`,
+      narrative: `os.environ acts like a dict of the process's environment variables; .get(..., "localhost") returns the fallback instead of raising, since DATABASE_HOST was never set here.`,
+      steps: [{ do: "Read the environment", code: `os.environ` }, { do: "With a safe fallback", code: `.get("DATABASE_HOST", "localhost")` }] },
+    { id: "env_set_read", task: `Create api_key — set the API_KEY environment variable to "secret123", then read it back with os.getenv.`,
+      why: "os.environ[key] = value sets a variable for THIS process (and anything it spawns); os.getenv is the read-side equivalent of .get().",
+      solution: `import os
+os.environ["API_KEY"] = "secret123"
+api_key = os.getenv("API_KEY")`,
+      assertions: `assert api_key == "secret123"`,
+      narrative: `Setting os.environ["API_KEY"] mutates the process's environment directly; os.getenv("API_KEY") (a convenience wrapper around os.environ.get) reads it straight back.`,
+      steps: [{ do: "Set it", code: `os.environ["API_KEY"] = "secret123"` }, { do: "Read it back", code: `os.getenv("API_KEY")` }] },
+    { id: "log_basic", task: `Create messages — capture a single INFO log message "Started" from the logging module into a list (via a small custom handler, since logging normally writes to stderr, not a variable).`,
+      why: "logging (not print) is how real applications record what happened — a Handler is where log records actually go once emitted.",
+      solution: `import logging
+
+messages = []
+
+class ListHandler(logging.Handler):
+    def emit(self, record):
+        messages.append(record.getMessage())
+
+logger = logging.getLogger("demo1")
+logger.handlers.clear()
+logger.setLevel(logging.INFO)
+logger.addHandler(ListHandler())
+logger.info("Started")`,
+      assertions: `assert messages == ["Started"]`,
+      narrative: `logger.info("Started") creates a LogRecord and hands it to every attached handler; our ListHandler's emit() is called with that record, and record.getMessage() gives back the formatted text. handlers.clear() first avoids piling up duplicate handlers if this cell runs more than once — the same fix real notebooks need.`,
+      steps: [{ do: "Route records into a list", code: `class ListHandler(logging.Handler):\n    def emit(self, record): messages.append(record.getMessage())` }, { do: "Attach it and log", code: `logger.addHandler(ListHandler())\nlogger.info("Started")` }] },
+    { id: "log_levels", task: `Create captured — only the WARNING message survives when the logger's level is set to WARNING (an INFO and a WARNING message are both logged).`,
+      why: "A logger's level is a THRESHOLD — anything below it is silently dropped before it even reaches a handler, which is how you dial verbosity up or down.",
+      solution: `import logging
+
+captured = []
+
+class ListHandler(logging.Handler):
+    def emit(self, record):
+        captured.append(record.getMessage())
+
+logger = logging.getLogger("demo2")
+logger.handlers.clear()
+logger.setLevel(logging.WARNING)
+logger.addHandler(ListHandler())
+logger.info("just fyi")
+logger.warning("heads up")`,
+      assertions: `assert captured == ["heads up"]`,
+      narrative: `setLevel(logging.WARNING) means only WARNING and above get processed — logger.info("just fyi") is discarded immediately (INFO < WARNING), so only "heads up" ever reaches the handler.`,
+      steps: [{ do: "Raise the threshold", code: `logger.setLevel(logging.WARNING)` }, { do: "Below-threshold calls are dropped", code: `logger.info("just fyi")  # ignored` }] },
+    { id: "log_levelname", task: `Create labeled — the level name ("ERROR") captured alongside the message, using record.levelname.`,
+      why: "A LogRecord carries structured metadata (level, logger name, timestamp, ...) beyond just the message text — levelname is the human-readable severity.",
+      solution: `import logging
+
+labeled = []
+
+class ListHandler(logging.Handler):
+    def emit(self, record):
+        labeled.append(f"{record.levelname}: {record.getMessage()}")
+
+logger = logging.getLogger("demo3")
+logger.handlers.clear()
+logger.setLevel(logging.ERROR)
+logger.addHandler(ListHandler())
+logger.error("something broke")`,
+      assertions: `assert labeled == ["ERROR: something broke"]`,
+      narrative: `record.levelname is the string "ERROR" (not the numeric level); combining it with record.getMessage() in an f-string is a miniature version of what a real log formatter does automatically.`,
+      steps: [{ do: "Read the severity off the record", code: `record.levelname` }, { do: "Combine with the message", code: `f"{record.levelname}: {record.getMessage()}"` }] },
+    { id: "logfmt_basic", task: `Create output — a single captured log line formatted as "LEVEL: message" using a logging.Formatter with the format string "%(levelname)s: %(message)s", for logger.warning("disk low").`,
+      why: "A Formatter turns a LogRecord into the final text — the %(field)s placeholders read straight off the record's attributes, so you never hand-build the string yourself.",
+      solution: `import logging
+
+output = []
+
+class ListHandler(logging.Handler):
+    def emit(self, record):
+        output.append(self.format(record))
+
+handler = ListHandler()
+handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+
+logger = logging.getLogger("fmt1")
+logger.handlers.clear()
+logger.setLevel(logging.WARNING)
+logger.addHandler(handler)
+logger.warning("disk low")`,
+      assertions: `assert output == ["WARNING: disk low"]`,
+      narrative: `self.format(record) inside emit() applies the handler's Formatter — "%(levelname)s: %(message)s" — producing exactly "WARNING: disk low", the same mechanism behind every real log line you've ever read.`,
+      steps: [{ do: "Define the format string", code: `logging.Formatter("%(levelname)s: %(message)s")` }, { do: "Apply it in emit()", code: `self.format(record)` }] },
+    { id: "logfmt_custom_field", task: `Create output — a captured log line including the logger's name via %(name)s, formatted as "[name] message", for a logger named "billing" logging.info("invoice sent").`,
+      why: "%(name)s is the logger's own name — including it in the format is how a multi-module app tells log lines apart by WHERE they came from.",
+      solution: `import logging
+
+output = []
+
+class ListHandler(logging.Handler):
+    def emit(self, record):
+        output.append(self.format(record))
+
+handler = ListHandler()
+handler.setFormatter(logging.Formatter("[%(name)s] %(message)s"))
+
+logger = logging.getLogger("billing")
+logger.handlers.clear()
+logger.setLevel(logging.INFO)
+logger.addHandler(handler)
+logger.info("invoice sent")`,
+      assertions: `assert output == ["[billing] invoice sent"]`,
+      narrative: `getLogger("billing") names the logger itself; %(name)s in the format string pulls that name back out at format time, so every line from this logger is tagged [billing] automatically.`,
+      steps: [{ do: "Name the logger", code: `logging.getLogger("billing")` }, { do: "Include its name in the format", code: `"[%(name)s] %(message)s"` }] },
+  ],
+};
+
 export const LETS_DO_THIS_PACKS: DrillPack[] = [
   {
     id: "lets-do-this-values-types",
@@ -641,5 +834,13 @@ export const LETS_DO_THIS_PACKS: DrillPack[] = [
     tag: "basics",
     lang: "python",
     content: OOP,
+  },
+  {
+    id: "lets-do-this-files-envs-logging",
+    title: "Let's Do This! — Files, Envs & Logging",
+    blurb: "File I/O, venv commands, project layout, env vars, logging + formatters. Part 6 of the fundamentals series.",
+    tag: "basics",
+    lang: "python",
+    content: FILES_ENVS_LOGGING,
   },
 ];
