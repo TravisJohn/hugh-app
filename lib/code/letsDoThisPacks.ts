@@ -313,6 +313,112 @@ while i < len(nums):
   ],
 };
 
+// ── Part 4 · Functions ──────────────────────────────────────────────────────
+const FUNCTIONS: DrillContent = {
+  cumulative: false,
+  scenario: {
+    title: "Let's Do This! — Functions",
+    role: "Part 4 of the fundamentals series. Defining functions, parameters (default, keyword, *args), the global keyword, and docstrings.",
+    goal: "Each cell defines and calls a small function. Independent reps; write each from memory.",
+    outcome: "That's functions covered end to end: define, return (single and multiple values), default/keyword/variadic parameters, read AND write a module-level variable with global, and document a function with a docstring.",
+    setupCode: "",
+  },
+  cells: [
+    { id: "fn_define", task: "Create result — call a function square(n) that returns n squared, with n = 6.",
+      why: "def + return is the basic shape of a function — take input, hand back an output.",
+      solution: `def square(n):
+    return n * n
+
+result = square(6)`,
+      assertions: `assert result == 36`,
+      narrative: `def square(n): names the function and its parameter; return n * n is what the CALL square(6) evaluates to — the function only runs when called, not when defined.`,
+      steps: [{ do: "Define it", code: `def square(n): return n * n` }, { do: "Call it", code: `square(6)` }] },
+    { id: "fn_multi_return", task: "Create lo and hi — call a function bounds(nums) that returns the min and max as a tuple, on [4, 1, 9, 2].",
+      why: "Returning a tuple is how a Python function hands back more than one value — the caller just unpacks it.",
+      solution: `def bounds(nums):
+    return min(nums), max(nums)
+
+lo, hi = bounds([4, 1, 9, 2])`,
+      assertions: `assert lo == 1 and hi == 9`,
+      narrative: `return min(nums), max(nums) packs both values into one tuple; lo, hi = bounds(...) unpacks it on the way out — the same unpacking you already used on a plain tuple.`,
+      steps: [{ do: "Return two values as a tuple", code: `return min(nums), max(nums)` }, { do: "Unpack the call", code: `lo, hi = bounds([4, 1, 9, 2])` }] },
+    { id: "fp_default", task: `Create msg — call greet(name) with a default greeting="Hello" parameter, called as greet("Ann").`,
+      why: "A default parameter value makes an argument optional — callers can leave it out and get a sensible fallback.",
+      solution: `def greet(name, greeting="Hello"):
+    return f"{greeting}, {name}!"
+
+msg = greet("Ann")`,
+      assertions: `assert msg == "Hello, Ann!"`,
+      narrative: `greeting="Hello" in the signature only applies when the caller doesn't supply their own — greet("Ann") uses it, so greeting is "Hello" inside the function.`,
+      steps: [{ do: "Give greeting a default", code: `def greet(name, greeting="Hello"):` }, { do: "Call without it", code: `greet("Ann")` }] },
+    { id: "fp_keyword", task: `Create msg2 — call greet(name, greeting="Hello") using a keyword argument to override the default, name="Ben", greeting="Hi".`,
+      why: "A keyword argument names which parameter it fills, overriding a default explicitly and self-documenting the call.",
+      solution: `def greet(name, greeting="Hello"):
+    return f"{greeting}, {name}!"
+
+msg2 = greet("Ben", greeting="Hi")`,
+      assertions: `assert msg2 == "Hi, Ben!"`,
+      narrative: `greeting="Hi" in the CALL (not the def) passes "Hi" specifically for that parameter by name, so it wins over the def's own default of "Hello".`,
+      steps: [{ do: "Call with a named override", code: `greet("Ben", greeting="Hi")` }] },
+    { id: "fp_args", task: "Create total — call add_all(1, 2, 3, 4) where add_all accepts any number of positional arguments with *args and sums them.",
+      why: "*args collects any number of positional arguments into a tuple — the way a function accepts a variable-length argument list.",
+      solution: `def add_all(*args):
+    return sum(args)
+
+total = add_all(1, 2, 3, 4)`,
+      assertions: `assert total == 10`,
+      narrative: `Inside add_all, args is the tuple (1, 2, 3, 4) — however many arguments the caller passes, *args gathers them all under one name.`,
+      steps: [{ do: "Gather every positional arg", code: `def add_all(*args):` }, { do: "Sum the tuple", code: `sum(args)` }] },
+    { id: "global_read", task: "Create result — a function reads (but doesn't modify) a module-level counter variable (counter = 5) and returns counter * 2.",
+      why: "A function can READ a variable from the enclosing scope with no special syntax — global is only needed when you want to WRITE to it.",
+      solution: `counter = 5
+
+def double_counter():
+    return counter * 2
+
+result = double_counter()`,
+      assertions: `assert result == 10`,
+      narrative: `double_counter() has no counter parameter and no global declaration, yet it sees counter fine — Python looks outward to the enclosing scope automatically for reads.`,
+      steps: [{ do: "Define it at module level", code: `counter = 5` }, { do: "Just read it inside a function", code: `def double_counter(): return counter * 2` }] },
+    { id: "global_write", task: "Create counter — start at 0, then call a function increment() that uses the global keyword to modify counter by +1, called twice.",
+      why: "global tells Python 'this name refers to the module-level variable, not a new local one' — required the moment a function assigns to an outer variable.",
+      solution: `counter = 0
+
+def increment():
+    global counter
+    counter += 1
+
+increment()
+increment()`,
+      assertions: `assert counter == 2`,
+      narrative: `Without global counter, counter += 1 inside the function would create a brand-new LOCAL counter and error (used before assignment) — the declaration is what makes it mutate the module-level one instead.`,
+      steps: [{ do: "Declare intent to mutate the outer name", code: `global counter` }, { do: "Call it twice", code: `increment(); increment()` }] },
+    { id: "doc_basic", task: `Create doc — the docstring of a function square(n) that returns n*n, written with a one-line docstring "Return n squared.", read via square.__doc__.`,
+      why: "A docstring — a string literal right under def — becomes the function's documentation, retrievable at runtime via .__doc__.",
+      solution: `def square(n):
+    """Return n squared."""
+    return n * n
+
+doc = square.__doc__`,
+      assertions: `assert doc == "Return n squared."`,
+      narrative: `The triple-quoted string directly after the def line isn't executed like normal code — Python stores it on the function object itself, readable later as square.__doc__ (and by help(square)).`,
+      steps: [{ do: "Write it as the first statement", code: `"""Return n squared."""` }, { do: "Read it back off the function", code: `square.__doc__` }] },
+    { id: "doc_multiline", task: "Create summary — the first line of a multi-line docstring on a function describe(), read via describe.__doc__.splitlines()[0].",
+      why: "Docstrings are ordinary multi-line strings — convention puts a one-line summary first, then a blank line, then more detail.",
+      solution: `def describe():
+    """One-line summary.
+
+    Longer explanation goes here, if needed.
+    """
+    return None
+
+summary = describe.__doc__.splitlines()[0]`,
+      assertions: `assert summary == "One-line summary."`,
+      narrative: `.__doc__ returns the whole triple-quoted block as one string; .splitlines()[0] takes just the first line — the short summary a reader (or an IDE tooltip) sees first.`,
+      steps: [{ do: "Write summary, blank line, detail", code: `"""One-line summary.\\n\\n    Longer explanation...\\n    """` }, { do: "Read just the first line", code: `describe.__doc__.splitlines()[0]` }] },
+  ],
+};
+
 export const LETS_DO_THIS_PACKS: DrillPack[] = [
   {
     id: "lets-do-this-values-types",
@@ -337,5 +443,13 @@ export const LETS_DO_THIS_PACKS: DrillPack[] = [
     tag: "basics",
     lang: "python",
     content: CONTROL_FLOW,
+  },
+  {
+    id: "lets-do-this-functions",
+    title: "Let's Do This! — Functions",
+    blurb: "Define, return, default/keyword/*args parameters, global, docstrings. Part 4 of the fundamentals series.",
+    tag: "basics",
+    lang: "python",
+    content: FUNCTIONS,
   },
 ];
