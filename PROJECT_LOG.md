@@ -2031,3 +2031,66 @@ thumbnail so the flag reads at a glance without opening the screenshot.
 **Verified:** tsc clean, full Vitest suite green (172/172, unchanged — no new logic worth a unit
 test, this is CRUD wiring mirroring the existing rename-image path), `next build` clean.
 Migration `030` applied by Travis directly.
+
+## Code pillar — ML/stdlib pattern packs + arrow-key carousel (2026-07-23)
+
+Grew the Python pattern library from 6 to 15 packs (18 total Python-lang packs incl. automation/
+airflow/rag) and replaced the landing's stacked grid with a one-at-a-time carousel, per Travis's
+ask. Scope locked via AskUserQuestion first: (1) ML packs teach **real scikit-learn syntax**
+(`.fit`/`.predict`/`train_test_split`/etc.), not from-scratch math like the existing Linear
+Regression pack; (2) a **second** automation pack (not just leaving the existing one alone); (3)
+for-loop constructs pack is **plain stdlib**, not pandas-flavored looping.
+
+**New `lib/code/mlPacks.ts`** — 7 packs (`preprocessing`, `validation`, `decision-trees`,
+`naive-bayes`, `kmeans`, `logistic-regression`, `neural-network`), all sharing one 20-row telecom
+customer table (`age/income_k/tenure_months/monthly_usage/plan/churn`). The table was deliberately
+built with two "hard case" rows (a loyal-profile customer who churned, a risky-profile one who
+didn't) so no single feature perfectly separates the classes — models land at realistic ~90%
+accuracy instead of a trivial 100%, which also gives cross-validation something real to show
+(fold scores vary: `[1, 0.75, 0.75, 1, 1]`). **New `lib/code/loopPacks.ts`** — `for-loop-constructs`
+(accumulator/filter/break/enumerate/zip/nested-loop/comprehension, on a small `rows` orders list).
+**Extended `lib/code/automationPacks.ts`** with a second pack, `automation-ii` (argparse, logging
+capture, JSON round-trip, itertools groupby/chain, csv.DictReader, env config, backoff) — deliberately
+non-overlapping with the first pack's resilience-pattern focus (retry/timing/batching).
+
+**Verification methodology (this mattered more than usual):** every cell's solution+assertion was
+run for real, not hand-derived — but against a **pinned venv matching Pyodide 0.26.4's exact
+package versions** (numpy 1.26.4, pandas 2.2.0, scikit-learn 1.4.2, scipy 1.12.0 — pulled from the
+CDN's `pyodide-lock.json`), not whatever's newest locally (numpy 2.2.1/sklearn 1.6.1), since a
+newer local sklearn could silently produce different numbers than what actually runs in the
+browser. Float-producing assertions (probabilities, R², coefficients, inertia) are rounded to
+1-3dp specifically to absorb native-BLAS-vs-WASM floating-point drift; anything through an
+iterative solver (logistic regression, k-means, the MLP) got extra scrutiny here. First noise
+injection attempt (randomly flipping two labels) didn't actually break separability — the flipped
+rows' feature values still fell outside the opposite class's range, so a single-threshold split
+still hit 100%; fixed by choosing hard-case feature values that genuinely overlap the other class.
+
+**Runtime fix required (not just content):** scikit-learn cells broke the existing
+`EXEC_TIMEOUT_MS = 6000` in `lib/code/pyodideClient.ts` — real browser testing showed sklearn
+cells (already-preloaded pandas+scikit-learn) consistently take ~9s per run, not the <1s pandas
+aggregations the constant was tuned for. Worse than a slow cell: a timeout triggers `hardReset()`
+(worker killed + respawned), and the fresh worker has nothing loaded, so the NEXT run has to
+reload every package from scratch inside its own 6s budget too — a death spiral that never
+recovers (confirmed live: 3 worker respawns inside 20 seconds, every cell stuck showing "…").
+Fixed two ways: raised `EXEC_TIMEOUT_MS` to 15000 (comfortable margin over the measured ~9s
+ceiling, still recovers a genuine infinite loop reasonably fast), and made `hardReset()` reissue
+the last `preload()` call on the fresh worker (`PyodideRunner.lastPreload`) so a reset — if one
+ever happens — actually recovers instead of spiraling. Also added `DrillContent.preloadPackages`
+(defaults to `["pandas"]` for `dataKind: "dataframe"`, back-compat) so packs can ask for
+`["pandas", "scikit-learn"]`; the boot button label is now derived from it
+(`Booting Python + pandas + scikit-learn…`) instead of a hardcoded pandas-only string.
+
+**Carousel (`components/code/CodeLanding.tsx`):** the "Coding patterns" grid became a single
+active card flanked by prev/next arrow buttons, a `current / total` counter, and a click-to-jump
+dot strip — plus real `ArrowLeft`/`ArrowRight` keyboard support (ignored while an input/textarea/
+contenteditable has focus, so it doesn't steal keys from CodeChat). Switching the language pill
+resets to card 0.
+
+**Verified:** tsc clean, full Vitest suite green (199/199 — `packs.test.ts`'s generic structural
+checks run against every pack automatically, 71/71 including all new ones), `next build` clean.
+Browser-verified end-to-end with Playwright logged in as the seeded test user: carousel arrows +
+keyboard paging confirmed on `/code/start`; for all 9 new packs, typed the real cell-1 solution
+into the live CodeMirror editor and clicked "Run & check" against the live Pyodide worker — all 9
+passed (confetti + "passed · with reference"), including `decision-trees`' reference precompute
+chain resolving correctly cell-to-cell after the timeout fix. `scikit-learn` confirmed loading
+correctly in real Pyodide-WASM (not just theoretically Pyodide-compatible).

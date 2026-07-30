@@ -206,6 +206,139 @@ logged = events`,
   ],
 };
 
+// ── Pack 2: CLI, logging & scheduling ────────────────────────────────────────
+// A second, independent set of automation idioms — the stdlib modules a script
+// reaches for to be runnable unattended (CLI args, logging, JSON I/O) rather
+// than the resilience patterns (retry/timing/batching) the first pack covers.
+
+const IMPORTS_II = `import argparse, json, logging, io, csv, os
+from itertools import groupby, chain
+from datetime import datetime, timedelta`;
+
+export const AUTOMATION_II: DrillContent = {
+  dataKind: "rows",
+  cumulative: false,
+  scenario: {
+    title: "Automation II — CLI args, logging & scheduling",
+    role: "The other half of running a script unattended: reading its own arguments, logging what happened, passing data as JSON, and scheduling repeat runs.",
+    goal: "Each cell is one standard construct — mostly independent stdlib moves (argparse, logging, itertools, csv). Write each from memory.",
+    outcome: "That's the second automation toolkit: parse CLI args, capture log records, round-trip JSON, generate a schedule, group/flatten with itertools, parse CSV from memory, read env config, dedupe, and back off exponentially.",
+    setupCode: IMPORTS_II,
+  },
+  cells: [
+    {
+      id: "args",
+      task: `Build an argparse parser with --name (required) and --count (int, default 1), and create args by parsing ["--name", "backup", "--count", "3"].`,
+      why: "argparse is the standard way a script reads its own command-line arguments — parse_args() also accepts an explicit list, which is what makes it testable.",
+      solution: `parser = argparse.ArgumentParser()
+parser.add_argument("--name", required=True)
+parser.add_argument("--count", type=int, default=1)
+args = parser.parse_args(["--name", "backup", "--count", "3"])`,
+      assertions: `assert args.name == "backup"
+assert args.count == 3`,
+      narrative: `add_argument declares each flag once; parse_args(["--name", "backup", ...]) parses a literal list instead of real sys.argv — the same call a script makes, just handed a fixed input so it's testable.`,
+    },
+    {
+      id: "log_records",
+      task: `Attach a handler that collects messages into log_records, then log "job started" (info) and "retrying step 2" (warning).`,
+      why: "Capturing log output into a list — instead of printing it — is how you make logging behaviour testable.",
+      solution: `log_records = []
+
+class ListHandler(logging.Handler):
+    def emit(self, record):
+        log_records.append(record.getMessage())
+
+logger = logging.getLogger("job")
+logger.setLevel(logging.INFO)
+logger.addHandler(ListHandler())
+logger.propagate = False
+
+logger.info("job started")
+logger.warning("retrying step 2")`,
+      assertions: `assert log_records == ["job started", "retrying step 2"]`,
+      narrative: `A logging.Handler subclass's emit(record) runs for every log call; appending record.getMessage() to a plain list turns "what did the script log" into something an assert can check directly.`,
+    },
+    {
+      id: "restored",
+      task: `Create payload — {"job": "backup", "attempts": 2} as a sorted-key JSON string — then create restored by parsing it back.`,
+      why: "json.dumps/loads is the standard way scripts hand structured data to each other — files, APIs, message queues.",
+      solution: `payload = json.dumps({"job": "backup", "attempts": 2}, sort_keys=True)
+restored = json.loads(payload)`,
+      assertions: `assert payload == '{"attempts": 2, "job": "backup"}'
+assert restored == {"job": "backup", "attempts": 2}`,
+      narrative: `sort_keys=True makes the JSON string's key order deterministic (handy for diffs and tests); json.loads reverses it back into a plain dict, unchanged.`,
+    },
+    {
+      id: "schedule_strs",
+      task: `Create schedule_strs — 4 run times as "HH:MM" strings, 15 minutes apart, starting at 09:00.`,
+      why: "Building a schedule with datetime + timedelta is the stdlib way to generate run times without a scheduling library.",
+      solution: `start = datetime(2026, 1, 1, 9, 0)
+schedule = [start + timedelta(minutes=15 * i) for i in range(4)]
+schedule_strs = [t.strftime("%H:%M") for t in schedule]`,
+      assertions: `assert schedule_strs == ["09:00", "09:15", "09:30", "09:45"]`,
+      narrative: `timedelta(minutes=15 * i) offsets the start time by an increasing number of minutes each step; strftime("%H:%M") formats each resulting datetime back down to just hours and minutes.`,
+    },
+    {
+      id: "grouped",
+      task: `Create grouped — a dict of file extension to the files sharing it, using itertools.groupby on a pre-sorted file list.`,
+      why: "groupby only groups CONSECUTIVE matching items — sorting by the same key first is what makes it actually group correctly.",
+      solution: `files = ["a.csv", "b.csv", "c.txt", "d.txt", "e.pdf"]
+files_sorted = sorted(files, key=lambda f: f.split(".")[-1])
+grouped = {ext: list(group) for ext, group in groupby(files_sorted, key=lambda f: f.split(".")[-1])}`,
+      assertions: `assert grouped == {"csv": ["a.csv", "b.csv"], "pdf": ["e.pdf"], "txt": ["c.txt", "d.txt"]}`,
+      narrative: `groupby(iterable, key=...) only merges items that are ALREADY adjacent and share a key — sorted(files, key=...) first guarantees every extension's files sit together before groupby sees them.`,
+    },
+    {
+      id: "flattened",
+      task: "Create flattened — [[1, 2, 3], [4, 5], [6]] flattened into one list, using itertools.chain.from_iterable.",
+      why: "chain.from_iterable is the itertools one-liner for flattening a list of lists — no nested loop required.",
+      solution: `batches = [[1, 2, 3], [4, 5], [6]]
+flattened = list(chain.from_iterable(batches))`,
+      assertions: `assert flattened == [1, 2, 3, 4, 5, 6]`,
+      narrative: `chain.from_iterable(batches) lazily walks each sub-list in turn as if they were one long sequence; list(...) collects that into an actual flat list.`,
+    },
+    {
+      id: "csv_rows",
+      task: `Create csv_rows — a list of dicts parsed from an in-memory CSV string, using csv.DictReader.`,
+      why: "csv.DictReader plus io.StringIO parses CSV text without ever touching a real file on disk — handy for tests or in-memory data.",
+      solution: `csv_text = "name,status\\nalpha,done\\nbeta,pending\\n"
+reader = csv.DictReader(io.StringIO(csv_text))
+csv_rows = list(reader)`,
+      assertions: `assert csv_rows == [{"name": "alpha", "status": "done"}, {"name": "beta", "status": "pending"}]`,
+      narrative: `io.StringIO(csv_text) wraps a string so it behaves like a file handle; csv.DictReader reads its first line as headers and turns every following line into a dict keyed by those headers.`,
+    },
+    {
+      id: "env_config",
+      task: `Set the JOB_RETRIES environment variable to "5", then create env_config — {"retries": ..., "timeout": ...} read from the environment with fallback defaults.`,
+      why: "os.environ.get(key, default) is the standard way scripts read configuration that might be set externally, without crashing when it isn't.",
+      solution: `os.environ["JOB_RETRIES"] = "5"
+env_config = {
+    "retries": int(os.environ.get("JOB_RETRIES", 3)),
+    "timeout": int(os.environ.get("JOB_TIMEOUT", 30)),
+}`,
+      assertions: `assert env_config == {"retries": 5, "timeout": 30}`,
+      narrative: `os.environ.get(key, default) returns the set value if present (retries, set to "5" above) or silently falls back (timeout, never set) — the standard shape for config that's sometimes overridden externally.`,
+    },
+    {
+      id: "deduped_sorted",
+      task: `Create deduped_sorted — the distinct tags from ["prod", "eu", "prod", "batch", "eu", "nightly"], alphabetically sorted.`,
+      why: "set() then sorted() is the fast stdlib combo for de-duplicating and ordering in one line — no library needed.",
+      solution: `tags = ["prod", "eu", "prod", "batch", "eu", "nightly"]
+deduped_sorted = sorted(set(tags))`,
+      assertions: `assert deduped_sorted == ["batch", "eu", "nightly", "prod"]`,
+      narrative: `set(tags) drops every duplicate (order not guaranteed); sorted(...) then puts what's left back into a predictable, alphabetical order.`,
+    },
+    {
+      id: "backoff_delays",
+      task: "Create backoff_delays — exponential backoff delays for 6 retries (1, 2, 4, 8, …), capped at 30.",
+      why: "Exponential backoff, capped at a ceiling, is the standard retry-delay shape — it backs off fast but never waits forever between tries.",
+      solution: `backoff_delays = [min(2 ** i, 30) for i in range(6)]`,
+      assertions: `assert backoff_delays == [1, 2, 4, 8, 16, 30]`,
+      narrative: `2 ** i doubles the delay each retry (1, 2, 4, 8, 16, 32…); wrapping it in min(..., 30) caps it so the 6th retry waits 30 seconds instead of 32 — backoff that never grows unbounded.`,
+    },
+  ],
+};
+
 export const AUTOMATION_PACKS: DrillPack[] = [
   {
     id: "automation",
@@ -214,5 +347,13 @@ export const AUTOMATION_PACKS: DrillPack[] = [
     tag: "automation",
     lang: "python",
     content: AUTOMATION,
+  },
+  {
+    id: "automation-ii",
+    title: "Automation II — CLI, logging & scheduling",
+    blurb: "argparse, logging capture, JSON, itertools, CSV parsing, env config. 10 reps.",
+    tag: "automation",
+    lang: "python",
+    content: AUTOMATION_II,
   },
 ];
