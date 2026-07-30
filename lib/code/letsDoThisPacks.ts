@@ -419,6 +419,188 @@ summary = describe.__doc__.splitlines()[0]`,
   ],
 };
 
+// ── Part 5 · OOP ─────────────────────────────────────────────────────────────
+const OOP: DrillContent = {
+  cumulative: false,
+  scenario: {
+    title: "Let's Do This! — OOP",
+    role: "Part 5 of the fundamentals series. Classes, inheritance, decorators, and generators — the constructs everything else in the series builds on.",
+    goal: "Each cell is one standard OOP or functional-Python move. Independent reps; write each from memory.",
+    outcome: "That's classes, inheritance (+ super() and isinstance), decorators (single and stacked), and generators (a manual next(), a break-driven collect, and a generator expression) — all covered.",
+    setupCode: "",
+  },
+  cells: [
+    { id: "class_define", task: "Create p — an instance of a class Point with x and y attributes, using __init__, created as Point(3, 4).",
+      why: "__init__ is the constructor — it runs automatically when you call Point(...), setting up the instance's attributes.",
+      solution: `class Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+p = Point(3, 4)`,
+      assertions: `assert p.x == 3 and p.y == 4`,
+      narrative: `Point(3, 4) calls __init__(self, 3, 4) behind the scenes; self IS the new instance, so self.x = x attaches x as an attribute ON that instance — p.x reads it back.`,
+      steps: [{ do: "Define the constructor", code: `def __init__(self, x, y): self.x = x; self.y = y` }, { do: "Instantiate it", code: `Point(3, 4)` }] },
+    { id: "class_method", task: "Create area — call a method on a Rectangle class that computes width*height, for Rectangle(4, 5).",
+      why: "A method is a function defined inside a class that takes self first — it operates on one particular instance's data.",
+      solution: `class Rectangle:
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+
+    def area(self):
+        return self.width * self.height
+
+area = Rectangle(4, 5).area()`,
+      assertions: `assert area == 20`,
+      narrative: `Rectangle(4, 5).area() creates the instance, then calls area() on it — inside, self refers back to that same instance, so self.width and self.height are 4 and 5.`,
+      steps: [{ do: "Define a method using self's attributes", code: `def area(self): return self.width * self.height` }, { do: "Build and call", code: `Rectangle(4, 5).area()` }] },
+    { id: "class_attr", task: "Create count — track how many Widget instances have been created using a CLASS-level attribute, after creating 3 widgets.",
+      why: "An attribute defined directly in the class body (not in __init__) is shared by every instance — the right home for a running total like this.",
+      solution: `class Widget:
+    total = 0
+
+    def __init__(self):
+        Widget.total += 1
+
+Widget()
+Widget()
+Widget()
+count = Widget.total`,
+      assertions: `assert count == 3`,
+      narrative: `total = 0 lives on the CLASS, not any one instance; Widget.total += 1 inside __init__ bumps that single shared value every time a new Widget is built, regardless of which instance triggered it.`,
+      steps: [{ do: "Put the counter on the class", code: `class Widget: total = 0` }, { do: "Bump it on every construction", code: `Widget.total += 1` }] },
+    { id: "inherit_basic", task: `Create sound — call speak() on a Dog, which inherits from Animal and overrides speak() to return "Woof".`,
+      why: "class Dog(Animal) inherits everything Animal has; redefining a method in Dog overrides the parent's version for Dog instances.",
+      solution: `class Animal:
+    def speak(self):
+        return "..."
+
+class Dog(Animal):
+    def speak(self):
+        return "Woof"
+
+sound = Dog().speak()`,
+      assertions: `assert sound == "Woof"`,
+      narrative: `Dog(Animal) means Dog IS an Animal, but its own speak() shadows Animal's — Python looks for speak on Dog first, finds one, and never falls back to the parent's.`,
+      steps: [{ do: "Inherit from Animal", code: `class Dog(Animal):` }, { do: "Override its method", code: `def speak(self): return "Woof"` }] },
+    { id: "inherit_super", task: `Create desc — a Cat.__init__ that calls Animal.__init__ via super() to set self.name, then adds its own self.sound = "Meow", for Cat("Tom"), building desc as f"{name}: {sound}".`,
+      why: "super().__init__(...) reuses the PARENT's constructor instead of duplicating its logic — the standard way a subclass extends, rather than replaces, setup.",
+      solution: `class Animal:
+    def __init__(self, name):
+        self.name = name
+
+class Cat(Animal):
+    def __init__(self, name):
+        super().__init__(name)
+        self.sound = "Meow"
+
+c = Cat("Tom")
+desc = f"{c.name}: {c.sound}"`,
+      assertions: `assert desc == "Tom: Meow"`,
+      narrative: `super().__init__(name) calls Animal's constructor, which sets self.name — Cat's own __init__ then adds sound on top, so the instance ends up with both attributes.`,
+      steps: [{ do: "Reuse the parent's setup", code: `super().__init__(name)` }, { do: "Add the subclass's own attribute", code: `self.sound = "Meow"` }] },
+    { id: "inherit_isinstance", task: "Create checks — a tuple of (isinstance(Dog(), Animal), isinstance(Animal(), Dog)) proving a Dog IS an Animal but not vice versa.",
+      why: "isinstance() checks the relationship along the inheritance chain — a subclass instance passes for its parent, but not the other way round.",
+      solution: `class Animal:
+    pass
+
+class Dog(Animal):
+    pass
+
+checks = (isinstance(Dog(), Animal), isinstance(Animal(), Dog))`,
+      assertions: `assert checks == (True, False)`,
+      narrative: `A Dog IS-A Animal by definition (class Dog(Animal)), so isinstance(Dog(), Animal) is True; the reverse isn't declared anywhere, so isinstance(Animal(), Dog) is False.`,
+      steps: [{ do: "Check subclass against parent", code: `isinstance(Dog(), Animal)` }, { do: "Check parent against subclass", code: `isinstance(Animal(), Dog)` }] },
+    { id: "deco_basic", task: `Create result — apply a decorator shout that uppercases a function's string return value, to a function greet() returning "hello".`,
+      why: "A decorator is a function that takes a function and returns a replacement — @shout above def greet(): is shorthand for greet = shout(greet).",
+      solution: `def shout(fn):
+    def wrapper():
+        return fn().upper()
+    return wrapper
+
+@shout
+def greet():
+    return "hello"
+
+result = greet()`,
+      assertions: `assert result == "HELLO"`,
+      narrative: `shout(fn) returns wrapper, a new function that calls the original fn() and uppercases the result; @shout rebinds greet to that wrapper, so calling greet() now runs the wrapped version.`,
+      steps: [{ do: "Build a replacement function", code: `def shout(fn):\n    def wrapper(): return fn().upper()\n    return wrapper` }, { do: "Apply it", code: `@shout\ndef greet(): return "hello"` }] },
+    { id: "deco_args", task: "Create result — a decorator that doubles a function's numeric return value, applied to add(a, b) returning a+b, called as add(2, 3).",
+      why: "*args, **kwargs in the wrapper let a decorator work on ANY function's signature, not just zero-argument ones.",
+      solution: `def doubled(fn):
+    def wrapper(*args, **kwargs):
+        return fn(*args, **kwargs) * 2
+    return wrapper
+
+@doubled
+def add(a, b):
+    return a + b
+
+result = add(2, 3)`,
+      assertions: `assert result == 10`,
+      narrative: `wrapper(*args, **kwargs) accepts whatever add would — here (2, 3) — forwards them straight to fn(*args, **kwargs), and doubles what comes back: (2+3)*2 = 10.`,
+      steps: [{ do: "Forward any arguments through", code: `def wrapper(*args, **kwargs): return fn(*args, **kwargs) * 2` }, { do: "Apply and call", code: `@doubled\ndef add(a, b): ...\nadd(2, 3)` }] },
+    { id: "deco_stacked", task: `Create result — stack two decorators (shout then exclaim) on greet() returning "hi", so the result is uppercased AND has "!" appended.`,
+      why: "Stacked decorators apply bottom-up (closest to the function first) — reading the order right matters, since it changes the outcome.",
+      solution: `def shout(fn):
+    def wrapper():
+        return fn().upper()
+    return wrapper
+
+def exclaim(fn):
+    def wrapper():
+        return fn() + "!"
+    return wrapper
+
+@shout
+@exclaim
+def greet():
+    return "hi"
+
+result = greet()`,
+      assertions: `assert result == "HI!"`,
+      narrative: `@exclaim (closest to def) wraps greet first, turning "hi" into "hi!"; @shout then wraps THAT result, uppercasing it to "HI!" — bottom decorator runs first, outer one wraps around it.`,
+      steps: [{ do: "Nearest decorator applies first", code: `@exclaim  # "hi" -> "hi!"` }, { do: "Then the outer one wraps it", code: `@shout  # "hi!" -> "HI!"` }] },
+    { id: "gen_basic", task: "Create result — the first 3 values produced by a generator function count_up() that yields 1, 2, 3, 4, 5..., collected with next().",
+      why: "yield turns a function into a generator — it pauses at each yield and resumes right there on the next next() call, instead of running to completion.",
+      solution: `def count_up():
+    n = 1
+    while True:
+        yield n
+        n += 1
+
+gen = count_up()
+result = [next(gen), next(gen), next(gen)]`,
+      assertions: `assert result == [1, 2, 3]`,
+      narrative: `Calling count_up() doesn't run the function yet — it returns a generator object. Each next(gen) resumes execution from the last yield, produces the next value, and pauses again — an infinite loop that never actually blocks anything.`,
+      steps: [{ do: "Pause and produce with yield", code: `yield n` }, { do: "Pull values one at a time", code: `next(gen)` }] },
+    { id: "gen_list", task: "Create evens — the first 4 even numbers from a generator function evens_from(start) that yields start, start+2, start+4, ..., collected into a list with a for loop and break (start=2).",
+      why: "Looping a generator with for, then break-ing once you have enough, is how you take 'the first N' from something that never ends on its own.",
+      solution: `def evens_from(start):
+    n = start
+    while True:
+        yield n
+        n += 2
+
+evens = []
+for v in evens_from(2):
+    evens.append(v)
+    if len(evens) == 4:
+        break`,
+      assertions: `assert evens == [2, 4, 6, 8]`,
+      narrative: `for v in evens_from(2): pulls one value per iteration on demand; the moment evens has 4 items, break stops pulling — the generator never actually produces a 5th value.`,
+      steps: [{ do: "Loop the generator", code: `for v in evens_from(2):` }, { do: "Stop once you have enough", code: `if len(evens) == 4: break` }] },
+    { id: "gen_expr", task: "Create total — the sum of squares of 1 through 5, using a generator expression (parentheses, not brackets) passed straight to sum().",
+      why: "A generator expression looks like a list comprehension but never builds the intermediate list — sum() consumes values one at a time, which is more memory-efficient.",
+      solution: `total = sum(n * n for n in range(1, 6))`,
+      assertions: `assert total == 55`,
+      narrative: `n * n for n in range(1, 6) without square brackets is a generator expression — sum() pulls each squared value as it goes, never materialising [1, 4, 9, 16, 25] as an actual list in memory.`,
+      steps: [{ do: "Build a generator expression", code: `n * n for n in range(1, 6)` }, { do: "Feed it straight to sum()", code: `sum( ... )` }] },
+  ],
+};
+
 export const LETS_DO_THIS_PACKS: DrillPack[] = [
   {
     id: "lets-do-this-values-types",
@@ -451,5 +633,13 @@ export const LETS_DO_THIS_PACKS: DrillPack[] = [
     tag: "basics",
     lang: "python",
     content: FUNCTIONS,
+  },
+  {
+    id: "lets-do-this-oop",
+    title: "Let's Do This! — OOP",
+    blurb: "Classes, inheritance + super(), decorators (single and stacked), generators. Part 5 of the fundamentals series.",
+    tag: "basics",
+    lang: "python",
+    content: OOP,
   },
 ];
