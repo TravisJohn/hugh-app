@@ -124,6 +124,79 @@ const VALUES_AND_TYPES: DrillContent = {
   ],
 };
 
+// ── Part 2 · Collections ────────────────────────────────────────────────────
+const COLLECTIONS: DrillContent = {
+  cumulative: false,
+  scenario: {
+    title: "Let's Do This! — Collections",
+    role: "Part 2 of the fundamentals series. Lists, tuples, and dictionaries — the three containers behind almost everything you'll build.",
+    goal: "Each cell is one standard move on lists, tuples, or dicts. Independent reps; write each from memory.",
+    outcome: "That's the container toolkit: build and grow a list, unpack and respect a tuple's immutability, read a dict with a safe default and merge two together.",
+    setupCode: "",
+  },
+  cells: [
+    { id: "build_list", task: "Create nums — a list containing 3, 1, 4, 1, 5, built by listing the values directly.",
+      why: "A list literal — square brackets, comma-separated — is the most basic way to name an ordered, mutable collection.",
+      solution: `nums = [3, 1, 4, 1, 5]`,
+      assertions: `assert nums == [3, 1, 4, 1, 5]`,
+      narrative: `[3, 1, 4, 1, 5] creates a list in one line, keeping the exact order (and duplicates) you wrote — unlike a set, nothing gets deduplicated or reordered.`,
+      steps: [{ do: "List the values", code: `[3, 1, 4, 1, 5]` }] },
+    { id: "append", task: `Create fruits — start with ["apple", "banana"], then append "cherry" to it.`,
+      why: ".append() grows a list in place — the standard way to add one item at the end.",
+      solution: `fruits = ["apple", "banana"]\nfruits.append("cherry")`,
+      assertions: `assert fruits == ["apple", "banana", "cherry"]`,
+      narrative: `.append() mutates fruits directly (it returns None, not a new list) — that's why the line is just fruits.append(...), not fruits = fruits.append(...).`,
+      steps: [{ do: "Start the list", code: `fruits = ["apple", "banana"]` }, { do: "Add one item to the end", code: `fruits.append("cherry")` }] },
+    { id: "comprehension", task: "Create squares — the squares of 1 through 5, using a list comprehension.",
+      why: "A list comprehension is the idiomatic one-liner for 'build a new list by transforming each item' — the compressed form of a for-loop + append.",
+      solution: `squares = [n * n for n in range(1, 6)]`,
+      assertions: `assert squares == [1, 4, 9, 16, 25]`,
+      narrative: `[n * n for n in range(1, 6)] reads as "n times n, for each n in range(1, 6)" — the expression comes first, the loop after, collected straight into a new list.`,
+      steps: [{ do: "Loop over 1 through 5", code: `for n in range(1, 6)` }, { do: "Square each and collect", code: `[n * n for n in ...]` }] },
+    { id: "build_tuple", task: "Create point — a tuple holding the coordinates (3, 4).",
+      why: "Parentheses (or just a comma) build a tuple — an ordered, but FIXED, collection, unlike a list.",
+      solution: `point = (3, 4)`,
+      assertions: `assert point == (3, 4) and isinstance(point, tuple)`,
+      narrative: `(3, 4) is a tuple, not a list — visually similar, but once built its contents can never be reassigned, which is the whole reason to reach for one.`,
+      steps: [{ do: "Build the pair", code: `(3, 4)` }] },
+    { id: "unpack_tuple", task: "Create x and y — unpack them from the tuple (3, 4).",
+      why: "Unpacking a tuple straight into named variables is the everyday way multi-value returns get consumed.",
+      solution: `point = (3, 4)\nx, y = point`,
+      assertions: `assert x == 3 and y == 4`,
+      narrative: `x, y = point matches position by position — x gets point's first element, y its second — the same mechanism a function returning multiple values relies on.`,
+      steps: [{ do: "Have the tuple", code: `point = (3, 4)` }, { do: "Unpack it", code: `x, y = point` }] },
+    { id: "immutable", task: "Create attempt_failed — True, after catching the TypeError from trying to modify a tuple's element.",
+      why: "Tuples are immutable — proving it by catching the actual error is more convincing than just being told.",
+      solution: `point = (3, 4)
+attempt_failed = False
+try:
+    point[0] = 99
+except TypeError:
+    attempt_failed = True`,
+      assertions: `assert attempt_failed is True`,
+      narrative: `point[0] = 99 raises TypeError the instant it runs, because tuples don't support item assignment — the except clause catches exactly that and flips the flag, proving immutability rather than asserting it.`,
+      steps: [{ do: "Try to mutate the tuple", code: `point[0] = 99` }, { do: "Catch the resulting error", code: `except TypeError: attempt_failed = True` }] },
+    { id: "build_dict", task: `Create person — a dict with keys name="Ann" and age=30.`,
+      why: "A dict literal — curly braces, key: value pairs — is how you name a lookup table from the start.",
+      solution: `person = {"name": "Ann", "age": 30}`,
+      assertions: `assert person == {"name": "Ann", "age": 30}`,
+      narrative: `{"name": "Ann", "age": 30} maps each key straight to its value — no separate key list and value list to keep in sync.`,
+      steps: [{ do: "Pair up keys and values", code: `{"name": "Ann", "age": 30}` }] },
+    { id: "get_default", task: `Create role — person's "role" key, defaulting to "guest" if missing (person = {"name": "Ann"}).`,
+      why: ".get(key, default) reads a dict without risking a KeyError — the safe habit over person[\"role\"].",
+      solution: `person = {"name": "Ann"}\nrole = person.get("role", "guest")`,
+      assertions: `assert role == "guest"`,
+      narrative: `person["role"] would raise KeyError since "role" was never set; person.get("role", "guest") instead returns the fallback — no crash, no prior existence check needed.`,
+      steps: [{ do: "The dict has no role key", code: `person = {"name": "Ann"}` }, { do: "Read it with a safe fallback", code: `person.get("role", "guest")` }] },
+    { id: "update_dict", task: `Create merged — {"a": 1, "b": 2} updated with {"b": 20, "c": 3}.`,
+      why: ".update() merges another mapping in — matching keys overwrite, new keys get added, both in one call.",
+      solution: `merged = {"a": 1, "b": 2}\nmerged.update({"b": 20, "c": 3})`,
+      assertions: `assert merged == {"a": 1, "b": 20, "c": 3}`,
+      narrative: `.update({"b": 20, "c": 3}) overwrites the existing "b" (2 → 20) and adds the new "c" — "a" is untouched because the incoming dict never mentions it.`,
+      steps: [{ do: "Start the dict", code: `merged = {"a": 1, "b": 2}` }, { do: "Merge another dict in", code: `merged.update({"b": 20, "c": 3})` }] },
+  ],
+};
+
 export const LETS_DO_THIS_PACKS: DrillPack[] = [
   {
     id: "lets-do-this-values-types",
@@ -132,5 +205,13 @@ export const LETS_DO_THIS_PACKS: DrillPack[] = [
     tag: "basics",
     lang: "python",
     content: VALUES_AND_TYPES,
+  },
+  {
+    id: "lets-do-this-collections",
+    title: "Let's Do This! — Collections",
+    blurb: "Lists, tuples, dictionaries. Part 2 of the fundamentals series.",
+    tag: "basics",
+    lang: "python",
+    content: COLLECTIONS,
   },
 ];
