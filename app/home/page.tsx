@@ -43,7 +43,13 @@ export default async function HomePage() {
       </header>
 
       {/* ── Content ─────────────────────────────────────────────────── */}
-      <main className="relative flex flex-1 flex-col items-center justify-center gap-8 px-6 overflow-hidden">
+      {/* Vertical rhythm scales with viewport height via clamp() rather than a
+          fixed gap-8: on a single-screen laptop (~650-700px tall) fixed gaps
+          plus the four-card grid and Notes bar don't fit, and overflow-hidden
+          was silently clipping the Notes bar off the bottom. clamp() keeps the
+          generous spacing on tall/dual-monitor screens while compressing
+          smoothly — no breakpoint jump — as height shrinks. */}
+      <main className="relative flex flex-1 flex-col items-center justify-center gap-[clamp(0.5rem,3vh,2rem)] px-6 overflow-hidden">
 
         {/* Logo */}
         <div className="relative shrink-0">
@@ -53,7 +59,7 @@ export default async function HomePage() {
             alt="Hugh"
             width={88}
             height={88}
-            className="relative object-contain drop-shadow-2xl"
+            className="relative h-[clamp(36px,9vh,88px)] w-[clamp(36px,9vh,88px)] object-contain drop-shadow-2xl"
             priority
           />
         </div>
@@ -63,20 +69,20 @@ export default async function HomePage() {
           <p className="text-xs font-semibold uppercase tracking-widest text-slate-600 mb-1">
             Welcome back, {firstName}
           </p>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-100">
+          <h1 className="text-[clamp(1.125rem,2.8vh,1.5rem)] font-bold tracking-tight text-slate-100">
             What would you like to do?
           </h1>
         </div>
 
         {/* ── Four activities: Learn · Code · Cases · Cloud Skills ──── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-2xl shrink-0">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-[clamp(0.5rem,2vh,1rem)] w-full max-w-2xl shrink-0">
 
           {/* Learn — the whole learning experience */}
           <Link
             href="/home/learn"
-            className="group flex flex-col gap-3 rounded-2xl border border-green-500/40 bg-green-900/10 p-5 shadow-lg shadow-green-900/20 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-green-400/60 hover:bg-green-900/20 hover:shadow-xl hover:shadow-green-500/20"
+            className="group flex flex-col gap-[clamp(0.4rem,1.2vh,0.75rem)] rounded-2xl border border-green-500/40 bg-green-900/10 p-[clamp(0.75rem,2.2vh,1.25rem)] shadow-lg shadow-green-900/20 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-green-400/60 hover:bg-green-900/20 hover:shadow-xl hover:shadow-green-500/20"
           >
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-green-500/15 text-green-400 transition-transform duration-300 group-hover:scale-110">
+            <div className="flex h-[clamp(2rem,4.2vh,2.75rem)] w-[clamp(2rem,4.2vh,2.75rem)] items-center justify-center rounded-xl bg-green-500/15 text-green-400 transition-transform duration-300 group-hover:scale-110">
               <GraduationCap size={22} />
             </div>
             <div>
@@ -86,7 +92,7 @@ export default async function HomePage() {
                   Start here
                 </span>
               </div>
-              <p className="text-xs text-slate-500 leading-relaxed">
+              <p className="text-xs text-slate-500 leading-snug">
                 Pick a topic and build real knowledge — follow your track, ask Hugh
                 anything, and practise out loud.
               </p>
@@ -99,9 +105,9 @@ export default async function HomePage() {
           {/* Code — timed coding drills */}
           <Link
             href="/code/start"
-            className="group flex flex-col gap-3 rounded-2xl border border-sky-500/40 bg-sky-900/10 p-5 shadow-lg shadow-sky-900/20 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-sky-400/60 hover:bg-sky-900/20 hover:shadow-xl hover:shadow-sky-500/20"
+            className="group flex flex-col gap-[clamp(0.4rem,1.2vh,0.75rem)] rounded-2xl border border-sky-500/40 bg-sky-900/10 p-[clamp(0.75rem,2.2vh,1.25rem)] shadow-lg shadow-sky-900/20 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-sky-400/60 hover:bg-sky-900/20 hover:shadow-xl hover:shadow-sky-500/20"
           >
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-500/15 text-sky-400 transition-transform duration-300 group-hover:scale-110">
+            <div className="flex h-[clamp(2rem,4.2vh,2.75rem)] w-[clamp(2rem,4.2vh,2.75rem)] items-center justify-center rounded-xl bg-sky-500/15 text-sky-400 transition-transform duration-300 group-hover:scale-110">
               <Code2 size={22} />
             </div>
             <div>
@@ -111,7 +117,7 @@ export default async function HomePage() {
                   New
                 </span>
               </div>
-              <p className="text-xs text-slate-500 leading-relaxed">
+              <p className="text-xs text-slate-500 leading-snug">
                 Short, timed coding reps that build muscle memory — practise what
                 you&apos;ve learned or spin up your own drill.
               </p>
@@ -124,9 +130,9 @@ export default async function HomePage() {
           {/* Cases — The Case Room */}
           <Link
             href="/cases"
-            className="group flex flex-col gap-3 rounded-2xl border border-amber-500/40 bg-amber-900/10 p-5 shadow-lg shadow-amber-900/20 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-amber-400/60 hover:bg-amber-900/20 hover:shadow-xl hover:shadow-amber-500/20"
+            className="group flex flex-col gap-[clamp(0.4rem,1.2vh,0.75rem)] rounded-2xl border border-amber-500/40 bg-amber-900/10 p-[clamp(0.75rem,2.2vh,1.25rem)] shadow-lg shadow-amber-900/20 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-amber-400/60 hover:bg-amber-900/20 hover:shadow-xl hover:shadow-amber-500/20"
           >
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400 transition-transform duration-300 group-hover:scale-110">
+            <div className="flex h-[clamp(2rem,4.2vh,2.75rem)] w-[clamp(2rem,4.2vh,2.75rem)] items-center justify-center rounded-xl bg-amber-500/15 text-amber-400 transition-transform duration-300 group-hover:scale-110">
               <Trophy size={22} />
             </div>
             <div>
@@ -136,7 +142,7 @@ export default async function HomePage() {
                   New
                 </span>
               </div>
-              <p className="text-xs text-slate-500 leading-relaxed">
+              <p className="text-xs text-slate-500 leading-snug">
                 Work real business cases in The Case Room — make the calls that
                 matter and test your judgment against an expert&apos;s.
               </p>
@@ -149,9 +155,9 @@ export default async function HomePage() {
           {/* Cloud Skills — cloud-services reference */}
           <Link
             href="/cloud"
-            className="group flex flex-col gap-3 rounded-2xl border border-violet-500/40 bg-violet-900/10 p-5 shadow-lg shadow-violet-900/20 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-violet-400/60 hover:bg-violet-900/20 hover:shadow-xl hover:shadow-violet-500/20"
+            className="group flex flex-col gap-[clamp(0.4rem,1.2vh,0.75rem)] rounded-2xl border border-violet-500/40 bg-violet-900/10 p-[clamp(0.75rem,2.2vh,1.25rem)] shadow-lg shadow-violet-900/20 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-violet-400/60 hover:bg-violet-900/20 hover:shadow-xl hover:shadow-violet-500/20"
           >
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400 transition-transform duration-300 group-hover:scale-110">
+            <div className="flex h-[clamp(2rem,4.2vh,2.75rem)] w-[clamp(2rem,4.2vh,2.75rem)] items-center justify-center rounded-xl bg-violet-500/15 text-violet-400 transition-transform duration-300 group-hover:scale-110">
               <Cloud size={22} />
             </div>
             <div>
@@ -161,7 +167,7 @@ export default async function HomePage() {
                   New
                 </span>
               </div>
-              <p className="text-xs text-slate-500 leading-relaxed">
+              <p className="text-xs text-slate-500 leading-snug">
                 Know your cloud — AWS, GCP and Azure services for data work, grouped by
                 what they do, with an assistant to ask anything.
               </p>
@@ -176,9 +182,9 @@ export default async function HomePage() {
         {/* Notes — review a wrong answer with Hugh (personal utility) */}
         <Link
           href="/notes"
-          className="group flex w-full max-w-2xl shrink-0 items-center gap-3 rounded-xl border border-slate-700/70 bg-slate-900/40 px-4 py-3 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-rose-400/50 hover:bg-slate-900/60"
+          className="group flex w-full max-w-2xl shrink-0 items-center gap-3 rounded-xl border border-slate-700/70 bg-slate-900/40 px-4 py-[clamp(0.5rem,1.4vh,0.75rem)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-rose-400/50 hover:bg-slate-900/60"
         >
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-500/15 text-rose-400 transition-transform duration-300 group-hover:scale-110">
+          <div className="flex h-[clamp(1.75rem,3.6vh,2.25rem)] w-[clamp(1.75rem,3.6vh,2.25rem)] shrink-0 items-center justify-center rounded-lg bg-rose-500/15 text-rose-400 transition-transform duration-300 group-hover:scale-110">
             <NotebookPen size={18} />
           </div>
           <div className="min-w-0 flex-1">

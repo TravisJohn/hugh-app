@@ -1,25 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import {
-  ArrowLeft, ArrowRight, Braces, Lock, Flame, Play, Database, Zap, RotateCcw,
-} from "lucide-react";
+import { ArrowLeft, Lock, Play } from "lucide-react";
 import SwarmBackdrop from "./SwarmBackdrop";
 import CodeChat from "./CodeChat";
 import ProgressHeatmap from "./ProgressHeatmap";
+import PatternMap from "./PatternMap";
 import { PACKS } from "@/lib/code/packs";
+import { groupsForLang } from "@/lib/code/groups";
+import type { HeatReading } from "@/lib/code/heat";
 import type { DrillLang } from "@/types/code";
-import type { PackProgressSummary, PackTier, HeatmapDay } from "@/lib/code/progress";
+import type { PackProgressSummary, HeatmapDay } from "@/lib/code/progress";
 
 // The Code landing: what this is → the language you're drilling → your practice
-// history (heatmap) → the coding pattern to practise, badged with where you left
-// off → a free-form play space. Curated patterns are static packs (lib/code/packs.ts,
-// DrillContent shape) — no runtime AI. `lets-do-this-values-types` (the first of the
-// "Let's Do This!" fundamentals series, lib/code/letsDoThisPacks.ts) is the live
-// warm-up; the rest are the analytics-pattern packs. SQL and R patterns come in a
-// later build. `progress`/`heatmap` come from app/code/start/page.tsx (server-computed
-// from code_drill_attempts) — this component stays a plain prop-in renderer.
+// history (heatmap) → the pattern map → a free-form play space. Curated patterns
+// are static packs (lib/code/packs.ts, DrillContent shape) — no runtime AI.
+// `progress`/`heatmap`/`groupHeat` come from app/code/start/page.tsx
+// (server-computed from code_drill_attempts) — this stays a prop-in renderer.
+//
+// Opening a group on the map is a TAKEOVER: the hero copy, practice heatmap and
+// Play section collapse so the branch gets the whole viewport, which is what
+// keeps the page inside the no-scroll rule with up to 8 leaves. The language
+// pills deliberately stay put — SQL has a single group and so opens expanded,
+// and collapsing the pills with everything else would strand the learner there
+// with no way back to Python.
 
 const LANGUAGES: { id: DrillLang | "r"; label: string; ready: boolean }[] = [
   { id: "python", label: "Python", ready: true },
@@ -27,61 +32,39 @@ const LANGUAGES: { id: DrillLang | "r"; label: string; ready: boolean }[] = [
   { id: "r",      label: "R",      ready: false },
 ];
 
-const WARMUP_ID = "lets-do-this-values-types";
-
-const BADGE_STYLES: Record<PackTier, string> = {
-  "not-started": "border border-dashed border-slate-700 text-slate-500",
-  "in-progress": "bg-sky-500/15 text-sky-300",
-  "complete": "bg-emerald-500/15 text-emerald-300",
-  "owned": "bg-violet-500/15 text-violet-300",
-  "review-due": "bg-amber-500/15 text-amber-300",
-};
-
-function PackBadge({ progress }: { progress: PackProgressSummary }) {
-  const cls = `inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${BADGE_STYLES[progress.tier]}`;
-  switch (progress.tier) {
-    case "not-started":
-      return <span className={cls}>Not started</span>;
-    case "in-progress":
-      return <span className={cls}>{progress.cellsPassed}/{progress.cellsTotal} done</span>;
-    case "complete":
-      return <span className={cls}>Complete</span>;
-    case "owned":
-      return <span className={cls}><Zap size={10} /> Owned</span>;
-    case "review-due":
-      return <span className={cls}><RotateCcw size={10} /> Review due</span>;
-  }
-}
-
 export default function CodeLanding({
   progress,
   heatmap,
+  groupHeat,
+  packHeat,
 }: {
   progress?: Record<string, PackProgressSummary>;
   heatmap?: HeatmapDay[];
+  /** Group heat per language — the pill decides which set is read. */
+  groupHeat?: Record<DrillLang, Record<string, HeatReading>>;
+  /** Per-pack heat, for the gauge on each leaf. */
+  packHeat?: Record<string, HeatReading>;
 }) {
   const [activeLang, setActiveLang] = useState<DrillLang>("python");
-  const packs = PACKS.filter(p => p.lang === activeLang);
-  const [cardIndex, setCardIndex] = useState(0);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
-  // Switching language resets to the first pattern — the old index likely
-  // doesn't exist in the new language's (shorter or longer) pack list.
-  useEffect(() => { setCardIndex(0); }, [activeLang]);
+  // Territories for the active language. Groups with no packs in this language
+  // are dropped rather than rendered as cells that branch into nothing.
+  const groups = groupsForLang(activeLang);
+  const langGroupHeat = groupHeat?.[activeLang];
 
-  // Left/right arrow keys page through patterns, same as the on-screen arrows —
-  // ignored while typing (e.g. into CodeChat) so it doesn't hijack text input.
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      const tag = (document.activeElement as HTMLElement | null)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || (document.activeElement as HTMLElement | null)?.isContentEditable) return;
-      if (e.key === "ArrowLeft") setCardIndex(i => Math.max(0, i - 1));
-      if (e.key === "ArrowRight") setCardIndex(i => Math.min(packs.length - 1, i + 1));
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [packs.length]);
+  // A language with a single territory has no choice to offer, so it opens
+  // straight into its branch instead of showing a lone cell in a 3-up grid.
+  const effectiveSelectedId = groups.length === 1 ? groups[0].id : selectedGroupId;
+  const expanded = effectiveSelectedId !== null;
 
-  const activePack = packs[cardIndex];
+  // Switching language always returns to the grid: the open group may not exist
+  // in the new language at all, and even when it does the leaves are different.
+  function switchLang(lang: DrillLang) {
+    setActiveLang(lang);
+    setSelectedGroupId(null);
+  }
+
   return (
     <div className="relative min-h-screen overflow-x-clip bg-[#0A0F1E] text-slate-200">
       <SwarmBackdrop />
@@ -93,19 +76,32 @@ export default function CodeLanding({
         <span className="font-serif text-lg font-semibold text-white">Hugh.</span>
       </header>
 
-      <main className="relative z-10 mx-auto max-w-5xl px-6 py-12">
-        {/* What this is */}
-        <div className="mb-2 text-xs font-semibold uppercase tracking-widest text-sky-400">Practice · Code</div>
-        <h1 className="font-serif text-3xl font-bold tracking-tight text-white sm:text-4xl">Practise code until it&apos;s muscle memory</h1>
-        <p className="mt-3 max-w-2xl text-slate-400">
-          Short, standard coding reps — the same constructs, typed from memory, until they&apos;re automatic.
-          Each pattern drills the moves behind a real piece of analytics work. Pick a language, choose a pattern,
-          and go — or warm up with the everyday essentials.
-        </p>
+      <main className="relative z-10 mx-auto max-w-5xl px-6 py-5 [@media(max-height:830px)]:py-3">
+        {/* What this is — collapses on expand so the branch owns the viewport. */}
+        <div
+          className={`overflow-hidden transition-all duration-300 ${
+            expanded ? "max-h-0 -translate-y-2 opacity-0" : "max-h-52 opacity-100"
+          }`}
+        >
+          {/* Below ~830px of viewport height there isn't room for the full hero AND
+              six cells AND the Play row without scrolling, and the no-scroll rule
+              outranks the intro copy. Height media queries shed the least
+              load-bearing parts first: the eyebrow, then the standfirst. */}
+          <div className="mb-2 text-xs font-semibold uppercase tracking-widest text-sky-400 [@media(max-height:830px)]:hidden">Practice · Code</div>
+          <h1 className="font-serif text-2xl font-bold tracking-tight text-white sm:text-3xl">Practise code until it&apos;s muscle memory</h1>
+          <p className="mt-2 max-w-2xl text-sm text-slate-400 [@media(max-height:830px)]:hidden">
+            Short, standard coding reps — the same constructs, typed from memory, until they&apos;re
+            automatic. Pick a language, choose an area, and go.
+          </p>
+        </div>
 
-        {/* Language */}
-        <section className="mt-10">
-          <div className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-slate-500">Language</div>
+        {/* Language and practice history share a row: two small blocks that
+            would each waste a full band of vertical space stacked, and the page
+            has to fit the viewport without scrolling. */}
+        <div className={`flex flex-wrap items-start justify-between gap-x-10 gap-y-5 ${expanded ? "" : "mt-6"}`}>
+        {/* Language — deliberately NOT collapsed; see the note at the top. */}
+        <section>
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-500">Language</div>
           <div className="flex flex-wrap gap-2">
             {LANGUAGES.map(lang => {
               const active = lang.ready && lang.id === activeLang;
@@ -114,7 +110,7 @@ export default function CodeLanding({
                   key={lang.id}
                   type="button"
                   disabled={!lang.ready}
-                  onClick={() => lang.ready && setActiveLang(lang.id as DrillLang)}
+                  onClick={() => lang.ready && switchLang(lang.id as DrillLang)}
                   aria-pressed={active}
                   className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
                     active
@@ -133,126 +129,67 @@ export default function CodeLanding({
           </div>
         </section>
 
-        {/* Practice history — no streaks, just an honest record of when you showed up */}
+        {/* Practice history — no streaks, just an honest record of when you
+            showed up. Collapses on expand. */}
         {heatmap && heatmap.length > 0 && (
-          <section className="mt-9">
-            <div className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-slate-500">Your practice</div>
-            <ProgressHeatmap days={heatmap} />
-          </section>
+          <div
+            className={`overflow-hidden transition-all duration-300 ${
+              expanded ? "max-h-0 w-0 opacity-0" : "max-h-52 opacity-100"
+            }`}
+          >
+            <section>
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-500">Your practice</div>
+              <ProgressHeatmap days={heatmap} />
+            </section>
+          </div>
         )}
+        </div>
 
-        {/* Coding patterns — one at a time; arrow keys or the on-screen arrows
-            page through instead of scanning a stacked grid. */}
-        <section className="mt-9">
-          <div className="mb-3 flex items-center justify-between">
+        {/* The pattern map — territories, then one opened into its packs. */}
+        <section className="mt-6">
+          <div className="mb-2 flex items-center justify-between">
             <div className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Coding patterns</div>
-            {packs.length > 0 && (
-              <div className="font-mono text-xs text-slate-500">{cardIndex + 1} / {packs.length}</div>
-            )}
+            <div className="text-[11px] text-slate-600">
+              {groups.length} {groups.length === 1 ? "area" : "areas"}
+            </div>
           </div>
 
-          {activePack && (
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setCardIndex(i => Math.max(0, i - 1))}
-                disabled={cardIndex === 0}
-                aria-label="Previous pattern"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-800 text-slate-400 transition-colors hover:border-emerald-500/40 hover:text-emerald-300 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-slate-800 disabled:hover:text-slate-400"
-              >
-                <ArrowLeft size={18} />
-              </button>
-
-              {(() => {
-                const isWarmup = activePack.id === WARMUP_ID;
-                const Icon = activePack.lang === "sql" ? Database : Braces;
-                const packProgress = progress?.[activePack.id];
-                return (
-                  <Link
-                    key={activePack.id}
-                    href={`/code/drill?pack=${encodeURIComponent(activePack.id)}`}
-                    className="group flex min-w-0 flex-1 flex-col rounded-2xl border border-slate-800 bg-slate-900/40 p-6 transition-all hover:-translate-y-0.5 hover:border-emerald-500/40 hover:bg-slate-900/70"
-                  >
-                    <div className="mb-3 flex items-center gap-2">
-                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400">
-                        <Icon size={18} />
-                      </span>
-                      {isWarmup ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-300">
-                          <Flame size={10} /> Warm-up · start here
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[11px] font-medium text-slate-400">{activePack.tag}</span>
-                      )}
-                      <span className="ml-auto text-xs text-slate-500">{activePack.content.cells.length} reps</span>
-                    </div>
-                    <h2 className="text-lg font-semibold text-white">{activePack.title}</h2>
-                    <p className="mt-1 text-sm text-slate-400">{activePack.blurb}</p>
-                    {packProgress && (
-                      <div className="mt-3">
-                        <PackBadge progress={packProgress} />
-                      </div>
-                    )}
-                    <span className="mt-4 flex items-center gap-1 text-xs font-semibold text-emerald-400 opacity-0 transition-opacity group-hover:opacity-100">
-                      Start practising <ArrowRight size={12} />
-                    </span>
-                  </Link>
-                );
-              })()}
-
-              <button
-                type="button"
-                onClick={() => setCardIndex(i => Math.min(packs.length - 1, i + 1))}
-                disabled={cardIndex === packs.length - 1}
-                aria-label="Next pattern"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-800 text-slate-400 transition-colors hover:border-emerald-500/40 hover:text-emerald-300 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-slate-800 disabled:hover:text-slate-400"
-              >
-                <ArrowRight size={18} />
-              </button>
-            </div>
-          )}
-
-          {/* Dots — click to jump straight to a pattern */}
-          {packs.length > 1 && (
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5">
-              {packs.map((p, i) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => setCardIndex(i)}
-                  aria-label={`Go to ${p.title}`}
-                  title={p.title}
-                  className={`h-1.5 rounded-full transition-all ${
-                    i === cardIndex ? "w-5 bg-emerald-400" : "w-1.5 bg-slate-700 hover:bg-slate-500"
-                  }`}
-                />
-              ))}
-            </div>
-          )}
+          <PatternMap
+            groups={groups}
+            packs={PACKS}
+            lang={activeLang}
+            groupHeat={langGroupHeat}
+            packHeat={packHeat}
+            progress={progress}
+            selectedId={effectiveSelectedId}
+            onSelect={setSelectedGroupId}
+          />
         </section>
 
-        {/* Play */}
-        <section className="mt-9">
-          <div className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-slate-500">Play</div>
-          <div className="flex cursor-not-allowed select-none items-center gap-4 rounded-2xl border border-dashed border-slate-800/70 bg-slate-900/20 p-5">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-800/60 text-slate-600">
-              <Play size={20} />
+        {/* Play — collapses on expand, same as the hero and heatmap. */}
+        <div
+          className={`overflow-hidden transition-all duration-300 ${
+            expanded ? "max-h-0 opacity-0" : "max-h-56 opacity-100"
+          }`}
+        >
+        <section className="mt-6">
+          <div className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-500">Play</div>
+          {/* Kept to one line: it's a disabled placeholder, and the vertical
+              space it was taking is what pushed the grid past the viewport on
+              shorter laptops. */}
+          <div className="flex cursor-not-allowed select-none flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-dashed border-slate-800/70 bg-slate-900/20 px-4 py-2.5">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-800/60 text-slate-600">
+              <Play size={14} />
             </span>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold text-slate-500">Play environment</h2>
-                <span className="flex items-center gap-1 rounded-full bg-slate-800 px-2 py-0.5 text-[11px] text-slate-600">
-                  <Lock size={9} /> Soon
-                </span>
-              </div>
-              <p className="mt-1 text-sm text-slate-600">A free-form Python sandbox — write and run anything, no drill, no clock.</p>
-            </div>
+            <h2 className="text-sm font-semibold text-slate-500">Play environment</h2>
+            <span className="flex items-center gap-1 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-600">
+              <Lock size={9} /> Soon
+            </span>
+            <p className="min-w-0 text-xs text-slate-600">A free-form Python sandbox — write and run anything, no drill, no clock.</p>
           </div>
         </section>
 
-        <p className="mt-8 text-center text-xs text-slate-600">
-          More patterns land soon. The goal is muscle memory — repeat until the syntax is automatic.
-        </p>
+        </div>
       </main>
 
       <CodeChat />

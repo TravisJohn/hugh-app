@@ -27,8 +27,15 @@ describe("practice packs", () => {
         expect(typeof pack.content.cumulative).toBe("boolean");
       });
 
-      it("setup is non-trivial and every cell is fully specified with a unique id", () => {
-        expect(pack.content.scenario.setupCode.trim().length).toBeGreaterThan(0);
+      it("setup matches the pack's data shape and every cell is fully specified with a unique id", () => {
+        // setupCode is what loads the shared dataset, so it's required only for
+        // packs that HAVE one. The "Let's Do This!" fundamentals packs are
+        // deliberately dataset-less — every rep is a self-contained snippet, so
+        // an empty setupCode is correct there, not a gap. Where a dataset is
+        // declared, setupCode is derived from it and the two must stay in sync.
+        if (pack.content.scenario.dataset) {
+          expect(pack.content.scenario.setupCode.trim().length).toBeGreaterThan(0);
+        }
         const ids = pack.content.cells.map(c => c.id);
         expect(new Set(ids).size).toBe(ids.length);
         for (const c of pack.content.cells) {

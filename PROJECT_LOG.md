@@ -2094,3 +2094,155 @@ into the live CodeMirror editor and clicked "Run & check" against the live Pyodi
 passed (confetti + "passed · with reference"), including `decision-trees`' reference precompute
 chain resolving correctly cell-to-cell after the timeout fix. `scikit-learn` confirmed loading
 correctly in real Pyodide-WASM (not just theoretically Pyodide-compatible).
+
+---
+
+## Code pillar — pattern map (grouped cells → branch → leaves) ✅
+
+Replaced the one-at-a-time carousel on `/code/start` with a two-state map. The carousel was built
+when the library was small; at 26 Python packs it had stopped being a picker and become a 26-dot
+slideshow, which is what Travis reported ("the cards disappear, replaced by 1 huge card"). Scope
+locked via AskUserQuestion before any code: **6 groups** (not the 4 in the original ask — "For Web
+Development" had zero packs, and the 10 Foundations packs belonged to no bucket at all),
+**recency-decayed heat**, **full-viewport takeover** on expand.
+
+**Taxonomy — `lib/code/groups.ts` (+ `groups.test.ts`).** Six territories, all 31 packs filed:
+Language basics (8), For analysis (5 Python + 5 SQL), Machine learning (7), AI & retrieval (1),
+For automation (3), Working with APIs (2). Membership is an **explicit ordered `packIds` list**,
+not derived from `pack.tag` — nine packs share the tag `basics` but split across two groups here,
+and leaf order is authored so a group reads as a progression. The module is deliberately **pure
+data** (no React, no lucide import) so `app/code/start/page.tsx` can pull it into a server
+component; `icon` is a string key resolved to a component by `components/code/groupIcons.tsx`,
+typed `Record<GroupIconKey, LucideIcon>` so an unmapped icon is a compile error. The load-bearing
+test is **"every pack belongs to exactly one group"**: before grouping, a new pack appeared on the
+landing just by existing in `PACKS`, and an unfiled pack would now vanish silently with no other
+symptom. Verified the guard actually fails (removing `airflow` → `expected [ 'airflow' ] to deeply
+equal []`), because a test that can't fail is worthless. Also asserts ≤8 leaves per group per
+language, so a group that outgrows the branch layout fails the build rather than quietly breaking
+the no-scroll rule.
+
+**Heat — `lib/code/heat.ts` (+ 26 tests).** `score = Σ 0.5^(daysAgo / 30) ÷ repCount`. Three
+deliberate properties: it **decays** on a 30-day half-life (matching the existing
+`REVIEW_DUE_DAYS` horizon, so the map can go backwards — that is the honest signal about skill
+fading); it **counts failed attempts too** (heat is time spent, not success — completion is
+already `PackBadge`'s job, and collapsing the two loses a signal); and it is **normalised per
+rep**, so a 1-pack group and a 7-pack group are comparable rather than the map being a picture of
+how big each group is. Group heat is **language-scoped** — with the Python pill active, SQL
+practice must not warm the "For analysis" cell whose branch shows only Python leaves. Both
+languages are computed server-side and passed as one small record each; shipping every attempt row
+to the browser to recompute there would be worse. `HEAT_THRESHOLDS` is exported for tuning
+(current calibration: one full pass today = 1.0 = "hot"; a full pass three months ago = 0.13 =
+"cool").
+
+**UI.** `PatternMap` (state machine, controlled by `CodeLanding` because the takeover means the
+parent must know), `GroupCell`, `LeafCard`, `BranchLinks`, `HeatGauge`, and `PackBadge` (extracted
+from `CodeLanding` so leaves carry progress too). Accent and heat are kept as **strictly separate
+colour systems** — accent means identity (which territory), the universal cold→blazing ramp means
+state (how much have I practised it); tinting heat per group would make levels incomparable across
+cells, which is the gauge's only job. Both map layers stay mounted and cross-fade, which is what
+makes the other cells visibly *blur out* rather than blink off — no FLIP measurement, one CSS
+transition. The carousel, its `cardIndex` state and its arrow-key handler are gone, which also
+removed a pre-existing `set-state-in-effect` lint error.
+
+**Connectors (`BranchLinks`).** One cubic Bézier per leaf, measured from the live DOM — leaf rows
+differ in height with the badges they carry, so assumed geometry would detach. Three things make
+it hold: it measures the leaves' **static wrappers, not the animating cards** (the cards slide in
+on a transform and `getBoundingClientRect` reports the transformed box, so measuring mid-flight
+anchors every curve where the leaf *started*); `pathLength={1}` normalises the dash animation so a
+39px hop and a 421px sweep draw in the same 420ms; and control points are **deliberately
+asymmetric** (0.7× / 1.05× reach) because an even split gives a mechanical, evenly-bowed S.
+Re-measures on a ResizeObserver over the container *and* each leaf, plus after
+`document.fonts.ready` (font swap changes text metrics → card heights → every endpoint).
+
+**Two design changes made after seeing it render, not from the plan.** (1) **Dropped the
+two-column leaf layout**: every curve to the far column has to cross the near column to reach it,
+and drawn behind semi-transparent cards those lines read as streaks through the text. Single
+column has no crossings and truncates far less; 8 leaves still fit, which is what made two columns
+unnecessary. (2) **Widened the spine-to-leaves gap from 20px to 56px** — the connectors are drawn
+into that gap, and at a normal card gap they had no room to curve, collapsing into invisible
+hooks. Both are commented in place as load-bearing so they don't get "tidied" back.
+
+**Two real bugs found in this work's own code, both by measuring rather than eyeballing.**
+(1) `LeafCard`'s detail panel used `group-focus-within`, and `PatternMap` programmatically focuses
+the first leaf whenever a branch opens — so **every group opened with a panel already hanging over
+the leaves below it**. Caught by counting visible panels in the clean state (`[0]`, expected `[]`);
+fixed by switching to `peer-hover` / `peer-focus-visible` off the link, since `focus-visible`
+ignores programmatic focus but still fires for a keyboard user tabbing through. (2) The grid layer
+was `aria-hidden` while expanded, but the *selected* cell inside it kept `tabIndex 0` — a
+focusable element inside an aria-hidden subtree. Replaced with **`inert` on the layer**, which
+removes it from tab order, the a11y tree and hit-testing at once, and let the per-cell
+`aria-hidden`/`tabIndex` juggling be deleted.
+
+**Panel positioning is by index, not measurement**: top-half leaves open downward, bottom-half
+upward. An absolutely positioned panel still contributes to document scroll height, so one hanging
+off the last leaf would push the page past the viewport; flipping by index keeps it inside the
+branch's own vertical band with no measurement pass. The panel is `aria-hidden` — `truncate` clips
+visually but leaves full text in the DOM, so assistive tech already reads the whole title and blurb
+from the link.
+
+**No-scroll work beyond the map itself.** The landing was already scrolling before this change
+(1510px against a 900px viewport). Getting both states inside the viewport needed: the practice
+heatmap paired beside the language pills rather than stacked, a two-line hero, tightened section
+margins, the Play placeholder collapsed to a single row, the "More patterns land soon" footer line
+deleted, and **viewport-height media queries** (`[@media(max-height:830px)]`) that shed the hero
+eyebrow and standfirst on short laptops — full hero at 900px+, fits at 768px.
+
+**Also fixed, pre-existing and unrelated to the feature:** `packs.test.ts` asserted every pack has
+non-empty `setupCode`, but the "Let's Do This!" fundamentals packs are dataset-less by design — 7
+failures, now scoped to packs that declare a `dataset` (still 19 of 31, so the check keeps its
+teeth). And `progress.test.ts` had an **intermittent flake**: its `daysAgo` helper read
+`Date.now()` on every call, so a millisecond ticking between building a fixture and building the
+expectation made `daysAgo(1)` return two different timestamps — failing roughly **one run in
+three**. Pinned `NOW` once at module load; 15 consecutive runs, zero failures. Worth knowing
+independently: the suite has been unreliable for a while, so a red run may have been dismissed as
+noise before.
+
+**Verified.** `tsc` clean; Vitest 259/259 (up from 233, +36 new); every touched file lint-clean
+(13 issues remain across `components/code/` but all in untouched files — `SwarmBackdrop`,
+`DrillMock`). Browser-verified with Playwright as the seeded test user: all **6 groups × 3
+viewports (1440×900, 1280×800, 1366×768) at 0px overflow with no leaf below the fold**, in both
+grid and branch states, plus SQL's auto-expanded single-group path; connector endpoints attach at
+**0.00px drift** across 7-leaf, 5-leaf, 1-leaf and post-resize layouts; draw-on sampled over time
+(dash-offset 1 → 0, staggering correctly); keyboard journey (Enter opens → focus lands on first
+leaf → Tab never reaches the inert grid → Escape returns focus to the opened cell); click passes
+through the hover panel to the drill; reduced motion disables blur, leaf slide and connector draw
+while leaving everything fully visible.
+
+**Deliberately left open for Travis:** the blur is a *transition*, not a resting state (the grid
+layer settles at opacity 0) — one line if the other cells should stay faintly visible behind the
+branch. And heat calibration: completing one of seven ML packs only reaches `cool` (0.14), which
+is defensible but may want a gentler denominator after real use.
+
+## Fixed — /home Notes cutoff + pattern-map card sizing (2026-07-31)
+
+Travis reported two things while browsing on a single-screen laptop: the Notes bar on `/home` was
+being clipped off the bottom of the viewport (visible fine on a taller dual-monitor screen), and
+the coding-pattern cards on `/code/start` were still uneven sizes despite the `h-full` fix noted
+above.
+
+**Notes cutoff — root cause confirmed with Playwright, not guessed.** Logged in as the seeded test
+user and measured `/home` at a 1366×700 viewport (a realistic single-laptop browser height): the
+page needed 691px of content but `<main>` only had 643px available (700 − 57px header) — a 48px
+shortfall that `overflow-hidden` was silently eating from the Notes bar at the bottom. Fixed by
+making the vertical rhythm scale with viewport height via `clamp()` instead of fixed `gap-8`/`p-5`
+values: outer gaps, the logo, the greeting heading, the four activity cards (gap/padding/icon size),
+their description line-height, and the Notes bar padding/icon all now compress smoothly as height
+shrinks, with no change at dual-monitor heights (the clamp ceiling matches the old fixed values).
+Verified with real measurements, not eyeballing: 0px overflow from 650px viewport height up
+(700/768/900/1080 all clean too); the extreme 560–600px range — shorter than any realistic browser
+chrome leaves on a real laptop — is much closer but not perfectly zero, an accepted tradeoff against
+over-compressing the common case.
+
+**Pattern-map cards — root cause was NOT what the earlier `h-full` fix targeted.** That fix
+correctly equalized row heights via CSS Grid's default stretch on the wrapper `<div>`. But
+`GroupCell`'s root element is a `<button>`, and form controls don't participate in block-level
+"fill available width" the way a `<div>` does — a `<button>` with `display:flex` sizes to its
+*content* by default, not its container. Confirmed via `getBoundingClientRect()`: wrapper divs were
+all a uniform 317px (grid stretch working as designed), but the "For analysis" and "Working with
+APIs" buttons — the two with the shortest title/tagline text — measured 255px and 298px respectively,
+narrower than their column. One-line fix: added `w-full` to `GroupCell`'s button className. Verified
+all six cards render pixel-identical width and height post-fix.
+
+Both fixes verified live in a headless-Chromium session (Playwright, already a project dependency)
+against the running dev server, logged in as `test_user@testmail.com` — not just code review.
+Vitest 259/259 still green (no test touched either file).

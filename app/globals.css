@@ -89,6 +89,59 @@
   to   { transform: scaleY(1.0); }
 }
 
+/* ── Code pattern map (/code/start) ─────────────────────────────────────── */
+
+/* Leaves growing out of an opened group cell. The per-leaf delay is set inline
+   (animation-delay) so the stagger follows branch order. */
+@keyframes leaf-in {
+  from { opacity: 0; transform: translateX(-10px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+
+.animate-leaf-in {
+  animation: leaf-in 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Cells that aren't the open one: pushed back so the branch reads as the
+   foreground. Blur is the expensive-but-effective part, hence its own class. */
+.map-dimmed {
+  opacity: 0.25;
+  filter: blur(3px);
+}
+
+/* Connectors growing from the spine to each leaf. Paths carry pathLength="1",
+   so a dasharray/offset of 1 is the whole curve whatever its real length —
+   one duration draws every connector at the same speed regardless of distance. */
+@keyframes branch-draw {
+  from { stroke-dashoffset: 1; }
+  to   { stroke-dashoffset: 0; }
+}
+
+.animate-branch-draw {
+  stroke-dasharray: 1;
+  animation: branch-draw 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Land the leaves immediately — no slide, no stagger. `both` still applies
+     the end state, so they stay visible rather than never animating in. */
+  .animate-leaf-in {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+  }
+  /* Drop the blur too: it's a heavy visual effect and some vestibular-
+     sensitivity settings cover it. Dimming alone carries the same meaning. */
+  .map-dimmed {
+    filter: none;
+    opacity: 0.35;
+  }
+  /* Connectors appear fully drawn rather than growing. */
+  .animate-branch-draw {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+  }
+}
+
 *,
 *::before,
 *::after {

@@ -3,6 +3,7 @@ import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import CodeLanding from "@/components/code/CodeLanding";
 import { PACKS } from "@/lib/code/packs";
 import { computeAllPackProgress, buildHeatmap, type DrillAttemptRow } from "@/lib/code/progress";
+import { computeAllGroupHeat, computeAllPackHeat, type PackHeatInput } from "@/lib/code/heat";
 
 // The Code pillar landing — a picker of curated practice packs (see CodeLanding),
 // plus a practice-history summary: a per-pack tier badge (not started / in
@@ -27,5 +28,31 @@ export default async function CodeStartPage() {
   );
   const heatmap = buildHeatmap(attempts);
 
-  return <CodeLanding progress={progress} heatmap={heatmap} />;
+  // Practice heat for the pattern map. Group heat is language-scoped (a group
+  // cell sits above the leaves of the ACTIVE language only), but the language
+  // pill is client state — so both languages are computed here and the client
+  // picks one. Two small records beat shipping every attempt row to the browser
+  // and recomputing there.
+  const packInputs: PackHeatInput[] = PACKS.map(p => ({
+    id: p.id,
+    lang: p.lang,
+    repCount: p.content.cells.length,
+  }));
+  const groupHeat = {
+    python: computeAllGroupHeat(packInputs, attempts, "python"),
+    sql: computeAllGroupHeat(packInputs, attempts, "sql"),
+  };
+
+  // Per-pack heat is not language-scoped the way group heat is: a leaf belongs
+  // to exactly one language already, so one record covers both pills.
+  const packHeat = computeAllPackHeat(packInputs, attempts);
+
+  return (
+    <CodeLanding
+      progress={progress}
+      heatmap={heatmap}
+      groupHeat={groupHeat}
+      packHeat={packHeat}
+    />
+  );
 }

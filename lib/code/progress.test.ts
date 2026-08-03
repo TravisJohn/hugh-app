@@ -10,7 +10,12 @@ const row = (overrides: Partial<DrillAttemptRow>): DrillAttemptRow => ({
   ...overrides,
 });
 
-const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
+// Pinned once at module load, NOT read per call. With a live Date.now() inside
+// the helper, a millisecond ticking over between building a fixture row and
+// building the expectation made daysAgo(1) return two different timestamps —
+// an intermittent 1ms off-by-one that failed roughly one run in three.
+const NOW = Date.now();
+const daysAgo = (n: number) => new Date(NOW - n * 86_400_000).toISOString();
 
 describe("computePackProgress", () => {
   const cellIds = ["a", "b", "c"];
