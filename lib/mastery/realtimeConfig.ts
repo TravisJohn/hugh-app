@@ -11,8 +11,11 @@ export const REALTIME_MODEL = "gpt-realtime-mini";
 // Explicit transcription model for the learner's speech (never a default) so the
 // transcript that feeds the recap is deterministic. Transcription still runs, but
 // it is NOT shown live (distracting + it guessed wrong languages) — it's captured
-// silently for the end-of-session recap only.
-export const REALTIME_TRANSCRIPTION_MODEL = "gpt-4o-transcribe";
+// silently for the end-of-session recap only. Mini tier: this text never drives
+// the live conversation (the coach hears raw audio directly), it only feeds the
+// end-of-session Haiku recap — so mini's lower accuracy risks a slightly rougher
+// recap, not a worse conversation.
+export const REALTIME_TRANSCRIPTION_MODEL = "gpt-4o-mini-transcribe";
 
 // Pin the transcription language so it stops guessing (and mis-rendering) other
 // languages mid-conversation. One-line change if the app ever goes multilingual.
