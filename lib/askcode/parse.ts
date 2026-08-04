@@ -9,11 +9,30 @@
 
 import type { ChatResponse, CodeExample } from "@/types/askcode";
 
+// Models sometimes wrap the *entire* JSON payload in a ```json fence. Strip that
+// outer wrapper only — this must NOT match a fence that happens to sit inside a
+// field value (e.g. a code block the model inlined into "reply"), so the match is
+// anchored to the whole trimmed string, not to any line start/end within it.
 function stripFences(text: string): string {
-  return text
-    .replace(/^```(?:json)?\s*/im, "")
-    .replace(/\s*```\s*$/im, "")
+  const trimmed = text.trim();
+  const wrapped = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  return wrapped ? wrapped[1].trim() : trimmed;
+}
+
+// If the model ignored the "codeExample only, never fenced in reply" rule and
+// inlined a fenced block directly into `reply`, pull it out so the "Mirror this
+// snippet" affordance still appears instead of silently degrading to plain text.
+const INLINE_FENCE_RE = /```([a-zA-Z0-9+#-]*)\n([\s\S]*?)```/;
+
+function extractInlineCodeExample(reply: string): { reply: string; codeExample: CodeExample } | null {
+  const m = INLINE_FENCE_RE.exec(reply);
+  if (!m) return null;
+  const code = m[2].replace(/\n$/, "");
+  if (!code.trim()) return null;
+  const withoutFence = (reply.slice(0, m.index) + reply.slice(m.index + m[0].length))
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
+  return { reply: withoutFence, codeExample: { language: (m[1] || "").toLowerCase(), code } };
 }
 
 /** Decode the standard JSON string escapes; leave any stray characters as-is. */
@@ -49,12 +68,7 @@ export function parseChatResponse(raw: string): ChatResponse {
   try {
     const o = JSON.parse(cleaned) as Record<string, unknown>;
     if (o && typeof o === "object" && !Array.isArray(o) && typeof o.reply === "string") {
-      return {
-        reply:       o.reply,
-        isOffTopic:  o.isOffTopic === true,
-        codeExample: toCodeExample(o.codeExample),
-        covered:     o.covered === true,
-      };
+      return finalize(o.reply, o.isOffTopic === true, toCodeExample(o.codeExample), o.covered === true);
     }
     // Parsed, but not the {reply,...} object we expect — fall through.
   } catch {
@@ -98,5 +112,16 @@ export function parseChatResponse(raw: string): ChatResponse {
     reply = cleaned.trim();
   }
 
+  return finalize(reply, isOffTopic, codeExample, covered);
+}
+
+// Shared by both the fast and salvage paths: if the model inlined a fenced code
+// block into `reply` instead of using `codeExample`, promote it so the block still
+// renders as code and the "Mirror this snippet" affordance still appears.
+function finalize(reply: string, isOffTopic: boolean, codeExample: CodeExample | null, covered: boolean): ChatResponse {
+  if (!codeExample) {
+    const extracted = extractInlineCodeExample(reply);
+    if (extracted) return { reply: extracted.reply, isOffTopic, codeExample: extracted.codeExample, covered };
+  }
   return { reply, isOffTopic, codeExample, covered };
 }

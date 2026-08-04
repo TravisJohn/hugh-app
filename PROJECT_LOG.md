@@ -2246,3 +2246,31 @@ all six cards render pixel-identical width and height post-fix.
 Both fixes verified live in a headless-Chromium session (Playwright, already a project dependency)
 against the running dev server, logged in as `test_user@testmail.com` — not just code review.
 Vitest 259/259 still green (no test touched either file).
+
+## Fix: learn/chat code blocks silently losing formatting + "try it yourself" not appearing
+
+Manual refinement testing surfaced a bug: some Hugh replies in `/learn` chat
+contained an AdaBoost code walkthrough with a "your turn, try it yourself"
+prompt, but the code rendered as plain unformatted text and the "Mirror this
+snippet" button never appeared.
+
+Root cause in `lib/askcode/parse.ts`'s `stripFences()`: it's meant to strip
+an outer ` ```json ` wrapper some models put around the whole payload, but
+its regexes used `^`/`$` with the multiline flag and no `g` flag — so on a
+JSON-parse failure (routinely triggered by an unescaped literal newline in
+`reply`, which forces the salvage path), it matched the *first* fence-looking
+line anywhere in the raw text, not the outer wrapper. When the model also
+broke the "codeExample only, never fenced in reply" contract (`prompts.ts`
+`focusedLearningSystemPrompt`) by inlining a fenced python block straight
+into `reply`, `stripFences` ate that block's own opening/closing fences,
+leaving the code as bare text by the time `ChatBubble`'s markdown renderer
+saw it — and `codeExample` stayed `null`, so the retype button never showed.
+
+Fix: (1) anchored `stripFences` to only strip a fence wrapping the *entire*
+trimmed payload, never one nested inside a field value; (2) added a shared
+`finalize()` step in `parseChatResponse` that, when `codeExample` is still
+null, extracts an inline fenced block from `reply` and promotes it to
+`codeExample` — so even when the model violates the field-separation
+contract, the code still renders correctly and the "Mirror this snippet"
+affordance still appears. Added 3 regression tests
+(`lib/askcode/parse.test.ts`); full suite (297 tests) and typecheck pass.

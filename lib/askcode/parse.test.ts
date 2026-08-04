@@ -94,3 +94,38 @@ describe("parseChatResponse — salvage path (the leak bug)", () => {
     expect(out.reply).toBe("");
   });
 });
+
+describe("parseChatResponse — inline fence in reply (the missing 'try it yourself' bug)", () => {
+  // Regression for the bug where the model breaks its own contract by pasting a
+  // fenced code block straight into `reply` (instead of using `codeExample`) with
+  // an unescaped literal newline, which used to (a) make stripFences eat the
+  // block's own opening/closing fence because its line-anchored regex matched
+  // anywhere in the payload, and (b) leave `codeExample` null so the "Mirror this
+  // snippet" button never rendered.
+  const rawWithInlineFence =
+    '{"reply": "Here\'s the code.\n\n```python\nimport numpy as np\nx = 1\n```\n\nYour turn!", ' +
+    '"isOffTopic": false, "codeExample": null}';
+
+  it("does not let stripFences corrupt a fence nested inside a field value", () => {
+    const out = parseChatResponse(rawWithInlineFence);
+    expect(out.reply).not.toContain("```");
+    expect(out.reply).not.toContain("python\nimport"); // stray unfenced "python" line
+  });
+
+  it("promotes the inline fence into codeExample so the reply is left as plain prose", () => {
+    const out = parseChatResponse(rawWithInlineFence);
+    expect(out.reply).toContain("Here's the code.");
+    expect(out.reply).toContain("Your turn!");
+    expect(out.codeExample).toEqual({ language: "python", code: "import numpy as np\nx = 1" });
+  });
+
+  it("leaves a well-formed codeExample alone even if reply also happens to contain a fence", () => {
+    const raw = JSON.stringify({
+      reply: "See ```inline``` above.",
+      isOffTopic: false,
+      codeExample: { language: "python", code: "y = 2" },
+    });
+    const out = parseChatResponse(raw);
+    expect(out.codeExample).toEqual({ language: "python", code: "y = 2" });
+  });
+});
