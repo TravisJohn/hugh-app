@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { BookMarked, Sparkles, Loader2, AlertTriangle } from "lucide-react";
+import { BookMarked, Sparkles, Loader2, AlertTriangle, Upload, FileText, ArrowRight } from "lucide-react";
 import { type LearningGoal } from "@/types";
 import { classifyTopic, type TopicDomainVerdict } from "@/lib/learn/topic-domain";
 import GoalCard from "./GoalCard";
 import RefinementFlow from "./RefinementFlow";
+import DocumentUploadFlow, { ACCEPT as DOCUMENT_ACCEPT } from "./DocumentUploadFlow";
+
+type InputMode = "qa" | "document";
 
 interface Props {
   initialGoals: LearningGoal[];
@@ -36,10 +39,22 @@ export default function DashboardPanel({ initialGoals }: Props) {
   const [chip, setChip]         = useState<DurationChip | null>(null);
   const [customDate, setCustomDate] = useState("");
 
+  // Which input the idle "Add goal" form shows — a typed topic (Q&A
+  // refinement) or a document upload. Only relevant when neither flow below
+  // has been entered yet.
+  const [inputMode, setInputMode] = useState<InputMode>("qa");
+
   // Refinement flow state
   const [refining, setRefining]       = useState(false);
   const [pendingTopic, setPendingTopic] = useState("");
   const [pendingEndDate, setPendingEndDate] = useState("");
+
+  // Document upload flow state
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  // Picked in the idle panel, before "Continue" — carried into
+  // DocumentUploadFlow as its initialFile so the user only picks once.
+  const [docFile, setDocFile]     = useState<File | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   // Domain gate: judge the topic before building anything. `gate` holds the
   // kind reminder when the topic is out of Hugh's data & analytics domain.
@@ -88,15 +103,30 @@ export default function DashboardPanel({ initialGoals }: Props) {
   function handleGoalCreated(goal: LearningGoal) {
     setGoals(prev => [goal, ...prev]);
     setRefining(false);
+    setUploadingDoc(false);
+    setInputMode("qa");
     setTopic("");
     setChip(null);
     setCustomDate("");
     setPendingTopic("");
     setPendingEndDate("");
+    setDocFile(null);
+    setPendingFile(null);
   }
 
   function handleCancelRefinement() {
     setRefining(false);
+  }
+
+  function handleStartUpload() {
+    if (!endDate || !docFile) return;
+    setPendingEndDate(endDate);
+    setPendingFile(docFile);
+    setUploadingDoc(true);
+  }
+
+  function handleCancelUpload() {
+    setUploadingDoc(false);
   }
 
   function handleGoalDeleted(id: string) {
@@ -114,6 +144,8 @@ export default function DashboardPanel({ initialGoals }: Props) {
         <p className="mt-1 text-sm text-slate-500">
           {refining
             ? "Hugh is learning more about your goal to personalize your path."
+            : uploadingDoc
+            ? "Hugh is scoping a course around your document."
             : "Data, analytics, and everything in between — add a topic and set a commitment date."}
         </p>
 
@@ -125,52 +157,117 @@ export default function DashboardPanel({ initialGoals }: Props) {
               onGoalCreated={handleGoalCreated}
               onCancel={handleCancelRefinement}
             />
+          ) : uploadingDoc ? (
+            <DocumentUploadFlow
+              endDate={pendingEndDate}
+              initialFile={pendingFile}
+              onGoalCreated={handleGoalCreated}
+              onCancel={handleCancelUpload}
+            />
           ) : (
             <div className="flex flex-col gap-4">
-              {/* Topic input */}
-              <input
-                type="text"
-                value={topic}
-                onChange={e => handleTopicChange(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="e.g. Apache Airflow, dbt, SQL window functions, ML pipelines…"
-                className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500 transition-colors"
-              />
+              {/* Input mode toggle */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setInputMode("qa")}
+                  className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors
+                    ${inputMode === "qa"
+                      ? "border-amber-500 bg-amber-500/20 text-amber-300"
+                      : "border-slate-700 bg-slate-800 text-slate-500 hover:border-slate-500 hover:text-slate-300"
+                    }`}
+                >
+                  <Sparkles size={12} />
+                  Answer a few questions
+                </button>
+                <button
+                  onClick={() => setInputMode("document")}
+                  className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors
+                    ${inputMode === "document"
+                      ? "border-amber-500 bg-amber-500/20 text-amber-300"
+                      : "border-slate-700 bg-slate-800 text-slate-500 hover:border-slate-500 hover:text-slate-300"
+                    }`}
+                >
+                  <Upload size={12} />
+                  Upload a document
+                </button>
+              </div>
 
-              {/* Out-of-domain reminder (strict data & analytics gate) */}
-              {gate && !gate.inDomain && (
-                <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-                  <div className="flex items-start gap-2.5">
-                    <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-400" />
-                    <div className="space-y-2.5">
-                      <p className="text-sm leading-relaxed text-slate-200">
-                        {gate.message ||
-                          "Hugh is built specifically for data & analytics skill prep — that topic sits outside this focus. Try a data-related angle."}
-                      </p>
-                      {gate.suggestions.length > 0 && (
-                        <div>
-                          <p className="mb-1.5 text-xs font-medium text-slate-500">
-                            Try a data angle
+              {inputMode === "qa" ? (
+                <>
+                  {/* Topic input */}
+                  <input
+                    type="text"
+                    value={topic}
+                    onChange={e => handleTopicChange(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="e.g. Apache Airflow, dbt, SQL window functions, ML pipelines…"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500 transition-colors"
+                  />
+
+                  {/* Out-of-domain reminder (strict data & analytics gate) */}
+                  {gate && !gate.inDomain && (
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+                      <div className="flex items-start gap-2.5">
+                        <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-400" />
+                        <div className="space-y-2.5">
+                          <p className="text-sm leading-relaxed text-slate-200">
+                            {gate.message ||
+                              "Hugh is built specifically for data & analytics skill prep — that topic sits outside this focus. Try a data-related angle."}
                           </p>
-                          <div className="flex flex-wrap gap-2">
-                            {gate.suggestions.map(s => (
-                              <button
-                                key={s}
-                                onClick={() => handleTopicChange(s)}
-                                className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs text-amber-200 hover:bg-amber-500/20 transition-colors"
-                              >
-                                {s}
-                              </button>
-                            ))}
-                          </div>
+                          {gate.suggestions.length > 0 && (
+                            <div>
+                              <p className="mb-1.5 text-xs font-medium text-slate-500">
+                                Try a data angle
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {gate.suggestions.map(s => (
+                                  <button
+                                    key={s}
+                                    onClick={() => handleTopicChange(s)}
+                                    className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs text-amber-200 hover:bg-amber-500/20 transition-colors"
+                                  >
+                                    {s}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  )}
+                </>
+              ) : (
+                <label
+                  htmlFor="document-upload-input-panel"
+                  className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-slate-700 bg-slate-800/50 px-4 py-8 text-center hover:border-slate-500 transition-colors"
+                >
+                  {docFile ? (
+                    <>
+                      <FileText size={22} className="text-amber-400" />
+                      <span className="text-sm text-slate-200">{docFile.name}</span>
+                      <span className="text-xs text-slate-600">Click to choose a different file</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={22} className="text-slate-500" />
+                      <span className="text-sm text-slate-300">Upload a PDF, DOCX, or HTML file</span>
+                      <span className="text-xs text-slate-600">
+                        A job description, syllabus, or textbook chapter works well
+                      </span>
+                    </>
+                  )}
+                  <input
+                    id="document-upload-input-panel"
+                    type="file"
+                    accept={DOCUMENT_ACCEPT}
+                    onChange={e => setDocFile(e.target.files?.[0] ?? null)}
+                    className="hidden"
+                  />
+                </label>
               )}
 
-              {/* Commitment chips */}
+              {/* Commitment chips — shared by both input modes */}
               <div>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-600">
                   I&apos;ll commit for
@@ -202,23 +299,34 @@ export default function DashboardPanel({ initialGoals }: Props) {
                 )}
               </div>
 
-              <button
-                onClick={handleFinalize}
-                disabled={!canSubmit || checking}
-                className="flex items-center justify-center gap-2 rounded-xl bg-amber-500 py-3 text-sm font-bold text-slate-900 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                {checking ? (
-                  <>
-                    <Loader2 size={15} className="animate-spin" />
-                    Checking topic…
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={15} />
-                    Let&apos;s Discuss
-                  </>
-                )}
-              </button>
+              {inputMode === "qa" ? (
+                <button
+                  onClick={handleFinalize}
+                  disabled={!canSubmit || checking}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-amber-500 py-3 text-sm font-bold text-slate-900 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {checking ? (
+                    <>
+                      <Loader2 size={15} className="animate-spin" />
+                      Checking topic…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={15} />
+                      Let&apos;s Discuss
+                    </>
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={handleStartUpload}
+                  disabled={!endDate || !docFile}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-amber-500 py-3 text-sm font-bold text-slate-900 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Analyze document
+                  <ArrowRight size={15} />
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -242,7 +350,7 @@ export default function DashboardPanel({ initialGoals }: Props) {
         </section>
       )}
 
-      {goals.length === 0 && !refining && (
+      {goals.length === 0 && !refining && !uploadingDoc && (
         <p className="text-sm text-slate-700 italic">
           Your library is empty — add your first topic above.
         </p>

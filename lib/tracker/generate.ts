@@ -1,29 +1,47 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { type SupabaseClient } from "@supabase/supabase-js";
-import { milestoneGenerationPrompt, parseClaudeJson } from "@/lib/claude/prompts";
+import {
+  milestoneGenerationPrompt,
+  parseMilestoneGeneration,
+  type MilestoneGenerationResult,
+} from "@/lib/claude/prompts";
 import { assignBacklogPriority } from "@/lib/tracker/priority";
 import { logUsage } from "@/lib/usage";
 import { type KanbanColumn } from "@/types";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-export async function generateTrack(
-  supabase: SupabaseClient,
-  userId:  string,
-  topic:   string,
-  goalId?: string,
-): Promise<string> {
-  const res = await anthropic.messages.create({
-    model:      "claude-sonnet-4-6",
-    max_tokens: 2048,
-    messages:   [{ role: "user", content: milestoneGenerationPrompt(topic) }],
-  });
+// Retries once on a malformed/unparseable response — mirrors the retry
+// pattern already used for the refine/classify-topic/domain-gate calls.
+async function generateMilestones(
+  topic:        string,
+  documentText?: string,
+): Promise<MilestoneGenerationResult> {
+  let lastErr: unknown = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await anthropic.messages.create({
+        model:      "claude-sonnet-4-6",
+        max_tokens: 2048,
+        messages:   [{ role: "user", content: milestoneGenerationPrompt(topic, documentText) }],
+      });
+      const raw = res.content[0]?.type === "text" ? res.content[0].text : "{}";
+      return parseMilestoneGeneration(raw);
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr ?? new Error("milestone generation failed");
+}
 
-  const raw    = res.content[0]?.type === "text" ? res.content[0].text : "{}";
-  const parsed = parseClaudeJson<{
-    trackTitle: string;
-    milestones: Array<{ title: string; summary: string; column: string }>;
-  }>(raw);
+export async function generateTrack(
+  supabase:      SupabaseClient,
+  userId:        string,
+  topic:         string,
+  goalId?:       string,
+  documentText?: string,
+): Promise<string> {
+  const parsed = await generateMilestones(topic, documentText);
 
   const trackRow: Record<string, unknown> = {
     user_id:           userId,

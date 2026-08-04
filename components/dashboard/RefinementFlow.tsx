@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Loader2, SkipForward, ArrowRight, Brain, ChevronLeft, AlertTriangle } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { type LearningGoal, type TrackStatus } from "@/types";
+import { useTrackStatusWatch } from "@/hooks/useTrackStatusWatch";
+import { type LearningGoal } from "@/types";
 
 interface QA {
   question: string;
@@ -40,10 +40,6 @@ export default function RefinementFlow({ topic, endDate, onGoalCreated, onCancel
   const [pendingGoal, setPendingGoal] = useState<LearningGoal | null>(null);
   const [apiError, setApiError]   = useState(false);
 
-  // Guards a single terminal transition (ready/failed) — Realtime + the
-  // race-guard fetch can both fire, but the goal must only settle once.
-  const settledRef = useRef(false);
-
   // Load first question on mount
   useEffect(() => {
     fetchNextQuestion([]);
@@ -59,80 +55,14 @@ export default function RefinementFlow({ topic, endDate, onGoalCreated, onCancel
     return () => clearInterval(id);
   }, [phase, tips.length]);
 
-  // ── Watch the goal's track_status while the track builds ──────────────────
-  // Realtime is the fast path, but it silently drops events on RLS-protected
-  // tables when the socket isn't authed, so it can NOT be the only mechanism.
-  // A 3s poll guarantees the transition; a hard timeout guarantees the UI can
-  // never hang on "Building…" — including when the background build is killed
-  // (e.g. Vercel Hobby's 10s cap) and the row stays 'pending' forever.
-  useEffect(() => {
-    if (phase !== "waiting" || !pendingGoal) return;
-
-    const goalId   = pendingGoal.id;
-    const supabase = createClient();
-    let pollId:    ReturnType<typeof setInterval> | null = null;
-    let timeoutId: ReturnType<typeof setTimeout>  | null = null;
-
-    const channel = supabase
-      .channel(`goal-${goalId}`)
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "learning_goals", filter: `id=eq.${goalId}` },
-        payload => settle((payload.new as { track_status?: TrackStatus }).track_status),
-      )
-      .subscribe();
-
-    const cleanup = () => {
-      if (pollId)    clearInterval(pollId);
-      if (timeoutId) clearTimeout(timeoutId);
-      void supabase.removeChannel(channel);
-    };
-
-    function settle(status: TrackStatus | undefined) {
-      if (settledRef.current) return;
-      if (status === "ready") {
-        settledRef.current = true;
-        cleanup();
-        onGoalCreated({ ...pendingGoal!, track_status: "ready" });
-      } else if (status === "failed") {
-        settledRef.current = true;
-        cleanup();
-        setPhase("failed");
-      }
-    }
-
-    const checkNow = () => {
-      void supabase
-        .from("learning_goals")
-        .select("track_status")
-        .eq("id", goalId)
-        .single()
-        .then(({ data }) => settle(data?.track_status as TrackStatus | undefined));
-    };
-
-    // Authenticate the realtime socket so RLS-protected changes are delivered.
-    void supabase.auth.getSession().then(({ data }) => {
-      const token = data.session?.access_token;
-      if (token) supabase.realtime.setAuth(token);
-    });
-
-    // Reliable path: immediate check + poll until the build settles.
-    checkNow();
-    pollId = setInterval(checkNow, 3000);
-
-    // Hard safety net: never hang. If nothing has settled after the build
-    // window, surface a failure instead of an endless "Building…".
-    timeoutId = setTimeout(() => {
-      if (!settledRef.current) {
-        settledRef.current = true;
-        cleanup();
-        setPhase("failed");
-      }
-    }, 180_000);
-
-    return cleanup;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, pendingGoal]);
+  // Watch the goal's track_status while the track builds (see hook for the
+  // Realtime/poll/timeout rationale — shared with DocumentUploadFlow).
+  useTrackStatusWatch({
+    goalId:   pendingGoal?.id ?? null,
+    active:   phase === "waiting",
+    onReady:  () => pendingGoal && onGoalCreated({ ...pendingGoal, track_status: "ready" }),
+    onFailed: () => setPhase("failed"),
+  });
 
   // Attempt the /refine call, retrying once. Returns the parsed payload, or
   // null if it failed/was malformed after the retry. Note: a 502 from the route
@@ -189,7 +119,6 @@ export default function RefinementFlow({ topic, endDate, onGoalCreated, onCancel
   }
 
   const enterWaiting = useCallback(async (finalAnswers: QA[]) => {
-    settledRef.current = false;
     setPhase("waiting");
     setApiError(false);
     setPendingGoal(null);

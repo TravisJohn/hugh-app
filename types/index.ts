@@ -87,7 +87,14 @@ export type ClientPersona = Omit<Persona, 'voiceId'>;
 
 // ── Learning goals (dashboard) ────────────────────────────────────────────
 // Status of the Kanban track that is generated for a goal in the background.
-export type TrackStatus = 'pending' | 'ready' | 'failed';
+// 'awaiting_approval' is document-sourced goals only: the extract step lands
+// here so the learner can review the candidate topic/tips before generation
+// fires (see PRD-course-from-document.md).
+export type TrackStatus = 'pending' | 'ready' | 'failed' | 'awaiting_approval';
+
+// Where a goal's topic came from: the Socratic refinement loop, or an
+// uploaded document.
+export type SourceKind = 'qa' | 'document';
 
 export interface LearningGoal {
   id:           string;
@@ -96,6 +103,7 @@ export interface LearningGoal {
   start_date:   string;
   end_date:     string;
   track_status: TrackStatus;
+  source_kind:  SourceKind;
   created_at:   string;
 }
 

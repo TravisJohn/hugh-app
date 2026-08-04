@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Sparkles, Trash2, Loader2, AlertTriangle } from "lucide-react";
+import { Sparkles, Trash2, Loader2, AlertTriangle, Pencil } from "lucide-react";
 import { type LearningGoal } from "@/types";
 
 // A goal still 'pending' past this age means its background build never
@@ -50,7 +50,7 @@ export default function GoalCard({ goal, onDelete }: Props) {
     onDelete?.(goal.id);
   }
 
-  const status: "pending" | "ready" | "failed" | "stalled" =
+  const status: "pending" | "ready" | "failed" | "stalled" | "awaiting_approval" =
     stalled ? "stalled" : goal.track_status;
 
   return (
@@ -61,6 +61,8 @@ export default function GoalCard({ goal, onDelete }: Props) {
           <Loader2 size={20} className="text-amber-400 animate-spin" />
         ) : status === "failed" || status === "stalled" ? (
           <AlertTriangle size={20} className="text-red-400" />
+        ) : status === "awaiting_approval" ? (
+          <Pencil size={20} className="text-sky-400" />
         ) : (
           <Sparkles size={20} className="text-amber-400 animate-pulse" />
         )}
@@ -78,6 +80,10 @@ export default function GoalCard({ goal, onDelete }: Props) {
         ) : status === "failed" ? (
           <p className="mt-0.5 text-xs text-red-400/90">
             Track build failed — remove and re-add to try again.
+          </p>
+        ) : status === "awaiting_approval" ? (
+          <p className="mt-0.5 text-xs text-sky-400/90">
+            Review the topic extracted from your document to build this track.
           </p>
         ) : (
           <p className="mt-0.5 text-xs text-slate-500">
@@ -131,6 +137,8 @@ export default function GoalCard({ goal, onDelete }: Props) {
                 ? "Track is still being built"
                 : status === "stalled"
                 ? "Track build stalled — remove and re-add"
+                : status === "awaiting_approval"
+                ? "Review the extracted topic to build this track"
                 : "Track build failed"
             }
           >
