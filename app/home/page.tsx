@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { GraduationCap, Code2, Trophy, Cloud, NotebookPen } from "lucide-react";
+import { GraduationCap, Code2, Trophy, Cloud, NotebookPen, Cpu } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import SignOutButton from "@/components/landing/SignOutButton";
@@ -9,7 +9,9 @@ import HeaderUsage from "@/components/usage/HeaderUsage";
 // Top-level activity picker — the post-login landing for every user. Picking
 // "Learn" leads to the "What do you want to learn?" dashboard (/home/learn);
 // "Code" opens the coding-drill landing (/code/start); "Cases" opens The Case
-// Room (/cases); "Cloud Skills" opens the cloud-services reference (/cloud).
+// Room (/cases); "Cloud Skills" opens the cloud-services reference (/cloud);
+// "Notes" opens the wrong-answer review workspace (/notes); "Systems" is a
+// placeholder — no route yet, card is intentionally non-interactive.
 export default async function HomePage() {
   const supabase = await createClient();
   const { user } = await verifyUserAccess(supabase);
@@ -74,8 +76,9 @@ export default async function HomePage() {
           </h1>
         </div>
 
-        {/* ── Four activities: Learn · Code · Cases · Cloud Skills ──── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-[clamp(0.5rem,2vh,1rem)] w-full max-w-2xl shrink-0">
+        {/* ── Six activities, 2 rows × 3 cols: Learn · Code · Cases ──
+            Cloud Skills · Systems · Notes ─────────────────────────── */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-[clamp(0.5rem,2vh,1rem)] w-full max-w-4xl shrink-0">
 
           {/* Learn — the whole learning experience */}
           <Link
@@ -177,26 +180,50 @@ export default async function HomePage() {
             </span>
           </Link>
 
-        </div>
+          {/* Systems — placeholder, no route yet, intentionally non-interactive */}
+          <div
+            aria-disabled="true"
+            className="flex cursor-not-allowed flex-col gap-[clamp(0.4rem,1.2vh,0.75rem)] rounded-2xl border border-slate-700/40 bg-slate-900/20 p-[clamp(0.75rem,2.2vh,1.25rem)] opacity-60"
+          >
+            <div className="flex h-[clamp(2rem,4.2vh,2.75rem)] w-[clamp(2rem,4.2vh,2.75rem)] items-center justify-center rounded-xl bg-slate-500/15 text-slate-400">
+              <Cpu size={22} />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5 mb-1">
+                <p className="font-semibold text-slate-100 text-base">Systems</p>
+                <span className="rounded-full bg-slate-500/15 px-1.5 py-0.5 text-xs font-semibold text-slate-400">
+                  Coming soon
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 leading-snug">
+                System design fundamentals for data work — details soon.
+              </p>
+            </div>
+            <span className="mt-auto text-xs font-semibold text-slate-500">
+              Coming soon
+            </span>
+          </div>
 
-        {/* Notes — review a wrong answer with Hugh (personal utility) */}
-        <Link
-          href="/notes"
-          className="group flex w-full max-w-2xl shrink-0 items-center gap-3 rounded-xl border border-slate-700/70 bg-slate-900/40 px-4 py-[clamp(0.5rem,1.4vh,0.75rem)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-rose-400/50 hover:bg-slate-900/60"
-        >
-          <div className="flex h-[clamp(1.75rem,3.6vh,2.25rem)] w-[clamp(1.75rem,3.6vh,2.25rem)] shrink-0 items-center justify-center rounded-lg bg-rose-500/15 text-rose-400 transition-transform duration-300 group-hover:scale-110">
-            <NotebookPen size={18} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-slate-100">Notes</p>
-            <p className="truncate text-xs text-slate-500">
-              Drop a screenshot of a question you got wrong, jot your thinking, and let Hugh correct it.
-            </p>
-          </div>
-          <span className="shrink-0 text-xs font-semibold text-rose-400 transition-all group-hover:text-rose-300">
-            Open →
-          </span>
-        </Link>
+          {/* Notes — review a wrong answer with Hugh (personal utility) */}
+          <Link
+            href="/notes"
+            className="group flex flex-col gap-[clamp(0.4rem,1.2vh,0.75rem)] rounded-2xl border border-rose-500/40 bg-rose-900/10 p-[clamp(0.75rem,2.2vh,1.25rem)] shadow-lg shadow-rose-900/20 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-rose-400/60 hover:bg-rose-900/20 hover:shadow-xl hover:shadow-rose-500/20"
+          >
+            <div className="flex h-[clamp(2rem,4.2vh,2.75rem)] w-[clamp(2rem,4.2vh,2.75rem)] items-center justify-center rounded-xl bg-rose-500/15 text-rose-400 transition-transform duration-300 group-hover:scale-110">
+              <NotebookPen size={22} />
+            </div>
+            <div>
+              <p className="font-semibold text-slate-100 text-base mb-1">Notes</p>
+              <p className="text-xs text-slate-500 leading-snug">
+                Drop a screenshot of a question you got wrong, jot your thinking, and let Hugh correct it.
+              </p>
+            </div>
+            <span className="mt-auto text-xs font-semibold text-rose-400 transition-all group-hover:text-rose-300">
+              Open →
+            </span>
+          </Link>
+
+        </div>
       </main>
     </div>
   );
