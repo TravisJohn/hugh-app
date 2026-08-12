@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # database backups (contain real data — never commit)
 /backups
@@ -48,6 +49,9 @@ yarn-error.log*
 # architecture dashboard — generated at build (predev/prebuild)
 /lib/architecture/data.generated.json
 /public/admin-architecture/
+
+# warm-start ledger (Stage A proof) — per-session marker capture, local only
+/.starship/
 
 # vercel
 .vercel

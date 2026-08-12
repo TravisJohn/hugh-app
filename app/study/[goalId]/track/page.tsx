@@ -1,7 +1,8 @@
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, CalendarClock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import SignOutButton from "@/components/landing/SignOutButton";
 import HeaderUsage from "@/components/usage/HeaderUsage";
 import KanbanBoard from "@/components/tracker/KanbanBoard";
@@ -30,13 +31,11 @@ export default async function StudyTrackPage({ params, searchParams }: Props) {
   const masteredId  = typeof sp.mastered  === "string" ? sp.mastered  : undefined;
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { user, profile } = await verifyUserAccess(supabase);
 
-  const [{ data: goal }, { data: track }, { data: profile }] = await Promise.all([
+  const [{ data: goal }, { data: track }] = await Promise.all([
     supabase.from("learning_goals").select("*").eq("id", goalId).eq("user_id", user.id).single(),
     supabase.from("tracks").select("*").eq("goal_id", goalId).eq("user_id", user.id).maybeSingle(),
-    supabase.from("profiles").select("plan, is_admin").eq("user_id", user.id).maybeSingle(),
   ]);
 
   const isPremium = (profile?.plan === "pro") || (profile?.is_admin === true);

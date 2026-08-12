@@ -316,7 +316,8 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
 
   const runnerRef = useRef<DrillRunner | null>(null);
   const confetti  = useRef<ConfettiHandle>(null);
-  const cellsRef  = useRef(cells); cellsRef.current = cells;
+  const cellsRef  = useRef(cells);
+  useEffect(() => { cellsRef.current = cells; }, [cells]);
   const audio     = useDrillAudio();
 
   const allPassed = cells.every(c => c.status === "pass");
@@ -439,13 +440,21 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
     return () => { cancelled = true; };
   }, [ready, dataset, DRILL_CELLS, cumulative, SCENARIO.setupCode, isSql]);
 
+  // Resets the countdown whenever the active cell or round changes. `timeLeft`
+  // can't be computed as derived state — the ticking effect below independently
+  // decrements it every second — so this deliberately re-syncs it on the two
+  // events that should restart the clock.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setTimeLeft(timeFor(active, round)); }, [active, round]);
 
   // Ran out of time on the active cell → flag it (red) so it's clear which cells
   // weren't done in time. Never blocks; passing it still turns it green.
-  // Practice is untimed, so overtime can only apply in Test mode.
+  // Practice is untimed, so overtime can only apply in Test mode. Reacting to
+  // the ticking `timeLeft` reaching zero has to live in an effect — there's no
+  // event to hang this off of.
   useEffect(() => {
     if (!started || showRefs || timeLeft !== 0) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCells(prev => prev.map((c, idx) =>
       idx === active && c.status !== "pass" && !c.overTime ? { ...c, overTime: true } : c));
   }, [timeLeft, started, active, showRefs]);
@@ -525,7 +534,8 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
   // Stable per-cell handlers so the memoized CmEditors don't re-render en masse.
   // runCell's identity changes with combo/showRefs, so call it through a ref to
   // keep each cell's onSubmit referentially stable across renders.
-  const runCellRef = useRef(runCell); runCellRef.current = runCell;
+  const runCellRef = useRef(runCell);
+  useEffect(() => { runCellRef.current = runCell; }, [runCell]);
   const codeHandlers = useMemo(
     () => DRILL_CELLS.map((_, i) => (v: string) => setCode(i, v)),
     [DRILL_CELLS.length, setCode],

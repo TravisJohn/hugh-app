@@ -48,12 +48,20 @@ async function checkEnvVars(): Promise<boolean> {
     "NEXT_PUBLIC_SUPABASE_ANON_KEY",
     "SUPABASE_SERVICE_ROLE_KEY",
   ];
+  // OPENAI_API_KEY is optional per deployment (Notes Coach/summarize and
+  // Realtime mastery fail gracefully with a 503 if it's unset), so it's
+  // checked but never fails the overall gate.
+  const optional = ["OPENAI_API_KEY"];
   let allOk = true;
   for (const key of required) {
     const val = env(key);
     const ok = val.length > 0;
     result(key, ok, ok ? "(set)" : "missing or empty");
     if (!ok) allOk = false;
+  }
+  for (const key of optional) {
+    const val = env(key);
+    result(key, val.length > 0, val.length > 0 ? "(set)" : "not set — optional features will 503");
   }
   return allOk;
 }

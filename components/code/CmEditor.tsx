@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo, useRef } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { python } from "@codemirror/lang-python";
 import { sql } from "@codemirror/lang-sql";
@@ -36,20 +36,26 @@ const langExtension = (lang: DrillLang) => (lang === "sql" ? sql() : python());
 function CmEditor({ value, onChange, readOnly = false, onSubmit, fontSize = 13, lang = "python" }: Props) {
   // Call the latest onSubmit via a ref so the keymap extension stays stable.
   const submitRef = useRef(onSubmit);
-  submitRef.current = onSubmit;
+  useEffect(() => { submitRef.current = onSubmit; }, [onSubmit]);
 
+  const hasSubmit = !!onSubmit;
   const extensions = useMemo(() => {
-    if (!onSubmit) return [langExtension(lang)];
+    if (!hasSubmit) return [langExtension(lang)];
     return [
       langExtension(lang),
       Prec.highest(
+        // The ref is only ever read inside the CodeMirror keymap's `run`
+        // callback (a keypress handler), never during this render — that's
+        // the whole point of routing it through a ref instead of a closure
+        // over `onSubmit` directly, so `extensions` (and CodeMirror's
+        // instance) doesn't need to be rebuilt on every keystroke.
+        // eslint-disable-next-line react-hooks/refs
         keymap.of([
           { key: "Shift-Enter", run: () => { submitRef.current?.(); return true; } },
         ]),
       ),
     ];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!onSubmit, lang]);
+  }, [hasSubmit, lang]);
 
   return (
     <CodeMirror

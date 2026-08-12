@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
+import { enforceUsageGate } from "@/lib/usage";
 import { generateSessionAssessment } from "@/lib/claude/assessSession";
 import type { Room } from "@/types";
 
@@ -9,6 +10,9 @@ export async function POST(request: NextRequest) {
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const usageGate = await enforceUsageGate(userId);
+  if (usageGate) return usageGate;
 
   const body = (await request.json()) as { sessionId: string; room: Room };
   const { sessionId, room } = body;

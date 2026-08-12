@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
+import { enforceUsageGate } from "@/lib/usage";
 import { refineTopicPrompt, parseClaudeJson } from "@/lib/claude/prompts";
 import { generateTrack } from "@/lib/tracker/generate";
 
@@ -20,6 +21,9 @@ export async function POST(request: NextRequest) {
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const usageGate = await enforceUsageGate(userId);
+  if (usageGate) return usageGate;
 
   const body = (await request.json()) as {
     topic:    string;

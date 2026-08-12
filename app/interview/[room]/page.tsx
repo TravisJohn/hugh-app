@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient }  from "@/lib/supabase/server";
+import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import { getPersonaById } from "@/lib/personas";
 import { isValidRoom, type CoachingMode, type Room, type ClientPersona } from "@/types";
 import InterviewRoom from "@/components/interview/InterviewRoom";
@@ -15,9 +16,7 @@ export default async function InterviewPage({ params }: Props) {
 
   const room      = roomParam as Room;
   const supabase  = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { user }  = await verifyUserAccess(supabase);
 
   // Fetch the most recent active session for this user + room
   const { data: session } = await supabase

@@ -1,5 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { verifyUserAccess } from "@/lib/supabase/verify-access";
+import { safeInternalPath } from "@/utils/safe-redirect";
 import QuizClient from "./QuizClient";
 
 interface Props {
@@ -11,12 +13,11 @@ export default async function ReviewQuizPage({ params, searchParams }: Props) {
   const { milestoneId } = await params;
   const sp = await searchParams;
 
-  // Sanitise returnUrl to prevent open-redirect
-  const returnUrl = sp.returnUrl?.startsWith("/") ? sp.returnUrl : "/";
+  // Sanitise returnUrl to prevent open-redirect (rejects protocol-relative `//` too)
+  const returnUrl = safeInternalPath(sp.returnUrl, "/");
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect(`/login?next=/review/${milestoneId}`);
+  await verifyUserAccess(supabase);
 
   // Verify ownership and fetch milestone
   const { data: milestone } = await supabase

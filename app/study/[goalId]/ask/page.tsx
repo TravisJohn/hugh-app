@@ -1,7 +1,8 @@
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Milestone as MilestoneIcon, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import SignOutButton from "@/components/landing/SignOutButton";
 import HeaderUsage from "@/components/usage/HeaderUsage";
 import AskWorkspace from "@/components/learn/AskWorkspace";
@@ -19,8 +20,7 @@ export default async function StudyAskPage({ params, searchParams }: Props) {
   const urlMilestoneId = typeof sp.milestoneId === "string" ? sp.milestoneId.trim() : null;
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { user } = await verifyUserAccess(supabase);
 
   const { data: goal } = await supabase
     .from("learning_goals")

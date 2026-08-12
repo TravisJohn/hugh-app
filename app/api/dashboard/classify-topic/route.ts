@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
+import { enforceUsageGate } from "@/lib/usage";
 import { judgeTopicDomain } from "@/lib/learn/topic-domain-server";
 
 // Entry-point domain gate: judge whether a topic is within Hugh's data &
@@ -10,6 +11,9 @@ import { judgeTopicDomain } from "@/lib/learn/topic-domain-server";
 export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const usageGate = await enforceUsageGate(userId);
+  if (usageGate) return usageGate;
 
   const body = (await request.json()) as { topic?: string };
   const topic = body.topic?.trim();

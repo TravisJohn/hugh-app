@@ -1,7 +1,8 @@
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import KanbanBoard from "@/components/tracker/KanbanBoard";
 import { type Milestone, type BacklogPriorityMode } from "@/types";
 
@@ -15,12 +16,10 @@ export default async function TrackPage({ params, searchParams }: Props) {
   const { validated, mastered } = await searchParams;
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login?next=/tracker");
+  const { user, profile } = await verifyUserAccess(supabase);
 
-  const [{ data: track }, { data: profile }, { data: milestones }] = await Promise.all([
+  const [{ data: track }, { data: milestones }] = await Promise.all([
     supabase.from("tracks").select("*").eq("id", trackId).eq("user_id", user.id).single(),
-    supabase.from("profiles").select("plan, is_admin").eq("user_id", user.id).maybeSingle(),
     supabase.from("milestones").select("*").eq("track_id", trackId).order("position", { ascending: true }),
   ]);
 

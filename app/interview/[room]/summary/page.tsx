@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import { getPersonaById } from "@/lib/personas";
 import { isValidRoom, type Room } from "@/types";
 import { generateSessionAssessment } from "@/lib/claude/assessSession";
@@ -19,8 +20,7 @@ export default async function SummaryPage({ params, searchParams }: Props) {
   const room = roomParam as Room;
 
   const supabase  = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { user }  = await verifyUserAccess(supabase);
 
   // Fetch session and verify ownership
   const { data: session } = await supabase

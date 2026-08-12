@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import { getRandomPersona } from "@/lib/personas";
+import { safeInternalPath } from "@/utils/safe-redirect";
 import MasteryClient from "./MasteryClient";
 import MasteryRealtimeClient from "./MasteryRealtimeClient";
 
@@ -10,12 +12,15 @@ interface Props {
 }
 
 export default async function MasteryPage({ params, searchParams }: Props) {
-  const { milestoneId }       = await params;
-  const { returnUrl, classic } = await searchParams;
+  const { milestoneId }             = await params;
+  const { returnUrl: rawReturnUrl, classic } = await searchParams;
+
+  // Sanitised once here; every downstream redirect()/client prop uses this,
+  // never the raw query value.
+  const returnUrl = rawReturnUrl ? safeInternalPath(rawReturnUrl, "/tracker") : undefined;
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect(`/login?next=/mastery/${milestoneId}`);
+  await verifyUserAccess(supabase);
 
   // Ownership + data fetch — include track_id so the client can build a
   // reliable fallback URL that always points to the specific board, not /tracker

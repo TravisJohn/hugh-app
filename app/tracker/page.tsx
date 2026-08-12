@@ -1,7 +1,7 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import TrackerDashboard from "@/components/tracker/TrackerDashboard";
 import SignOutButton from "@/components/landing/SignOutButton";
 import HeaderUsage from "@/components/usage/HeaderUsage";
@@ -13,8 +13,7 @@ interface Props {
 
 export default async function TrackerPage({ searchParams }: Props) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login?next=/tracker");
+  const { user } = await verifyUserAccess(supabase);
 
   const sp         = searchParams ? await searchParams : {};
   const fromGoalId = typeof sp.from === "string" ? sp.from : null;

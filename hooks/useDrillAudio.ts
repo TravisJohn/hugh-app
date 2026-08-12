@@ -41,7 +41,7 @@ export function useDrillAudio() {
   const [musicOn, setMusicOn] = useState(true);
   const [soundOn, setSoundOn] = useState(true);
   const soundOnRef = useRef(true);
-  soundOnRef.current = soundOn;
+  useEffect(() => { soundOnRef.current = soundOn; }, [soundOn]);
 
   useEffect(() => {
     if (FOCUS_TRACKS.length === 0) return;

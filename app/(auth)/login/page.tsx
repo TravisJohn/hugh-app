@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { safeInternalPath } from "@/utils/safe-redirect";
 
 function LoginForm() {
   const router = useRouter();
@@ -34,7 +35,7 @@ function LoginForm() {
       return;
     }
 
-    const next = searchParams.get("next") ?? "/home";
+    const next = safeInternalPath(searchParams.get("next"));
     router.push(next);
     router.refresh();
   }

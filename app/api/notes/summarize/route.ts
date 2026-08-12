@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
+import { enforceUsageGate } from "@/lib/usage";
 import { createServiceClient } from "@/lib/supabase/service";
 import { buildSummaryMessages, type SummaryThreadMessage } from "@/lib/notes/summaryPrompt";
 
@@ -19,6 +20,9 @@ const unauth = () => NextResponse.json({ error: "Not signed in." }, { status: 40
 export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return unauth();
+
+  const usageGate = await enforceUsageGate(userId);
+  if (usageGate) return usageGate;
 
   const body = (await request.json().catch(() => ({}))) as { image_id?: string };
   const imageId = body.image_id?.trim();

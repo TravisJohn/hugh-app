@@ -2449,3 +2449,259 @@ null, extracts an inline fenced block from `reply` and promotes it to
 contract, the code still renders correctly and the "Mirror this snippet"
 affordance still appears. Added 3 regression tests
 (`lib/askcode/parse.test.ts`); full suite (297 tests) and typecheck pass.
+
+## Deployment readiness audit — independent remediation pass
+
+Travis commissioned a full codebase quality/security/deployment-readiness
+audit (`DEPLOYMENT_READINESS_AUDIT.md`, dated 2026-08-04): 1 Critical, 5
+High, 10 Medium, 3 Low findings across 313 source files. Given the size, we
+split it into what was safely actionable independent of other in-flight
+work (pure code, no vendor/infra decisions) versus what needed a product
+call first (Next.js major-version bump, rate-limiter backend choice,
+monitoring vendor, CDN migration for 177.7MB of audio, etc.) — Travis chose
+to action all four independent groups: security quick-fixes, drafting (not
+applying) the two blocking DB migrations, the access-control unification,
+and housekeeping.
+
+**CRITICAL-01 / MEDIUM-06 — drafted, not applied.** `profiles_owner` was a
+`FOR ALL USING (auth.uid() = user_id)` policy from before `is_admin`,
+`approved`, `is_blocked`, and `token_limit` existed on that table — since
+the anon key is public by design, any signed-in user could set their own
+`is_admin=true` via a direct REST call. New migration
+`032_lock_down_profiles_rls.sql` drops it for a SELECT-only policy plus a
+`REVOKE INSERT, UPDATE, DELETE ... FROM authenticated`. Confirmed safe: every
+legitimate write to `profiles` in the app already goes through the
+service-role client (`admin/users/[userId]`, `auth/self-approve`,
+`auth/confirm`), which bypasses RLS entirely. `033_missing_fk_indexes.sql`
+adds the seven FK-column indexes Postgres doesn't create automatically
+(`sessions.user_id`, `questions.session_id`, etc., as composites matching
+real query shape). Both need Travis to apply them via the Supabase Dashboard
+SQL editor — before applying the RLS one, check existing `profiles` rows for
+privilege values an attacker may already have set through the hole.
+
+**HIGH-01 — return-URL sanitization.** New `utils/safe-redirect.ts`
+(`safeInternalPath`, 13 unit tests) centralizes the same-origin-only check
+that `app/auth/confirm/route.ts` already had (and `app/review/[milestoneId]`
+had a weaker version of — `startsWith("/")` alone still allows
+`//evil.example`). Applied at login, mastery, and review; the mastery/review
+*client* components never needed their own fix since they only ever receive
+an already-sanitized value from their server page.
+
+**HIGH-03 — approval/block gate coverage.** The existing
+`checkUsageAllowed()` already checked `is_blocked`/`approved` before the
+token-budget check, so routes that called it were already covered — the gap
+was 11 API routes that called an AI provider with *no* usage check at all
+(`dashboard/goals`, `dashboard/goals/document/extract`, `dashboard/refine`,
+`dashboard/classify-topic`, all five `interview/*` generation routes,
+`notes/coach`, `notes/summarize`), plus 10 pages that checked only
+`auth.getUser()` instead of the existing `verifyUserAccess()` helper
+(`interview`, `interview/[room]`, `interview/[room]/summary`, `learn`,
+`mastery/[milestoneId]`, `review/[milestoneId]`, `study/[goalId]/ask`,
+`study/[goalId]/track`, `tracker`, `tracker/[trackId]`, `upgrade`). Added
+`enforceUsageGate()` to `lib/usage.ts` (thin wrapper returning the 403/429
+JSON response) and applied both fixes at every identified call site — found
+via an Explore-agent sweep of every provider SDK call and every
+`getAuthenticatedUserId`/`auth.getUser()` usage, cross-referenced against
+existing gates. `tracker`/`tracker/[trackId]` picked up a small bonus: their
+separate `profiles` query for `plan`/`is_admin` was redundant with
+`verifyUserAccess`'s own fetch, so those got merged into one query.
+
+**MEDIUM-01 — lint errors, 28 → 0.** Four were genuine anti-patterns (a ref
+mutated during render instead of in an effect — `CmEditor.tsx`,
+`DrillMock.tsx` ×2, `useDrillAudio.ts`), fixed by moving the mutation into a
+`useEffect`. Three more are patterns the newer `react-hooks` ESLint rules
+flag conservatively but are legitimate here — a ref read inside a deferred
+CodeMirror keypress handler, and two "reset the countdown when the active
+cell/round changes" effects in the drill timer that don't have a
+non-effect equivalent without redesigning the timer's state shape, which
+wasn't worth the regression risk on a shipped, hand-tuned feature I can't
+interactively test from here. Scoped `eslint-disable` + rationale comment on
+each rather than a blanket suppression. The remaining 22 errors were
+`require()` imports in `tools/architecture-dashboard/scripts/**` — that's a
+standalone `"type": "commonjs"` Node CLI, not part of the Next.js app, so
+added a scoped `eslint.config.mjs` override instead of rewriting working
+tool scripts to ESM for no reason.
+
+**MEDIUM-02 — security headers + CSP.** `next.config.ts` now sets
+`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
+`Permissions-Policy`, and a `Content-Security-Policy-Report-Only` (report-only
+per the audit's own recommendation, to observe before enforcing). Directives
+were derived from an actual sweep of the browser's external surface, not
+guessed: Supabase (signed image URLs load as `<img src>`, plus the SDK's own
+calls), OpenAI Realtime (`api.openai.com` — the mastery WebRTC handshake),
+and jsDelivr (`cdn.jsdelivr.net` — Pyodide's worker script and DuckDB-WASM
+are both CDN-loaded, not bundled). Verified for real: built, ran
+`next start` locally, `curl -I`'d it, confirmed every header including the
+resolved Supabase host in the CSP.
+
+**MEDIUM-09 — Proxy no longer runs on `/api/*`.** It was calling
+`supabase.auth.getUser()` on every request matching its matcher, but only
+ever made an authorization decision for the `/interview` page — everything
+else, including every API call, paid the latency for nothing. Root cause:
+`lib/supabase/server.ts`'s `setAll` comment already explained why —
+`cookies().set()` throws in Server Components, so *pages* genuinely need the
+Proxy to refresh the session cookie; Route Handlers can set cookies
+themselves, so they don't. Narrowed the matcher to exclude `api/`.
+
+**LOW-01 — raw Supabase errors.** `self-approve` and
+`dashboard/goals/[id]` DELETE were returning `error.message` straight from
+Postgres to the client. Now logged server-side, stable public message
+returned.
+
+**MEDIUM-08 (partial) — deployment docs.** Replaced the untouched
+`create-next-app` README with real setup/env/migration/deployment docs.
+`.env.example` already existed locally with good inline documentation but
+was gitignored by the blanket `.env*` rule (the exact gap the audit
+flagged) — added a `!.env.example` exception and committed it, plus the
+previously-undocumented `SUPABASE_ACCESS_TOKEN`. Pinned
+`"engines": {"node": ">=20.9.0"}` (Next.js's own minimum). The existing
+`scripts/health-check.ts` (env-var + live provider-key verification) wasn't
+exposed as an npm script and didn't check `OPENAI_API_KEY` — both fixed
+(`npm run health`).
+
+Verified throughout: `tsc --noEmit` clean, full Vitest suite passing
+(307/307 — added 13 for `safe-redirect`), `npm run build` succeeding, lint
+at 0 errors (was 28). Not started: HIGH-02 (Next.js version bump — breaking-
+change risk), HIGH-04/05 (usage-accounting rework + rate limiting — needs a
+rate-limiter backend decision), MEDIUM-03/04/05/07/10, LOW-02/03 — all
+logged in the audit doc as needing a product/infra decision first.
+
+## Notes v2 — free-form grouping, the Bag, multi-snip buckets (2026-08-12)
+
+Five-stage rebuild of the Notes tree, agreed up front. Stages 1 and 2 are done;
+3-5 follow. The requests, and what each decided:
+
+**Grouping.** Notebooks nest inside notebooks, pages inside pages, to any
+depth, via Ctrl+click. A group is a NEW named folder, created empty above the
+selection. Pages can never be grouped with a notebook, and page groups live
+wholly inside one notebook.
+
+**The Bag.** Anything can be tucked away into a drawer at the sidebar foot —
+hidden from the tree, restorable in place. A bagged group takes its subtree
+with it as one entry.
+
+**Drag.** Reorders siblings and also moves items into or out of a group, so
+dragging is a second way to nest.
+
+**Zen default.** The tree opens collapsed except the ancestor path down to the
+last-opened note.
+
+**Multi-snip buckets.** The real pain: a question too tall for one snip landed
+in two screenshots with two disconnected threads, so the Coach never saw the
+bottom half while commenting on the top.
+
+### Decisions worth not relitigating
+
+**Groups are rows in the existing tables (`is_group` + self-referencing
+`parent_id`), not a separate `note_groups` table.** The deciding factor is
+drag-reorder: a folder and a notebook are siblings in ONE ordered list, and
+interleaving `position` across two tables means sorting across tables on every
+drop. One table makes ordering, moving and rendering identical for both kinds.
+
+**A bucket is the first snip, not a new entity.** Extra snips attach via
+`note_images.parent_image_id`; the parent row keeps the title, the flag and the
+whole thread. Everything keyed on `note_messages.image_id` therefore keeps
+working untouched — no backfill of live data. The alternative (a `note_buckets`
+table owning 1..N images) is conceptually cleaner but would have forced a
+migration of every existing message.
+
+**Promotion swaps bytes, not rows.** Lifting a snip to the top of its bucket
+swaps `storage_path`/`mime` between the two rows rather than re-parenting them,
+because the bucket row is the thread anchor and must stay put. This is what
+makes a tall question pasted bottom-half-first fixable instead of delete-and-redo.
+
+**If any slice of a bucket is unreadable, the Coach refuses the turn** rather
+than answering on a partial question — half a question produces a confident
+answer to something the learner never asked.
+
+**Cap of 4 snips per bucket.** Each is inlined as base64 into every Coach
+request, so this is a cost/latency ceiling. `maxDuration` on the coach route
+raised 60 → 90 to match.
+
+### Stage 1 — data model + pure logic
+`034_notes_grouping.sql`: `parent_id`/`is_group`/`bagged_at` on `notebooks` and
+`notes`, `parent_image_id`/`position` on `note_images`, sibling indexes, and a
+backfill seeding `position` from `created_at` so existing strips keep their
+order. No new tables, so 027's owner-only RLS still covers everything.
+
+`lib/notes/tree.ts` holds all the fiddly rules with no React and no I/O:
+`buildTree`, `canGroup`, `canMove`, `pathTo`, `reindex`. Two robustness
+choices worth keeping: a row whose parent has vanished becomes a root rather
+than disappearing, and the walk only descends from roots, so a corrupt parent
+cycle degrades to "not shown" instead of hanging the render. 30 tests.
+
+### Stage 2 — multi-snip buckets
+Images API returns nested buckets; upload takes an optional `parent_image_id`;
+delete of a bucket purges its parts' Storage bytes (FK cascade only clears the
+rows). The Coach sends every slice in order, and both the system prompt and the
+image preamble now state that multiple images are consecutive slices of ONE
+question — an option list can run across the boundary between two snips.
+
+UI: slices stack flush in the large view so a split capture reads as one page,
+each with hover controls to reorder or remove it; the thumbnail strip stays one
+tile per bucket, badged with its snip count. Two distinct + buttons — the strip
+starts a new screenshot, the one under the stack adds to the current one — and
+paste/drop repeats whichever was used last, shown in the header as
+"Paste → this screenshot" / "Paste → new screenshot".
+
+Verified: `tsc --noEmit` clean, lint clean, 42 notes tests passing (349 total).
+NOT yet verified against a live database — migration 034 needs a manual apply in
+the Supabase Dashboard first, same as 031.
+
+### Stage 3 — Ctrl+click grouping
+`POST /api/notes/group` wraps a selection in a new folder; `DELETE` dissolves
+one. The tree endpoint now returns FLAT rows and `lib/notes/tree.ts` nests them,
+so there is one nesting implementation shared by the UI and the guards instead
+of recursive SQL plus a second walk in React. `useNotes` holds the tree flat and
+derives the nested form, which turns every mutation into a plain array update
+however deep the row sits.
+
+The sidebar is now recursive: Ctrl+click multi-select, a floating SelectionBar,
+Ctrl+G and Esc. An invalid selection leaves Group visible but disabled with the
+reason from `canGroup` as its tooltip. Folders dissolve rather than delete
+(contents lift into the slot the folder occupied); the notebook and page DELETE
+endpoints refuse folders outright so the FK cascade can't take a branch.
+
+Ordering logic was pulled out of the route into `planGroup`/`planDissolve`,
+because the dev auth bypass returns a non-UUID and can't insert rows — there is
+no way to test these over HTTP, and they are exactly the logic that fails
+invisibly. The case that would have bitten: a child whose index happens not to
+change on dissolve still needs re-parenting or the cascade deletes it.
+
+### Stage 4 — drag to reorder and re-parent
+`PATCH /api/notes/move` takes (parent_id, index) for both cases. Explicit drop
+zones — a thin gap between every pair of rows, plus folders as "drop inside"
+targets — rather than inferring before/after from the pointer's offset in a row;
+with a tree that is the difference between a drop landing where the line showed
+and not. dnd-kit was already a dependency.
+
+`planMove` handles the off-by-one that makes this subtle: dragging the first of
+[A,B,C] into the gap before C is index 2 on screen but index 1 once A is lifted
+out. `canMove` gained a target-notebook argument, because every notebook's page
+list has parent_id null — without it a page dropped on another notebook's list
+passed the guard and then silently snapped back to its own.
+
+### Stage 5 — the Bag, zen defaults
+`bagged_at` set through the existing PATCH endpoints. BagDrawer sits at the
+sidebar foot and renders nothing when empty (an always-visible empty drawer is
+the clutter the feature exists to remove). Bag anything; a folder travels with
+its subtree as one entry; "put back" restores in place. If the open page ends up
+inside what was just bagged, the workspace lets go of it.
+
+Collapse state inverted to track what is OPEN, so an empty set is a fully
+collapsed tree — which is the state Notes should open in. The last-opened page
+id lives in localStorage; on entry `pathTo` expands only the chain down to it. A
+saved id that has since been deleted, bagged or turned into a folder is ignored
+and Notes opens fully collapsed rather than picking an arbitrary other page.
+
+### Verified
+`tsc --noEmit` clean, lint clean, 362 tests passing (was 337), `npm run build`
+succeeding. Migration 034 applied and confirmed against the live database.
+
+Driven end to end in a real browser (Playwright, test learner account) rather
+than trusted from the build: group two notebooks → folder opens in rename mode →
+bag the third → Bag drawer shows 1 → put back → correct tree; drag a notebook
+onto a between-rows gap → reorders and survives a reload; add a page, reload →
+tree returns collapsed except the chain down to that page. Dropping a row onto
+the middle of a plain notebook correctly does nothing — only folders take a drop
+inside.

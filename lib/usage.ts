@@ -1,4 +1,5 @@
 import "server-only";
+import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // Free users get 100k combined tokens per calendar month (enforced).
@@ -81,6 +82,27 @@ export async function checkUsageAllowed(
 
   if (total >= limit) return { allowed: false, reason: "limit_reached" };
   return { allowed: true };
+}
+
+/**
+ * Route-handler gate for every billable AI/TTS endpoint (HIGH-03/HIGH-05 —
+ * deployment readiness audit). Wraps `checkUsageAllowed` (which already
+ * covers `is_blocked`/`approved` as well as the token budget) into the
+ * 403/429 JSON response every route should return on rejection, so each
+ * handler doesn't hand-roll its own copy of this logic.
+ *
+ * Usage:
+ *   const gate = await enforceUsageGate(userId);
+ *   if (gate) return gate;
+ */
+export async function enforceUsageGate(userId: string): Promise<NextResponse | null> {
+  const { allowed, reason } = await checkUsageAllowed(userId);
+  if (allowed) return null;
+
+  const msg = reason === "limit_reached"
+    ? "Monthly usage limit reached."
+    : "Your access has been restricted.";
+  return NextResponse.json({ error: msg }, { status: reason === "limit_reached" ? 429 : 403 });
 }
 
 export interface UsageSummary {

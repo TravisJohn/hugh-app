@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { createClient } from "@/lib/supabase/server";
+import { enforceUsageGate } from "@/lib/usage";
 import {
   documentTopicExtractionPrompt,
   parseDocumentTopicExtraction,
@@ -45,6 +46,9 @@ async function extractCandidateTopic(documentText: string): Promise<DocumentTopi
 export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const usageGate = await enforceUsageGate(userId);
+  if (usageGate) return usageGate;
 
   let form: FormData;
   try {

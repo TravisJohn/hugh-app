@@ -1,15 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import { checkSessionQuota, FREE_SESSION_LIMIT } from "@/lib/quota";
 import { Lock, Zap } from "lucide-react";
 
 export default async function UpgradePage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { user } = await verifyUserAccess(supabase);
 
   const quota = await checkSessionQuota(supabase, user.id);
   if (quota.plan === "pro") redirect("/home");

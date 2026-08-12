@@ -24,7 +24,8 @@ export async function POST() {
     .eq("is_blocked", false); // don't resurrect a blocked account
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[self-approve] profile update failed", error);
+    return NextResponse.json({ error: "Could not approve account" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

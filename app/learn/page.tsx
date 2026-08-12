@@ -1,7 +1,7 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Lightbulb } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import SignOutButton from "@/components/landing/SignOutButton";
 import HeaderUsage from "@/components/usage/HeaderUsage";
 import TopicSetup from "@/components/learn/TopicSetup";
@@ -13,8 +13,7 @@ interface Props {
 
 export default async function LearnPage({ searchParams }: Props) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login?next=/learn");
+  const { user } = await verifyUserAccess(supabase);
 
   const sp         = await searchParams;
   const topic      = typeof sp.topic === "string" ? sp.topic.trim() : "";

@@ -45,7 +45,12 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Run on all routes except Next.js internals and static assets
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // Run on pages only — never /api/*. Route Handlers can set cookies
+    // themselves (lib/supabase/server.ts), so they self-refresh the session
+    // via their own getUser() call; Server Components can't (cookies().set()
+    // throws outside middleware), which is the actual reason this needs to
+    // run here at all. Routing every API request through an extra Supabase
+    // getUser() round trip was pure duplicated latency (MEDIUM-09).
+    "/((?!api/|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

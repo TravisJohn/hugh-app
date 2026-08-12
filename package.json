@@ -2,6 +2,9 @@
   "name": "hugh",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "predev": "node tools/architecture-dashboard/scripts/build-hosted.js",
     "dev": "next dev",
@@ -10,7 +13,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "health": "node scripts/health-check.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
