@@ -282,8 +282,20 @@ export interface MasteryRealtimeCredentials {
 // Screenshot-driven learning notes with a per-note Coach chat. Mirrors the
 // tables in migration 027_notes.sql. All personal (one owner per row).
 
-// A tree branch — e.g. "GCP Data Engineer".
-export interface Notebook {
+// Nesting + the Bag are shared by both levels of the tree (see migration
+// 034_notes_grouping.sql). A row with `is_group` is a container: it holds
+// children and nothing else. `parent_id` only ever points at such a container.
+// `bagged_at` non-null means "tucked away" — hidden from the tree, listed in
+// the Bag drawer, restorable in place.
+interface TreeRowFields {
+  parent_id: string | null;
+  is_group:  boolean;
+  bagged_at: string | null;
+}
+
+// A tree branch — e.g. "GCP Data Engineer" — or, with is_group, a folder
+// holding notebooks and other folders to any depth.
+export interface Notebook extends TreeRowFields {
   id:         string;
   user_id:    string;
   title:      string;
@@ -292,8 +304,10 @@ export interface Notebook {
   updated_at: string;
 }
 
-// A leaf under a notebook — "Untitled" until renamed.
-export interface Note {
+// A leaf under a notebook — "Untitled" until renamed. Pages group freely among
+// themselves, but `notebook_id` never changes: a page is always bounded by its
+// notebook, however deeply it is nested.
+export interface Note extends TreeRowFields {
   id:          string;
   user_id:     string;
   notebook_id: string;
@@ -310,16 +324,32 @@ export interface Note {
 // nothing reads it for scoring.
 export type NoteImageFlag = 'red' | 'yellow' | 'green';
 
+// `parent_image_id` is what makes a tall question capturable: a screenshot too
+// long for one snip is stored as a bucket (parent_image_id null — it owns the
+// title, the flag and the thread) plus extra snips hanging off it, stacked in
+// `position` order. Parts nest exactly one level; a part never has parts.
 export interface NoteImage {
-  id:           string;
-  note_id:      string;
-  title:        string;
-  storage_path: string;
-  mime:         string;
-  created_at:   string;
-  url:          string | null;
-  flag:         NoteImageFlag | null;
+  id:              string;
+  note_id:         string;
+  title:           string;
+  storage_path:    string;
+  mime:            string;
+  created_at:      string;
+  url:             string | null;
+  flag:            NoteImageFlag | null;
+  parent_image_id: string | null;
+  position:        number;
 }
+
+// What the workspace actually works with: one screenshot slot and every snip in
+// it. `parts` is empty for the ordinary single-snip case.
+export interface NoteImageBucket extends NoteImage {
+  parts: NoteImage[];
+}
+
+// The most snips one bucket may hold. Each part is inlined as base64 into the
+// Coach request, so this is a cost and latency ceiling, not an arbitrary cap.
+export const MAX_BUCKET_PARTS = 4;
 
 // One line in a screenshot's chat thread. `user` = the learner's own thoughts,
 // `assistant` = Hugh's correction. Each message is tagged to the screenshot it's
@@ -335,7 +365,39 @@ export interface NoteMessage {
   created_at: string;
 }
 
-// The tree the workspace loads on entry: notebooks each with their leaf notes.
-export interface NotebookWithNotes extends Notebook {
-  notes: Note[];
+// ── The nested tree ─────────────────────────────────────────────────────────
+// The API returns flat rows; `lib/notes/tree.ts` nests them. Both node kinds
+// carry `children` (nested groups) — for a notebook node, `notes` additionally
+// holds the roots of that notebook's own page tree. A container populates only
+// `children`; a real notebook or page populates only its content.
+
+export interface NoteNode extends Note {
+  children: NoteNode[];
+  depth:    number;
+}
+
+export interface NotebookNode extends Notebook {
+  children: NotebookNode[];
+  notes:    NoteNode[];
+  depth:    number;
+}
+
+// One entry in the Bag drawer. A bagged page carries its notebook's title so
+// the drawer can say where it will go back to.
+export type BaggedItem =
+  | { kind: 'notebook'; node: NotebookNode }
+  | { kind: 'note';     node: NoteNode; notebook_id: string; notebook_title: string };
+
+// What `buildTree` hands back: the visible tree plus whatever is in the Bag.
+// Bagged rows are lifted out of the tree entirely — a bagged group brings its
+// whole subtree with it, so the drawer lists one entry, not many.
+export interface NotesTree {
+  roots:  NotebookNode[];
+  bagged: BaggedItem[];
+}
+
+// The flat payload the tree endpoint returns.
+export interface NotesTreePayload {
+  notebooks: Notebook[];
+  notes:     Note[];
 }

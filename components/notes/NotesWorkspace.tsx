@@ -16,14 +16,16 @@ import NotesPomodoroProvider from "./NotesPomodoroProvider";
 export default function NotesWorkspace() {
   const n = useNotes();
 
-  // Paste a screenshot straight from the clipboard into the selected note (it
-  // becomes a new screenshot with its own thread).
+  // Paste a screenshot straight from the clipboard into the selected note. It
+  // either starts a new screenshot or stacks onto the open one, depending on
+  // which + was used last — so capturing a tall question in two goes is just
+  // paste, paste.
   useEffect(() => {
     function onPaste(e: ClipboardEvent) {
       if (!n.selectedNote) return;
       const item = Array.from(e.clipboardData?.items ?? []).find((i) => i.type.startsWith("image/"));
       const file = item?.getAsFile();
-      if (file) { e.preventDefault(); void n.addImage(file); }
+      if (file) { e.preventDefault(); void n.addPasted(file); }
     }
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
@@ -62,9 +64,25 @@ export default function NotesWorkspace() {
         <div className="flex min-h-0 flex-1">
           <NotebookTree
             tree={n.tree}
+            treeItems={n.treeItems}
             selectedNoteId={n.selectedNote?.id ?? null}
+            selection={n.selection}
+            groupCheck={n.groupCheck}
+            pendingRenameId={n.pendingRenameId}
+            expanded={n.expanded}
             loading={n.loadingTree}
+            onToggleExpand={n.toggleExpand}
+            onExpand={n.expandNode}
+            onBag={n.bagItem}
+            onUnbag={n.unbagItem}
+            onBagSelection={n.bagSelection}
             onSelectNote={n.selectNote}
+            onToggleSelect={n.toggleSelect}
+            onClearSelection={n.clearSelection}
+            onGroup={n.groupSelection}
+            onDissolve={n.dissolveGroup}
+            onClearPendingRename={n.clearPendingRename}
+            onMove={n.moveRow}
             onAddNotebook={n.addNotebook}
             onRenameNotebook={n.renameNotebook}
             onRemoveNotebook={n.removeNotebook}
@@ -74,19 +92,24 @@ export default function NotesWorkspace() {
           />
           <ImagePanel
             hasNote={!!n.selectedNote}
-            images={n.images}
-            selectedImageId={n.selectedImageId}
+            buckets={n.buckets}
+            selectedBucketId={n.selectedBucketId}
             uploading={n.uploading}
-            onSelectImage={n.selectImage}
-            onUpload={n.addImage}
-            onRenameImage={n.renameImage}
-            onFlagImage={n.flagImage}
-            onRemoveImage={n.removeImage}
+            pasteMode={n.pasteMode}
+            onSelectBucket={n.selectBucket}
+            onAddBucket={n.addBucket}
+            onAddPart={n.addPart}
+            onRenameBucket={n.renameBucket}
+            onFlagBucket={n.flagBucket}
+            onRemoveBucket={n.removeBucket}
+            onRemovePart={n.removePart}
+            onMovePart={n.movePart}
+            onSetPasteMode={n.setPasteMode}
           />
           <NoteThread
-            key={n.selectedImageId ?? "none"}
-            hasImage={!!n.selectedImage}
-            imageTitle={n.selectedImage?.title ?? null}
+            key={n.selectedBucketId ?? "none"}
+            hasImage={!!n.selectedBucket}
+            imageTitle={n.selectedBucket?.title ?? null}
             messages={n.messages}
             summary={n.summary}
             coaching={n.coaching}

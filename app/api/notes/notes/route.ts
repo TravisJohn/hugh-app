@@ -42,17 +42,21 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PATCH /api/notes/notes { id, title?, position? } → rename / reorder.
+// PATCH /api/notes/notes { id, title?, position?, bagged? } → rename, reorder,
+// or tuck away into the Bag.
 export async function PATCH(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return unauth();
 
-  const body = (await request.json().catch(() => ({}))) as { id?: string; title?: string; position?: number };
+  const body = (await request.json().catch(() => ({}))) as {
+    id?: string; title?: string; position?: number; bagged?: boolean;
+  };
   if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (typeof body.title === "string") patch.title = body.title.trim().slice(0, 200) || "Untitled";
   if (typeof body.position === "number") patch.position = body.position;
+  if (typeof body.bagged === "boolean") patch.bagged_at = body.bagged ? new Date().toISOString() : null;
 
   try {
     const db = createServiceClient();
@@ -82,6 +86,15 @@ export async function DELETE(request: NextRequest) {
 
   try {
     const db = createServiceClient();
+
+    // Page folders are dissolved via /api/notes/group, not deleted — otherwise
+    // the FK cascade would take every page inside and strand their screenshots.
+    const { data: row } = await db
+      .from("notes").select("is_group").eq("id", id).eq("user_id", userId).maybeSingle();
+    if (row?.is_group) {
+      return NextResponse.json({ error: "Use dissolve to remove a folder." }, { status: 400 });
+    }
+
     await purgeNoteImageFiles(db, userId, [id]);
     const { error } = await db.from("notes").delete().eq("id", id).eq("user_id", userId);
     if (error) throw error;

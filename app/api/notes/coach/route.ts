@@ -1,14 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
+import { enforceUsageGate } from "@/lib/usage";
 import { createServiceClient } from "@/lib/supabase/service";
 import { NOTE_IMAGES_BUCKET } from "@/lib/notes/storage";
 import { buildCoachMessages, type CoachThreadMessage } from "@/lib/notes/coachPrompt";
 import type { NoteMessage } from "@/types";
 
 export const dynamic = "force-dynamic";
-// Vision + a short reply can take a few seconds; give it headroom.
-export const maxDuration = 60;
+// Vision + a short reply can take a few seconds, and a multi-snip bucket sends
+// up to four images; give it headroom.
+export const maxDuration = 90;
 
 // The Coach: Hugh reads ONE screenshot + that screenshot's chat thread and
 // appends a correction. Threads are per screenshot, so the Coach's attention is
@@ -16,6 +18,11 @@ export const maxDuration = 60;
 // route that calls an LLM, so it's the only one that can be slow or cost money —
 // it runs only on an explicit "Coach" press. Model + client pattern mirror
 // app/api/architecture/chat.
+//
+// "One screenshot" can be several snips: a question too tall to capture in one
+// go is stored as a bucket plus its parts (migration 034). Every slice goes in
+// the same request, in order, so the model sees the whole question — that is
+// the entire point of buckets.
 
 const unauth = () => NextResponse.json({ error: "Not signed in." }, { status: 401 });
 
@@ -23,6 +30,9 @@ const unauth = () => NextResponse.json({ error: "Not signed in." }, { status: 40
 export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return unauth();
+
+  const usageGate = await enforceUsageGate(userId);
+  if (usageGate) return usageGate;
 
   const body = (await request.json().catch(() => ({}))) as { image_id?: string };
   const imageId = body.image_id?.trim();
@@ -43,9 +53,13 @@ export async function POST(request: NextRequest) {
 
     // Ownership: resolve the screenshot (and its note) for this user.
     const { data: image } = await db
-      .from("note_images").select("note_id, storage_path, mime")
+      .from("note_images").select("note_id, storage_path, mime, parent_image_id")
       .eq("id", imageId).eq("user_id", userId).maybeSingle();
     if (!image) return NextResponse.json({ error: "Screenshot not found." }, { status: 404 });
+    if (image.parent_image_id) {
+      // Only buckets own a thread; a snip is part of one, never a target itself.
+      return NextResponse.json({ error: "That's a slice of another screenshot." }, { status: 400 });
+    }
 
     // This screenshot's thread only.
     const { data: msgRows } = await db
@@ -53,14 +67,24 @@ export async function POST(request: NextRequest) {
       .order("created_at", { ascending: true });
     const thread = (msgRows ?? []) as CoachThreadMessage[];
 
-    // Inline the one screenshot's bytes as a base64 data URL so the model gets it
-    // directly (no dependency on OpenAI reaching Supabase Storage).
-    const dataUrl = await toDataUrl(db, image.storage_path as string, image.mime as string);
-    if (!dataUrl) {
+    // The bucket's own image first, then its snips in stacking order — the same
+    // order the learner sees them in the pane.
+    const { data: partRows } = await db
+      .from("note_images").select("storage_path, mime")
+      .eq("user_id", userId).eq("parent_image_id", imageId)
+      .order("position", { ascending: true }).order("created_at", { ascending: true });
+    const slices = [image, ...(partRows ?? [])] as Array<{ storage_path: string; mime: string }>;
+
+    // Inline each slice's bytes as a base64 data URL so the model gets them
+    // directly (no dependency on OpenAI reaching Supabase Storage). If ANY slice
+    // is unreadable we stop: half a question would produce a confident answer to
+    // something the learner never asked.
+    const dataUrls = await Promise.all(slices.map((s) => toDataUrl(db, s.storage_path, s.mime)));
+    if (dataUrls.some((u) => u === null)) {
       return NextResponse.json({ error: "Couldn't read that screenshot. Try again." }, { status: 502 });
     }
 
-    const messages = buildCoachMessages(thread, [dataUrl]);
+    const messages = buildCoachMessages(thread, dataUrls as string[]);
 
     const openai = new OpenAI({ apiKey });
     const res = await openai.chat.completions.create({

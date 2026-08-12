@@ -3,7 +3,7 @@ import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { createServiceClient } from "@/lib/supabase/service";
 import { purgeNoteImageFiles } from "@/lib/notes/storage";
 import { nextPosition } from "@/lib/notes/positions";
-import type { Notebook, Note, NotebookWithNotes } from "@/types";
+import type { Notebook, Note } from "@/types";
 
 // Notebooks = the branches of the Notes tree. GET returns the whole tree
 // (notebooks + their leaf notes) in one shot for the workspace's initial load.
@@ -11,7 +11,10 @@ import type { Notebook, Note, NotebookWithNotes } from "@/types";
 
 const unauth = () => NextResponse.json({ error: "Not signed in." }, { status: 401 });
 
-// GET /api/notes/notebooks → { tree: NotebookWithNotes[] }
+// GET /api/notes/notebooks → { notebooks, notes } — the whole tree as FLAT rows.
+// Nesting happens client-side in lib/notes/tree.ts, which keeps one nesting
+// implementation (shared with the grouping guards) instead of a recursive SQL
+// query here and a second walk in the UI.
 export async function GET(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return unauth();
@@ -27,17 +30,10 @@ export async function GET(request: NextRequest) {
     if (e1) throw e1;
     if (e2) throw e2;
 
-    const byNotebook = new Map<string, Note[]>();
-    for (const n of (notes ?? []) as Note[]) {
-      const arr = byNotebook.get(n.notebook_id) ?? [];
-      arr.push(n);
-      byNotebook.set(n.notebook_id, arr);
-    }
-    const tree: NotebookWithNotes[] = ((nbs ?? []) as Notebook[]).map((nb) => ({
-      ...nb,
-      notes: byNotebook.get(nb.id) ?? [],
-    }));
-    return NextResponse.json({ tree });
+    return NextResponse.json({
+      notebooks: (nbs ?? []) as Notebook[],
+      notes:     (notes ?? []) as Note[],
+    });
   } catch (e) {
     console.error("[notes/notebooks] tree failed:", e);
     return NextResponse.json({ error: "Couldn't load your notes." }, { status: 502 });
@@ -68,17 +64,22 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PATCH /api/notes/notebooks { id, title?, position? } → rename / reorder.
+// PATCH /api/notes/notebooks { id, title?, position?, bagged? } → rename,
+// reorder, or tuck away. `bagged` is a timestamp under the hood so the Bag
+// drawer can sort by most-recently-put-away without another column.
 export async function PATCH(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return unauth();
 
-  const body = (await request.json().catch(() => ({}))) as { id?: string; title?: string; position?: number };
+  const body = (await request.json().catch(() => ({}))) as {
+    id?: string; title?: string; position?: number; bagged?: boolean;
+  };
   if (!body.id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (typeof body.title === "string") patch.title = body.title.trim().slice(0, 200) || "Untitled notebook";
   if (typeof body.position === "number") patch.position = body.position;
+  if (typeof body.bagged === "boolean") patch.bagged_at = body.bagged ? new Date().toISOString() : null;
 
   try {
     const db = createServiceClient();
@@ -108,6 +109,15 @@ export async function DELETE(request: NextRequest) {
 
   try {
     const db = createServiceClient();
+
+    // Folders are dissolved, never deleted — /api/notes/group lifts their
+    // contents out first, so a stray trash click can't take a branch with it.
+    const { data: row } = await db
+      .from("notebooks").select("is_group").eq("id", id).eq("user_id", userId).maybeSingle();
+    if (row?.is_group) {
+      return NextResponse.json({ error: "Use dissolve to remove a folder." }, { status: 400 });
+    }
+
     const { data: noteRows } = await db
       .from("notes").select("id").eq("user_id", userId).eq("notebook_id", id);
     await purgeNoteImageFiles(db, userId, (noteRows ?? []).map((r) => r.id as string));

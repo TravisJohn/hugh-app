@@ -1,4 +1,7 @@
-import type { Notebook, Note, NoteImage, NoteImageFlag, NoteMessage, NotebookWithNotes } from "@/types";
+import type {
+  Notebook, Note, NoteImage, NoteImageBucket, NoteImageFlag, NoteMessage, NotesTreePayload,
+} from "@/types";
+import type { TreeKind } from "@/lib/notes/tree";
 
 // Thin client-side wrappers around the /api/notes/* routes. Kept separate from
 // the useNotes hook so the hook is pure state orchestration and these are the
@@ -12,9 +15,61 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
 }
 
 // ── Tree / notebooks ─────────────────────────────────────────────────────────
-export async function fetchTree(): Promise<NotebookWithNotes[]> {
-  const { tree } = await jsonOrThrow<{ tree: NotebookWithNotes[] }>(await fetch("/api/notes/notebooks"));
-  return tree;
+// The tree arrives flat and is nested client-side by lib/notes/tree.ts.
+export async function fetchTree(): Promise<NotesTreePayload> {
+  return jsonOrThrow<NotesTreePayload>(await fetch("/api/notes/notebooks"));
+}
+
+// ── Grouping ─────────────────────────────────────────────────────────────────
+// Wrap a Ctrl+click selection in a new folder. Returns the folder so the UI can
+// drop straight into rename mode on it.
+export async function createGroup(kind: TreeKind, ids: string[]): Promise<Notebook | Note> {
+  const { group } = await jsonOrThrow<{ group: Notebook | Note }>(
+    await fetch("/api/notes/group", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, ids }),
+    }),
+  );
+  return group;
+}
+
+// Tuck a row away into the Bag, or put it back. A folder takes its whole
+// subtree with it, so the drawer lists one entry rather than many.
+export async function setBagged(kind: TreeKind, id: string, bagged: boolean): Promise<void> {
+  const url = kind === "notebook" ? "/api/notes/notebooks" : "/api/notes/notes";
+  await jsonOrThrow(
+    await fetch(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, bagged }),
+    }),
+  );
+}
+
+// Drop a row into a new slot. `index` is the position as displayed; the server
+// resolves it, validates the destination and renumbers the siblings.
+export async function moveRow(
+  kind: TreeKind,
+  id: string,
+  parentId: string | null,
+  index: number,
+  notebookId?: string,
+): Promise<void> {
+  await jsonOrThrow(
+    await fetch("/api/notes/move", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, id, parent_id: parentId, index, notebook_id: notebookId }),
+    }),
+  );
+}
+
+// Remove a folder and lift everything inside it up one level.
+export async function dissolveGroup(kind: TreeKind, id: string): Promise<void> {
+  await jsonOrThrow(
+    await fetch(`/api/notes/group?kind=${kind}&id=${encodeURIComponent(id)}`, { method: "DELETE" }),
+  );
 }
 
 export async function createNotebook(title?: string): Promise<Notebook> {
@@ -71,19 +126,50 @@ export async function deleteNote(id: string): Promise<void> {
 }
 
 // ── Images ───────────────────────────────────────────────────────────────────
-export async function fetchImages(noteId: string): Promise<NoteImage[]> {
-  const { images } = await jsonOrThrow<{ images: NoteImage[] }>(
+// A screenshot slot ("bucket") can hold several snips of one tall question, so
+// reads come back nested and uploads say which bucket they belong to.
+export async function fetchImages(noteId: string): Promise<NoteImageBucket[]> {
+  const { images } = await jsonOrThrow<{ images: NoteImageBucket[] }>(
     await fetch(`/api/notes/images?note_id=${encodeURIComponent(noteId)}`),
   );
   return images;
 }
 
-export async function uploadImage(noteId: string, file: File): Promise<NoteImage> {
+// Omit `parentImageId` to start a new bucket; pass one to stack another snip
+// inside that bucket.
+export async function uploadImage(
+  noteId: string, file: File, parentImageId?: string,
+): Promise<NoteImage> {
   const form = new FormData();
   form.append("note_id", noteId);
   form.append("file", file);
+  if (parentImageId) form.append("parent_image_id", parentImageId);
   const { image } = await jsonOrThrow<{ image: NoteImage }>(
     await fetch("/api/notes/images", { method: "POST", body: form }),
+  );
+  return image;
+}
+
+// Lift a snip to the top of its bucket. The server swaps the image bytes rather
+// than the rows, so the bucket keeps its thread.
+export async function promoteImage(id: string): Promise<void> {
+  await jsonOrThrow(
+    await fetch("/api/notes/images", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, promote: true }),
+    }),
+  );
+}
+
+// Reorder a snip within its bucket (or a bucket within its note).
+export async function moveImage(id: string, position: number): Promise<NoteImage> {
+  const { image } = await jsonOrThrow<{ image: NoteImage }>(
+    await fetch("/api/notes/images", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, position }),
+    }),
   );
   return image;
 }

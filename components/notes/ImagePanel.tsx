@@ -1,19 +1,25 @@
 "use client";
 
 import { useRef, useState, type DragEvent, type KeyboardEvent } from "react";
-import { ImagePlus, Trash2, Loader2, ImageOff, Plus } from "lucide-react";
-import type { NoteImage, NoteImageFlag } from "@/types";
+import { ImagePlus, Trash2, Loader2, ImageOff, Plus, ChevronUp, ChevronDown, Layers } from "lucide-react";
+import { MAX_BUCKET_PARTS, type NoteImage, type NoteImageBucket, type NoteImageFlag } from "@/types";
+import type { PasteMode } from "@/hooks/useNotes";
 
 interface Props {
-  hasNote:         boolean;
-  images:          NoteImage[];
-  selectedImageId: string | null;
-  uploading:       boolean;
-  onSelectImage:   (id: string) => void;
-  onUpload:        (file: File) => void;
-  onRenameImage:   (id: string, title: string) => void;
-  onFlagImage:     (id: string, flag: NoteImageFlag | null) => void;
-  onRemoveImage:   (id: string) => void;
+  hasNote:          boolean;
+  buckets:          NoteImageBucket[];
+  selectedBucketId: string | null;
+  uploading:        boolean;
+  pasteMode:        PasteMode;
+  onSelectBucket:   (id: string) => void;
+  onAddBucket:      (file: File) => void;
+  onAddPart:        (file: File) => void;
+  onRenameBucket:   (id: string, title: string) => void;
+  onFlagBucket:     (id: string, flag: NoteImageFlag | null) => void;
+  onRemoveBucket:   (id: string) => void;
+  onRemovePart:     (id: string) => void;
+  onMovePart:       (id: string, direction: -1 | 1) => void;
+  onSetPasteMode:   (mode: PasteMode) => void;
 }
 
 const FLAG_ORDER: NoteImageFlag[] = ["red", "yellow", "green"];
@@ -91,25 +97,36 @@ function EditableTitle({ value, onCommit }: { value: string; onCommit: (v: strin
 // Centre pane: the selected screenshot shown large so the learner can read the
 // question, with a strip of thumbnails to switch between the note's screenshots.
 // Selecting a screenshot here drives the per-screenshot thread in the right pane.
+//
+// A screenshot is a *bucket*: a question too tall for one capture is stacked
+// here as several snips, flush, in order — and goes to the Coach as one
+// question. The thumbnail strip shows one tile per bucket, never per snip.
 export default function ImagePanel({
-  hasNote, images, selectedImageId, uploading,
-  onSelectImage, onUpload, onRenameImage, onFlagImage, onRemoveImage,
+  hasNote, buckets, selectedBucketId, uploading, pasteMode,
+  onSelectBucket, onAddBucket, onAddPart, onRenameBucket, onFlagBucket,
+  onRemoveBucket, onRemovePart, onMovePart, onSetPasteMode,
 }: Props) {
-  const fileRef = useRef<HTMLInputElement>(null);
+  const newFileRef = useRef<HTMLInputElement>(null);
+  const partFileRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
-  const selected = images.find((i) => i.id === selectedImageId) ?? images[0] ?? null;
+  const selected = buckets.find((b) => b.id === selectedBucketId) ?? buckets[0] ?? null;
+  // The bucket's own image is the top slice; its parts stack underneath.
+  const slices: NoteImage[] = selected ? [selected, ...selected.parts] : [];
+  const full = slices.length >= MAX_BUCKET_PARTS;
 
-  function pickFiles(files: FileList | null) {
+  function pickFiles(files: FileList | null, onEach: (f: File) => void) {
     if (!files) return;
     for (const f of Array.from(files)) {
-      if (f.type.startsWith("image/")) onUpload(f);
+      if (f.type.startsWith("image/")) onEach(f);
     }
   }
+  // A drop follows the same rule as a paste: whichever + was used last.
   function onDrop(e: DragEvent) {
     e.preventDefault();
     setDragOver(false);
-    pickFiles(e.dataTransfer.files);
+    const target = pasteMode === "current" && selected ? onAddPart : onAddBucket;
+    pickFiles(e.dataTransfer.files, target);
   }
 
   if (!hasNote) {
@@ -125,19 +142,29 @@ export default function ImagePanel({
     );
   }
 
-  const hiddenInput = (
-    <input
-      ref={fileRef}
-      type="file"
-      accept="image/png,image/jpeg,image/webp,image/gif"
-      multiple
-      className="hidden"
-      onChange={(e) => { pickFiles(e.target.files); e.target.value = ""; }}
-    />
+  const hiddenInputs = (
+    <>
+      <input
+        ref={newFileRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        multiple
+        className="hidden"
+        onChange={(e) => { pickFiles(e.target.files, onAddBucket); e.target.value = ""; }}
+      />
+      <input
+        ref={partFileRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        multiple
+        className="hidden"
+        onChange={(e) => { pickFiles(e.target.files, onAddPart); e.target.value = ""; }}
+      />
+    </>
   );
 
   // ── No screenshots yet → dropzone ─────────────────────────────────────────
-  if (images.length === 0) {
+  if (buckets.length === 0) {
     return (
       <section className="flex min-w-0 flex-1 flex-col bg-[#0A0F1E]">
         <header className="flex shrink-0 items-center justify-between border-b border-slate-800 px-4 py-2.5">
@@ -151,7 +178,7 @@ export default function ImagePanel({
         >
           <button
             type="button"
-            onClick={() => fileRef.current?.click()}
+            onClick={() => newFileRef.current?.click()}
             className={`flex h-full min-h-40 w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-8 text-center transition-colors
               ${dragOver ? "border-sky-500 text-sky-300" : "border-slate-700 text-slate-500 hover:border-slate-600 hover:text-slate-400"}`}
           >
@@ -160,12 +187,12 @@ export default function ImagePanel({
             <span className="text-xs text-slate-600">PNG, JPEG, WebP or GIF · up to 10 MB</span>
           </button>
         </div>
-        {hiddenInput}
+        {hiddenInputs}
       </section>
     );
   }
 
-  // ── Selected screenshot (large) + thumbnail switcher ──────────────────────
+  // ── Selected screenshot (stacked slices) + thumbnail switcher ─────────────
   return (
     <section
       onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -175,24 +202,36 @@ export default function ImagePanel({
     >
       {/* Selected screenshot's title + actions */}
       <header className="flex shrink-0 items-center gap-3 border-b border-slate-800 px-4 py-2">
-        {selected && <EditableTitle value={selected.title} onCommit={(v) => onRenameImage(selected.id, v)} />}
+        {selected && <EditableTitle value={selected.title} onCommit={(v) => onRenameBucket(selected.id, v)} />}
         {selected && (
-          <FlagPicker value={selected.flag} onChange={(f) => onFlagImage(selected.id, f)} />
+          <FlagPicker value={selected.flag} onChange={(f) => onFlagBucket(selected.id, f)} />
         )}
+
+        {/* Where a paste lands. Both + buttons set this; showing it here means
+            the learner never has to guess mid-capture. */}
         <button
           type="button"
-          onClick={() => fileRef.current?.click()}
+          onClick={() => onSetPasteMode(pasteMode === "current" ? "new" : "current")}
+          title="Click to switch where pasted images go"
+          className="ml-auto rounded-md px-2 py-1 text-xs text-slate-500 transition-colors hover:bg-slate-800 hover:text-slate-300"
+        >
+          Paste → {pasteMode === "current" ? "this screenshot" : "new screenshot"}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => newFileRef.current?.click()}
           disabled={uploading}
-          className="ml-auto flex items-center gap-1.5 rounded-md bg-slate-800 px-2.5 py-1 text-xs font-medium text-slate-200 transition-colors hover:bg-slate-700 disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-md bg-slate-800 px-2.5 py-1 text-xs font-medium text-slate-200 transition-colors hover:bg-slate-700 disabled:opacity-50"
         >
           {uploading ? <Loader2 size={13} className="animate-spin" /> : <ImagePlus size={13} />}
-          Add
+          New
         </button>
         {selected && (
           <button
             type="button"
-            onClick={() => onRemoveImage(selected.id)}
-            title="Delete this screenshot"
+            onClick={() => onRemoveBucket(selected.id)}
+            title="Delete this screenshot and all its snips"
             className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-slate-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
           >
             <Trash2 size={13} /> Delete
@@ -200,39 +239,92 @@ export default function ImagePanel({
         )}
       </header>
 
-      {/* Large view of the selected screenshot */}
+      {/* The stack: slices butt up against each other so a question split across
+          two captures reads as one continuous page. */}
       <div className="min-h-0 flex-1 overflow-auto p-4">
-        {selected && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={selected.url ?? ""}
-            alt={selected.title}
-            className="mx-auto max-w-full rounded-lg border border-slate-800 shadow-2xl"
-          />
-        )}
+        <div className="mx-auto w-fit max-w-full overflow-hidden rounded-lg border border-slate-800 shadow-2xl">
+          {slices.map((slice, i) => (
+            <figure key={slice.id} className="group relative block">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={slice.url ?? ""} alt={selected?.title ?? ""} className="block max-w-full" />
+
+              {slices.length > 1 && (
+                <>
+                  <span className="absolute left-2 top-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-slate-300">
+                    {i + 1} / {slices.length}
+                  </span>
+                  <div className="absolute right-2 top-2 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <SliceButton
+                      title="Move up"
+                      disabled={i === 0}
+                      onClick={() => onMovePart(slice.id, -1)}
+                    >
+                      <ChevronUp size={13} />
+                    </SliceButton>
+                    <SliceButton
+                      title="Move down"
+                      disabled={i === slices.length - 1}
+                      // Nudging the top slice down is the same swap as lifting
+                      // the one below it up — the bucket row must stay put.
+                      onClick={() => onMovePart(i === 0 ? slices[1].id : slice.id, i === 0 ? -1 : 1)}
+                    >
+                      <ChevronDown size={13} />
+                    </SliceButton>
+                    {i > 0 && (
+                      <SliceButton title="Remove this snip" onClick={() => onRemovePart(slice.id)} danger>
+                        <Trash2 size={13} />
+                      </SliceButton>
+                    )}
+                  </div>
+                </>
+              )}
+            </figure>
+          ))}
+
+          {/* The second +: adds another snip to THIS screenshot, for a question
+              too tall to capture in one go. */}
+          <button
+            type="button"
+            onClick={() => partFileRef.current?.click()}
+            disabled={uploading || full}
+            title={full ? `A screenshot can hold ${MAX_BUCKET_PARTS} snips.` : "Add another snip to this screenshot"}
+            className="flex w-full items-center justify-center gap-2 border-t border-dashed border-slate-700 bg-slate-900/40 py-2.5 text-xs text-slate-500 transition-colors hover:bg-slate-800/60 hover:text-sky-400 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-slate-900/40 disabled:hover:text-slate-500"
+          >
+            {uploading ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            {full ? `Full — ${MAX_BUCKET_PARTS} snips max` : "Add a snip to this screenshot"}
+          </button>
+        </div>
       </div>
 
-      {/* Thumbnail strip: switch between this note's screenshots */}
+      {/* Thumbnail strip: one tile per screenshot, badged with its snip count */}
       <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-t border-slate-800 px-3 py-2.5">
-        {images.map((img) => (
+        {buckets.map((bucket) => (
           <button
-            key={img.id}
+            key={bucket.id}
             type="button"
-            onClick={() => onSelectImage(img.id)}
-            title={img.title}
+            onClick={() => onSelectBucket(bucket.id)}
+            title={bucket.title}
             className={`group relative aspect-video h-14 shrink-0 overflow-hidden rounded-md border transition-all
-              ${img.id === selected?.id ? "border-sky-500 ring-1 ring-sky-500" : "border-slate-800 hover:border-slate-600"}`}
+              ${bucket.id === selected?.id ? "border-sky-500 ring-1 ring-sky-500" : "border-slate-800 hover:border-slate-600"}`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={img.url ?? ""} alt={img.title} className="h-full w-full object-cover" />
-            {img.flag && (
+            <img src={bucket.url ?? ""} alt={bucket.title} className="h-full w-full object-cover" />
+            {bucket.flag && (
               <span
-                title={FLAG_LABEL[img.flag]}
-                className={`absolute left-0.5 top-0.5 h-2 w-2 rounded-full ring-1 ring-black/40 ${FLAG_DOT[img.flag]}`}
+                title={FLAG_LABEL[bucket.flag]}
+                className={`absolute left-0.5 top-0.5 h-2 w-2 rounded-full ring-1 ring-black/40 ${FLAG_DOT[bucket.flag]}`}
               />
             )}
+            {bucket.parts.length > 0 && (
+              <span
+                title={`${bucket.parts.length + 1} snips`}
+                className="absolute bottom-0.5 right-0.5 flex items-center gap-0.5 rounded bg-black/70 px-1 text-[10px] font-medium text-slate-200"
+              >
+                <Layers size={9} /> {bucket.parts.length + 1}
+              </span>
+            )}
             <span
-              onClick={(e) => { e.stopPropagation(); onRemoveImage(img.id); }}
+              onClick={(e) => { e.stopPropagation(); onRemoveBucket(bucket.id); }}
               title="Delete screenshot"
               className="absolute right-0.5 top-0.5 rounded bg-black/60 p-0.5 text-slate-300 opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
             >
@@ -242,16 +334,37 @@ export default function ImagePanel({
         ))}
         <button
           type="button"
-          onClick={() => fileRef.current?.click()}
+          onClick={() => newFileRef.current?.click()}
           disabled={uploading}
-          title="Add a screenshot"
+          title="Start a new screenshot"
           className="flex aspect-video h-14 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-700 text-slate-500 transition-colors hover:border-sky-600 hover:text-sky-400 disabled:opacity-50"
         >
           {uploading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
         </button>
       </div>
 
-      {hiddenInput}
+      {hiddenInputs}
     </section>
+  );
+}
+
+// Small overlay control on a slice — reorder or remove, shown on hover only so
+// the screenshot itself stays readable.
+function SliceButton({
+  title, onClick, disabled, danger, children,
+}: {
+  title: string; onClick: () => void; disabled?: boolean; danger?: boolean; children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onClick={onClick}
+      disabled={disabled}
+      className={`rounded bg-black/70 p-1 text-slate-300 transition-colors disabled:opacity-30
+        ${danger ? "hover:text-red-400" : "hover:text-sky-400"}`}
+    >
+      {children}
+    </button>
   );
 }

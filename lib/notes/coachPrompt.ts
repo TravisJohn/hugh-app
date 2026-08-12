@@ -14,6 +14,11 @@ export const COACH_SYSTEM_PROMPT = [
   "check. You are given: (1) the screenshot(s) of the question, and (2) the",
   "learner's own written reasoning — what they think the answer is and WHY.",
   "",
+  "If more than one image is supplied, they are consecutive slices of ONE",
+  "question — a page too tall to capture in a single screenshot — given top to",
+  "bottom. Read them as one continuous page, never as separate questions. An",
+  "option list may run across the boundary between two slices.",
+  "",
   "Your job is to correct their thinking, not just hand over the answer:",
   "- Read the question in the screenshot carefully, including every option.",
   "- State the correct answer plainly and briefly.",
@@ -30,8 +35,15 @@ export const COACH_SYSTEM_PROMPT = [
   "the screenshot is clearly off-topic, gently say this coach is for data work.",
 ].join("\n");
 
-const IMAGE_PREAMBLE =
-  "Here are the screenshot(s) of the question for this note. Read them carefully before responding.";
+// The preamble names how many slices are coming and in what order, so the model
+// stitches a two-part capture back into one question instead of treating the
+// second half as a new one.
+export function imagePreamble(count: number): string {
+  return count > 1
+    ? `Here are ${count} slices of a single question, in order from top to bottom. ` +
+      "Read them as one continuous page before responding."
+    : "Here is the screenshot of the question for this note. Read it carefully before responding.";
+}
 
 // Structural type for a message row — matches the persisted NoteMessage subset
 // we care about, but kept local so callers can pass any compatible shape.
@@ -63,7 +75,7 @@ export function buildCoachMessages(
     messages.push({
       role: "user",
       content: [
-        { type: "text", text: IMAGE_PREAMBLE },
+        { type: "text", text: imagePreamble(imageDataUrls.length) },
         ...imageDataUrls.map(
           (url) => ({ type: "image_url", image_url: { url } }) as const,
         ),
