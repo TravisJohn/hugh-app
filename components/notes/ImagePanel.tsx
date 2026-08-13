@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type DragEvent, type KeyboardEvent } from "react";
-import { ImagePlus, Trash2, Loader2, ImageOff, Plus, ChevronUp, ChevronDown, Layers } from "lucide-react";
+import { ImagePlus, Trash2, Loader2, ImageOff, Plus, ChevronUp, ChevronDown, Layers, EyeOff } from "lucide-react";
 import { MAX_BUCKET_PARTS, type NoteImage, type NoteImageBucket, type NoteImageFlag } from "@/types";
 import type { PasteMode } from "@/hooks/useNotes";
 
@@ -20,6 +20,7 @@ interface Props {
   onRemovePart:     (id: string) => void;
   onMovePart:       (id: string, direction: -1 | 1) => void;
   onSetPasteMode:   (mode: PasteMode) => void;
+  onHide:           () => void;
 }
 
 const FLAG_ORDER: NoteImageFlag[] = ["red", "yellow", "green"];
@@ -104,7 +105,7 @@ function EditableTitle({ value, onCommit }: { value: string; onCommit: (v: strin
 export default function ImagePanel({
   hasNote, buckets, selectedBucketId, uploading, pasteMode,
   onSelectBucket, onAddBucket, onAddPart, onRenameBucket, onFlagBucket,
-  onRemoveBucket, onRemovePart, onMovePart, onSetPasteMode,
+  onRemoveBucket, onRemovePart, onMovePart, onSetPasteMode, onHide,
 }: Props) {
   const newFileRef = useRef<HTMLInputElement>(null);
   const partFileRef = useRef<HTMLInputElement>(null);
@@ -129,14 +130,35 @@ export default function ImagePanel({
     pickFiles(e.dataTransfer.files, target);
   }
 
+  // The pane's hide control. It sits in every branch's header — including the
+  // empty states — so this pane can always be collapsed from itself, not only
+  // by dragging a divider.
+  const hideButton = (
+    <button
+      type="button"
+      onClick={onHide}
+      title="Hide screenshots"
+      aria-label="Hide screenshots"
+      className="shrink-0 rounded-md p-1 text-slate-500 transition-colors hover:bg-slate-800 hover:text-sky-400"
+    >
+      <EyeOff size={15} />
+    </button>
+  );
+
   if (!hasNote) {
     return (
-      <section className="flex min-w-0 flex-1 items-center justify-center bg-[#0A0F1E] text-center">
-        <div className="max-w-xs px-6">
-          <ImageOff size={28} className="mx-auto mb-3 text-slate-700" />
-          <p className="text-sm text-slate-500">
-            Pick a note on the left, or create one, to drop in a screenshot.
-          </p>
+      <section className="flex h-full w-full min-w-0 flex-col bg-[#0A0F1E]">
+        <header className="flex shrink-0 items-center justify-between border-b border-slate-800 px-4 py-2.5">
+          <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Screenshots</span>
+          {hideButton}
+        </header>
+        <div className="flex min-h-0 flex-1 items-center justify-center text-center">
+          <div className="max-w-xs px-6">
+            <ImageOff size={28} className="mx-auto mb-3 text-slate-700" />
+            <p className="text-sm text-slate-500">
+              Pick a note on the left, or create one, to drop in a screenshot.
+            </p>
+          </div>
         </div>
       </section>
     );
@@ -166,9 +188,10 @@ export default function ImagePanel({
   // ── No screenshots yet → dropzone ─────────────────────────────────────────
   if (buckets.length === 0) {
     return (
-      <section className="flex min-w-0 flex-1 flex-col bg-[#0A0F1E]">
+      <section className="flex h-full w-full min-w-0 flex-col bg-[#0A0F1E]">
         <header className="flex shrink-0 items-center justify-between border-b border-slate-800 px-4 py-2.5">
           <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Screenshots</span>
+          {hideButton}
         </header>
         <div
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -198,7 +221,7 @@ export default function ImagePanel({
       onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
       onDragLeave={() => setDragOver(false)}
       onDrop={onDrop}
-      className={`flex min-w-0 flex-1 flex-col bg-[#0A0F1E] ${dragOver ? "bg-sky-500/5" : ""}`}
+      className={`flex h-full w-full min-w-0 flex-col bg-[#0A0F1E] ${dragOver ? "bg-sky-500/5" : ""}`}
     >
       {/* Selected screenshot's title + actions */}
       <header className="flex shrink-0 items-center gap-3 border-b border-slate-800 px-4 py-2">
@@ -237,6 +260,7 @@ export default function ImagePanel({
             <Trash2 size={13} /> Delete
           </button>
         )}
+        {hideButton}
       </header>
 
       {/* The stack: slices butt up against each other so a question split across

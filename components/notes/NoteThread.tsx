@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { Sparkles, Loader2, Send, ScrollText, MessageSquare, RefreshCw } from "lucide-react";
+import { Sparkles, Loader2, Send, ScrollText, MessageSquare, RefreshCw, PanelRightClose } from "lucide-react";
 import ChatBubble from "@/components/learn/ChatBubble";
 import type { NoteMessage } from "@/types";
 
@@ -16,6 +16,7 @@ interface Props {
   onSaveThought: (content: string) => void;
   onCoach:       () => void;
   onSummarize:   () => void;
+  onHide:        () => void;
 }
 
 // Right ~1/3 pane: the selected screenshot's chat thread. The learner writes their
@@ -26,7 +27,7 @@ interface Props {
 // remounts it — resetting the view back to the conversation and clearing the draft.
 export default function NoteThread({
   hasImage, imageTitle, messages, summary,
-  coaching, summarizing, loadingThread, onSaveThought, onCoach, onSummarize,
+  coaching, summarizing, loadingThread, onSaveThought, onCoach, onSummarize, onHide,
 }: Props) {
   const [draft, setDraft] = useState("");
   const [view, setView]   = useState<"thread" | "summary">("thread");
@@ -58,16 +59,36 @@ export default function NoteThread({
     if (!summary && !summarizing) onSummarize();
   }
 
+  // Present in both branches, so the pane can be collapsed whether or not a
+  // screenshot is selected.
+  const hideButton = (
+    <button
+      type="button"
+      onClick={onHide}
+      title="Hide thread"
+      aria-label="Hide thread"
+      className="shrink-0 rounded-md p-1 text-slate-500 transition-colors hover:bg-slate-800 hover:text-sky-400"
+    >
+      <PanelRightClose size={15} />
+    </button>
+  );
+
   if (!hasImage) {
     return (
-      <aside className="flex w-[34%] min-w-[320px] shrink-0 items-center justify-center border-l border-slate-800 bg-[#0B1120] px-6 text-center">
-        <p className="text-sm text-slate-600">Select or add a screenshot to start a thread — your thoughts and Hugh&apos;s coaching for it appear here.</p>
+      <aside className="flex h-full w-full min-w-0 flex-col bg-[#0B1120]">
+        <header className="flex shrink-0 items-center justify-between border-b border-slate-800 px-4 py-2.5">
+          <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Thread</span>
+          {hideButton}
+        </header>
+        <div className="flex min-h-0 flex-1 items-center justify-center px-6 text-center">
+          <p className="text-sm text-slate-600">Select or add a screenshot to start a thread — your thoughts and Hugh&apos;s coaching for it appear here.</p>
+        </div>
       </aside>
     );
   }
 
   return (
-    <aside className="flex w-[34%] min-w-[320px] shrink-0 flex-col border-l border-slate-800 bg-[#0B1120]">
+    <aside className="flex h-full w-full min-w-0 flex-col bg-[#0B1120]">
       <header className="flex shrink-0 items-center gap-2 border-b border-slate-800 px-4 py-2.5">
         <span className="min-w-0 flex-1 truncate text-xs font-semibold uppercase tracking-widest text-slate-500">
           {view === "summary" ? "Running summary" : `${imageTitle ?? "Your thinking"} · Hugh`}
@@ -93,6 +114,7 @@ export default function NoteThread({
             <MessageSquare size={14} /> Conversation
           </button>
         )}
+        {hideButton}
       </header>
 
       {view === "summary" ? (

@@ -7,7 +7,7 @@ import {
 } from "@dnd-kit/core";
 import {
   ChevronDown, ChevronRight, Plus, Trash2, FileText, FolderPlus, Folder, FolderOpen, Ungroup,
-  GripVertical, Briefcase,
+  GripVertical, Briefcase, PanelLeftClose,
 } from "lucide-react";
 import { canMove, INDENT_CAP, type Check, type TreeItem, type TreeKind } from "@/lib/notes/tree";
 import type { TreeSelection } from "@/hooks/useNotes";
@@ -42,6 +42,7 @@ interface Props {
   onAddNote:            (notebookId: string) => void;
   onRenameNote:         (id: string, title: string) => void;
   onRemoveNote:         (id: string) => void;
+  onHide:               () => void;
 }
 
 // What a drag is carrying, and what a drop target accepts.
@@ -122,6 +123,7 @@ export default function NotebookTree({
   onToggleExpand, onExpand, onBag, onUnbag, onBagSelection,
   onSelectNote, onToggleSelect, onClearSelection, onGroup, onDissolve, onClearPendingRename, onMove,
   onAddNotebook, onRenameNotebook, onRemoveNotebook, onAddNote, onRenameNote, onRemoveNote,
+  onHide,
 }: Props) {
   const [drag, setDrag] = useState<DragData | null>(null);
 
@@ -190,17 +192,28 @@ export default function NotebookTree({
   };
 
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-slate-800 bg-[#0B1120]">
+    <aside className="flex h-full w-full min-w-0 flex-col bg-[#0B1120]">
       <header className="flex shrink-0 items-center justify-between px-3 py-3">
         <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Notebooks</span>
-        <button
-          type="button"
-          onClick={onAddNotebook}
-          title="New notebook"
-          className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-sky-400"
-        >
-          <FolderPlus size={16} />
-        </button>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={onAddNotebook}
+            title="New notebook"
+            className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-sky-400"
+          >
+            <FolderPlus size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={onHide}
+            title="Hide notebooks"
+            aria-label="Hide notebooks"
+            className="rounded-md p-1 text-slate-500 transition-colors hover:bg-slate-800 hover:text-sky-400"
+          >
+            <PanelLeftClose size={15} />
+          </button>
+        </div>
       </header>
 
       <DndContext

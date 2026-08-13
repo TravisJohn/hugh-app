@@ -2705,3 +2705,50 @@ onto a between-rows gap → reorders and survives a reload; add a page, reload �
 tree returns collapsed except the chain down to that page. Dropping a row onto
 the middle of a plain notebook correctly does nothing — only folders take a drop
 inside.
+
+## Notes — collapsible, resizable panes (2026-08-13)
+
+The three Notes panes (notebooks · screenshots · thread) were fixed at `w-64`,
+`flex-1` and `w-[34%]`. Reviewing a tall screenshot meant living with a sidebar
+you weren't using; a long coaching thread had a third of the window and no more.
+Both panes are now draggable, and any of the three can be collapsed.
+
+### Where the layout lives
+`lib/notes/layout.ts` holds the whole model as pure functions — clamping,
+snap-to-collapse, which pane absorbs slack, and parsing the stored blob. It is
+unit-tested on plain objects (22 tests) the same way `lib/notes/tree.ts` is, so
+the geometry is not something you have to open a browser to check.
+
+The side panes carry pixel widths; the screenshot pane takes what is left. Fixed
+sides with a fluid centre beat three percentages: percentages fight the
+min-widths and make a dragged divider feel rubbery.
+
+### Collapse
+A hidden pane is not removed — it becomes a 32px rail carrying its icon and a
+rotated label, and clicking the rail brings it back at the width it had. That
+choice is what makes the feature safe: there is no state in which a pane is gone
+with no way back, including all three collapsed. Dragging a divider more than
+56px past a pane's minimum collapses it, so the dividers and the rails are one
+gesture rather than two separate features. Each pane also carries a hide button
+in its own header — added to the two empty states that previously had no header
+at all, so the control exists in every branch.
+
+### Persistence
+Layout is remembered per browser in localStorage. It is read through
+`useSyncExternalStore` over a small module-level store (`lib/notes/layoutStore.ts`)
+rather than copied into state in a mount effect: localStorage genuinely is an
+external store, it settles the SSR/hydration question, and the repo's lint rules
+reject sync setState in an effect. Writes are debounced 150ms so a pointer drag
+does not write on every frame. A corrupt or hand-edited blob falls back to the
+default instead of rendering a broken workspace, and a layout saved on a wide
+monitor is re-clamped by a ResizeObserver when opened narrow.
+
+`useNotesLayout` is deliberately separate from `useNotes` — nothing about moving
+a divider should re-fetch a note. The hook's return is destructured at the call
+site because passing `attachContainer` through as `ref` off an object marks every
+sibling field as a ref access under `react-hooks/refs`.
+
+### Verified
+`tsc --noEmit` clean, lint clean, 384 tests passing (was 362), `next build`
+succeeding. Not yet driven in a real browser — the pointer-drag feel and the
+rail rendering are unverified outside the build.

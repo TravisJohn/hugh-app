@@ -105,6 +105,8 @@ Every screen must fit within the viewport height. Use `h-screen`, flex column la
 
 **Exception — the Notes workspace (`/notes`).** Notes is a document-style tool for reviewing long screenshots and coaching threads, so its three panes (tree · screenshots · thread) each scroll *internally* while the page itself stays locked to the viewport (`h-screen`, no page scroll). This is the only screen permitted to scroll inside its panes.
 
+Those panes are also user-resizable and individually collapsible. The geometry lives in `lib/notes/layout.ts` (pure, unit-tested) and is driven by `useNotesLayout`; a collapsed pane becomes a clickable rail, never nothing. Pane components take their width from the workspace wrapper — they must not set their own widths.
+
 ### 5. Buttons appear only after audio finishes
 On the question screen, "Show Best Answer" and "I'm Ready" only render when state is `READY` (audio playback complete). This is enforced in `useAudioPlayer` via an `onEnded` callback that transitions state.
 
