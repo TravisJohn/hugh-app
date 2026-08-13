@@ -14,12 +14,12 @@ const supabaseHost = supabaseUrl ? new URL(supabaseUrl).origin : "";
 // Supabase (auth/storage), OpenAI Realtime (mastery WebRTC handshake — see
 // lib/mastery/realtimeSession.ts), and jsDelivr (Pyodide worker script +
 // DuckDB-WASM bundle — see lib/code/pyodide.worker.ts, lib/code/duckdbClient.ts).
-const cspDirectives = [
+const cspDirectives = (frameAncestors: "none" | "self") => [
   `default-src 'self'`,
   `base-uri 'self'`,
   `object-src 'none'`,
   `form-action 'self'`,
-  `frame-ancestors 'none'`,
+  `frame-ancestors '${frameAncestors}'`,
   `script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://cdn.jsdelivr.net`,
   `style-src 'self' 'unsafe-inline'`,
   `img-src 'self' data: blob:${supabaseHost ? ` ${supabaseHost}` : ""}`,
@@ -29,19 +29,38 @@ const cspDirectives = [
   `media-src 'self' blob:`,
 ].join("; ");
 
+// Framing policy is the one header that varies by path. Everything else is
+// identical, so it's built once here rather than duplicated across the two
+// rules below.
+const securityHeaders = (framing: "DENY" | "SAMEORIGIN") => [
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "X-Frame-Options", value: framing },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "microphone=(self), camera=(), geolocation=(), interest-cohort=()" },
+  {
+    key: "Content-Security-Policy-Report-Only",
+    value: cspDirectives(framing === "SAMEORIGIN" ? "self" : "none"),
+  },
+];
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   async headers() {
     return [
+      // The architecture dashboard is a static asset that app/admin/architecture
+      // embeds in a same-origin <iframe>. A blanket DENY refuses even that, so
+      // this one prefix gets SAMEORIGIN. The page doing the framing is itself
+      // admin-gated, and the asset carries no secrets or data.
       {
-        source: "/:path*",
-        headers: [
-          { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "X-Frame-Options", value: "DENY" },
-          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "Permissions-Policy", value: "microphone=(self), camera=(), geolocation=(), interest-cohort=()" },
-          { key: "Content-Security-Policy-Report-Only", value: cspDirectives },
-        ],
+        source: "/admin-architecture/:path*",
+        headers: securityHeaders("SAMEORIGIN"),
+      },
+      // Everything else stays un-framable. The negative lookahead keeps this
+      // rule from also matching the path above — Next.js applies every matching
+      // rule, which would otherwise emit two conflicting X-Frame-Options.
+      {
+        source: "/((?!admin-architecture/).*)",
+        headers: securityHeaders("DENY"),
       },
     ];
   },

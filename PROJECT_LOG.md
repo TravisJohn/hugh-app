@@ -2752,3 +2752,39 @@ sibling field as a ref access under `react-hooks/refs`.
 `tsc --noEmit` clean, lint clean, 384 tests passing (was 362), `next build`
 succeeding. Not yet driven in a real browser — the pointer-drag feel and the
 rail rendering are unverified outside the build.
+
+## Fix: X-Frame-Options broke the admin architecture dashboard (2026-08-13)
+
+The architecture dashboard at `/admin/architecture` showed "hugh-app.vercel.app
+refused to connect" in production. The page is an admin-gated shell that embeds
+the standalone dashboard (`/admin-architecture/dashboard.html`) in a same-origin
+iframe. The deployment-readiness pass (7977747) had added
+`X-Frame-Options: DENY` to every route, and `DENY` refuses framing from all
+origins including the page's own — so the page was refusing itself.
+
+Nothing else in the chain was at fault: the route, the build-time asset
+generation (`prebuild`), the admin gate, and the 401 on
+`/api/architecture/data` all behaved correctly when checked.
+
+### The fix
+`next.config.ts` now serves `SAMEORIGIN` for the `/admin-architecture/*` prefix
+and keeps `DENY` everywhere else, rather than relaxing the whole app to
+`SAMEORIGIN` for the sake of one static asset. The general rule carries a
+negative lookahead so both rules cannot match the same path — Next.js applies
+every matching rule, which would otherwise emit two conflicting
+`X-Frame-Options` headers. The report-only CSP's `frame-ancestors` tracks the
+same split (`'self'` for that prefix, `'none'` elsewhere); it is inert while the
+policy is report-only, but leaving it at `'none'` would have re-broken the
+dashboard the moment the CSP is promoted to enforcing.
+
+### Verified
+Headers curled against a running server: `SAMEORIGIN` on the dashboard asset,
+`DENY` on `/login` and `/admin/architecture`, exactly one `X-Frame-Options` per
+response. `tsc --noEmit` clean, lint clean, 384 tests passing, `next build`
+succeeding.
+
+### Outstanding
+`OPENAI_API_KEY` is set locally but unconfirmed in the Vercel environment. If it
+is missing there, the graph renders but the floating assistant returns "The
+architecture assistant isn't configured on this deployment" — the route degrades
+with a message rather than failing.
