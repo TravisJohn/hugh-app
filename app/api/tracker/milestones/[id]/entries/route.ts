@@ -15,9 +15,14 @@ export async function GET(
   const { id } = await params;
   const supabase = await createClient();
 
+  // Columns are enumerated rather than "*" so the diary list never ships every
+  // entry's stored `transcript` to the browser — it can be thousands of words
+  // per entry and nothing in the diary view reads it. Add new columns here when
+  // the drawer needs them.
   const { data, error } = await supabase
     .from("milestone_entries")
-    .select("*")
+    .select("id, milestone_id, user_id, title, body, fact_status, correction, " +
+            "gap_note, corrected, point_id, archived_at, covered, created_at")
     .eq("milestone_id", id)
     .eq("user_id", userId)
     .order("created_at", { ascending: true });

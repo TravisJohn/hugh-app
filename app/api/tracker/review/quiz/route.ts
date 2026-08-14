@@ -4,15 +4,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { checkUsageAllowed, logUsage } from "@/lib/usage";
+import {
+  buildEntriesText, sourceCharCount, questionTarget, keepGroundedQuestions,
+  MIN_QUESTIONS, type DiaryEntry,
+} from "@/lib/tracker/quizSource";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-interface QuizQuestion {
-  question:     string;
-  options:      string[];
-  correctIndex: number;
-  explanation:  string;
-}
 
 export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
@@ -33,23 +30,29 @@ export async function POST(request: NextRequest) {
 
   const supabase = await createClient();
 
-  // Verify ownership
+  // Ownership: RLS already scopes this read, but the check is asserted here too
+  // rather than left implicit — a quiz is generated from private notes.
   const { data: milestone } = await supabase
     .from("milestones")
     .select("id, title, tracks!track_id!inner(user_id)")
     .eq("id", body.milestoneId)
-    .single();
+    .single<{ id: string; title: string; tracks: { user_id: string } }>();
 
-  if (!milestone) {
+  if (!milestone || milestone.tracks?.user_id !== userId) {
     return NextResponse.json({ error: "Milestone not found" }, { status: 404 });
   }
 
-  // Fetch diary entries scoped to this milestone
+  // Archived entries are hidden from the learner's diary, so they must not be
+  // quizzed either — otherwise the quiz asks about notes they cannot re-read.
+  // `covered` is what the session actually established; `body` is the narrative
+  // fallback for entries written before migration 034 or written by hand.
   const { data: entries } = await supabase
     .from("milestone_entries")
-    .select("title, body")
+    .select("title, body, covered")
     .eq("milestone_id", body.milestoneId)
-    .order("created_at", { ascending: true });
+    .is("archived_at", null)
+    .order("created_at", { ascending: true })
+    .returns<DiaryEntry[]>();
 
   if (!entries || entries.length === 0) {
     return NextResponse.json(
@@ -58,25 +61,25 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const entriesText = entries
-    .map((e, i) => `Entry ${i + 1}${e.title ? ` — ${e.title}` : ""}:\n${(e.body ?? "").slice(0, 2000)}`)
-    .join("\n\n---\n\n");
+  const entriesText = buildEntriesText(entries);
+  const target      = questionTarget(sourceCharCount(entries));
 
-  const prompt = `You are generating a review quiz to test a learner's understanding of what they have studied.
+  // Note what is deliberately absent: the milestone title. Naming the subject
+  // gave the model a topic to generate from when the notes ran thin, which is
+  // exactly how questions about undiscussed material got in.
+  const prompt = `A learner wrote the notes below while studying. They are the ONLY material you may draw on.
 
-Topic: "${milestone.title}"
-
-Learner's diary entries:
 ${entriesText}
 
-Generate exactly 5 multiple-choice questions based ONLY on the content above.
+Write ${target} multiple-choice question${target === 1 ? "" : "s"} checking whether the learner understood what their own notes say.
 
-Rules:
-- Each question must test genuine conceptual understanding, not just word-for-word recall
-- Each question has exactly 4 options; only one is correct
-- The correct answer must be clearly supported by the learner's own notes
-- Vary the difficulty and cover different ideas from the entries
-- Include a 1-2 sentence explanation of why the correct answer is right
+Hard rules:
+- Draw ONLY on the notes above. If a fact is not in the notes it must not appear in a question, an option, or an explanation — not even standard textbook knowledge of the subject.
+- "source" must be a phrase or sentence copied VERBATIM from the notes that makes the correct answer true. It is checked against the notes automatically; a question whose source is not found there is discarded.
+- Test understanding of what the notes claim, not recall of their exact wording.
+- Exactly 4 options, exactly one correct.
+- Give a 1-2 sentence explanation of why the correct answer is right, drawn from the notes.
+- If the notes genuinely support fewer than ${target} questions, return fewer. Returning fewer is correct; inventing material is not.
 
 Return ONLY a valid JSON array — no markdown, no commentary:
 [
@@ -84,29 +87,50 @@ Return ONLY a valid JSON array — no markdown, no commentary:
     "question": "...",
     "options": ["Option text A", "Option text B", "Option text C", "Option text D"],
     "correctIndex": 0,
-    "explanation": "..."
+    "explanation": "...",
+    "source": "verbatim phrase from the notes"
   }
 ]`;
 
   try {
     const response = await anthropic.messages.create({
       model:      "claude-sonnet-4-6",
-      max_tokens: 2048,
+      max_tokens: 3072,
       messages:   [{ role: "user", content: prompt }],
     });
 
     const block = response.content[0];
     if (block.type !== "text") throw new Error("Non-text response from Claude");
 
-    const raw       = block.text.trim().replace(/^```(?:json)?\n?|\n?```$/g, "").trim();
-    const questions = JSON.parse(raw) as QuizQuestion[];
+    const raw    = block.text.trim().replace(/^```(?:json)?\n?|\n?```$/g, "").trim();
+    const parsed = JSON.parse(raw) as unknown;
 
-    if (!Array.isArray(questions) || questions.length !== 5) {
-      throw new Error(`Expected 5 questions, got ${Array.isArray(questions) ? questions.length : "non-array"}`);
-    }
+    const { kept, malformed, ungrounded } = keepGroundedQuestions(parsed, entriesText, target);
 
     void logUsage({ userId, feature: "review/quiz", tokensIn: response.usage.input_tokens, tokensOut: response.usage.output_tokens });
-    return NextResponse.json({ questions });
+
+    if (malformed || ungrounded) {
+      console.warn(
+        `[review/quiz] milestone=${body.milestoneId} target=${target} kept=${kept.length} ` +
+        `malformed=${malformed} ungrounded=${ungrounded}`
+      );
+    }
+
+    // Better to say the notes are too thin than to quiz someone on material
+    // they never covered — that was the original complaint.
+    if (kept.length < MIN_QUESTIONS) {
+      return NextResponse.json(
+        {
+          error:
+            "There isn't enough in your notes for this card to build a fair quiz yet. " +
+            "Add another learning session or a diary entry, then try again.",
+          code: "insufficient_material",
+        },
+        { status: 422 }
+      );
+    }
+
+    return NextResponse.json({ questions: kept });
   } catch (err) {
     console.error("[review/quiz] Generation failed:", err);
     return NextResponse.json({ error: "Failed to generate quiz. Please try again." }, { status: 500 });

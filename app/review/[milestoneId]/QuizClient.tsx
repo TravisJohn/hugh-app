@@ -13,6 +13,8 @@ interface QuizQuestion {
   options:      string[];
   correctIndex: number;
   explanation:  string;
+  /** The verbatim line from the learner's own notes that the question rests on. */
+  source:       string;
 }
 
 type Phase = "idle" | "generating" | "quiz" | "results" | "validating";
@@ -120,7 +122,8 @@ export default function QuizClient({ milestoneId, milestoneTitle, entryCount, re
 
     if (currentIdx + 1 >= questions.length) {
       const correct = newAnswers.filter((a, i) => a !== null && a === questions[i]?.correctIndex).length;
-      if (correct === 5) {
+      // Pass is every question, however many the notes supported — not a fixed 5.
+      if (correct === questions.length) {
         setPhase("validating");
         doValidate();
       } else {
@@ -160,12 +163,13 @@ export default function QuizClient({ milestoneId, milestoneTitle, entryCount, re
             <h1 className="mb-1 text-2xl font-bold text-slate-100">Review Quiz</h1>
             <p className="mb-8 text-sm text-slate-400">{milestoneTitle}</p>
 
-            <div className="mb-8 rounded-2xl border border-slate-700/60 bg-slate-800/50 px-6 py-5 text-left space-y-3">
+            <div className="mb-8 rounded-2xl border border-slate-700/60 bg-slate-800/50 px-6 py-4 text-left space-y-2.5">
               <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-1">How it works</p>
               {([
-                ["5 questions", "scoped entirely to your learning diary for this milestone"],
+                ["2 to 5 questions", "however many your diary entries for this card genuinely support"],
+                ["Grounded in your notes", "every question quotes the line it came from — nothing from outside"],
                 ["45 seconds each", "answer before time runs out or it counts as wrong"],
-                ["All 5 correct", "required to officially mark this card as reviewed"],
+                ["All correct", "required to officially mark this card as reviewed"],
                 ["Unlimited retries", "each attempt generates fresh questions — no memorising"],
               ] as const).map(([bold, rest]) => (
                 <div key={bold} className="flex items-start gap-3">
@@ -333,6 +337,18 @@ export default function QuizClient({ milestoneId, milestoneTitle, entryCount, re
                   <p className="text-sm text-slate-300 leading-relaxed">{q.explanation}</p>
                 </div>
 
+                {/* The line from your own diary this question rests on. Shown so a
+                    question can always be traced back — if it can't be, it was
+                    dropped server-side before you ever saw it. */}
+                {q.source && (
+                  <div className="mb-4 rounded-xl border border-slate-700/60 bg-slate-800/40 px-4 py-3">
+                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+                      From your notes
+                    </p>
+                    <p className="text-xs italic leading-relaxed text-slate-400">“{q.source}”</p>
+                  </div>
+                )}
+
                 <button
                   onClick={handleNext}
                   className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-700 px-6 py-3 text-sm font-semibold text-slate-100 hover:bg-slate-600 transition-colors"
@@ -357,7 +373,9 @@ export default function QuizClient({ milestoneId, milestoneTitle, entryCount, re
             <Trophy size={30} />
           </div>
           <h2 className="mb-2 text-2xl font-bold text-slate-100">Quiz Passed!</h2>
-          <p className="mb-1 text-4xl font-black text-green-400">5 / 5</p>
+          <p className="mb-1 text-4xl font-black text-green-400">
+            {questions.length} / {questions.length}
+          </p>
           <p className="mb-6 text-sm text-slate-400">All correct — marking this card as reviewed…</p>
           <div className="flex items-center justify-center gap-2 text-sm text-slate-500">
             <Loader2 size={14} className="animate-spin" />
@@ -390,9 +408,11 @@ export default function QuizClient({ milestoneId, milestoneTitle, entryCount, re
               <XCircle size={30} />
             </div>
             <h2 className="mb-2 text-2xl font-bold text-slate-100">Almost there</h2>
-            <p className="mb-1 text-4xl font-black text-amber-400">{finalCorrect} / 5</p>
+            <p className="mb-1 text-4xl font-black text-amber-400">
+              {finalCorrect} / {questions.length}
+            </p>
             <p className="mb-8 text-sm text-slate-400">
-              You need all 5 correct to pass. Review your notes and give it another go.
+              You need all {questions.length} correct to pass. Review your notes and give it another go.
             </p>
 
             {/* Per-question breakdown */}

@@ -3,13 +3,15 @@
 import { useEffect, useState } from "react";
 import { X, BookMarked, CheckCircle2, Loader2, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { type LearningPoint } from "@/types";
+import { type LearningPoint, type CoveredPoint, type TranscriptMessage } from "@/types";
 import PointTagSelect from "./PointTagSelect";
 
 export interface SummaryData {
   story:    string;
   takeaway: string;
   title?:   string | null;
+  /** What the session established — saved with the entry and quizzed from later. */
+  covered?: CoveredPoint[] | null;
 }
 
 interface Props {
@@ -18,10 +20,12 @@ interface Props {
   loading:      boolean;
   goalId?:      string;
   milestoneId?: string;
+  /** The session itself, stored alongside the entry so it can be re-read. */
+  transcript?:  TranscriptMessage[];
   onClose:      () => void;
 }
 
-export default function SummaryPanel({ topic, data, loading, goalId, milestoneId, onClose }: Props) {
+export default function SummaryPanel({ topic, data, loading, goalId, milestoneId, transcript, onClose }: Props) {
   const router = useRouter();
   const [saving, setSaving]       = useState(false);
   const [saved, setSaved]         = useState(false);
@@ -58,6 +62,8 @@ export default function SummaryPanel({ topic, data, loading, goalId, milestoneId
           title:       data.title ?? undefined,
           milestoneId,
           pointId,
+          covered:     data.covered ?? null,
+          transcript:  transcript ?? null,
         }),
       });
 

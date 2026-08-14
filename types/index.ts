@@ -171,6 +171,23 @@ export interface Milestone {
 
 export type FactStatus = 'pending' | 'correct' | 'incorrect';
 
+// One substantive thing actually established during a learning session — the
+// claim itself, not a note that the subject came up. `body` narrates the shape
+// of a conversation ("the student explored dot products"); this records what was
+// established ("a feature vector and a weight vector must match in length…").
+// It is what review quizzes are generated from, so a quiz can only ask about
+// material the learner genuinely covered.
+export interface CoveredPoint {
+  point:  string;
+  detail: string;
+}
+
+// A message as stored on an entry's transcript — the session that produced it.
+export interface TranscriptMessage {
+  role:    'user' | 'assistant';
+  content: string;
+}
+
 export interface MilestoneEntry {
   id:           string;
   milestone_id: string;
@@ -187,6 +204,12 @@ export interface MilestoneEntry {
   // Soft-archive: null = active (shown by default), a timestamp = archived
   // (hidden behind "Show archived", restorable). Entries are never hard-deleted.
   archived_at:  string | null;
+  // What the session actually established, and the session itself. Both null on
+  // entries written by hand and on everything saved before migration 034.
+  // `transcript` is optional because the diary list endpoint deliberately does
+  // not fetch it — it is large and nothing in that view reads it.
+  covered:      CoveredPoint[] | null;
+  transcript?:  TranscriptMessage[] | null;
   created_at:   string;
 }
 

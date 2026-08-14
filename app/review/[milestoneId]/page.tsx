@@ -31,11 +31,14 @@ export default async function ReviewQuizPage({ params, searchParams }: Props) {
   // Guard: quiz only makes sense for cards in the review column
   if (milestone.kanban_column !== "review") redirect(returnUrl);
 
-  // Guard: must have at least one diary entry to generate questions
+  // Guard: must have at least one *live* diary entry to generate questions.
+  // Archived entries are excluded here to match the quiz route — counting them
+  // would open the quiz on a card whose generation then fails for lack of notes.
   const { count } = await supabase
     .from("milestone_entries")
     .select("id", { count: "exact", head: true })
-    .eq("milestone_id", milestoneId);
+    .eq("milestone_id", milestoneId)
+    .is("archived_at", null);
 
   if ((count ?? 0) === 0) redirect(returnUrl);
 

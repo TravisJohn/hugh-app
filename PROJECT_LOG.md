@@ -2837,3 +2837,89 @@ the board then reads: the quiz pass path, `sendToReview`, and
 ### Verified
 `tsc --noEmit` clean, lint clean on all five files, 384 tests passing,
 `next build` succeeding.
+
+---
+
+## Review quizzes: ask only what was actually covered (2026-08-15)
+
+### The report
+On the card "Statistics & Algebra Foundations" (track "Linear Regression: Math,
+Python & Parameters") the review quiz asked about material that was never
+discussed in the learning session it was supposed to be testing.
+
+### The diagnosis
+Confirmed against the live row. That card holds one diary entry, 961 characters,
+and this is what it contains: a four-sentence third-person narrative of how the
+session unfolded ("The student began by building foundational intuition around
+mean, variance, and covariance…") plus a one-sentence takeaway.
+
+That is by design — `learn/summarize` asks for "a SHORT narrative (3-4
+sentences) describing how this conversation unfolded". The diary records the
+*shape* of a session, not its content: it notes that dot products came up, never
+what was said about them. The raw conversation is not persisted anywhere; no
+table has ever stored learn-chat messages.
+
+The quiz route then demanded exactly 5 multiple-choice questions from those five
+sentences, told the model to "vary the difficulty and cover different ideas",
+and handed it `Topic: "<milestone title>"` as a subject line. Five substantive
+questions cannot come out of four sentences of narration, so the model did the
+only thing left: it generated textbook questions about the topics the narrative
+named. With a 5/5 pass bar, one invented question failed the whole attempt.
+
+### Part 2 — the quiz can no longer overreach its material
+New `lib/tracker/quizSource.ts` (pure, 27 tests) holds the two rules:
+
+- **Question count follows the material.** `questionTarget()` derives 2–5
+  questions from the source length rather than always demanding 5. The card
+  above yields 2 — about what four sentences can honestly carry.
+- **Every question must cite its source, and the citation is verified.** Each
+  question carries a `source` field that must be a verbatim span of the notes.
+  `keepGroundedQuestions()` normalises punctuation and whitespace, checks the
+  quote really appears, and drops any question that fails. Grounding is enforced
+  in code, not requested in a prompt.
+
+Around those: the milestone title is no longer sent (it was the subject the
+model extrapolated from), the prompt states that returning fewer questions is
+correct and inventing material is not, and if fewer than 2 questions survive
+grounding the route returns "not enough in your notes to build a fair quiz yet"
+instead of a padded one. Archived entries are now excluded from both the quiz
+and the entry-count gate that opens it — the diary hides them, so quizzing on
+them asked about notes the learner could no longer read. The `// Verify
+ownership` block that never compared `user_id` now does; RLS already covered it,
+but the comment claimed a check that wasn't there.
+
+The quiz UI shows each question's supporting line under the explanation ("From
+your notes"), and the score, pass bar and instructions are all derived from the
+question count instead of hardcoded 5s.
+
+### Part 1 — Hugh now keeps what a session established
+Migration `034_entry_content_record.sql` adds two nullable JSONB columns to
+`milestone_entries`:
+
+- `covered` — `[{point, detail}]`, the substantive points a session actually
+  established, written as the claims themselves ("a feature vector and a weight
+  vector must have the same length…") rather than as descriptions of the
+  discussion. `learn/summarize` now produces this alongside the narrative, under
+  instructions to include only what was genuinely stated or worked through.
+- `transcript` — `[{role, content}]`, the session itself, so a past conversation
+  can be re-read rather than only summarised.
+
+`entryMaterial()` makes quizzes prefer `covered` and **exclude** the narrative
+body when it exists — otherwise a question could be "grounded" in a sentence
+that only records that a subject came up. Entries predating the migration, and
+hand-written ones, fall back to the body as before.
+
+Both records are sanitised in `lib/learn/sessionRecord.ts` (10 tests) on the way
+out of the model and again on the way in from the browser: capped in count and
+length, points without substance dropped, empty results stored as NULL. The
+diary list endpoint enumerates its columns instead of `select("*")` so it never
+ships stored transcripts to the browser.
+
+### Verified
+`tsc --noEmit` clean, lint 0 errors, 421 tests passing (was 384), `next build`
+succeeding.
+
+### Outstanding — blocks deployment
+Migration 034 is **not yet applied**; confirmed against the live database. Until
+it is run in the Supabase SQL editor, saving a session summary and generating a
+review quiz will both fail on the missing columns. Apply it before this ships.

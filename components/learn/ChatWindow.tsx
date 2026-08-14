@@ -12,6 +12,7 @@ import { buildTranscriptMarkdown, transcriptFilename } from "@/lib/learn/transcr
 import { isCodeModeRequest, isCodeModeCommand } from "@/lib/askcode/detect";
 import { fenceCode, mergeCodeExample } from "@/lib/askcode/format";
 import type { ChatResponse } from "@/types/askcode";
+import type { TranscriptMessage } from "@/types";
 
 interface Message {
   role:    "user" | "assistant";
@@ -79,6 +80,9 @@ export default function ChatWindow({ topic, goalId, milestoneId, milestoneTitle,
   const [panelOpen, setPanelOpen]     = useState(false);
   const [summary, setSummary]         = useState<SummaryData | null>(null);
   const [summarizing, setSummarizing] = useState(false);
+  // The exact turns the summary was built from, kept so they can be saved with
+  // the entry — a summary describes a session, the transcript is the session.
+  const [summarized, setSummarized]   = useState<TranscriptMessage[]>([]);
 
   // Shared app-wide Pomodoro focus timer. While a focus block is active, the chat
   // route is asked to use the 1-hour prompt-cache TTL (spaced study keeps the
@@ -261,9 +265,10 @@ export default function ChatWindow({ topic, goalId, milestoneId, milestoneTitle,
     setSummary(null);
 
     try {
-      const apiMessages = messages
+      const apiMessages: TranscriptMessage[] = messages
         .filter((_, i) => !(i === 0 && messages[0].role === "assistant"))
         .map(m => ({ role: m.role, content: m.content }));
+      setSummarized(apiMessages);
       const res  = await fetch("/api/learn/summarize", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
@@ -493,6 +498,7 @@ export default function ChatWindow({ topic, goalId, milestoneId, milestoneTitle,
           loading={summarizing}
           goalId={goalId}
           milestoneId={milestoneId}
+          transcript={summarized}
           onClose={() => { setPanelOpen(false); setSummary(null); }}
         />
       )}
