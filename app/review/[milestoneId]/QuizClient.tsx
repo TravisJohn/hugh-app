@@ -3,9 +3,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Loader2, Timer, CheckCircle2, XCircle,
+  Loader2, Timer, CheckCircle2, XCircle,
   Trophy, RefreshCcw, AlertCircle, ChevronRight,
 } from "lucide-react";
+import ExitLink from "@/components/ui/ExitLink";
 
 interface QuizQuestion {
   question:     string;
@@ -143,13 +144,12 @@ export default function QuizClient({ milestoneId, milestoneTitle, entryCount, re
     return (
       <div className="min-h-screen bg-[#0F172A] flex flex-col">
         <header className="shrink-0 flex items-center gap-4 border-b border-slate-800 px-6 py-4">
-          <button
-            onClick={() => router.push(returnUrl)}
+          <ExitLink
+            href={returnUrl}
+            label="Back to board"
+            iconSize={15}
             className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-          >
-            <ArrowLeft size={15} />
-            Back to board
-          </button>
+          />
         </header>
 
         <div className="flex flex-1 items-center justify-center px-6 py-12">
@@ -232,13 +232,12 @@ export default function QuizClient({ milestoneId, milestoneTitle, entryCount, re
       <div className="min-h-screen bg-[#0F172A] flex flex-col">
         <header className="shrink-0 border-b border-slate-800 px-6 py-4">
           <div className="mx-auto max-w-2xl flex items-center justify-between">
-            <button
-              onClick={() => { clearTimer(); router.push(returnUrl); }}
+            <ExitLink
+              href={returnUrl}
+              label="Quit"
+              onNavigate={clearTimer}
               className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300 transition-colors"
-            >
-              <ArrowLeft size={14} />
-              Quit
-            </button>
+            />
             <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">
               Question {currentIdx + 1} / {questions.length}
             </span>
@@ -377,13 +376,11 @@ export default function QuizClient({ milestoneId, milestoneTitle, entryCount, re
       <div className="min-h-screen bg-[#0F172A] flex flex-col">
         <header className="shrink-0 border-b border-slate-800 px-6 py-4">
           <div className="mx-auto max-w-2xl">
-            <button
-              onClick={() => router.push(returnUrl)}
+            <ExitLink
+              href={returnUrl}
+              label="Back to board"
               className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300 transition-colors"
-            >
-              <ArrowLeft size={14} />
-              Back to board
-            </button>
+            />
           </div>
         </header>
 
@@ -416,12 +413,11 @@ export default function QuizClient({ milestoneId, milestoneTitle, entryCount, re
             </div>
 
             <div className="flex gap-3">
-              <button
-                onClick={() => router.push(returnUrl)}
-                className="flex-1 rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm font-semibold text-slate-300 hover:bg-slate-700 transition-colors"
-              >
-                Back to board
-              </button>
+              <ExitLink
+                href={returnUrl}
+                label="Back to board"
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm font-semibold text-slate-300 hover:bg-slate-700 transition-colors"
+              />
               <button
                 onClick={handleStart}
                 className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-3 text-sm font-semibold text-white hover:bg-amber-500 transition-colors"
