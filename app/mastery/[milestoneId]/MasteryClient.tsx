@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Briefcase, Users, MessageCircle, GraduationCap,
+  Briefcase, Users, MessageCircle, GraduationCap,
   Mic, MicOff, Loader2, Trophy, RotateCcw,
 } from "lucide-react";
+import ExitLink from "@/components/ui/ExitLink";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 
@@ -229,10 +230,11 @@ export default function MasteryClient({ milestoneId, milestoneTitle, personaId, 
   }
 
   // ── Clean exit: stop audio/speech before navigating ──────────────────────
-  function handleExit() {
+  // Runs as the onNavigate of an <ExitLink> (see components/ui/ExitLink), so the
+  // teardown happens while the prefetched board is already loading.
+  function stopPlayback() {
     audio.stop();
     speech.reset();
-    router.push(boardUrl);
   }
 
   function navigateBackMastered() {
@@ -295,13 +297,12 @@ export default function MasteryClient({ milestoneId, milestoneTitle, personaId, 
 
       {/* Header */}
       <header className="relative z-10 shrink-0 flex items-center justify-between border-b border-slate-800 px-6 py-4">
-        <button
-          onClick={handleExit}
+        <ExitLink
+          href={boardUrl}
+          label="Back"
+          onNavigate={stopPlayback}
           className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300 transition-colors"
-        >
-          <ArrowLeft size={14} />
-          Back
-        </button>
+        />
         <div className="text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Mastery Session</p>
           <p className="mt-0.5 max-w-[280px] truncate text-sm font-semibold text-slate-200">{milestoneTitle}</p>
@@ -507,12 +508,14 @@ export default function MasteryClient({ milestoneId, milestoneTitle, personaId, 
               </div>
 
               {/* End session — always visible during active conversation */}
-              <button
-                onClick={handleExit}
-                className="text-xs text-slate-700 hover:text-slate-500 transition-colors"
-              >
-                End session &amp; take a break
-              </button>
+              <ExitLink
+                href={boardUrl}
+                label="End session & take a break"
+                onNavigate={stopPlayback}
+                showIcon={false}
+                iconSize={12}
+                className="inline-flex items-center gap-1.5 text-xs text-slate-700 hover:text-slate-500 transition-colors"
+              />
 
             </div>
           </div>

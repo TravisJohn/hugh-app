@@ -2788,3 +2788,52 @@ succeeding.
 is missing there, the graph renders but the floating assistant returns "The
 architecture assistant isn't configured on this deployment" — the route degrades
 with a message rather than failing.
+
+---
+
+## Fix: "Back to board" felt dead after failing a review quiz (2026-08-15)
+
+### The report
+After failing a review quiz, the "Back to board" button on the results screen
+did nothing; the "Back to board" link in the header worked.
+
+### The diagnosis
+Both controls ran the identical call — `router.push(returnUrl)` — so no
+difference existed between them in code. The real fault was the navigation
+itself. `/tracker/[trackId]` is a dynamic server route that awaits
+`auth.getUser()`, the profile lookup, and the track + milestone queries before
+it can stream anything, and the app had no `loading.tsx` in any route. A soft
+navigation therefore left the failed-quiz screen on display, unchanged and with
+no indicator, for the whole server round-trip. A second attempt lands instantly
+because the RSC payload is then cached — which is why one control felt broken
+and the other felt fine.
+
+### The fix
+Two parts, both aimed at the round-trip rather than the button wiring:
+
+- `app/tracker/[trackId]/loading.tsx` — a card-shaped Suspense fallback that
+  mirrors the board's header and four columns, so navigating to a board shows
+  the board's own shell immediately instead of the previous screen. Chosen over
+  a centred spinner so nothing shifts when the real data arrives.
+- `components/ui/ExitLink.tsx` — a shared primitive for "leave this activity and
+  go back to a board". It renders a real `<Link>`, so the destination is
+  prefetched and navigation still happens if hydration is late or a handler
+  throws, and `useLinkStatus` swaps the arrow for a spinner the moment it is
+  clicked. `onNavigate` carries synchronous teardown only (stop audio, clear a
+  timer, close a socket).
+
+Every silent `router.push` exit now uses it:
+
+| Screen | Controls converted | Teardown via `onNavigate` |
+|---|---|---|
+| `QuizClient` | idle header, in-quiz Quit, results header, results button | `clearTimer` |
+| `MasteryRealtimeClient` | header Back, recap "Back to board" | `disconnect` |
+| `MasteryClient` | header Back, "End session & take a break" | `audio.stop()` + `speech.reset()` |
+
+`router.push` deliberately remains where navigation must follow an async write
+the board then reads: the quiz pass path, `sendToReview`, and
+`navigateBackMastered`. Each of those already renders its own pending state.
+
+### Verified
+`tsc --noEmit` clean, lint clean on all five files, 384 tests passing,
+`next build` succeeding.

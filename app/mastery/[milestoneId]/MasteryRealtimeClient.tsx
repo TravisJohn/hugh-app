@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Mic, Loader2, RotateCcw, AlertTriangle, Undo2, Sparkles,
+  Mic, Loader2, RotateCcw, AlertTriangle, Undo2, Sparkles,
 } from "lucide-react";
+import ExitLink from "@/components/ui/ExitLink";
 import { useMasteryRealtime } from "@/hooks/useMasteryRealtime";
 import type { MasteryRealtimeStatus } from "@/types";
 import SummaryPanel from "./SummaryPanel";
@@ -92,11 +93,9 @@ export default function MasteryRealtimeClient({
     // On failure the hook sets status='error'; the live pane renders the banner.
   }
 
-  function handleExit() {
-    disconnect();
-    router.push(boardUrl);
-  }
-
+  // Leaving is an <ExitLink> (see components/ui/ExitLink) — `disconnect` runs as
+  // its onNavigate. This one still needs router.push: the board reads the column
+  // change, so the PATCH has to land before we navigate.
   async function sendToReview() {
     setSendingReview(true);
     try {
@@ -121,10 +120,12 @@ export default function MasteryRealtimeClient({
 
       {/* Header */}
       <header className="relative z-10 shrink-0 flex items-center justify-between border-b border-slate-800 px-6 py-4">
-        <button onClick={handleExit} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300 transition-colors">
-          <ArrowLeft size={14} />
-          Back
-        </button>
+        <ExitLink
+          href={boardUrl}
+          label="Back"
+          onNavigate={disconnect}
+          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300 transition-colors"
+        />
         <div className="text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">Reflect · Live</p>
           <p className="mt-0.5 max-w-[280px] truncate text-sm font-semibold text-slate-200">{milestoneTitle}</p>
@@ -237,12 +238,12 @@ export default function MasteryRealtimeClient({
                 </p>
 
                 <div className="space-y-2">
-                  <button
-                    onClick={handleExit}
+                  <ExitLink
+                    href={boardUrl}
+                    label="Back to board"
+                    onNavigate={disconnect}
                     className="w-full flex items-center justify-center gap-2 rounded-2xl bg-slate-700 py-3.5 text-sm font-bold text-white hover:bg-slate-600 transition-colors"
-                  >
-                    Back to board
-                  </button>
+                  />
                   <button
                     onClick={() => void sendToReview()}
                     disabled={sendingReview}
