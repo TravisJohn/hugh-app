@@ -19,7 +19,7 @@ import type { CoveredPoint } from "@/types";
 export interface DiaryEntry {
   title:    string | null;
   body:     string | null;
-  /** What the session established, when the entry has it (migration 034 on). */
+  /** What the session established, when the entry has it (migration 035 on). */
   covered?: CoveredPoint[] | null;
 }
 

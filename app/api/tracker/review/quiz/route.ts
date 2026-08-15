@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
   // Archived entries are hidden from the learner's diary, so they must not be
   // quizzed either — otherwise the quiz asks about notes they cannot re-read.
   // `covered` is what the session actually established; `body` is the narrative
-  // fallback for entries written before migration 034 or written by hand.
+  // fallback for entries written before migration 035 or written by hand.
   const { data: entries } = await supabase
     .from("milestone_entries")
     .select("title, body, covered")

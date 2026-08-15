@@ -1,4 +1,5 @@
 -- ── Diary entries: keep what was actually covered ────────────────────────
+-- (Numbered 035: 034 was already taken by 034_notes_grouping.sql.)
 -- `body` is a 3-4 sentence narrative of how a session unfolded ("the student
 -- explored dot products…"). It records the shape of a conversation, not its
 -- content, which is why review quizzes generated from it drifted into material

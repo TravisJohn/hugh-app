@@ -2893,7 +2893,7 @@ your notes"), and the score, pass bar and instructions are all derived from the
 question count instead of hardcoded 5s.
 
 ### Part 1 — Hugh now keeps what a session established
-Migration `034_entry_content_record.sql` adds two nullable JSONB columns to
+Migration `035_entry_content_record.sql` adds two nullable JSONB columns to
 `milestone_entries`:
 
 - `covered` — `[{point, detail}]`, the substantive points a session actually
@@ -2920,6 +2920,16 @@ ships stored transcripts to the browser.
 succeeding.
 
 ### Outstanding — blocks deployment
-Migration 034 is **not yet applied**; confirmed against the live database. Until
-it is run in the Supabase SQL editor, saving a session summary and generating a
-review quiz will both fail on the missing columns. Apply it before this ships.
+Migration 035 is **not yet applied**; confirmed against the live database (the
+probe returns Postgres `42703`, not PostgREST's `PGRST204`, so it is a genuinely
+missing column and not a stale schema cache). Until it is run in the Supabase SQL
+editor, saving a session summary and generating a review quiz will both fail on
+the missing columns. Apply it before this ships.
+
+This file was first numbered 034, which collided with the already-applied
+`034_notes_grouping.sql` — the next number was taken from a grep of the
+migrations rather than a listing of them. The collision sent the wrong file to
+the SQL editor, so nothing landed. Re-running notes grouping was harmless (every
+statement is `IF NOT EXISTS`), with one caveat: its backfill re-seeds `position`
+for any `note_images` row sitting at 0, so a manually reordered screenshot strip
+may have snapped back to upload order.

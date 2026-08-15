@@ -205,7 +205,7 @@ export interface MilestoneEntry {
   // (hidden behind "Show archived", restorable). Entries are never hard-deleted.
   archived_at:  string | null;
   // What the session actually established, and the session itself. Both null on
-  // entries written by hand and on everything saved before migration 034.
+  // entries written by hand and on everything saved before migration 035.
   // `transcript` is optional because the diary list endpoint deliberately does
   // not fetch it — it is large and nothing in that view reads it.
   covered:      CoveredPoint[] | null;
