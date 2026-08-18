@@ -3066,3 +3066,46 @@ Rewritten against the actual repo rather than from memory:
 
 README.md was checked and needed no changes — it was already accurate on Next 16,
 OpenAI and the learning-platform framing.
+
+## DrillMock's hook dependencies, and a bug that wasn't (2026-08-19)
+
+Closed out the last item from the health pass: the six
+`react-hooks/exhaustive-deps` warnings in `components/code/DrillMock.tsx`, one of
+which had been flagged as a suspected stale-`round` timing bug.
+
+**It was not a bug.** Recording why, because the reasoning is not visible in the
+code and the next person will otherwise re-derive it:
+
+- `content` is set exactly once in `DrillLoader` (guarded by a ref) and held in
+  state. So `DRILL_CELLS`, `SCENARIO`, `cumulative` and `timeFor` are
+  referentially stable for the entire life of a drill — four of the five
+  "missing" dependencies on `runCell` were structurally incapable of going stale.
+- `round` genuinely was absent from `runCell`'s array. But the drill has exactly
+  two rounds (`owned = allPassed && round === 2` ends it), and every transition
+  flips `showRefs`, which *is* a dependency — so `runCell` was always rebuilt
+  with a fresh `round` on the real path. The countdown effect keyed on
+  `[active, round]` also re-syncs `timeLeft` on every cell change, which masks
+  any stale write anyway. Worst case was a sub-frame flicker on a contrived path
+  (toggle references back on during round 2, then restart).
+- Also worth knowing: the speed meter only renders when `isActive && !showRefs`,
+  so the countdown isn't even visible during round 1.
+
+The earlier report overstated this. Calling it a probable bug was wrong; the
+dependency arrays were dishonest, which is a smaller and different problem.
+
+Fixed properly rather than suppressed. `bootPackages` was the one dependency
+that genuinely had to be omitted — the `?? []` fallback and the `["pandas"]`
+literal built a fresh array every render, so naming it would have re-initialised
+Pyodide in a loop. Memoising it makes it a safe dependency, and the remaining
+arrays now name what they actually use. Widening `runCell` costs nothing: its
+identity churn is already absorbed by `runCellRef`, and its only other consumer
+is an inline `onClick` rebuilt every render regardless. **No `eslint-disable` was
+added** — nothing here needed hiding.
+
+Verified in a real browser against a production build, driving the sample drill
+as the seeded test user: Pyodide boots once and does not re-init, the speed meter
+counts down, a submitted cell is accepted, and the next cell's clock re-arms at
+100% and ticks. No console or page errors.
+
+Repo is now at 0 lint warnings and 0 errors, 436 tests green, clean tsc, clean
+production build, clean working tree, `main` level with `origin/main`.
