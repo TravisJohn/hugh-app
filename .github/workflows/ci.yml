@@ -1,0 +1,62 @@
+name: CI
+
+# The release gate specified in DEPLOYMENT_READINESS_AUDIT.md ("Proposed CI
+# release gate"). Every step here passes locally; this makes that continuous
+# rather than a thing someone remembers to check.
+#
+# Deliberately needs NO secrets. The production build was made independent of
+# environment variables so this workflow can run on a bare checkout, including
+# from a fork. If a step here ever starts needing a key, fix the code rather
+# than adding the key.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A newer push to the same branch supersedes an in-flight run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: lint · typecheck · test · audit · build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 20 is the floor declared in package.json engines (and Next's own
+      # minimum). Running the gate here proves that claim stays honest, since
+      # local development happens on a much newer Node.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+
+      - name: Install (locked)
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit --pretty false
+
+      - name: Unit tests
+        run: npm test
+
+      # Production dependencies only. Dev-only advisories should not gate a
+      # release, but a high-severity issue in shipped code should.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      # Runs the architecture-dashboard prebuild too, so that stays wired up.
+      - name: Production build
+        run: npm run build
