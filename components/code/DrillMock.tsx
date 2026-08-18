@@ -284,7 +284,13 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
   const isPandas = lang === "python" && content.dataKind === "dataframe"; // DataFrame packs
   // Which Pyodide packages to load during boot (outside the per-run timeout) —
   // a pack can ask for more than pandas (e.g. scikit-learn for the ML packs).
-  const bootPackages = content.preloadPackages ?? (isPandas ? ["pandas"] : []);
+  // Memoised so its identity is stable: the `?? []` fallback and the ["pandas"]
+  // literal would otherwise build a fresh array on every render, and the boot
+  // effect below would tear down and re-init the runtime each time.
+  const bootPackages = useMemo(
+    () => content.preloadPackages ?? (isPandas ? ["pandas"] : []),
+    [content.preloadPackages, isPandas],
+  );
   const bootLabel = isSql ? "SQL" : bootPackages.length ? `Python + ${bootPackages.join(" + ")}` : "Python";
 
   const emptyCells = useCallback(
@@ -407,7 +413,7 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
       .then(() => setReady(true))
       .catch(e => setInitErr(String(e?.message ?? e)));
     return () => r.destroy();
-  }, [isSql, isPandas]);
+  }, [isSql, isPandas, bootPackages]);
 
   // Precompute each cell's answer once Python is up, by running the reference
   // solution and printing its result variable. Deterministic, off the critical
@@ -445,7 +451,7 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
   // decrements it every second — so this deliberately re-syncs it on the two
   // events that should restart the clock.
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { setTimeLeft(timeFor(active, round)); }, [active, round]);
+  useEffect(() => { setTimeLeft(timeFor(active, round)); }, [active, round, timeFor]);
 
   // Ran out of time on the active cell → flag it (red) so it's clear which cells
   // weren't done in time. Never blocks; passing it still turns it green.
@@ -481,7 +487,7 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
     if (timeLeft > 0 && timeLeft <= Math.ceil(timeFor(active, round) * 0.3) && !st.usedRef) {
       revealRef(active);
     }
-  }, [timeLeft, started, active, round, showRefs, revealRef]);
+  }, [timeLeft, started, active, round, showRefs, revealRef, DRILL_CELLS, timeFor]);
 
   const setCode = useCallback((i: number, code: string) => {
     setCells(prev => prev.map((c, idx) => (idx === i ? { ...c, code } : c)));
@@ -529,7 +535,7 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
     } else if (snap[i].attempts + 1 >= 2 && !showRefs) {
       revealRef(i);
     }
-  }, [ready, combo, showRefs, audio, revealRef, packId]);
+  }, [ready, combo, showRefs, audio, revealRef, packId, cumulative, SCENARIO.setupCode, DRILL_CELLS, timeFor, round]);
 
   // Stable per-cell handlers so the memoized CmEditors don't re-render en masse.
   // runCell's identity changes with combo/showRefs, so call it through a ref to
@@ -538,11 +544,11 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
   useEffect(() => { runCellRef.current = runCell; }, [runCell]);
   const codeHandlers = useMemo(
     () => DRILL_CELLS.map((_, i) => (v: string) => setCode(i, v)),
-    [DRILL_CELLS.length, setCode],
+    [DRILL_CELLS, setCode],
   );
   const runHandlers = useMemo(
     () => DRILL_CELLS.map((_, i) => () => { void runCellRef.current(i); }),
-    [DRILL_CELLS.length],
+    [DRILL_CELLS],
   );
 
   function onType(e: React.KeyboardEvent) {
