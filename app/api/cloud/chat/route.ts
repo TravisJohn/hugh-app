@@ -12,6 +12,10 @@ import { GROUP_LABELS } from "@/types/cloud";
 // answers stay grounded and on-domain rather than free-associating.
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Model for this route — see CLAUDE.md "Model Selection". Kept in one place so
+// the API call and the usage log can never disagree about what was billed.
+const MODEL = "claude-haiku-4-5";
+
 interface Msg { role: "user" | "assistant"; content: string }
 
 const BASE_SYSTEM = `You are Hugh, a friendly, concise cloud-skills tutor for a data/analytics learner.
@@ -77,13 +81,13 @@ export async function POST(request: NextRequest) {
 
   try {
     const res = await anthropic.messages.create({
-      model: "claude-haiku-4-5",
+      model: MODEL,
       max_tokens: 600,
       system: `${BASE_SYSTEM}\n\n${serviceContext(service)}`,
       messages,
     });
     const reply = res.content[0]?.type === "text" ? res.content[0].text : "";
-    void logUsage({ userId, feature: "cloud/chat", tokensIn: res.usage.input_tokens, tokensOut: res.usage.output_tokens });
+    void logUsage({ userId, model: MODEL, feature: "cloud/chat", tokensIn: res.usage.input_tokens, tokensOut: res.usage.output_tokens });
     return NextResponse.json({ reply: reply || "Sorry — please try again." });
   } catch (err) {
     console.error("[cloud/chat] Claude error:", err);

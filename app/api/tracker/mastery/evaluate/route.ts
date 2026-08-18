@@ -22,6 +22,10 @@ export const dynamic = "force-dynamic";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Model for this route — see CLAUDE.md "Model Selection". Kept in one place so
+// the API call and the usage log can never disagree about what was billed.
+const MODEL = "claude-sonnet-4-6";
+
 const VALID_END_REASONS: ReadonlySet<string> = new Set<MasteryEndReason>([
   "coach_concluded", "max_followups", "max_duration", "inactivity", "user_ended",
 ]);
@@ -110,13 +114,14 @@ export async function POST(request: NextRequest) {
   let raw: string;
   try {
     const completion = await anthropic.messages.create({
-      model:      "claude-sonnet-4-6", // grounded scoring — quality matters
+      model:      MODEL, // grounded scoring — quality matters
       max_tokens: 700,
       messages:   [{ role: "user", content: prompt }],
     });
     raw = completion.content[0].type === "text" ? completion.content[0].text : "";
     void logUsage({
       userId,
+      model:     MODEL,
       feature:   "mastery/evaluate",
       tokensIn:  completion.usage.input_tokens,
       tokensOut: completion.usage.output_tokens,

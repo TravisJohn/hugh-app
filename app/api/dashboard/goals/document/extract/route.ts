@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { createClient } from "@/lib/supabase/server";
-import { enforceUsageGate } from "@/lib/usage";
+import { enforceUsageGate, logUsage } from "@/lib/usage";
 import {
   documentTopicExtractionPrompt,
   parseDocumentTopicExtraction,
@@ -18,6 +18,10 @@ import { ALLOWED_DOCUMENT_MIME, MAX_DOCUMENT_BYTES } from "@/lib/documents/limit
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Model for this route — see CLAUDE.md "Model Selection". Kept in one place so
+// the API call and the usage log can never disagree about what was billed.
+const MODEL = "claude-sonnet-4-6";
+
 // First half of the document-upload path (PRD-course-from-document.md §7.1):
 // upload → extract text → derive a candidate topic → gate it → create the
 // goal in 'awaiting_approval' so the learner can review before the second
@@ -25,17 +29,29 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // (topic extraction, then the domain gate) comfortably fit a normal request —
 // no after() needed here, unlike generateTrack's milestone build.
 
-async function extractCandidateTopic(documentText: string): Promise<DocumentTopicExtraction> {
+/**
+ * Extraction has no user context of its own, so it hands the token counts back
+ * to the POST handler, which owns the userId and does the logging. Counts
+ * accumulate across retries — a discarded attempt still costs money.
+ */
+async function extractCandidateTopic(
+  documentText: string,
+): Promise<{ candidate: DocumentTopicExtraction; tokensIn: number; tokensOut: number }> {
   let lastErr: unknown = null;
+  let tokensIn  = 0;
+  let tokensOut = 0;
+
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const msg = await anthropic.messages.create({
-        model:      "claude-sonnet-4-6",
+        model:      MODEL,
         max_tokens: 600,
         messages:   [{ role: "user", content: documentTopicExtractionPrompt(documentText) }],
       });
+      tokensIn  += msg.usage.input_tokens;
+      tokensOut += msg.usage.output_tokens;
       const text = msg.content[0]?.type === "text" ? msg.content[0].text : "";
-      return parseDocumentTopicExtraction(text);
+      return { candidate: parseDocumentTopicExtraction(text), tokensIn, tokensOut };
     } catch (err) {
       lastErr = err;
     }
@@ -88,7 +104,15 @@ export async function POST(request: NextRequest) {
 
   let candidate: DocumentTopicExtraction;
   try {
-    candidate = await extractCandidateTopic(extracted.text);
+    const extraction = await extractCandidateTopic(extracted.text);
+    candidate = extraction.candidate;
+    void logUsage({
+      userId,
+      model:     MODEL,
+      feature:   "dashboard/document-extract",
+      tokensIn:  extraction.tokensIn,
+      tokensOut: extraction.tokensOut,
+    });
   } catch (err) {
     console.error("[goals/document/extract] topic extraction failed:", err);
     return NextResponse.json({ error: "Couldn't extract a topic from that document." }, { status: 502 });

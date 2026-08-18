@@ -11,6 +11,10 @@ import {
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Model for this route — see CLAUDE.md "Model Selection". Kept in one place so
+// the API call and the usage log can never disagree about what was billed.
+const MODEL = "claude-sonnet-4-6";
+
 export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -94,7 +98,7 @@ Return ONLY a valid JSON array — no markdown, no commentary:
 
   try {
     const response = await anthropic.messages.create({
-      model:      "claude-sonnet-4-6",
+      model:      MODEL,
       max_tokens: 3072,
       messages:   [{ role: "user", content: prompt }],
     });
@@ -107,7 +111,7 @@ Return ONLY a valid JSON array — no markdown, no commentary:
 
     const { kept, malformed, ungrounded } = keepGroundedQuestions(parsed, entriesText, target);
 
-    void logUsage({ userId, feature: "review/quiz", tokensIn: response.usage.input_tokens, tokensOut: response.usage.output_tokens });
+    void logUsage({ userId, model: MODEL, feature: "review/quiz", tokensIn: response.usage.input_tokens, tokensOut: response.usage.output_tokens });
 
     if (malformed || ungrounded) {
       console.warn(

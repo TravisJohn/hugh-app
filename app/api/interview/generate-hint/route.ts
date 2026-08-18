@@ -2,11 +2,16 @@ import { type NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
-import { enforceUsageGate } from "@/lib/usage";
+import { enforceUsageGate, logUsage } from "@/lib/usage";
 import { ROOM_CONTEXT, hintGenerationPrompt, parseClaudeJson, stripEmphasis } from "@/lib/claude/prompts";
 import { isPresetRoom, type Room } from "@/types";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// Single-sentence hint (short, low-stakes gen) — Haiku is sufficient and cheaper.
+// See CLAUDE.md "Model Selection". Kept in one place so the API call and
+// the usage log can never disagree about what was billed.
+const MODEL = "claude-haiku-4-5";
 
 export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
@@ -55,8 +60,7 @@ export async function POST(request: NextRequest) {
   let hint: string;
   try {
     const res = await anthropic.messages.create({
-      // Single-sentence hint (short, low-stakes gen) — Haiku is sufficient and cheaper.
-      model: "claude-haiku-4-5",
+      model: MODEL,
       max_tokens: 128,
       messages: [
         {
@@ -64,6 +68,14 @@ export async function POST(request: NextRequest) {
           content: hintGenerationPrompt(question, topicContext),
         },
       ],
+    });
+
+    void logUsage({
+      userId,
+      model:     MODEL,
+      feature:   "interview/hint",
+      tokensIn:  res.usage.input_tokens,
+      tokensOut: res.usage.output_tokens,
     });
 
     const text = res.content[0].type === "text" ? res.content[0].text : "";

@@ -4,9 +4,14 @@ import { backlogPriorityPrompt, parseClaudeJson } from "@/lib/claude/prompts";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Model for this call — see CLAUDE.md "Model Selection". Returned to the
+// caller alongside the token counts so it can log what was actually billed.
+const MODEL = "claude-sonnet-4-6";
+
 export interface PriorityUsage {
   inputTokens:  number;
   outputTokens: number;
+  model:        string;
 }
 
 /**
@@ -36,7 +41,7 @@ export async function assignBacklogPriority(
   const items = milestones.map((m, i) => ({ n: i + 1, title: m.title, summary: m.summary }));
 
   const res = await anthropic.messages.create({
-    model:      "claude-sonnet-4-6",
+    model:      MODEL,
     max_tokens: 1200,
     messages:   [{ role: "user", content: backlogPriorityPrompt(topic, items) }],
   });
@@ -66,5 +71,5 @@ export async function assignBacklogPriority(
       .eq("id", a.id)
   ));
 
-  return { inputTokens: res.usage.input_tokens, outputTokens: res.usage.output_tokens };
+  return { inputTokens: res.usage.input_tokens, outputTokens: res.usage.output_tokens, model: MODEL };
 }

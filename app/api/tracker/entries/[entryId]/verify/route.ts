@@ -7,6 +7,10 @@ import { checkUsageAllowed, logUsage } from "@/lib/usage";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Model for this route — see CLAUDE.md "Model Selection". Kept in one place so
+// the API call and the usage log can never disagree about what was billed.
+const MODEL = "claude-sonnet-4-6";
+
 interface FactCheckResult {
   status:     "correct" | "incorrect";
   correction: string | null;
@@ -57,7 +61,7 @@ export async function POST(
 
   try {
     const res = await anthropic.messages.create({
-      model:      "claude-sonnet-4-6",
+      model:      MODEL,
       max_tokens: 700,
       messages:   [{ role: "user", content: factCheckEntryPrompt(topic, title, entry.body as string) }],
     });
@@ -84,7 +88,7 @@ export async function POST(
       .select("*")
       .single();
 
-    void logUsage({ userId, feature: "tracker/verify", tokensIn: res.usage.input_tokens, tokensOut: res.usage.output_tokens });
+    void logUsage({ userId, model: MODEL, feature: "tracker/verify", tokensIn: res.usage.input_tokens, tokensOut: res.usage.output_tokens });
     return NextResponse.json({ entry: updated });
   } catch (err) {
     console.error("[tracker/verify] error:", err);

@@ -9,6 +9,10 @@ import { type LearningPoint, type PointStatus } from "@/types";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Model for this route — see CLAUDE.md "Model Selection". Kept in one place so
+// the API call and the usage log can never disagree about what was billed.
+const MODEL = "claude-sonnet-4-6";
+
 interface MilestoneRow {
   id:              string;
   title:           string;
@@ -43,7 +47,7 @@ async function ensureLearningPoints(
 
   const topic = ms.tracks?.topic_description ?? ms.title;
   const res = await anthropic.messages.create({
-    model:      "claude-sonnet-4-6",
+    model:      MODEL,
     max_tokens: 500,
     messages:   [{ role: "user", content: learningPointsPrompt(topic, ms.title, ms.summary) }],
   });
@@ -54,7 +58,7 @@ async function ensureLearningPoints(
     .map((text, i) => ({ id: `p${i + 1}`, text: text.trim() }));
 
   await supabase.from("milestones").update({ learning_points: points }).eq("id", ms.id);
-  void logUsage({ userId, feature: "tracker/points", tokensIn: res.usage.input_tokens, tokensOut: res.usage.output_tokens });
+  void logUsage({ userId, model: MODEL, feature: "tracker/points", tokensIn: res.usage.input_tokens, tokensOut: res.usage.output_tokens });
   return points;
 }
 

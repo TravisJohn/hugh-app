@@ -11,22 +11,38 @@ import { type KanbanColumn } from "@/types";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Model for track generation — see CLAUDE.md "Model Selection". Kept in one
+// place so the API call and the usage log can never disagree about billing.
+const MODEL = "claude-sonnet-4-6";
+
+/** Tokens spent generating a track, so the caller can log them. */
+interface GenerationUsage {
+  inputTokens:  number;
+  outputTokens: number;
+}
+
 // Retries once on a malformed/unparseable response — mirrors the retry
 // pattern already used for the refine/classify-topic/domain-gate calls.
+// Token counts accumulate across attempts: a discarded first attempt still
+// costs money, so it must still be billed to the user.
 async function generateMilestones(
   topic:        string,
   documentText?: string,
-): Promise<MilestoneGenerationResult> {
+): Promise<{ parsed: MilestoneGenerationResult; usage: GenerationUsage }> {
   let lastErr: unknown = null;
+  const usage: GenerationUsage = { inputTokens: 0, outputTokens: 0 };
+
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const res = await anthropic.messages.create({
-        model:      "claude-sonnet-4-6",
+        model:      MODEL,
         max_tokens: 2048,
         messages:   [{ role: "user", content: milestoneGenerationPrompt(topic, documentText) }],
       });
+      usage.inputTokens  += res.usage.input_tokens;
+      usage.outputTokens += res.usage.output_tokens;
       const raw = res.content[0]?.type === "text" ? res.content[0].text : "{}";
-      return parseMilestoneGeneration(raw);
+      return { parsed: parseMilestoneGeneration(raw), usage };
     } catch (err) {
       lastErr = err;
     }
@@ -41,7 +57,17 @@ export async function generateTrack(
   goalId?:       string,
   documentText?: string,
 ): Promise<string> {
-  const parsed = await generateMilestones(topic, documentText);
+  const { parsed, usage: genUsage } = await generateMilestones(topic, documentText);
+
+  // Track generation is the single largest Claude call in the product. Log it
+  // as soon as it returns, so the spend is recorded even if the DB writes fail.
+  void logUsage({
+    userId,
+    model:     MODEL,
+    feature:   "tracker/generate",
+    tokensIn:  genUsage.inputTokens,
+    tokensOut: genUsage.outputTokens,
+  });
 
   const trackRow: Record<string, unknown> = {
     user_id:           userId,
@@ -78,7 +104,7 @@ export async function generateTrack(
   try {
     const usage = await assignBacklogPriority(supabase, track.id as string, topic);
     if (usage) {
-      void logUsage({ userId, feature: "tracker/priority", tokensIn: usage.inputTokens, tokensOut: usage.outputTokens });
+      void logUsage({ userId, model: usage.model, feature: "tracker/priority", tokensIn: usage.inputTokens, tokensOut: usage.outputTokens });
     }
   } catch (err) {
     console.error("[generateTrack] backlog priority ranking failed:", err);

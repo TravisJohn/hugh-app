@@ -3,11 +3,15 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
-import { enforceUsageGate } from "@/lib/usage";
+import { enforceUsageGate, logUsage } from "@/lib/usage";
 import { refineTopicPrompt, parseClaudeJson } from "@/lib/claude/prompts";
 import { generateTrack } from "@/lib/tracker/generate";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// Model for this route — see CLAUDE.md "Model Selection". Kept in one place so
+// the API call and the usage log can never disagree about what was billed.
+const MODEL = "claude-sonnet-4-6";
 
 // Track generation runs post-response via `after()` and chains two Claude
 // calls (milestones + backlog priority), so the invocation must outlive the
@@ -49,9 +53,16 @@ export async function POST(request: NextRequest) {
     try {
       const prompt = refineTopicPrompt(topic, answers);
       const msg    = await anthropic.messages.create({
-        model:      "claude-sonnet-4-6",
+        model:      MODEL,
         max_tokens: 600,
         messages:   [{ role: "user", content: prompt }],
+      });
+      void logUsage({
+        userId,
+        model:     MODEL,
+        feature:   "dashboard/refine-topic",
+        tokensIn:  msg.usage.input_tokens,
+        tokensOut: msg.usage.output_tokens,
       });
       const text   = msg.content[0]?.type === "text" ? msg.content[0].text : "";
       const result = parseClaudeJson<{ refinedTopic: string; tips: string[] }>(text);

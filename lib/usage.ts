@@ -1,6 +1,16 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { isKnownModel } from "@/lib/pricing";
+
+// Pricing lives in lib/pricing.ts (pure, unit-tested). Re-exported here so the
+// many existing `from "@/lib/usage"` importers keep working.
+export { estimateCost, totalCost, MODEL_RATES, rateFor } from "@/lib/pricing";
+export type { ModelRate, PricedUsageRow } from "@/lib/pricing";
+
+// Sentinel userId used by the interview routes in local dev — not a real
+// auth.users row, so usage rows are never written for it.
+const DEV_BYPASS_USER_ID = "dev-test-bypass";
 
 // Free users get 100k combined tokens per calendar month (enforced).
 export const DEFAULT_MONTHLY_TOKEN_LIMIT = 100_000;
@@ -9,15 +19,6 @@ export const DEFAULT_MONTHLY_TOKEN_LIMIT = 100_000;
 // currently display-only (we don't hard-block paying users in checkUsageAllowed).
 export const PRO_MONTHLY_TOKEN_LIMIT = 1_000_000;
 
-// Approximate cost constants (USD)
-const COST_PER_INPUT_TOKEN  = 3    / 1_000_000; // claude-sonnet-4-6 input
-const COST_PER_OUTPUT_TOKEN = 15   / 1_000_000; // claude-sonnet-4-6 output
-const COST_PER_TTS_CHAR     = 0.30 / 1_000;     // ElevenLabs ~Creator plan
-
-export function estimateCost(tokensIn: number, tokensOut: number, ttsChars: number): number {
-  return (tokensIn * COST_PER_INPUT_TOKEN) + (tokensOut * COST_PER_OUTPUT_TOKEN) + (ttsChars * COST_PER_TTS_CHAR);
-}
-
 function startOfMonth(): string {
   const d = new Date();
   d.setDate(1);
@@ -25,28 +26,59 @@ function startOfMonth(): string {
   return d.toISOString();
 }
 
+/**
+ * Record one billable call. `model` is required for any call that spent tokens
+ * so the row can be priced at that model's real rate (migration 036); TTS-only
+ * rows legitimately omit it.
+ */
 export async function logUsage({
   userId,
   feature,
+  model,
   tokensIn  = 0,
   tokensOut = 0,
   ttsChars  = 0,
 }: {
   userId:     string;
   feature:    string;
+  model?:     string;
   tokensIn?:  number;
   tokensOut?: number;
   ttsChars?:  number;
 }): Promise<void> {
   if (!tokensIn && !tokensOut && !ttsChars) return;
+
+  // A token-spending row with no known model would be priced at the fallback
+  // rate, silently mis-stating spend. Surface it in dev rather than swallow it.
+  if (process.env.NODE_ENV !== "production" && (tokensIn || tokensOut) && !isKnownModel(model)) {
+    console.warn(
+      `[usage] "${feature}" logged ${tokensIn + tokensOut} tokens with ` +
+      `${model ? `unrecognised model "${model}"` : "no model"} — cost will fall back to Sonnet rates. ` +
+      `Add it to MODEL_RATES in lib/pricing.ts.`
+    );
+  }
+
+  // The interview routes use a sentinel userId in local dev. It isn't a real
+  // auth.users row, so the insert would fail the FK — skip it rather than
+  // emit a misleading error on every dev request.
+  if (userId === DEV_BYPASS_USER_ID) return;
+
   const supabase = createServiceClient();
-  await supabase.from("usage_logs").insert({
+  const { error } = await supabase.from("usage_logs").insert({
     user_id:    userId,
     feature,
+    model:      model ?? null,
     tokens_in:  tokensIn,
     tokens_out: tokensOut,
     tts_chars:  ttsChars,
   });
+
+  // Callers `void` this promise, so a rejected insert would vanish entirely and
+  // the spend would go unrecorded with nothing to show for it. Logging is the
+  // right level of handling: usage accounting must never fail a user request.
+  if (error) {
+    console.error(`[usage] failed to log "${feature}" for ${userId}:`, error.message);
+  }
 }
 
 export async function checkUsageAllowed(

@@ -3,6 +3,7 @@ import { ArrowLeft, Users, Zap, DollarSign, AlertTriangle, ExternalLink } from "
 import { requireAdminPage } from "@/lib/auth/requireAdmin";
 import { createServiceClient } from "@/lib/supabase/service";
 import { estimateCost, DEFAULT_MONTHLY_TOKEN_LIMIT } from "@/lib/usage";
+import { MODEL_RATES } from "@/lib/pricing";
 import AdminActions from "./AdminActions";
 
 // ── ElevenLabs subscription fetch ─────────────────────────────────────────
@@ -74,7 +75,7 @@ export default async function AdminPage() {
     service.auth.admin.listUsers({ perPage: 200 }),
     service.from("profiles").select("*"),
     service.from("usage_logs")
-      .select("user_id, tokens_in, tokens_out, tts_chars, created_at")
+      .select("user_id, tokens_in, tokens_out, tts_chars, model, created_at")
       .gte("created_at", monthStart),
     fetchElevenLabsStatus(),
   ]);
@@ -82,26 +83,62 @@ export default async function AdminPage() {
   // Build lookup maps
   const profileMap = new Map((profiles ?? []).map(p => [p.user_id as string, p]));
 
-  // Per-user usage totals (respecting usage_reset_at)
-  const usageMap = new Map<string, { tokensIn: number; tokensOut: number; ttsChars: number }>();
+  // Per-user usage totals (respecting usage_reset_at).
+  //
+  // Cost accumulates PER ROW, priced at that row's own model, because Hugh
+  // deliberately mixes models whose rates differ by up to 20x. Summing tokens
+  // first and applying one rate — what this page used to do — priced every
+  // Haiku call at Sonnet rates and overstated spend accordingly.
+  interface UserUsage {
+    tokensIn:  number;
+    tokensOut: number;
+    ttsChars:  number;
+    cost:      number;
+  }
+  const EMPTY_USAGE: UserUsage = { tokensIn: 0, tokensOut: 0, ttsChars: 0, cost: 0 };
+
+  const usageMap  = new Map<string, UserUsage>();
+  // Spend by model, for the breakdown below the cost total.
+  const modelCost = new Map<string, number>();
+
   for (const log of usageLogs ?? []) {
     const p = profileMap.get(log.user_id as string);
     const resetAt = p?.usage_reset_at as string | null ?? null;
     const effectiveStart = resetAt && resetAt > monthStart ? resetAt : monthStart;
     if ((log.created_at as string) < effectiveStart) continue;
 
-    const cur = usageMap.get(log.user_id as string) ?? { tokensIn: 0, tokensOut: 0, ttsChars: 0 };
+    const tokensIn  = log.tokens_in  as number ?? 0;
+    const tokensOut = log.tokens_out as number ?? 0;
+    const ttsChars  = log.tts_chars  as number ?? 0;
+    const model     = log.model as string | null;
+    const rowCost   = estimateCost(tokensIn, tokensOut, ttsChars, model);
+
+    const cur = usageMap.get(log.user_id as string) ?? EMPTY_USAGE;
     usageMap.set(log.user_id as string, {
-      tokensIn:  cur.tokensIn  + (log.tokens_in  as number ?? 0),
-      tokensOut: cur.tokensOut + (log.tokens_out as number ?? 0),
-      ttsChars:  cur.ttsChars  + (log.tts_chars  as number ?? 0),
+      tokensIn:  cur.tokensIn  + tokensIn,
+      tokensOut: cur.tokensOut + tokensOut,
+      ttsChars:  cur.ttsChars  + ttsChars,
+      cost:      cur.cost      + rowCost,
     });
+
+    const key = model ?? (ttsChars && !tokensIn && !tokensOut ? "elevenlabs-tts" : "unattributed");
+    modelCost.set(key, (modelCost.get(key) ?? 0) + rowCost);
+  }
+
+  // Split by provider. The Anthropic panel below must not quote a number that
+  // silently folds in OpenAI and ElevenLabs spend.
+  let anthropicCost = 0;
+  let openaiCost    = 0;
+  for (const [model, cost] of modelCost) {
+    if (model.startsWith("gpt")) openaiCost += cost;
+    // Rows with no model fall back to Claude rates, so they count as Anthropic.
+    else if (model !== "elevenlabs-tts") anthropicCost += cost;
   }
 
   // Merge into rows
   const rows = (authUsers ?? []).map(u => {
     const p   = profileMap.get(u.id);
-    const use = usageMap.get(u.id) ?? { tokensIn: 0, tokensOut: 0, ttsChars: 0 };
+    const use = usageMap.get(u.id) ?? EMPTY_USAGE;
     return {
       id:        u.id,
       email:     u.email ?? "—",
@@ -112,7 +149,6 @@ export default async function AdminPage() {
       isAdmin:   (p?.is_admin ?? false) as boolean,
       limit:     (p?.token_limit as number | null) ?? DEFAULT_MONTHLY_TOKEN_LIMIT,
       ...use,
-      cost: estimateCost(use.tokensIn, use.tokensOut, use.ttsChars),
     };
   });
 
@@ -217,10 +253,39 @@ export default async function AdminPage() {
               <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-500">Est. Claude cost</span>
                 <span className="text-slate-300 font-semibold tabular-nums">
-                  ${rows.reduce((s, r) => s + estimateCost(r.tokensIn, r.tokensOut, 0), 0).toFixed(3)}
+                  ${anthropicCost.toFixed(3)}
                 </span>
               </div>
+              {openaiCost > 0 && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-500">Est. OpenAI cost</span>
+                  <span className="text-slate-400 tabular-nums">${openaiCost.toFixed(3)}</span>
+                </div>
+              )}
             </div>
+
+            {/* Per-model breakdown — this is what makes a model switch visible. */}
+            {modelCost.size > 0 && (
+              <div className="space-y-1 border-t border-slate-800 pt-2">
+                <p className="text-xs font-semibold text-slate-600">By model</p>
+                {[...modelCost.entries()]
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([model, cost]) => (
+                    <div key={model} className="flex items-center justify-between text-xs">
+                      <span className="truncate text-slate-600">
+                        {model}
+                        {model in MODEL_RATES && (
+                          <span className="ml-1 text-slate-700">
+                            (${MODEL_RATES[model].input}/${MODEL_RATES[model].output} per MTok)
+                          </span>
+                        )}
+                      </span>
+                      <span className="tabular-nums text-slate-500">${cost.toFixed(3)}</span>
+                    </div>
+                  ))}
+              </div>
+            )}
+
             <p className="text-xs text-slate-700">No live usage API — check Console for actual billing.</p>
           </div>
 

@@ -8,6 +8,10 @@ import { checkUsageAllowed, logUsage } from "@/lib/usage";
 // in CLAUDE.md). Server-side only; the browser never sees the API key.
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Model for this route — see CLAUDE.md "Model Selection". Kept in one place so
+// the API call and the usage log can never disagree about what was billed.
+const MODEL = "claude-haiku-4-5";
+
 interface Msg { role: "user" | "assistant"; content: string }
 
 const SYSTEM = `You are Hugh, a friendly, concise coding helper beside a Python fluency drill.
@@ -39,13 +43,13 @@ export async function POST(request: NextRequest) {
 
   try {
     const res = await anthropic.messages.create({
-      model: "claude-haiku-4-5",
+      model: MODEL,
       max_tokens: 500,
       system,
       messages,
     });
     const reply = res.content[0]?.type === "text" ? res.content[0].text : "";
-    void logUsage({ userId, feature: "code/chat", tokensIn: res.usage.input_tokens, tokensOut: res.usage.output_tokens });
+    void logUsage({ userId, model: MODEL, feature: "code/chat", tokensIn: res.usage.input_tokens, tokensOut: res.usage.output_tokens });
     return NextResponse.json({ reply: reply || "Sorry — please try again." });
   } catch (err) {
     console.error("[code/chat] Claude error:", err);

@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
-import { enforceUsageGate } from "@/lib/usage";
+import { enforceUsageGate, logUsage } from "@/lib/usage";
 import { createServiceClient } from "@/lib/supabase/service";
 import { NOTE_IMAGES_BUCKET } from "@/lib/notes/storage";
 import { buildCoachMessages, type CoachThreadMessage } from "@/lib/notes/coachPrompt";
@@ -11,6 +11,11 @@ export const dynamic = "force-dynamic";
 // Vision + a short reply can take a few seconds, and a multi-snip bucket sends
 // up to four images; give it headroom.
 export const maxDuration = 90;
+
+// The Coach reads screenshots, so it needs a vision-capable model.
+// Kept in one place so the API call and the usage log can never disagree
+// about what was billed.
+const MODEL = "gpt-4o";
 
 // The Coach: Hugh reads ONE screenshot + that screenshot's chat thread and
 // appends a correction. Threads are per screenshot, so the Coach's attention is
@@ -88,9 +93,17 @@ export async function POST(request: NextRequest) {
 
     const openai = new OpenAI({ apiKey });
     const res = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: MODEL,
       max_tokens: 1024,
       messages,
+    });
+    // OpenAI names these prompt_/completion_tokens, not input_/output_tokens.
+    void logUsage({
+      userId,
+      model:     MODEL,
+      feature:   "notes/coach",
+      tokensIn:  res.usage?.prompt_tokens     ?? 0,
+      tokensOut: res.usage?.completion_tokens ?? 0,
     });
     // Visibility into OpenAI's automatic prompt caching (no code lever to pull —
     // it kicks in on its own once the shared system+image prefix clears ~1024

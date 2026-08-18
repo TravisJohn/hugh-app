@@ -17,6 +17,10 @@ import { buildDrillPrompt, parseDrill, drillCacheKey, DRILL_SYSTEM, type DrillRe
 // with generated:false so the drill screen always has something to render.
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Model for this route — see CLAUDE.md "Model Selection". Kept in one place so
+// the API call and the usage log can never disagree about what was billed.
+const MODEL = "claude-sonnet-4-6";
+
 const sample = (reason: string) =>
   NextResponse.json({ content: SAMPLE_DRILL, generated: false, reason });
 
@@ -73,12 +77,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const res = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: MODEL,
       max_tokens: 2000,
       system: DRILL_SYSTEM,
       messages: [{ role: "user", content: buildDrillPrompt(req) }],
     });
-    void logUsage({ userId, feature: "code/generate-drill", tokensIn: res.usage.input_tokens, tokensOut: res.usage.output_tokens });
+    void logUsage({ userId, model: MODEL, feature: "code/generate-drill", tokensIn: res.usage.input_tokens, tokensOut: res.usage.output_tokens });
 
     const text = res.content[0]?.type === "text" ? res.content[0].text : "";
     const content = parseDrill(text); // throws on any shape problem

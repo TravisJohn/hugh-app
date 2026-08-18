@@ -15,6 +15,10 @@ export const dynamic = "force-dynamic";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Model for this route — see CLAUDE.md "Model Selection". Kept in one place so
+// the API call and the usage log can never disagree about what was billed.
+const MODEL = "claude-haiku-4-5";
+
 const MAX_TURNS = 40;
 const MAX_TURN_CHARS = 4_000;
 
@@ -71,13 +75,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const completion = await anthropic.messages.create({
-      model:      "claude-haiku-4-5", // short, low-stakes generation
+      model:      MODEL, // short, low-stakes generation
       max_tokens: 300,
       messages:   [{ role: "user", content: prompt }],
     });
     const recap = completion.content[0]?.type === "text" ? completion.content[0].text.trim() : "";
     void logUsage({
       userId,
+      model:     MODEL,
       feature:   "mastery/recap",
       tokensIn:  completion.usage.input_tokens,
       tokensOut: completion.usage.output_tokens,

@@ -1,10 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
-import { enforceUsageGate } from "@/lib/usage";
+import { enforceUsageGate, logUsage } from "@/lib/usage";
 import { similarityCheckPrompt, parseClaudeJson } from "@/lib/claude/prompts";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// Pure classification (alignment judgment) — Haiku handles this well at 1/5 the cost.
+// See CLAUDE.md "Model Selection". Kept in one place so the API call and
+// the usage log can never disagree about what was billed.
+const MODEL = "claude-haiku-4-5";
 
 export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
@@ -31,8 +36,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const res = await anthropic.messages.create({
-      // Pure classification (alignment judgment) — Haiku handles this well at 1/5 the cost.
-      model: "claude-haiku-4-5",
+      model: MODEL,
       max_tokens: 128,
       messages: [
         {
@@ -40,6 +44,14 @@ export async function POST(request: NextRequest) {
           content: similarityCheckPrompt(bestAnswer, transcript),
         },
       ],
+    });
+
+    void logUsage({
+      userId,
+      model:     MODEL,
+      feature:   "interview/check-similarity",
+      tokensIn:  res.usage.input_tokens,
+      tokensOut: res.usage.output_tokens,
     });
 
     const raw = res.content[0].type === "text" ? res.content[0].text : "{}";

@@ -168,17 +168,20 @@ Return ONLY valid JSON with no markdown fences:
     return NextResponse.json({ error: "Invalid phase" }, { status: 400 });
   }
 
+  // Scoring (evaluate) needs Sonnet's judgment; the in-character open/respond
+  // lines are short conversational gen — Haiku handles those at 1/5 the cost.
+  // Bound once so the usage log records the model that actually ran.
+  const model = phase === "evaluate" ? "claude-sonnet-4-6" : "claude-haiku-4-5";
+
   const completion = await anthropic.messages.create({
-    // Scoring (evaluate) needs Sonnet's judgment; the in-character open/respond
-    // lines are short conversational gen — Haiku handles those at 1/5 the cost.
-    model:      phase === "evaluate" ? "claude-sonnet-4-6" : "claude-haiku-4-5",
+    model,
     max_tokens: phase === "evaluate" ? 512 : 256,
     messages:   [{ role: "user", content: prompt }],
   });
 
   const raw = (completion.content[0] as { type: string; text: string }).text.trim();
 
-  void logUsage({ userId, feature: "mastery/session", tokensIn: completion.usage.input_tokens, tokensOut: completion.usage.output_tokens });
+  void logUsage({ userId, model, feature: "mastery/session", tokensIn: completion.usage.input_tokens, tokensOut: completion.usage.output_tokens });
 
   if (phase === "evaluate") {
     const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();

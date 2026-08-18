@@ -1,12 +1,17 @@
 import { type NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
-import { enforceUsageGate } from "@/lib/usage";
+import { enforceUsageGate, logUsage } from "@/lib/usage";
 import { createServiceClient } from "@/lib/supabase/service";
 import { buildSummaryMessages, type SummaryThreadMessage } from "@/lib/notes/summaryPrompt";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
+
+// Summarising an existing thread needs no vision — the cheaper model is enough.
+// Kept in one place so the API call and the usage log can never disagree
+// about what was billed.
+const MODEL = "gpt-4o-mini";
 
 // The running summary: condense ONE screenshot's thread into revision notes. Like
 // /api/notes/coach it calls OpenAI (same OPENAI_API_KEY), but the thread is
@@ -59,9 +64,17 @@ export async function POST(request: NextRequest) {
 
     const openai = new OpenAI({ apiKey });
     const res = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: MODEL,
       max_tokens: 512,
       messages: buildSummaryMessages(thread),
+    });
+    // OpenAI names these prompt_/completion_tokens, not input_/output_tokens.
+    void logUsage({
+      userId,
+      model:     MODEL,
+      feature:   "notes/summarize",
+      tokensIn:  res.usage?.prompt_tokens     ?? 0,
+      tokensOut: res.usage?.completion_tokens ?? 0,
     });
     const summary = res.choices[0]?.message?.content?.trim();
     if (!summary) {

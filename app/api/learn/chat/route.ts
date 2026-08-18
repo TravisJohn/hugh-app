@@ -7,6 +7,14 @@ import { checkUsageAllowed, logUsage } from "@/lib/usage";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Model for this route — see CLAUDE.md "Model Selection". Kept in one place so
+// the API call and the usage log can never disagree about what was billed.
+//
+// TRIAL: learn/chat is the highest-volume route, so we're testing Haiku
+// (5x cheaper input, 3x cheaper output) against Sonnet for tutoring quality.
+// Revert this constant to "claude-sonnet-4-6" if the answers get weaker.
+const MODEL = "claude-haiku-4-5";
+
 interface ChatMessage {
   role:    "user" | "assistant";
   content: string;
@@ -56,10 +64,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const res = await anthropic.messages.create({
-      // TRIAL: learn/chat is the highest-volume route, so we're testing Haiku
-      // (5x cheaper input, 3x cheaper output) against Sonnet for tutoring quality.
-      // Revert this one line to "claude-sonnet-4-6" if the answers get weaker.
-      model:      "claude-haiku-4-5",
+      model:      MODEL,
       max_tokens: 1024,
       system:     focusedLearningSystemPrompt(topic.trim()),
       messages:   capped,
@@ -92,7 +97,7 @@ export async function POST(request: NextRequest) {
     // Count fresh input + cache writes against usage; cache reads (~0.1x cost)
     // are intentionally excluded so a warm cache eases the learner's quota.
     const tokensIn = res.usage.input_tokens + (res.usage.cache_creation_input_tokens ?? 0);
-    void logUsage({ userId, feature: "learn/chat", tokensIn, tokensOut: res.usage.output_tokens });
+    void logUsage({ userId, model: MODEL, feature: "learn/chat", tokensIn, tokensOut: res.usage.output_tokens });
     return NextResponse.json({
       reply: reply || "I couldn't generate a response. Please try again.",
       isOffTopic,

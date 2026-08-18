@@ -7,6 +7,10 @@ import { sanitizeCovered } from "@/lib/learn/sessionRecord";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Model for this route — see CLAUDE.md "Model Selection". Kept in one place so
+// the API call and the usage log can never disagree about what was billed.
+const MODEL = "claude-sonnet-4-6";
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -65,7 +69,7 @@ Rules:
 
   try {
     const response = await anthropic.messages.create({
-      model:      "claude-sonnet-4-6",
+      model:      MODEL,
       // Raised for "covered": the narrative alone fitted in 512, the record of
       // substance does not.
       max_tokens: 2048,
@@ -77,7 +81,7 @@ Rules:
       return NextResponse.json({ error: "Unexpected response type" }, { status: 500 });
     }
 
-    void logUsage({ userId: user.id, feature: "learn/summarize", tokensIn: response.usage.input_tokens, tokensOut: response.usage.output_tokens });
+    void logUsage({ userId: user.id, model: MODEL, feature: "learn/summarize", tokensIn: response.usage.input_tokens, tokensOut: response.usage.output_tokens });
 
     const raw    = block.text.trim().replace(/^```(?:json)?|```$/g, "").trim();
     const parsed = JSON.parse(raw) as {

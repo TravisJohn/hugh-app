@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
-import { enforceUsageGate } from "@/lib/usage";
+import { enforceUsageGate, logUsage } from "@/lib/usage";
 import {
   ROOM_CONTEXT,
   questionGenerationPrompt,
@@ -12,6 +12,11 @@ import {
 import { isPresetRoom, type Room } from "@/types";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// Question generation and model answers drive the whole session — Sonnet.
+// See CLAUDE.md "Model Selection". Kept in one place so the API call and
+// the usage log can never disagree about what was billed.
+const MODEL = "claude-sonnet-4-6";
 
 const INTRO_Q1 =
   "Thanks for coming in today. Let's start — tell me about yourself and your background.";
@@ -63,11 +68,19 @@ export async function POST(request: NextRequest) {
           : INTRO_Q2_POOL[Math.floor(Math.random() * INTRO_Q2_POOL.length)];
 
       const res = await anthropic.messages.create({
-        model: "claude-sonnet-4-6",
+        model: MODEL,
         max_tokens: 512,
         messages: [
           { role: "user", content: introQuestionBestAnswerPrompt(question) },
         ],
+      });
+
+      void logUsage({
+        userId,
+        model:     MODEL,
+        feature:   "interview/intro-best-answer",
+        tokensIn:  res.usage.input_tokens,
+        tokensOut: res.usage.output_tokens,
       });
 
       const raw = res.content[0].type === "text" ? res.content[0].text : "{}";
@@ -79,7 +92,7 @@ export async function POST(request: NextRequest) {
         : topic ?? (jobDescription ? null : "general data and ML engineering");
 
       const res = await anthropic.messages.create({
-        model: "claude-sonnet-4-6",
+        model: MODEL,
         max_tokens: 1024,
         messages: [
           {
@@ -87,6 +100,14 @@ export async function POST(request: NextRequest) {
             content: questionGenerationPrompt(topicContext, previousQuestions, jobDescription),
           },
         ],
+      });
+
+      void logUsage({
+        userId,
+        model:     MODEL,
+        feature:   "interview/generate-question",
+        tokensIn:  res.usage.input_tokens,
+        tokensOut: res.usage.output_tokens,
       });
 
       const raw =

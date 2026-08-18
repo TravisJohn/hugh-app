@@ -9,6 +9,10 @@ import { type LearningPoint } from "@/types";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Model for this route — see CLAUDE.md "Model Selection". Kept in one place so
+// the API call and the usage log can never disagree about what was billed.
+const MODEL = "claude-sonnet-4-6";
+
 interface MilestoneRow {
   id:                string;
   title:             string;
@@ -90,7 +94,7 @@ export async function POST(
 
   try {
     const res = await anthropic.messages.create({
-      model:      "claude-sonnet-4-6",
+      model:      MODEL,
       max_tokens: 1024,
       messages:   [{ role: "user", content: prompt }],
     });
@@ -106,7 +110,7 @@ export async function POST(
       .update({ summary_doc: doc, summary_doc_at: generatedAt })
       .eq("id", id);
 
-    void logUsage({ userId, feature: "tracker/summary", tokensIn: res.usage.input_tokens, tokensOut: res.usage.output_tokens });
+    void logUsage({ userId, model: MODEL, feature: "tracker/summary", tokensIn: res.usage.input_tokens, tokensOut: res.usage.output_tokens });
 
     return NextResponse.json({ summaryDoc: doc, generatedAt });
   } catch (err) {

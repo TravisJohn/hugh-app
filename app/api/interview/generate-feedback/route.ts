@@ -2,10 +2,15 @@ import { type NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
-import { enforceUsageGate } from "@/lib/usage";
+import { enforceUsageGate, logUsage } from "@/lib/usage";
 import { submitAnswerPrompt, parseClaudeJson } from "@/lib/claude/prompts";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// Merged judgment + feedback — quality matters, so Sonnet.
+// See CLAUDE.md "Model Selection". Kept in one place so the API call and
+// the usage log can never disagree about what was billed.
+const MODEL = "claude-sonnet-4-6";
 
 export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
@@ -52,7 +57,7 @@ export async function POST(request: NextRequest) {
     // Merged judgment + feedback in one Sonnet call (formerly check-similarity
     // then generate-feedback, which duplicated question/bestAnswer/transcript).
     const res = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: MODEL,
       max_tokens: 512,
       messages: [
         {
@@ -66,6 +71,14 @@ export async function POST(request: NextRequest) {
           }),
         },
       ],
+    });
+
+    void logUsage({
+      userId,
+      model:     MODEL,
+      feature:   "interview/feedback",
+      tokensIn:  res.usage.input_tokens,
+      tokensOut: res.usage.output_tokens,
     });
 
     const raw = res.content[0].type === "text" ? res.content[0].text : "{}";
