@@ -2933,3 +2933,136 @@ the SQL editor, so nothing landed. Re-running notes grouping was harmless (every
 statement is `IF NOT EXISTS`), with one caveat: its backfill re-seeds `position`
 for any `note_images` row sitting at 0, so a manually reordered screenshot strip
 may have snapped back to upload order.
+
+## Landing page told the truth again + per-model cost tracking (2026-08-19)
+
+A health pass over the repo turned up two things worth fixing. Everything else
+was in good shape: 421 tests green, clean build, zero `any`/TODO, `.env.example`
+in sync with code, and migrations 031-035 all confirmed applied against the live
+database.
+
+### 1. The public landing page was advertising a smaller product than we built
+
+`components/landing/FeatureCards.tsx` still rendered **Apply** and **Show** as
+locked "Coming soon" cards. Both shipped a while ago — Apply is `/code` (the
+pattern map, drills and packs), Show is `/cases` (The Case Room and Case Lab).
+Anyone landing logged-out was told two thirds of Hugh didn't exist yet.
+
+All three pillars are now Live, with copy that matches what the authenticated
+study hub actually says, and each card carries its own accent — Learn green,
+Apply sky, Show amber — mirroring the internal cards.
+
+Two decisions worth recording:
+
+- **Kept the Learn / Apply / Show framing** rather than renaming the cards to
+  Code / Cases. It's a marketing page, not navigation; the pedagogical arc is
+  the point, and it matches the three-paths model of the study hub.
+- **All three cards behave identically** — click to reveal sign in / create
+  account. A logged-out visitor can't deep-link into `/code` anyway, since
+  `proxy.ts` bounces them to login, so linking straight there would just be a
+  redirect. The three cards collapsed into one config array while doing this;
+  unlocking two of them would otherwise have tripled the copy-pasted markup.
+
+### 2. Cost tracking was wrong, and blind on top of that
+
+`lib/usage.ts` hardcoded Sonnet pricing ($3/$15 per MTok) for **every** logged
+call, and `usage_logs` had no `model` column to do better with. Since we
+deliberately run Haiku on the cheap routes ($1/$5) and gpt-4o / gpt-4o-mini on
+Notes, the admin dashboard was pricing Haiku calls at 3x their real cost. The
+irony: the whole Haiku migration was a cost exercise, and the dashboard couldn't
+show the win.
+
+Worse, ten routes that call an LLM never logged usage at all — including
+`notes/coach` (gpt-4o vision), `dashboard/goals` (topic refinement), and
+`lib/tracker/generate.ts`'s track generation, which is the single largest Claude
+call in the product. All ten already called `enforceUsageGate`, so they checked
+the user's budget and then spent against it without recording anything.
+
+What changed:
+
+- **New `lib/pricing.ts`** — a pure, dependency-free module holding the rate
+  table, `estimateCost`, and `totalCost`. Kept out of `lib/usage.ts` because that
+  file imports `server-only` and the Supabase client, which makes it untestable.
+  15 unit tests cover it, including one that pins the exact old-vs-new
+  discrepancy so the bug can't quietly return.
+- **Migration 036** adds a nullable `usage_logs.model`, plus an index for the
+  by-model breakdown. Nullable because pre-036 rows have no model and TTS-only
+  rows never will; both fall back to the most expensive Claude rate, so unknown
+  spend is over-stated rather than hidden.
+- **Every route now names its model in one place.** Each hoists a `const MODEL`
+  used by both the API call and the usage log, so the two can't drift apart.
+  `mastery/session` binds a local instead, since its model varies by phase.
+  `priority.ts` and the document extractor return their model and token counts
+  to the caller that owns the userId.
+- **Ten previously-silent routes now log.** Retry loops accumulate tokens across
+  attempts — a discarded first attempt still costs money.
+- **The admin dashboard prices per row**, at each row's own model, instead of
+  applying one rate to a per-user aggregate. It also splits Anthropic from
+  OpenAI spend (the panel is headed "Anthropic", so folding in OpenAI would have
+  been a fresh version of the same bug) and adds a by-model breakdown, which is
+  what makes a future model switch visible.
+- **`logUsage` no longer swallows failures.** The insert error is checked and
+  logged; callers still `void` the promise, so accounting can never fail a user
+  request. It also skips the `dev-test-bypass` sentinel userId, which isn't a
+  real `auth.users` row and would fail the foreign key.
+
+`architecture/chat` is deliberately left unlogged — it's the local admin
+assistant and has no userId to attribute spend to.
+
+436 tests green, clean production build, landing page smoke-tested.
+
+**Migration 036 still needs applying by hand** in the Supabase SQL editor —
+`SUPABASE_ACCESS_TOKEN` isn't set locally, so `scripts/run-migration.ts` can't
+run. Until it lands, usage inserts fail (logged, non-fatal) and the admin usage
+panel reads zero. Apply it before deploying.
+
+## Housekeeping: dead branches pruned, CLAUDE.md brought back to reality (2026-08-19)
+
+Migration 036 applied. Follow-on tidy-up from the same health pass.
+
+### Six dead branches deleted
+
+`askcode`, `feat/architecture-dashboard`, `feat/ask-page-tweaks`,
+`feat/case-lab`, `feat/mastery-realtime` and `spike/code-drill` were all fully
+merged into `main` — zero commits ahead, six to seven weeks stale — so deleting
+them lost nothing. Verified local *and* remote tips for each before removing.
+
+`spike/code-drill` needed `-D` rather than `-d`: its local and remote tips had
+diverged from each other, so git's upstream check refused even though both tips
+are ancestors of `main`. Confirmed both explicitly with `merge-base
+--is-ancestor` before forcing.
+
+`feat/realtime-interview` was deliberately kept — it still holds the one parked
+commit that is not on `main`.
+
+Three remote branches (`origin/askcode`, `origin/feat/case-lab`,
+`origin/spike/code-drill`) are still present; deleting those is a push to the
+shared remote and was left as a separate decision.
+
+### CLAUDE.md was describing a product we no longer build
+
+The file still opened by calling Hugh a mock-interview trainer, and its stack
+table said Next.js 14 with no mention of React 19, OpenAI, Pyodide, DuckDB-WASM
+or CodeMirror. Its folder structure was the v1 interview layout. A doc that
+describes the wrong product is worse than no doc — it silently misdirects.
+
+Rewritten against the actual repo rather than from memory:
+
+- Leads with the learning platform, with a table of the real surfaces.
+- The interview loop is demoted to a **live legacy surface**, not deleted — its
+  state machine, personas and proxy gating are all still real code, it's simply
+  no longer linked from `/home`.
+- Stack table corrected, including `proxy.ts` as Next 16's rename of
+  `middleware.ts`, with an explicit "don't add a middleware.ts".
+- Environment variables now list all eleven, marked required vs optional.
+- Two new rules earned by this session's work: **every route names its model
+  once** (one `const MODEL` feeding both the API call and the usage log), and
+  **usage/cost accounting** (log with the model; price per row, never per
+  aggregate).
+- New rule: pure logic belongs in a testable `lib/**` module — the pattern
+  `lib/notes/layout.ts`, `lib/code/heat.ts` and now `lib/pricing.ts` all follow.
+- Migrations documented as forward-only and manually applied, since shipping
+  code ahead of a migration is exactly what bit us with 036.
+
+README.md was checked and needed no changes — it was already accurate on Next 16,
+OpenAI and the learning-platform framing.
