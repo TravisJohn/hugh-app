@@ -14,7 +14,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "health": "node scripts/health-check.ts"
+    "health": "tsx scripts/health-check.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
@@ -52,6 +52,7 @@
     "playwright": "^1.60.0",
     "tailwind-scrollbar": "^4.0.2",
     "tailwindcss": "^4",
+    "tsx": "^4.23.12",
     "typescript": "^5",
     "vitest": "^2.1.9"
   }

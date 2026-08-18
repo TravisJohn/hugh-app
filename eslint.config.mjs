@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Warm Start (Stage A) session-continuity hooks — kept local, not part of
+    // the app (see .gitignore), so they aren't held to the app's lint rules.
+    "scripts/warm-start/**",
   ]),
   // tools/architecture-dashboard/scripts is a standalone Node CLI (no bundler,
   // no "type": "module"), so its scripts are plain CommonJS by design —

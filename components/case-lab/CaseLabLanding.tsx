@@ -5,7 +5,6 @@ import { X, SlidersHorizontal, Search, ChevronDown } from "lucide-react";
 import {
   FACET_KEYS,
   FACET_LABELS,
-  type CaseLabFacets,
   type CaseLabStub,
   type FacetKey,
 } from "@/types/case-lab";

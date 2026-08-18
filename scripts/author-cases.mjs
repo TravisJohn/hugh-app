@@ -1165,7 +1165,7 @@ async function main() {
   for (const brief of targets) {
     process.stdout.write(`• ${brief.id} … `);
     try {
-      const { obj, critique, rounds, schemaOk } = await author(brief);
+      const { obj, critique, rounds } = await author(brief);
       obj.id = brief.id; // pin id regardless of what the model echoed
       writeFileSync(path.join(DATA_DIR, `${brief.id}.json`), JSON.stringify(obj, null, 2) + "\n");
       const errs = validate(obj);

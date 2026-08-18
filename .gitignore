@@ -45,13 +45,19 @@ yarn-error.log*
 # local scratch / analysis artifacts — kept locally, not part of the app
 /LEARNING_POINTS.md
 /case-analysis.html
+/docs/reports/
 
 # architecture dashboard — generated at build (predev/prebuild)
 /lib/architecture/data.generated.json
 /public/admin-architecture/
 
-# warm-start ledger (Stage A proof) — per-session marker capture, local only
-/.starship/
+# Warm Start (Stage A) — session-continuity hooks and their ledger. Decided
+# 2026-08-04 that this belongs in a separate tooling repo, not in the app, so
+# it stays local. Unanchored .starship/ so nested copies are caught too.
+.starship/
+/.claude/
+/scripts/warm-start/
+/warm-start-plan.md
 
 # vercel
 .vercel
