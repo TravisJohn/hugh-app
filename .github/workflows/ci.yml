@@ -30,18 +30,26 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Node 20 is the floor declared in package.json engines (and Next's own
       # minimum). Running the gate here proves that claim stays honest, since
       # local development happens on a much newer Node.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 20.x
           cache: npm
 
       - name: Install (locked)
         run: npm ci
+
+      # lib/architecture/data.generated.json is build output and is gitignored,
+      # but two API routes import it, so lint and typecheck need it to exist on
+      # a bare checkout. `npm run build` generates it via prebuild, which is too
+      # late: typecheck runs first. Generating it up front rather than
+      # committing the artifact keeps it a build product.
+      - name: Generate architecture data
+        run: node tools/architecture-dashboard/scripts/build-hosted.js
 
       - name: Lint
         run: npm run lint
