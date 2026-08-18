@@ -3109,3 +3109,74 @@ counts down, a submitted cell is accepted, and the next cell's clock re-arms at
 
 Repo is now at 0 lint warnings and 0 errors, 436 tests green, clean tsc, clean
 production build, clean working tree, `main` level with `origin/main`.
+
+## CI release gate, and two things it flushed out (2026-08-19)
+
+Stood up the release gate that `DEPLOYMENT_READINESS_AUDIT.md` specified and
+nothing enforced. `.github/workflows/ci.yml` runs the exact command set the audit
+named: `npm ci`, lint, `tsc --noEmit`, test, `npm audit --omit=dev
+--audit-level=high`, build. Green in 1m38s.
+
+Two deliberate choices. It **needs no secrets**, so it runs on a bare checkout
+including from a fork; if a step ever starts needing a key, that is a signal to
+fix the code, not to add the key. And it runs on **Node 20.x**, the floor
+declared in `engines`, rather than the much newer Node used locally, because
+nothing else exercises that claim.
+
+Setting it up surfaced three real problems that local runs could never have
+caught.
+
+### The production build required secrets
+
+`next build` failed outright without environment variables. The TTS route built
+its `ElevenLabsClient` at module scope, and that SDK throws eagerly on a missing
+key, so page-data collection died with a hard build error. Not a config warning
+— the whole build.
+
+Fixed by constructing the client inside the handler and returning 503 when the
+key is absent, which is how every other provider route already behaves and what
+`notes/coach` already does with OpenAI. The build now needs no credentials at
+all, and losing the key degrades one feature at request time instead of taking
+down the build.
+
+### Five high-severity advisories in shipped dependencies, one of them ours
+
+`npm audit --omit=dev --audit-level=high` reported 5 highs. Four were routine.
+The fifth was not: **"Next.js: Middleware / Proxy bypass in App Router
+applications using Turbopack"**. This app gates authentication in `proxy.ts` and
+builds with Turbopack, so that advisory describes this codebase directly, and a
+proxy bypass means unauthenticated access to gated routes.
+
+Upgraded to `next` 16.3.1 (non-semver-major), which also cleared the transitive
+`postcss` and `sharp` advisories; `form-data` and `nanoid` went with them.
+Production dependencies now audit clean.
+
+Verified beyond a green build, since the upgrade touches proxy behaviour: a real
+browser run confirmed anonymous visitors are still redirected away from `/home`,
+`/notes`, `/tracker` and `/admin`, that login works, and that the drill still
+boots Pyodide and executes a cell.
+
+### The first CI run failed, correctly
+
+`lib/architecture/data.generated.json` is gitignored build output, but two API
+routes import it. Locally it always exists because some earlier dev or build run
+produced it, so typecheck passes. On a bare checkout it does not, and
+`npm run build` generates it via `prebuild` — too late, since typecheck runs
+first. TS2307 on both routes.
+
+Reproduced locally by deleting the file, confirmed the generator alone fixes it,
+and added a generation step ahead of lint. Generating it keeps it a build product
+rather than committing an artifact.
+
+### Noted, not changed: /code and /code/drill are ungated
+
+While verifying gating, a sweep of all app routes found `/code` and `/code/drill`
+reachable by anonymous visitors, while `/code/start` — the entry point to the
+drills — redirects to login. `app/code/drill/page.tsx` has no auth check and
+`proxy.ts` only gates `/interview`; every other surface gates inside its server
+component. `/pending` and `/blocked` are open by design.
+
+No AI spend leaks, since the API routes behind them require auth, so an anonymous
+visitor only gets the static sample drill. Left alone deliberately: whether the
+code pillar is a public demo or a members-only surface is a product decision, not
+a bug to quietly fix.
