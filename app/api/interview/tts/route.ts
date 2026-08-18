@@ -4,9 +4,16 @@ import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { getPersonaById } from "@/lib/personas";
 import { enforceUsageGate, logUsage } from "@/lib/usage";
 
-const elevenlabs = new ElevenLabsClient({
-  apiKey: process.env.ELEVENLABS_API_KEY,
-});
+// Constructed per request, not at module scope. The ElevenLabs SDK throws
+// eagerly when the key is absent, so building this at import time made the
+// whole production build fail on any machine without secrets (CI, a fresh
+// clone). Lazily it degrades the way every other provider route does: a 503
+// at request time, and a build that needs no credentials.
+function ttsClient(): ElevenLabsClient | null {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) return null;
+  return new ElevenLabsClient({ apiKey });
+}
 
 export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
@@ -41,6 +48,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { error: `Unknown persona or missing voiceId: ${personaId}` },
       { status: 400 }
+    );
+  }
+
+  const elevenlabs = ttsClient();
+  if (!elevenlabs) {
+    console.error("[interview/tts] ELEVENLABS_API_KEY is not set");
+    return NextResponse.json(
+      { error: "Voice playback is unavailable right now." },
+      { status: 503 }
     );
   }
 
