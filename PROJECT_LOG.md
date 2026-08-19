@@ -3180,3 +3180,276 @@ No AI spend leaks, since the API routes behind them require auth, so an anonymou
 visitor only gets the static sample drill. Left alone deliberately: whether the
 code pillar is a public demo or a members-only surface is a product decision, not
 a bug to quietly fix.
+
+## Systems — View 1, "The Directory" (2026-08-19)
+
+The `/home` grid has carried a disabled "Systems — coming soon" card for a while.
+This is the first half of what it was reserving space for: a reference catalog of
+standard data-platform architectures, at `/systems`. View 2 ("The Builder"),
+where a learner assembles and breaks these topologies, is not built — every
+detail view carries a disabled CTA pointing at it.
+
+Static JSON, zero runtime AI, no database, no migration. Nothing here spends a
+token, so there is no `logUsage` call to make and no quota gate to enforce. It
+follows Cloud Skills rather than the Case Room: a catalog that is read, not a
+loop that is played.
+
+### The flat topology array was wrong, and it was wrong on the interesting card
+
+The PRD modelled each architecture's flow as a flat list of nodes. Five of the
+six seed entries are genuinely linear, so this looked fine — until Dual-Path.
+
+A lambda architecture is not a line. A speed layer and a batch layer run
+concurrently over the same input and reconverge at serving, and that fork is the
+entire lesson of the pattern; drawing it as `A → B → C → D` teaches the opposite
+of what the card is there to teach. The same is true of a feature store, whose
+online and offline halves are two materialisations of one definition.
+
+So `TopologyNode` carries an optional `lane: "speed" | "batch"`. Linear
+architectures leave it undefined and are unaffected; the two forked ones get told
+truthfully. `splitTopology` in `lib/systems/topology.ts` turns a flow into
+`{ head, speed, batch, tail }` and the renderer draws whatever it returns —
+no structural decisions live in the component.
+
+Laned nodes must be contiguous. `splitTopology` stays total if they are not (it
+never drops or duplicates a node, only renders the stray one in the tail), and
+`catalog.test.ts` forbids shipping that shape in the first place. A one-sided
+fork is also rejected: a branch that goes nowhere is worse than a straight line.
+
+### One renderer, two densities
+
+`TopologyFlow` takes a `variant` of `compact` or `full`. The card gets a wrapping
+chain of labelled dots; the modal gets stacked rows with each node's role. Same
+component on purpose — a card and a modal disagreeing about an architecture's
+shape is the one bug this feature cannot afford.
+
+The first version of the compact fork was too quiet. A dashed left border alone
+read as ordinary wrapped text at card size, so the fork — the whole reason the
+lane field exists — was invisible exactly where the grid is scanned. Added
+explicit `FAST` / `SLOW` tags and a bracketing rule; verified in the browser that
+both forked cards now read as forks at a glance.
+
+### Grouped by latency, not filtered
+
+The Case Room's facet filter exists because it has thirty-plus cases. At six
+entries a filter panel is furniture. The grid is grouped by latency tier instead
+— Sub-second, Seconds, Minutes, Hours/Daily — because latency is the axis every
+trade-off in this domain follows from, so the grouping teaches something a filter
+would not. Porting the filter later is a clean job if the roster grows.
+
+### The modal is addressable
+
+The PRD specified a plain modal. Every other detail view in Hugh has a URL, and a
+reference catalog is precisely the kind of thing someone sends a colleague a link
+into, so the open entry syncs to `?system=<id>` — written with the History API
+rather than a router navigation, since the whole catalog is already on the client
+and a modal should not cost a server round trip. Back closes it, deep links open
+it, and an unknown id resolves to the plain grid rather than an empty dialog.
+
+### Content: the seed roster was six-for-six basketball
+
+The drafted roster illustrated all six architectures with NBA examples — lineup
+metrics, Spurs rotations, shooting distributions, win probability, player injury
+load, and stadium ticketing. Each is a legitimate analytics problem, but a
+directory is the surface people return to mid-build, and every lookup arriving
+wrapped in one domain narrows who it speaks to.
+
+Kept two sports entries (real-time tracking and the experiment engine, where the
+examples are genuinely the best fit) and re-domained the rest: web-scraped
+consumer behaviour, shipping disruption against energy spot prices, ticketing
+replication, and audio-ML feature serving. The specificity was the good part and
+was deliberately preserved — "nightly NBA lineup variations feeding matchup
+regressions" is a better use case than "process the daily sales data", and the
+replacements were written to that same level rather than flattened to generics.
+
+### Tests
+
+58 tests across two files. `topology.test.ts` covers the structural logic — the
+fork split, lane ordering under interleaving, a fork with no shared head or tail,
+and the guarantee that no node is ever lost even on malformed input.
+`catalog.test.ts` validates the shipped JSON per entry: required fields, a
+latency tier the grid actually renders (an unknown one would make an entry vanish
+silently), unique node ids, lane contiguity, and that every entry states both
+sides of its trade-off plus where it breaks. Content bugs in hand-authored JSON
+are otherwise invisible until a card renders blank in production.
+
+Full suite: 494 passing. Typecheck, lint and a production build all clean, and
+the surface was walked in a real browser — login, grid, fork rendering, modal,
+deep link, back button, Escape, and an unknown id — with no console errors.
+
+### Noted, not changed
+
+`next dev` rewrites the `nextjs-agent-rules` block in `AGENTS.md` on every run
+(Next 16 behaviour, `node_modules/next/dist/server/lib/generate-agent-files.js`).
+It shows as an unrelated modified file; left alone rather than folded into this
+work.
+
+## Trial: a regression pipeline you can operate (2026-08-19)
+
+A standalone experiment at `/sim`, not linked from `/home` and deliberately so:
+the question it exists to answer is whether a constrained simulation teaches
+systems thinking, not whether it should be a product surface.
+
+The brief was "an end-to-end linear regression system with knobs, in a
+constrained environment", pointing at a longer-term goal of a simulation
+environment for practising systemic thinking.
+
+### Linear regression is the instrument, not the subject
+
+The codebase already teaches linear regression twice — `linear-regression` in
+`packs.ts` (from-scratch maths) and `sql-linear-regression` in `sqlPacks.ts`. A
+third surface explaining gradient descent would be waste.
+
+The model here is deliberately the most boring one available: closed form,
+transparent, no training instability, nothing to tune. That is exactly the point.
+When this system misbehaves, a learner can never wonder "is the model just bad?"
+— every failure is unambiguously a SYSTEMS failure. Swap in a gradient-boosted
+model and every lesson becomes confounded.
+
+So none of the seven knobs is a statistics knob. They are drift, holdout split,
+training window, retrain cadence, feature staleness, train/serve parity, and
+rollout lag. The design rule, written into the types file so it survives: **if a
+knob has an immediate, local, obvious effect, it is not teaching systems thinking
+and does not belong here.**
+
+### The lesson is the gap between two numbers
+
+Every run reports an OFFLINE number (what the training job measured on its own
+holdout — the only number that would ever reach a real dashboard) and a LIVE
+number (what production actually experienced). The chart shades the band between
+them. In a real system that band is invisible, because nothing measures it.
+
+The best interaction the simulator produces is not a single bad setting but a
+dependency between two: a random holdout split is completely fine when drift is
+zero, and catastrophic when it is not. There is no universally correct knob
+position, only positions that are correct given the rest of the system. The
+explainer says so explicitly in both directions rather than only scolding.
+
+### TypeScript, not Pyodide — against the obvious
+
+Pyodide 0.26.4 with real scikit-learn is already wired up in this codebase, so
+the obvious move was to run the model through it. Rejected, because the loop this
+tool lives or dies on is turn-a-knob-see-what-moves, and a 15-second sklearn
+download before the first experiment kills it. `EXEC_TIMEOUT_MS` is 15s besides.
+
+Closed-form OLS is about eighty lines and is mathematically what
+`LinearRegression` does. Writing it here bought instant feedback, deterministic
+seeding (so changing one knob changes one thing), and a pure `lib/` module whose
+causal claims are unit-tested rather than trusted. Swapping in Pyodide later is
+one module, not a rewrite.
+
+### Two bugs the tests and the browser caught
+
+The first version modelled train/serve skew on x2, a zero-centred feature. The
+resulting bias averaged out to roughly nothing: the "Silent skew" preset promised
+"live is worse every single day" and produced a gap of **0.00**. The test passed
+because it asserted the gap was positive rather than visible — a weak assertion
+that let a broken lesson through. Moved the skew onto x1, which has both a large
+mean and the larger coefficient, and the gap became 0.45 with the offline number
+provably unchanged. The test now demands a material gap.
+
+Before letting the "Paying for nothing" preset claim what it claims, its premise
+was checked directly. It holds, and harder than expected: daily retraining behind
+a 5-day rollout runs at 2.06 live error for 890 compute units, while retraining
+every 5 days with no rollout lag runs at 1.87 for 174. Worse AND five times
+costlier. That comparison is now a test, because a teaching tool asserting
+something its engine does not produce is the worst bug available to it.
+
+Lint also caught a real React defect rather than a style nit — the previous-run
+delta was being read from a ref during render, which does not reliably re-render.
+Moved to state.
+
+The chart needed two display fixes found only by looking at it: a fixed viewBox
+letterboxed it into the bottom third of a tall pane (now measured with a
+ResizeObserver), and the do-nothing baseline climbs so far in a drifting world
+that it squashed the two lines being compared into a sliver (the axis now scales
+to offline and live only, and the baseline runs off the top, which reads
+correctly). Gating the SVG on a measured size also removed a hydration mismatch.
+
+### State
+
+Seven knobs, six fixed nodes, six scenario presets, 90 simulated days recomputed
+on every knob change in a few milliseconds. Zero AI, zero token spend, no
+database, no migration, no API route — the only server work is the auth gate.
+Diagnoses are rule-based and deterministic, and each one names the pipeline node
+it implicates so the readout points at a place rather than describing a symptom.
+
+37 tests over the engine and OLS; full suite 517 passing. Typecheck, lint and
+production build clean. Verified in a real browser: no page scroll, every preset
+produces a distinct signature, node flagging matches the readout, no console
+errors.
+
+## Systems scratched; Monitor takes its place (2026-08-19)
+
+Travis scratched `/systems` outright. Not parked, not deprecated — deleted, along
+with the `/sim` regression-pipeline trial from earlier the same day. Gone:
+`app/systems`, `components/systems`, `lib/systems`, `public/systems-data`,
+`types/systems.ts`, `app/sim`, `components/sim`, `lib/sim`. The surface had
+exactly one live reference (the card on `/home`) and `/sim` had none, so removal
+was clean; the only typecheck failures were stale generated route types in
+`.next`. The `/systems` row is out of the surface table in CLAUDE.md and the home
+grid is down to five cards.
+
+What replaces it is **Monitor** — a tracking surface, and the first thing in Hugh
+that is purely a record rather than a teacher. Three views, all encoded by hand:
+
+- **Skills** — you type in what you want to learn, tick the days you touched it,
+  write a diary line. One calendar heatmap per skill.
+- **Applications** — job applications shaped like `/notes`: the job description,
+  the title applied for, the cover letter and résumé you actually sent, and a
+  status. A daily time series of applications sent.
+- **Usage** — one heatmap per Hugh feature. The only view the user doesn't fill
+  in.
+
+### The name is load-bearing
+
+`/tracker` is already the learning-track Kanban, fourteen API routes deep. "Track"
+as a feature name would have put two unrelated surfaces one character apart in
+every URL and every future conversation about them. Monitor at `/monitor` costs
+nothing and removes the collision permanently.
+
+### Usage needs its own table, and that is the real scope
+
+`usage_logs` looked like a free win — it already carries `user_id`, `created_at`,
+`feature` and (since migration 036) `model`, across 25 distinct feature strings.
+But it only records **token spend**, and three surfaces spend nothing: The Case
+Room and Case Lab are static JSON by design, and code drills run in Pyodide in the
+browser. On `usage_logs` alone their calendars would be permanently blank no
+matter how often they were used — a view whose most visible content is a lie of
+omission.
+
+So Monitor gets a new `activity_events` table, deduplicated per feature per day at
+write time (a forty-message chat is one day of using Ask Hugh, not forty).
+`usage_logs` stays what it is: a billing record. Overloading it with page views
+would corrupt the per-row per-model cost maths that migration 036 just got right.
+The cost of this decision is honest and worth stating — Monitor is not one page,
+it is one page plus instrumenting nine surfaces.
+
+### Two colour systems, still kept apart
+
+The heatmaps reuse the exact emerald ramp already in
+`components/code/ProgressHeatmap.tsx`, and Monitor takes cyan as its accent. This
+follows the rule `components/code/GroupCell.tsx` already states: accent means
+identity (which surface), the ramp means state (how much have I done). Giving each
+of Monitor's three views its own heat colour would have broken that on its first
+extension.
+
+The application-status palette was validated rather than eyeballed — rejected
+`#e66767`, applied `#3987e5`, screening `#d95926`, interview `#9085e9`, offer
+`#199e70`. All six checks pass, but **only in that stacking order**: green above
+red fails deuteranope separation at ΔE 4.6. The stack order is a constraint, not a
+preference, and is annotated as such in the prototype.
+
+### State
+
+An interactive prototype of all three views, in Hugh's own skin, with seeded
+deterministic data and the decisions annotated beside each screen. Saved at
+`docs/prototypes/monitor.html` and published privately for review.
+
+No PRD and no architecture proposal yet — deliberately. Four questions are open
+and each one changes the build: tabs versus three routes; whether Monitor gets the
+`/notes` scroll exception (it needs one — forty applications do not fit a
+viewport, and that is an edit to the architecture rules); whether Applications
+belongs in Hugh at all, being the first surface with no connection to data and
+analytics and therefore exactly the drift the topic gate exists to prevent; and
+whether Monitor takes the empty sixth slot on `/home`.

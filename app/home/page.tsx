@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { GraduationCap, Code2, Trophy, Cloud, NotebookPen, Cpu } from "lucide-react";
+import { GraduationCap, Code2, Trophy, Cloud, NotebookPen } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import SignOutButton from "@/components/landing/SignOutButton";
@@ -10,8 +10,7 @@ import HeaderUsage from "@/components/usage/HeaderUsage";
 // "Learn" leads to the "What do you want to learn?" dashboard (/home/learn);
 // "Code" opens the coding-drill landing (/code/start); "Cases" opens The Case
 // Room (/cases); "Cloud Skills" opens the cloud-services reference (/cloud);
-// "Notes" opens the wrong-answer review workspace (/notes); "Systems" is a
-// placeholder — no route yet, card is intentionally non-interactive.
+// "Notes" opens the wrong-answer review workspace (/notes).
 export default async function HomePage() {
   const supabase = await createClient();
   const { user } = await verifyUserAccess(supabase);
@@ -179,30 +178,6 @@ export default async function HomePage() {
               Explore the clouds →
             </span>
           </Link>
-
-          {/* Systems — placeholder, no route yet, intentionally non-interactive */}
-          <div
-            aria-disabled="true"
-            className="flex cursor-not-allowed flex-col gap-[clamp(0.4rem,1.2vh,0.75rem)] rounded-2xl border border-slate-700/40 bg-slate-900/20 p-[clamp(0.75rem,2.2vh,1.25rem)] opacity-60"
-          >
-            <div className="flex h-[clamp(2rem,4.2vh,2.75rem)] w-[clamp(2rem,4.2vh,2.75rem)] items-center justify-center rounded-xl bg-slate-500/15 text-slate-400">
-              <Cpu size={22} />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5 mb-1">
-                <p className="font-semibold text-slate-100 text-base">Systems</p>
-                <span className="rounded-full bg-slate-500/15 px-1.5 py-0.5 text-xs font-semibold text-slate-400">
-                  Coming soon
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 leading-snug">
-                System design fundamentals for data work — details soon.
-              </p>
-            </div>
-            <span className="mt-auto text-xs font-semibold text-slate-500">
-              Coming soon
-            </span>
-          </div>
 
           {/* Notes — review a wrong answer with Hugh (personal utility) */}
           <Link

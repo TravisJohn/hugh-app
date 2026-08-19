@@ -1,0 +1,945 @@
+<title>Hugh Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:wght@500;600&display=swap">
+
+<style>
+/* ── Tokens ───────────────────────────────────────────────────────────────
+   Hugh's app is dark-only, so this prototype commits to one visual world
+   rather than inventing a light theme the real product does not have.
+   Every colour is painted explicitly; nothing is inherited from the host. */
+:root{
+  --page:#0B1120;
+  --surface:#0F172A;      /* Hugh's real body background */
+  --card:#131E36;
+  --card-2:#18243F;
+  --line:#1E293B;
+  --line-soft:#172136;
+
+  --ink:#E2E8F0;
+  --ink-2:#94A3B8;
+  --ink-3:#5B6B85;
+
+  --accent:#22D3EE;       /* Monitor's identity hue — free after /systems */
+  --accent-dim:rgba(34,211,238,.14);
+
+  /* Activity ramp — the SAME emerald ramp components/code/ProgressHeatmap.tsx
+     already uses. In Hugh, ramp = state ("how much did I do"), accent =
+     identity ("which surface"). The two are kept strictly apart. */
+  --h0:#1E293B; --h1:#064E3B; --h2:#047857; --h3:#10B981; --h4:#34D399;
+
+  /* Application status — validated categorical, dark surface #0F1629.
+     All six checks PASS, no CVD warning, in this exact stacking order. */
+  --st-rejected:#e66767;
+  --st-applied:#3987e5;
+  --st-screening:#d95926;
+  --st-interview:#9085e9;
+  --st-offer:#199e70;
+
+  --r:14px;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--page);
+  color:var(--ink);
+  font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:15px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px 96px}
+
+/* ── Masthead ─────────────────────────────────────────────────────────── */
+.masthead{padding:72px 0 40px;border-bottom:1px solid var(--line)}
+.kicker{
+  font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--accent);font-weight:600;margin:0 0 14px;
+}
+h1{
+  font-family:Lora,Georgia,serif;font-weight:600;
+  font-size:clamp(2.4rem,5.5vw,3.6rem);line-height:1.06;margin:0 0 18px;
+  text-wrap:balance;letter-spacing:-.02em;
+}
+.standfirst{
+  font-size:1.05rem;color:var(--ink-2);max-width:64ch;margin:0 0 28px;
+}
+.standfirst strong{color:var(--ink);font-weight:600}
+code{
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.82em;
+  background:#0C1424;padding:1px 5px;border-radius:4px;color:var(--ink);
+}
+
+.settled{
+  display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
+  border-radius:var(--r);overflow:hidden;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));
+  margin:0;
+}
+.settled div{background:var(--surface);padding:16px 18px}
+.settled dt{
+  font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-3);font-weight:600;margin:0 0 6px;
+}
+.settled dd{margin:0;font-size:.9rem;color:var(--ink);line-height:1.45}
+.settled dd em{font-style:normal;color:var(--ink-2)}
+
+/* ── Sections ─────────────────────────────────────────────────────────── */
+section{padding-top:76px}
+.sec-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+.tabname{
+  font-family:Lora,Georgia,serif;font-size:1.85rem;font-weight:600;margin:0;
+  letter-spacing:-.01em;
+}
+.route{
+  font-size:12px;color:var(--accent);background:var(--accent-dim);
+  padding:3px 9px;border-radius:999px;font-weight:600;
+}
+.sec-sub{color:var(--ink-2);max-width:70ch;margin:0 0 26px;font-size:.96rem}
+
+/* ── App frame — asserts Hugh's "fits the viewport" rule ──────────────── */
+.frame{
+  border:1px solid var(--line);border-radius:var(--r);overflow:hidden;
+  background:var(--surface);box-shadow:0 24px 60px -30px rgba(0,0,0,.85);
+}
+.chrome{
+  display:flex;align-items:center;gap:8px;padding:9px 14px;
+  background:#0C1424;border-bottom:1px solid var(--line);
+}
+.dot{width:9px;height:9px;border-radius:50%;background:#22304C}
+.chrome .url{
+  margin-left:10px;font-size:11.5px;color:var(--ink-3);
+  font-variant-numeric:tabular-nums;
+}
+.screen{height:620px;display:flex;flex-direction:column;overflow:hidden}
+
+.topbar{
+  display:flex;align-items:center;gap:18px;padding:14px 20px;
+  border-bottom:1px solid var(--line-soft);flex:none;
+}
+.brand{display:flex;align-items:center;gap:9px;font-weight:600;font-size:.95rem}
+.brand .glyph{
+  width:26px;height:26px;border-radius:8px;background:var(--accent-dim);
+  color:var(--accent);display:grid;place-items:center;font-size:13px;font-weight:700;
+}
+.tabs{display:flex;gap:4px;margin-left:6px}
+.tab{
+  font-size:.85rem;padding:6px 13px;border-radius:9px;color:var(--ink-2);
+  border:1px solid transparent;font-weight:500;
+}
+.tab.on{background:var(--accent-dim);color:var(--accent);border-color:rgba(34,211,238,.3);font-weight:600}
+.today{margin-left:auto;font-size:.8rem;color:var(--ink-3);font-variant-numeric:tabular-nums}
+
+.body{flex:1;display:flex;min-height:0}
+.pane{min-height:0;overflow:auto;padding:18px 20px}
+.pane::-webkit-scrollbar{width:8px}
+.pane::-webkit-scrollbar-thumb{background:#1E293B;border-radius:8px}
+.pane+.pane{border-left:1px solid var(--line-soft)}
+
+.paneTitle{
+  font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);
+  font-weight:600;margin:0 0 14px;display:flex;align-items:center;gap:8px;
+}
+.paneTitle .count{color:var(--ink-2);letter-spacing:0;text-transform:none;font-size:11px}
+
+/* ── Skill rows ───────────────────────────────────────────────────────── */
+.skill{
+  border:1px solid var(--line-soft);border-radius:12px;padding:13px 15px;
+  background:var(--card);margin-bottom:10px;
+}
+.skill.sel{border-color:rgba(34,211,238,.4);background:var(--card-2)}
+.skill-top{display:flex;align-items:baseline;gap:10px;margin-bottom:11px}
+.skill-name{font-weight:600;font-size:.92rem;color:var(--ink)}
+.skill-meta{
+  margin-left:auto;font-size:11px;color:var(--ink-3);
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+.skill-meta b{color:var(--ink-2);font-weight:600}
+
+/* ── Heatmap ──────────────────────────────────────────────────────────── */
+.hm{display:flex;gap:3px}
+.hm-col{display:flex;flex-direction:column;gap:3px}
+.hm-cell{border-radius:2px;flex:none}
+.legend{
+  display:flex;align-items:center;gap:7px;font-size:10.5px;color:var(--ink-3);
+  margin-top:9px;
+}
+.legend .sw{width:11px;height:11px;border-radius:2px}
+
+/* ── Tick / diary rail ────────────────────────────────────────────────── */
+.tickcard{
+  border:1px solid var(--line-soft);border-radius:12px;background:var(--card);
+  padding:14px;margin-bottom:12px;
+}
+.tickrow{
+  display:flex;align-items:center;gap:10px;padding:7px 0;
+  border-bottom:1px solid var(--line-soft);font-size:.85rem;
+}
+.tickrow:last-child{border-bottom:0}
+.box{
+  width:17px;height:17px;border-radius:5px;border:1.5px solid #33425E;flex:none;
+  display:grid;place-items:center;font-size:11px;
+}
+.box.on{background:var(--h3);border-color:var(--h3);color:#052E22;font-weight:800}
+.tickrow .nm{color:var(--ink-2)}
+.tickrow.done .nm{color:var(--ink)}
+.streak{margin-left:auto;font-size:10.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+
+.diary{
+  border:1px solid rgba(34,211,238,.28);border-radius:12px;background:var(--card-2);
+  padding:14px;
+}
+.diary h4{margin:0 0 4px;font-size:.86rem;font-weight:600}
+.diary .for{font-size:11px;color:var(--accent);margin:0 0 10px}
+.diary textarea{
+  width:100%;min-height:96px;resize:none;background:#0C1424;color:var(--ink);
+  border:1px solid var(--line);border-radius:9px;padding:10px;font:inherit;
+  font-size:.83rem;line-height:1.55;
+}
+.diary .hint{font-size:10.5px;color:var(--ink-3);margin:8px 0 0}
+.btn{
+  background:var(--accent);color:#04252C;border:0;border-radius:9px;
+  padding:8px 15px;font:inherit;font-weight:600;font-size:.82rem;cursor:pointer;
+}
+.btn.ghost{background:transparent;color:var(--ink-2);border:1px solid var(--line)}
+.btnrow{display:flex;gap:8px;margin-top:10px;align-items:center}
+
+.entry{
+  border-left:2px solid var(--line);padding:0 0 14px 13px;margin-left:3px;
+  position:relative;
+}
+.entry::before{
+  content:"";position:absolute;left:-5px;top:6px;width:8px;height:8px;
+  border-radius:50%;background:var(--h3);border:2px solid var(--surface);
+}
+.entry .d{font-size:10.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.entry p{margin:3px 0 0;font-size:.83rem;color:var(--ink-2);line-height:1.55}
+
+/* ── Stat tiles ───────────────────────────────────────────────────────── */
+.stats{display:grid;gap:10px;margin-bottom:16px}
+.stat{border:1px solid var(--line-soft);border-radius:11px;background:var(--card);padding:11px 13px}
+.stat .k{font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+.stat .v{font-size:1.55rem;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.25;letter-spacing:-.02em}
+.stat .n{font-size:10.5px;color:var(--ink-3)}
+
+/* ── Application list ─────────────────────────────────────────────────── */
+.app{
+  border:1px solid var(--line-soft);border-radius:11px;background:var(--card);
+  padding:11px 13px;margin-bottom:8px;
+}
+.app.sel{border-color:rgba(34,211,238,.4);background:var(--card-2)}
+.app .role{font-size:.87rem;font-weight:600;line-height:1.35}
+.app .co{font-size:.79rem;color:var(--ink-2);margin-top:1px}
+.app .foot{display:flex;align-items:center;gap:8px;margin-top:8px}
+.app .when{margin-left:auto;font-size:10.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+
+.pill{
+  display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;
+  padding:2px 8px;border-radius:999px;border:1px solid;
+}
+.pill .bead{width:7px;height:7px;border-radius:50%;flex:none}
+
+.docTabs{display:flex;gap:4px;margin-bottom:12px;border-bottom:1px solid var(--line-soft)}
+.docTab{
+  font-size:.79rem;padding:7px 11px;color:var(--ink-3);border-bottom:2px solid transparent;
+  font-weight:500;
+}
+.docTab.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.doc{
+  font-size:.81rem;color:var(--ink-2);line-height:1.62;
+  border:1px solid var(--line-soft);border-radius:11px;background:var(--card);padding:14px;
+}
+.doc h5{margin:0 0 8px;font-size:.83rem;color:var(--ink);font-weight:600}
+.doc p{margin:0 0 9px}
+.doc ul{margin:0 0 9px;padding-left:17px}
+.doc li{margin-bottom:4px}
+.attach{
+  display:flex;align-items:center;gap:9px;border:1px solid var(--line-soft);
+  border-radius:10px;background:var(--card);padding:10px 12px;margin-top:9px;font-size:.8rem;
+}
+.attach .ic{
+  width:26px;height:26px;border-radius:7px;background:#1B2740;display:grid;
+  place-items:center;font-size:10px;color:var(--ink-2);flex:none;font-weight:600;
+}
+.attach .sz{margin-left:auto;font-size:10.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+
+.timeline{margin:14px 0 0}
+.tl{display:flex;gap:10px;font-size:.8rem;padding:5px 0}
+.tl .dt{color:var(--ink-3);font-variant-numeric:tabular-nums;flex:none;width:52px}
+.tl .tx{color:var(--ink-2)}
+
+/* ── Usage small multiples ────────────────────────────────────────────── */
+.multi{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+.mini{border:1px solid var(--line-soft);border-radius:11px;background:var(--card);padding:11px 12px}
+.mini .nm{font-size:.8rem;font-weight:600;display:flex;align-items:center;gap:7px}
+.mini .nm .src{
+  margin-left:auto;font-size:9px;letter-spacing:.06em;text-transform:uppercase;
+  font-weight:600;padding:1px 5px;border-radius:4px;
+}
+.src.logged{background:rgba(25,158,112,.16);color:#5FD3A8}
+.src.dark{background:rgba(230,103,103,.14);color:#F09B9B}
+.mini .st{font-size:10.5px;color:var(--ink-3);margin:2px 0 9px;font-variant-numeric:tabular-nums}
+
+.rank{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line-soft);font-size:.83rem}
+.rank:last-child{border-bottom:0}
+.rank .bar{flex:1;height:6px;border-radius:999px;background:#16223A;overflow:hidden}
+.rank .bar i{display:block;height:100%;border-radius:999px;background:var(--h3)}
+.rank .n{font-variant-numeric:tabular-nums;color:var(--ink-2);font-size:11.5px;width:34px;text-align:right}
+
+/* ── Annotations ──────────────────────────────────────────────────────── */
+.notes{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));
+  gap:1px;background:var(--line);border:1px solid var(--line);
+  border-radius:var(--r);overflow:hidden;margin-top:22px;
+}
+.note{background:var(--surface);padding:16px 18px}
+.note h4{
+  margin:0 0 7px;font-size:.85rem;font-weight:600;display:flex;align-items:center;
+  gap:8px;flex-wrap:wrap;
+}
+.tagQ{
+  font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;
+  padding:2px 6px;border-radius:5px;background:rgba(217,89,38,.18);color:#F0916A;
+}
+.tagD{
+  font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;
+  padding:2px 6px;border-radius:5px;background:rgba(57,135,229,.18);color:#7FB2F0;
+}
+.note p{margin:0;font-size:.84rem;color:var(--ink-2);line-height:1.6}
+.note p+p{margin-top:8px}
+.note b{color:var(--accent);font-weight:600}
+
+/* ── Tooltip ──────────────────────────────────────────────────────────── */
+#tip{
+  position:fixed;z-index:99;pointer-events:none;opacity:0;transition:opacity .1s;
+  background:#0A1120;border:1px solid #2A3A57;border-radius:8px;padding:7px 10px;
+  font-size:11.5px;line-height:1.45;color:var(--ink);box-shadow:0 10px 30px rgba(0,0,0,.6);
+  font-variant-numeric:tabular-nums;white-space:nowrap;left:0;top:0;
+}
+#tip b{color:#fff}
+#tip .sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px}
+
+/* ── Closing ──────────────────────────────────────────────────────────── */
+.asks{margin-top:26px;display:grid;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.ask{background:var(--surface);padding:18px 20px;display:flex;gap:16px;align-items:flex-start}
+.ask .num{
+  font-family:Lora,Georgia,serif;font-size:1.2rem;color:var(--accent);
+  font-variant-numeric:tabular-nums;flex:none;width:24px;
+}
+.ask h4{margin:0 0 5px;font-size:.93rem;font-weight:600}
+.ask p{margin:0;font-size:.87rem;color:var(--ink-2);line-height:1.6}
+.ask p+p{margin-top:7px}
+.ask .rec{color:var(--ink)}
+.ask .rec b{color:var(--accent);font-weight:600}
+
+@media (max-width:880px){
+  .screen{height:auto}
+  .body{flex-direction:column}
+  .pane+.pane{border-left:0;border-top:1px solid var(--line-soft)}
+  .pane{overflow-x:auto}
+  .multi{grid-template-columns:1fr}
+}
+</style>
+
+<div id="tip"></div>
+
+<div class="wrap">
+
+  <div class="masthead">
+    <p class="kicker">Prototype for approval &middot; 19 Aug 2026</p>
+    <h1>Monitor</h1>
+    <p class="standfirst">
+      Three things you keep by hand, in one place: <strong>what you are learning</strong>,
+      <strong>where you have applied</strong>, and <strong>how you actually use Hugh</strong>.
+      Nothing is inferred and nothing is automated &mdash; except the last view, which only
+      counts what you already did. This replaces the scratched <code>/systems</code>
+      directory; that code and the <code>/sim</code> trial are deleted.
+    </p>
+    <dl class="settled">
+      <div><dt>Name &amp; route</dt><dd>Monitor, at <code>/monitor</code>. <em>No collision with the existing <code>/tracker</code> Kanban.</em></dd></div>
+      <div><dt>Usage data</dt><dd>New <code>activity_events</code> table. <em>Covers the zero-AI surfaces too.</em></dd></div>
+      <div><dt>Skills</dt><dd>Fully independent, typed by hand. <em>No link to learning goals.</em></dd></div>
+      <div><dt>Accent</dt><dd>Cyan. <em>Distinct from the emerald activity ramp, which means state, not identity.</em></dd></div>
+    </dl>
+  </div>
+
+  <!-- ══ SKILLS ══════════════════════════════════════════════════════ -->
+  <section>
+    <div class="sec-head">
+      <h2 class="tabname">Skills</h2>
+      <span class="route">/monitor</span>
+    </div>
+    <p class="sec-sub">
+      You encode what you want to learn. Each day you tick what you touched and write one
+      diary line about it. The heatmap is the whole payoff &mdash; six months of showing up,
+      or not, at a glance.
+    </p>
+
+    <div class="frame">
+      <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="url">hugh.app/monitor</span></div>
+      <div class="screen">
+        <div class="topbar">
+          <div class="brand"><span class="glyph">M</span> Monitor</div>
+          <div class="tabs">
+            <span class="tab on">Skills</span>
+            <span class="tab">Applications</span>
+            <span class="tab">Usage</span>
+          </div>
+          <span class="today">Wed 19 Aug 2026</span>
+        </div>
+        <div class="body">
+          <div class="pane" style="flex:1.62">
+            <p class="paneTitle">Skills you are tracking <span class="count">6 &middot; 182 days shown</span></p>
+            <div id="skillList"></div>
+            <div class="legend">
+              <span>Nothing</span>
+              <span class="sw" style="background:var(--h0)"></span>
+              <span class="sw" style="background:var(--h1)"></span>
+              <span class="sw" style="background:var(--h2)"></span>
+              <span class="sw" style="background:var(--h3)"></span>
+              <span class="sw" style="background:var(--h4)"></span>
+              <span>Deep session</span>
+            </div>
+          </div>
+          <div class="pane" style="flex:1">
+            <p class="paneTitle">Today</p>
+            <div class="tickcard">
+              <div class="tickrow done"><span class="box on">&#10003;</span><span class="nm">Window functions (SQL)</span><span class="streak">4 days</span></div>
+              <div class="tickrow done"><span class="box on">&#10003;</span><span class="nm">dbt incremental models</span><span class="streak">2 days</span></div>
+              <div class="tickrow"><span class="box"></span><span class="nm">Airflow sensors &amp; backfills</span><span class="streak">last: 6d</span></div>
+              <div class="tickrow"><span class="box"></span><span class="nm">Bayesian A/B testing</span><span class="streak">last: 11d</span></div>
+              <div class="tickrow"><span class="box"></span><span class="nm">Polars for larger-than-memory</span><span class="streak">last: 3d</span></div>
+              <div class="tickrow"><span class="box"></span><span class="nm">RAG retrieval evaluation</span><span class="streak">never</span></div>
+            </div>
+
+            <div class="diary">
+              <h4>Diary entry</h4>
+              <p class="for">for &ldquo;Window functions (SQL)&rdquo; &middot; 19 Aug</p>
+              <textarea readonly>Finally got why RANGE and ROWS differ. ROWS counts physical rows, RANGE counts peer values, so with duplicate order-by keys a RANGE frame swallows all the ties at once. Bit me on the running-revenue query where two orders shared a timestamp.</textarea>
+              <div class="btnrow">
+                <button class="btn">Save entry</button>
+                <button class="btn ghost">Tick without a note</button>
+              </div>
+              <p class="hint">A tick with no note still counts on the heatmap &mdash; it just shades lighter.</p>
+            </div>
+
+            <p class="paneTitle" style="margin-top:18px">Recent &middot; Window functions</p>
+            <div class="entry"><span class="d">17 Aug</span><p>Rewrote the cohort retention query with a self-join replaced by LAG. Half the lines, and it finally reads top to bottom.</p></div>
+            <div class="entry"><span class="d">14 Aug</span><p>NTILE for decile bucketing. Uneven buckets when counts do not divide &mdash; that is expected, not a bug.</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note">
+        <h4><span class="tagD">Decided</span> Tick and note are separate</h4>
+        <p>A tick alone counts. Forcing a diary entry every day is how a tracker gets abandoned in week three &mdash; the shading distinguishes a ticked day from a written one, so honesty costs nothing.</p>
+      </div>
+      <div class="note">
+        <h4><span class="tagD">Decided</span> No streak scoreboard</h4>
+        <p><code>ProgressHeatmap</code> already refuses streak counts and &ldquo;don't break the chain&rdquo; framing on purpose. Monitor keeps that stance: &ldquo;4 days&rdquo; is a fact on the row, not a trophy you can lose.</p>
+      </div>
+      <div class="note">
+        <h4><span class="tagQ">Needs a call</span> How far back does a row show?</h4>
+        <p>Six months fits the pane at 11px cells. A full year needs 8px cells or horizontal scroll inside the row. I have drawn <b>182 days</b> &mdash; say the word if you want 365.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ APPLICATIONS ════════════════════════════════════════════════ -->
+  <section>
+    <div class="sec-head">
+      <h2 class="tabname">Applications</h2>
+      <span class="route">/monitor/applications</span>
+    </div>
+    <p class="sec-sub">
+      Shaped like Notes: a list on the left, the documents on the right. Every application
+      keeps the job description, the title you applied for, and the exact cover letter and
+      r&eacute;sum&eacute; you sent &mdash; so six weeks later you can see what you actually
+      claimed. Status is typed by you; nothing is scraped from email.
+    </p>
+
+    <div class="frame">
+      <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="url">hugh.app/monitor/applications</span></div>
+      <div class="screen">
+        <div class="topbar">
+          <div class="brand"><span class="glyph">M</span> Monitor</div>
+          <div class="tabs">
+            <span class="tab">Skills</span>
+            <span class="tab on">Applications</span>
+            <span class="tab">Usage</span>
+          </div>
+          <span class="today">Wed 19 Aug 2026</span>
+        </div>
+        <div class="body">
+          <div class="pane" style="flex:.92">
+            <div class="stats" style="grid-template-columns:repeat(2,1fr)">
+              <div class="stat"><div class="k">Sent</div><div class="v">58</div><div class="n">since 24 Jun</div></div>
+              <div class="stat"><div class="k">Live</div><div class="v">19</div><div class="n">not yet closed</div></div>
+              <div class="stat"><div class="k">Interviews</div><div class="v">7</div><div class="n">12% of sent</div></div>
+              <div class="stat"><div class="k">Offers</div><div class="v">1</div><div class="n">Halcyon Labs</div></div>
+            </div>
+            <p class="paneTitle">Applications per day <span class="count">8 weeks</span></p>
+            <div id="appChart"></div>
+            <div id="appLegend" style="margin-top:10px"></div>
+          </div>
+
+          <div class="pane" style="flex:.78">
+            <p class="paneTitle">All applications <span class="count">58</span></p>
+            <div class="app sel">
+              <div class="role">Senior Analytics Engineer</div>
+              <div class="co">Halcyon Labs</div>
+              <div class="foot">
+                <span class="pill" style="color:#5FD3A8;border-color:rgba(25,158,112,.45);background:rgba(25,158,112,.13)"><span class="bead" style="background:var(--st-offer)"></span>Offer</span>
+                <span class="when">2 Jul</span>
+              </div>
+            </div>
+            <div class="app">
+              <div class="role">Data Scientist, Growth</div>
+              <div class="co">Kestrel Logistics</div>
+              <div class="foot">
+                <span class="pill" style="color:#B4ABF3;border-color:rgba(144,133,233,.45);background:rgba(144,133,233,.13)"><span class="bead" style="background:var(--st-interview)"></span>Interview</span>
+                <span class="when">28 Jul</span>
+              </div>
+            </div>
+            <div class="app">
+              <div class="role">Analytics Engineer</div>
+              <div class="co">Brightline Energy</div>
+              <div class="foot">
+                <span class="pill" style="color:#F0916A;border-color:rgba(217,89,38,.45);background:rgba(217,89,38,.13)"><span class="bead" style="background:var(--st-screening)"></span>Screening</span>
+                <span class="when">11 Aug</span>
+              </div>
+            </div>
+            <div class="app">
+              <div class="role">Senior Data Analyst</div>
+              <div class="co">Meridian Health</div>
+              <div class="foot">
+                <span class="pill" style="color:#8FBEF3;border-color:rgba(57,135,229,.45);background:rgba(57,135,229,.13)"><span class="bead" style="background:var(--st-applied)"></span>Applied</span>
+                <span class="when">15 Aug</span>
+              </div>
+            </div>
+            <div class="app">
+              <div class="role">ML Engineer, Forecasting</div>
+              <div class="co">Northwind Bank</div>
+              <div class="foot">
+                <span class="pill" style="color:#F09B9B;border-color:rgba(230,103,103,.45);background:rgba(230,103,103,.13)"><span class="bead" style="background:var(--st-rejected)"></span>Rejected</span>
+                <span class="when">9 Jul</span>
+              </div>
+            </div>
+            <div class="app">
+              <div class="role">Data Platform Engineer</div>
+              <div class="co">Aurora Retail</div>
+              <div class="foot">
+                <span class="pill" style="color:#8FBEF3;border-color:rgba(57,135,229,.45);background:rgba(57,135,229,.13)"><span class="bead" style="background:var(--st-applied)"></span>Applied</span>
+                <span class="when">18 Aug</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="pane" style="flex:1.05">
+            <div class="docTabs">
+              <span class="docTab on">Job description</span>
+              <span class="docTab">Cover letter</span>
+              <span class="docTab">R&eacute;sum&eacute;</span>
+              <span class="docTab">Notes</span>
+            </div>
+            <div class="doc">
+              <h5>Senior Analytics Engineer &middot; Halcyon Labs</h5>
+              <p>Own the semantic layer end to end. You will be the person who decides what
+              &ldquo;active customer&rdquo; means and defends it to three teams who each already
+              have their own answer.</p>
+              <ul>
+                <li>5+ years in analytics or data engineering</li>
+                <li>dbt in production, not just tutorials &mdash; incremental models, snapshots, tests</li>
+                <li>Warehouse cost awareness; we run BigQuery and it is not free</li>
+                <li>Comfortable saying no to a dashboard request</li>
+              </ul>
+              <p>Salary banded. Hybrid, two days on site.</p>
+            </div>
+            <div class="attach"><span class="ic">PDF</span><span>cover-letter-halcyon-v2.pdf</span><span class="sz">78 KB</span></div>
+            <div class="attach"><span class="ic">PDF</span><span>resume-analytics-eng-2026-06.pdf</span><span class="sz">211 KB</span></div>
+
+            <p class="paneTitle" style="margin-top:18px">Status history</p>
+            <div class="timeline">
+              <div class="tl"><span class="dt">2 Jul</span><span class="tx">Applied &mdash; via careers page, no referral</span></div>
+              <div class="tl"><span class="dt">9 Jul</span><span class="tx">Screening &mdash; 30 min with the hiring manager</span></div>
+              <div class="tl"><span class="dt">21 Jul</span><span class="tx">Interview &mdash; SQL pairing, semantic-layer design</span></div>
+              <div class="tl"><span class="dt">6 Aug</span><span class="tx">Offer &mdash; verbal, written to follow</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note">
+        <h4><span class="tagD">Decided</span> Status is a history, not a field</h4>
+        <p>Each change appends a dated row. A single mutable status column would erase the thing you actually want later: how long each stage took, and where applications die.</p>
+      </div>
+      <div class="note">
+        <h4><span class="tagD">Decided</span> Bars stack in outcome order</h4>
+        <p>Rejected at the base, then Applied, Screening, Interview, Offer rising. This exact order was validated for colour-blind separation &mdash; reordering the stack breaks that, so it is not a free choice.</p>
+      </div>
+      <div class="note">
+        <h4><span class="tagQ">Needs a call</span> Files, or pasted text?</h4>
+        <p>Uploading the real PDF is truer documentation but means Supabase Storage, a bucket policy, and size limits. Pasted text is free and searchable. I would <b>ship pasted text first and add upload after</b> &mdash; though the r&eacute;sum&eacute; is the one where the file itself matters.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ USAGE ═══════════════════════════════════════════════════════ -->
+  <section>
+    <div class="sec-head">
+      <h2 class="tabname">Usage</h2>
+      <span class="route">/monitor/usage</span>
+    </div>
+    <p class="sec-sub">
+      The only view you do not fill in. Every surface writes one row to
+      <code>activity_events</code> when you actually use it, and each feature gets its own
+      calendar. The point is the gaps: Case Lab opened twice in six months is a fact worth
+      seeing.
+    </p>
+
+    <div class="frame">
+      <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="url">hugh.app/monitor/usage</span></div>
+      <div class="screen">
+        <div class="topbar">
+          <div class="brand"><span class="glyph">M</span> Monitor</div>
+          <div class="tabs">
+            <span class="tab">Skills</span>
+            <span class="tab">Applications</span>
+            <span class="tab on">Usage</span>
+          </div>
+          <span class="today">Wed 19 Aug 2026</span>
+        </div>
+        <div class="body">
+          <div class="pane" style="flex:1.72">
+            <p class="paneTitle">Everything <span class="count">last 12 months</span></p>
+            <div id="allHm" style="margin-bottom:18px"></div>
+            <p class="paneTitle">By feature <span class="count">9 surfaces</span></p>
+            <div class="multi" id="multi"></div>
+          </div>
+          <div class="pane" style="flex:.72">
+            <p class="paneTitle">Days used <span class="count">12 months</span></p>
+            <div id="rank"></div>
+            <div class="tickcard" style="margin-top:16px">
+              <p style="margin:0 0 6px;font-size:.8rem;font-weight:600">Where the data comes from</p>
+              <p style="margin:0;font-size:.78rem;color:var(--ink-2);line-height:1.55">
+                Six surfaces already log token spend. Three &mdash; Cases, Case Lab and Code
+                drills &mdash; spend nothing, so today they are invisible.
+                <code>activity_events</code> is what makes their calendars real rather than
+                permanently empty.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note">
+        <h4><span class="tagD">Decided</span> One event per surface per day</h4>
+        <p>A chat with forty messages is one day of using Ask Hugh, not forty. Events deduplicate at write time, so the calendar answers &ldquo;did I show up&rdquo; rather than &ldquo;how chatty was I&rdquo;.</p>
+      </div>
+      <div class="note">
+        <h4><span class="tagD">Decided</span> Separate from <code>usage_logs</code></h4>
+        <p><code>usage_logs</code> exists to price tokens and enforce quota; that is a billing record and should stay one. Overloading it with page views would corrupt the cost maths migration 036 just got right.</p>
+      </div>
+      <div class="note">
+        <h4><span class="tagQ">Needs a call</span> The red badges are honest, but ugly</h4>
+        <p>I marked which surfaces are not yet instrumented. Ship with those calendars visibly empty and labelled, or instrument all nine first and launch complete? <b>I would instrument first</b> &mdash; a view whose main content is &ldquo;coming soon&rdquo; teaches nothing.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ ASKS ════════════════════════════════════════════════════════ -->
+  <section>
+    <div class="sec-head"><h2 class="tabname">Before I build</h2></div>
+    <p class="sec-sub">Four things I could not settle from the brief. Everything else I will take as approved.</p>
+    <div class="asks">
+      <div class="ask">
+        <span class="num">1</span>
+        <div>
+          <h4>Three tabs, or three routes?</h4>
+          <p>Drawn here as tabs under one <code>/monitor</code> shell. That keeps one home card and one mental model, but the panes get tight &mdash; Applications is already three columns.</p>
+          <p class="rec">I would keep <b>tabs</b>, with Applications able to open a full-width detail view the way <code>/notes</code> does.</p>
+        </div>
+      </div>
+      <div class="ask">
+        <span class="num">2</span>
+        <div>
+          <h4>Monitor needs the Notes scroll exception</h4>
+          <p>Hugh's rule is no scroll on any screen. Six skills fit; forty applications do not, and neither does a year of diary entries. Monitor is a records tool, like Notes.</p>
+          <p class="rec">I would grant it <b>the same exception Notes has</b>: page locked to the viewport, panes scroll internally. That is an edit to the architecture rules in <code>CLAUDE.md</code>, so it is yours to approve.</p>
+        </div>
+      </div>
+      <div class="ask">
+        <span class="num">3</span>
+        <div>
+          <h4>Does Applications belong in Hugh at all?</h4>
+          <p>Skills and Usage are about learning. A job-application tracker is career admin &mdash; useful, personal, and the first thing in Hugh with no connection to data and analytics. The topic gate exists precisely to stop that kind of drift.</p>
+          <p class="rec">I will build it as asked. Flagging it once because <b>it is the piece that changes what Hugh is</b>, and you may want it gated to your own account rather than shipped to every learner.</p>
+        </div>
+      </div>
+      <div class="ask">
+        <span class="num">4</span>
+        <div>
+          <h4>What fills the Systems slot on <code>/home</code>?</h4>
+          <p>I removed that card, so the grid is five. Monitor can take the empty slot with the cyan accent shown throughout here.</p>
+          <p class="rec">Confirm <b>Monitor takes the sixth slot</b> and I will wire the card in the same pass.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script type="module">
+// ── Deterministic data ─────────────────────────────────────────────────
+// Seeded so the prototype looks identical every time it is opened. A mockup
+// that reshuffles on reload cannot be reviewed against.
+const rand = s => () => (s = Math.imul(s ^ (s >>> 15), 1 | s),
+  ((s = s + Math.imul(s ^ (s >>> 7), 61 | s) ^ s) ^ (s >>> 14)) >>> 0) / 4294967296;
+
+const END = new Date(Date.UTC(2026, 7, 19));
+const DAY = 86400000;
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const fmt = d => d.getUTCDate() + " " + MONTHS[d.getUTCMonth()] + " " + d.getUTCFullYear();
+
+/* density = share of days touched; burst = how much activity clumps into runs */
+function makeDays(seed, n, density, burst) {
+  const r = rand(seed), out = [];
+  let hot = 0;
+  for (let i = n - 1; i >= 0; i--) {
+    const date = new Date(END.getTime() - i * DAY);
+    const dow = date.getUTCDay();
+    const weekend = (dow === 0 || dow === 6) ? 0.45 : 1;
+    if (hot > 0) hot--;
+    else if (r() < density * burst * weekend) hot = 1 + Math.floor(r() * 4);
+    const on = hot > 0 && r() < 0.82 * weekend;
+    out.push({ date, count: on ? 1 + Math.floor(r() * r() * 5) : 0 });
+  }
+  return out;
+}
+
+const RAMP = ["--h0","--h1","--h2","--h3","--h4"];
+const level = (c, max) => c === 0 ? 0 : c / max > .75 ? 4 : c / max > .5 ? 3 : c / max > .25 ? 2 : 1;
+
+// ── Tooltip ────────────────────────────────────────────────────────────
+const tip = document.getElementById("tip");
+function bindTip(el, html) {
+  el.addEventListener("mouseenter", () => { tip.innerHTML = html; tip.style.opacity = "1"; });
+  el.addEventListener("mousemove", e => {
+    tip.style.left = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 10) + "px";
+    tip.style.top = Math.max(8, e.clientY - tip.offsetHeight - 12) + "px";
+  });
+  el.addEventListener("mouseleave", () => { tip.style.opacity = "0"; });
+}
+
+// ── Calendar heatmap ───────────────────────────────────────────────────
+function heatmap(days, cell, unit) {
+  const max = Math.max(1, ...days.map(d => d.count));
+  const pad = days[0].date.getUTCDay();
+  const cells = new Array(pad).fill(null).concat(days);
+
+  const wrap = document.createElement("div");
+  wrap.style.overflowX = "auto";
+  const grid = document.createElement("div");
+  grid.className = "hm";
+
+  for (let i = 0; i < cells.length; i += 7) {
+    const col = document.createElement("div");
+    col.className = "hm-col";
+    for (const d of cells.slice(i, i + 7)) {
+      const c = document.createElement("div");
+      c.className = "hm-cell";
+      c.style.width = c.style.height = cell + "px";
+      if (!d) {
+        c.style.background = "transparent";
+      } else {
+        const lv = level(d.count, max);
+        c.style.background = "var(" + RAMP[lv] + ")";
+        bindTip(c, d.count === 0
+          ? "<b>" + fmt(d.date) + "</b><br>Nothing logged"
+          : '<span class="sw" style="background:var(' + RAMP[lv] + ')"></span><b>'
+            + fmt(d.date) + "</b><br>" + d.count + " " + unit + (d.count === 1 ? "" : "s"));
+      }
+      col.appendChild(c);
+    }
+    grid.appendChild(col);
+  }
+  wrap.appendChild(grid);
+  return wrap;
+}
+
+// ── Skills ─────────────────────────────────────────────────────────────
+const SKILLS = [
+  { name: "Window functions (SQL)",        seed: 11, d: .30, b: 1.5, note: "16 entries" },
+  { name: "dbt incremental models",        seed: 27, d: .22, b: 1.4, note: "11 entries" },
+  { name: "Airflow sensors &amp; backfills",   seed: 43, d: .13, b: 1.2, note: "7 entries" },
+  { name: "Bayesian A/B testing",          seed: 61, d: .09, b: 1.1, note: "5 entries" },
+  { name: "Polars for larger-than-memory", seed: 83, d: .17, b: 1.3, note: "9 entries" },
+  { name: "RAG retrieval evaluation",      seed: 97, d: .00, b: 0,   note: "not started" },
+];
+
+const skillList = document.getElementById("skillList");
+SKILLS.forEach((s, i) => {
+  const days = makeDays(s.seed, 182, s.d, s.b);
+  const active = days.filter(x => x.count > 0).length;
+  const row = document.createElement("div");
+  row.className = "skill" + (i === 0 ? " sel" : "");
+  row.innerHTML = '<div class="skill-top"><span class="skill-name">' + s.name +
+    '</span><span class="skill-meta"><b>' + active + "</b> days &middot; " + s.note + "</span></div>";
+  row.appendChild(heatmap(days, 11, "session"));
+  skillList.appendChild(row);
+});
+
+// ── Applications per day, stacked ──────────────────────────────────────
+// Stack order is the validated one: rejected, applied, screening, interview,
+// offer. Colour follows the status, never its position in the stack.
+const STATUS = [
+  { key: "Rejected",  v: "--st-rejected"  },
+  { key: "Applied",   v: "--st-applied"   },
+  { key: "Screening", v: "--st-screening" },
+  { key: "Interview", v: "--st-interview" },
+  { key: "Offer",     v: "--st-offer"     },
+];
+
+const rA = rand(2026);
+const N = 56, W = 430, H = 128, PADL = 22, PADB = 18;
+const cols = [];
+for (let i = N - 1; i >= 0; i--) {
+  const date = new Date(END.getTime() - i * DAY);
+  const dow = date.getUTCDay();
+  const total = (dow === 0 || dow === 6) ? (rA() < .22 ? 1 : 0) : Math.floor(rA() * rA() * 4.4);
+  const seg = [0, 0, 0, 0, 0];
+  for (let k = 0; k < total; k++) {
+    const u = rA();
+    seg[u < .30 ? 0 : u < .70 ? 1 : u < .88 ? 2 : u < .97 ? 3 : 4]++;
+  }
+  cols.push({ date, seg, total });
+}
+const maxT = Math.max(1, ...cols.map(c => c.total));
+const bw = (W - PADL - 6) / N;
+
+const NS = "http://www.w3.org/2000/svg";
+const svg = document.createElementNS(NS, "svg");
+svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+svg.setAttribute("width", "100%");
+svg.setAttribute("role", "img");
+svg.setAttribute("aria-label", "Applications sent per day over eight weeks, stacked by current status");
+
+// Recessive gridlines — reference, not furniture.
+for (let g = 0; g <= maxT; g += 2) {
+  const y = H - PADB - (g / maxT) * (H - PADB - 8);
+  const ln = document.createElementNS(NS, "line");
+  ln.setAttribute("x1", PADL); ln.setAttribute("x2", W);
+  ln.setAttribute("y1", y);    ln.setAttribute("y2", y);
+  ln.setAttribute("stroke", "#1B2740"); ln.setAttribute("stroke-width", "1");
+  svg.appendChild(ln);
+  const tx = document.createElementNS(NS, "text");
+  tx.setAttribute("x", PADL - 6); tx.setAttribute("y", y + 3.5);
+  tx.setAttribute("text-anchor", "end"); tx.setAttribute("fill", "#5B6B85");
+  tx.setAttribute("font-size", "9"); tx.textContent = String(g);
+  svg.appendChild(tx);
+}
+
+cols.forEach((c, i) => {
+  let y = H - PADB;
+  const x = PADL + i * bw;
+  c.seg.forEach((n, si) => {
+    if (!n) return;
+    const h = (n / maxT) * (H - PADB - 8);
+    const r = document.createElementNS(NS, "rect");
+    r.setAttribute("x", x);
+    r.setAttribute("width", Math.max(1.5, bw - 2));
+    r.setAttribute("y", y - h);
+    r.setAttribute("height", Math.max(1.5, h - 2)); // 2px surface gap between segments
+    r.setAttribute("rx", 1.5);
+    r.setAttribute("fill", "var(" + STATUS[si].v + ")");
+    svg.appendChild(r);
+    y -= h;
+  });
+  const hit = document.createElementNS(NS, "rect");
+  hit.setAttribute("x", x - 1); hit.setAttribute("width", bw + 2);
+  hit.setAttribute("y", 0);     hit.setAttribute("height", H - PADB);
+  hit.setAttribute("fill", "transparent");
+  svg.appendChild(hit);
+  const lines = c.seg
+    .map((n, si) => n ? '<span class="sw" style="background:var(' + STATUS[si].v + ')"></span>'
+      + STATUS[si].key + " &middot; " + n : null)
+    .filter(Boolean).join("<br>");
+  bindTip(hit, "<b>" + fmt(c.date) + "</b><br>" + (c.total ? lines : "No applications"));
+});
+
+// Month ticks
+let lastM = -1;
+cols.forEach((c, i) => {
+  if (c.date.getUTCMonth() !== lastM && c.date.getUTCDate() <= 7) {
+    lastM = c.date.getUTCMonth();
+    const t = document.createElementNS(NS, "text");
+    t.setAttribute("x", PADL + i * bw); t.setAttribute("y", H - 5);
+    t.setAttribute("fill", "#5B6B85"); t.setAttribute("font-size", "9");
+    t.textContent = MONTHS[lastM];
+    svg.appendChild(t);
+  }
+});
+document.getElementById("appChart").appendChild(svg);
+
+// Legend — always present for >= 2 series, so identity is never colour alone.
+document.getElementById("appLegend").innerHTML =
+  '<div style="display:flex;flex-wrap:wrap;gap:8px 14px;font-size:10.5px;color:var(--ink-2)">' +
+  STATUS.map(s => '<span style="display:inline-flex;align-items:center;gap:6px">' +
+    '<span style="width:9px;height:9px;border-radius:2px;background:var(' + s.v + ')"></span>' +
+    s.key + "</span>").join("") + "</div>";
+
+// ── Usage ──────────────────────────────────────────────────────────────
+const FEATURES = [
+  { name: "Ask Hugh",      seed: 5,  d: .46, b: 1.5, logged: true,  last: "today"  },
+  { name: "Learn chat",    seed: 15, d: .38, b: 1.4, logged: true,  last: "today"  },
+  { name: "Code drills",   seed: 25, d: .31, b: 1.6, logged: false, last: "2d ago" },
+  { name: "Notes",         seed: 35, d: .24, b: 1.3, logged: true,  last: "3d ago" },
+  { name: "Review quiz",   seed: 45, d: .19, b: 1.2, logged: true,  last: "5d ago" },
+  { name: "The Case Room", seed: 55, d: .16, b: 1.4, logged: false, last: "1w ago" },
+  { name: "Mastery",       seed: 65, d: .12, b: 1.1, logged: true,  last: "2w ago" },
+  { name: "Cloud Skills",  seed: 75, d: .08, b: 1.2, logged: true,  last: "4w ago" },
+  { name: "Case Lab",      seed: 85, d: .03, b: 1.0, logged: false, last: "9w ago" },
+];
+
+const featDays = FEATURES.map(f => ({ f, days: makeDays(f.seed, 364, f.d, f.b) }));
+
+// Combined calendar: how many distinct surfaces were used that day.
+const combined = featDays[0].days.map((_, i) => ({
+  date: featDays[0].days[i].date,
+  count: featDays.reduce((a, x) => a + (x.days[i].count > 0 ? 1 : 0), 0),
+}));
+document.getElementById("allHm").appendChild(heatmap(combined, 11, "surface used"));
+
+const multi = document.getElementById("multi");
+featDays.forEach(({ f, days }) => {
+  const active = days.filter(d => d.count > 0).length;
+  const el = document.createElement("div");
+  el.className = "mini";
+  el.innerHTML = '<div class="nm">' + f.name + '<span class="src ' +
+    (f.logged ? "logged" : "dark") + '">' + (f.logged ? "logged" : "not yet") + "</span></div>" +
+    '<div class="st">' + active + " days &middot; last " + f.last + "</div>";
+  el.appendChild(heatmap(days, 6, "visit"));
+  multi.appendChild(el);
+});
+
+const ranked = featDays
+  .map(({ f, days }) => ({ name: f.name, n: days.filter(d => d.count > 0).length }))
+  .sort((a, b) => b.n - a.n);
+const rmax = ranked[0].n;
+document.getElementById("rank").innerHTML = ranked.map(r =>
+  '<div class="rank"><span style="width:88px;color:var(--ink-2);font-size:12px">' + r.name +
+  '</span><span class="bar"><i style="width:' + (r.n / rmax * 100).toFixed(1) +
+  '%"></i></span><span class="n">' + r.n + "</span></div>").join("");
+</script>
