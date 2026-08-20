@@ -4086,3 +4086,21 @@ migration also caught the second before it ran — `case_attempts` dates rows wi
 Green on lint, tsc, 612 tests (24 new). **Migration 044 needs a manual apply**;
 it is additive plus seeding, with no destructive statements. Monitor's four
 views are all built: Skills, Résumés and Cover Letters, Applications, Your Usage.
+
+## Monitor shipped to production (2026-08-20)
+
+`a37a157` on `main`. CI gate green — lint, typecheck, 614 unit tests, dependency
+audit, production build. Prod shares the Supabase project, so migrations 037-044
+and the `monitor-documents` bucket were already live and the surface worked on
+first load.
+
+One fix went in just before the commit, and it is worth recording because real
+data found it rather than review. The **Everything** calendar shades by how many
+surfaces were opened that day (0-10), not by total hits. Seeding revealed the
+problem: Notes alone produced 802 hits across 20 days, because it logs one per
+coaching message, so a single Notes session set the relative maximum and
+flattened 35 of 45 active days to the faintest shade. Counting surfaces is
+bounded and comparable between days; intensity still lives in the per-surface
+grids, where each day is measured against its own surface.
+
+Monitor is complete: Skills, Résumés and Cover Letters, Applications, Your Usage.
