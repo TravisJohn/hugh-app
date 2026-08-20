@@ -18,7 +18,9 @@ import {
   type CloudProvider,
   type Service,
 } from "@/types/cloud";
-import CloudAssistant from "./CloudAssistant";
+import MarginProvider from "@/components/margin/MarginProvider";
+import StubButton from "@/components/margin/StubButton";
+import ServiceRail from "./ServiceRail";
 
 const PROVIDER_ACCENT: Record<CloudProvider, string> = {
   aws: "text-amber-300",
@@ -27,11 +29,20 @@ const PROVIDER_ACCENT: Record<CloudProvider, string> = {
 };
 
 /**
- * A full service write-up + the scoped assistant. Reference layout — a normal
- * scrolling page (not an interview screen), two columns on desktop: the rundown
- * on the left, the assistant docked on the right.
+ * A full service write-up, the scoped assistant, and the margin. Reference
+ * layout — a normal scrolling page (not an interview screen), two columns on
+ * desktop: the rundown on the left, a tabbed rail docked on the right.
+ *
+ * Still a server component. Only the rail and the ＋ on each heading are
+ * client-side; the write-up itself never ships to the browser as JavaScript.
  */
-export default function ServiceDetail({ service }: { service: Service }) {
+export default function ServiceDetail({
+  service, initialNote,
+}: {
+  service: Service;
+  /** This learner's existing margin note, read during the server render. */
+  initialNote: string;
+}) {
   const accent = PROVIDER_ACCENT[service.provider];
 
   return (
@@ -71,7 +82,15 @@ export default function ServiceDetail({ service }: { service: Service }) {
           ))}
         </div>
 
-        {/* Two columns: rundown + assistant */}
+        {/* The provider spans both columns: the pad is docked right, but the
+            buttons that feed it sit on the headings on the left. */}
+        <MarginProvider
+          surface="cloud"
+          refId={`${service.provider}/${service.id}`}
+          refLabel={service.name}
+          refHref={`/cloud/${service.provider}/${service.id}`}
+          initialBody={initialNote}
+        >
         <div className="mt-8 flex flex-col gap-8 lg:flex-row">
           <article className="min-w-0 flex-1 space-y-8">
             {/* What it is */}
@@ -244,10 +263,10 @@ export default function ServiceDetail({ service }: { service: Service }) {
             )}
           </article>
 
-          {/* Assistant — docked on desktop, stacks below on mobile */}
+          {/* Ask · Notes — docked on desktop, stacks below on mobile */}
           <aside className="lg:w-80 lg:shrink-0">
             <div className="lg:sticky lg:top-6">
-              <CloudAssistant
+              <ServiceRail
                 provider={service.provider}
                 serviceId={service.id}
                 serviceName={service.name}
@@ -255,6 +274,7 @@ export default function ServiceDetail({ service }: { service: Service }) {
             </div>
           </aside>
         </div>
+        </MarginProvider>
       </main>
     </div>
   );
@@ -270,10 +290,13 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section>
+    <section className="group/section">
       <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-400">
         {icon && <span className="text-slate-500">{icon}</span>}
         {title}
+        {/* Pull this section into the margin. Hidden until the section is
+            hovered, so seven of these don't compete with the writing. */}
+        <StubButton heading={title} />
       </h2>
       {children}
     </section>

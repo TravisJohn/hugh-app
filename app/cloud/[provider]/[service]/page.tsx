@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import { loadCloudManifest, loadService } from "@/lib/cloud/loader";
+import { loadMarginNote } from "@/lib/margin/server";
 import { PROVIDER_LABELS, type CloudProvider } from "@/types/cloud";
 import ServiceDetail from "@/components/cloud/ServiceDetail";
 
@@ -22,7 +23,13 @@ export default async function ServicePage({ params }: Props) {
   await verifyUserAccess(supabase);
 
   const data = await loadService(provider, service);
-  if (data) return <ServiceDetail service={data} />;
+  if (data) {
+    // Read here rather than from the pad, so the margin opens already holding
+    // what you wrote last time instead of flashing empty on a page whose whole
+    // promise is being fast.
+    const note = await loadMarginNote(supabase, "cloud", `${provider}/${service}`);
+    return <ServiceDetail service={data} initialNote={note?.body ?? ""} />;
+  }
 
   // No detail JSON — is it at least a known service in the manifest?
   const manifest = await loadCloudManifest();

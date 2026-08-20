@@ -22,7 +22,7 @@ legacy surface.**
 | `/mastery/[milestoneId]` | Prove mastery out loud (scripted, or Realtime voice behind a flag) |
 | `/code/start` · `/code/drill` · `/code` | Pattern map, timed fluency drills, free-form Python sandbox |
 | `/cases` · `/cases/lab` | The Case Room (judgment cases) · Case Lab (long-form + CSV) |
-| `/cloud` | Cloud-services reference with an assistant |
+| `/cloud` | Cloud-services reference — assistant, margin notes, and a review list |
 | `/notes` | Screenshot + reasoning workspace with per-image Coach threads |
 | `/monitor` | Monitor — hand-kept tracking: Skills · Job Applications (résumés/cover letters + applications) · Your Usage |
 | `/interview/[room]` | Legacy mock-interview loop (not linked from `/home`) |
@@ -88,6 +88,21 @@ budget and then spends against it invisibly.
 - Retry loops accumulate tokens across attempts — a discarded attempt still costs
   money and must still be logged.
 
+**`learner_notes` is not the `/notes` workspace.** The margin (`lib/margin/`,
+`components/margin/`, migration 045) is a plain textarea that saves — one note
+per learner per thing-being-read, no images, no threads, no AI. `/notes` is
+screenshot-first: a `notes` row has no body column at all, and every thread
+hangs off an uploaded image read by a vision model. They answer different
+questions and neither can carry the other's data model.
+
+The margin is keyed `(surface, ref_id)`, not `(provider, service_id)` — Cloud
+Skills is the first surface to have one, not the only one that should. Each row
+snapshots its own `ref_label` and `ref_href`, refreshed on every save, so the
+review list never needs a per-surface resolver to render a note. Adding a
+surface means adding it to `MARGIN_SURFACES` in `types/margin.ts`; it is not a
+migration. **The margin spends no tokens** — Cloud Skills browsing is a
+zero-runtime-AI surface and the pad must not be what changes that.
+
 **`activity_events` is not `usage_logs`.** Monitor's Usage view reads a separate
 table that records *that a surface was used*, one row per learner per surface per
 day. Do not merge the two. `usage_logs` records token spend, and three surfaces
@@ -137,6 +152,7 @@ lib/
   calendar.ts               # calendar-heatmap bucketing (pure, tested, shared)
   pricing.ts                # per-model rates (pure, tested)
   usage.ts                  # logging, quota gates (server-only)
+  margin/                   # the margin: pure rules (tested) + server read
   tracker/ · learn/ · code/ · cases/ · case-lab/ · cloud/ · notes/ ·
   mastery/ · documents/ · askcode/ · pomodoro/ · architecture/ · monitor/
 hooks/                      # useInterview, useNotes, usePomodoro, …

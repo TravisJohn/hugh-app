@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, X, Search, LayoutGrid, Network } from "lucide-react";
+import { ArrowLeft, X, Search, LayoutGrid, Network, PencilLine } from "lucide-react";
 import {
   GROUP_LABELS,
   LOGICAL_GROUPS,
@@ -14,6 +14,8 @@ import {
   type ServiceStub,
 } from "@/types/cloud";
 import CloudPipelineMap from "./CloudPipelineMap";
+import CloudNotesList from "./CloudNotesList";
+import { useMarginNotes } from "@/hooks/useMarginNotes";
 
 // Per-provider accent, so the whole screen recolours when you switch clouds.
 const PROVIDER_ACCENT: Record<
@@ -50,11 +52,16 @@ const PROVIDER_ACCENT: Record<
  * content page (this is a reference, not an interview screen).
  */
 export default function CloudLanding({ manifest }: { manifest: CloudManifest }) {
-  const [view, setView] = useState<"browse" | "map">("browse");
+  const [view, setView] = useState<"browse" | "map" | "notes">("browse");
   const [provider, setProvider] = useState<CloudProvider>("aws");
   const [mapProvider, setMapProvider] = useState<CloudProvider | "all">("all");
   const [groups, setGroups] = useState<LogicalGroup[]>([]);
   const [query, setQuery] = useState("");
+
+  // Owned here (Architecture Rule 2), fetched only once the tab is opened —
+  // most visits are browsing, and a query for notes nobody asked to see would
+  // sit on the critical path of a deliberately fast page.
+  const marginNotes = useMarginNotes("cloud", view === "notes");
 
   const accent = PROVIDER_ACCENT[provider];
 
@@ -157,7 +164,19 @@ export default function CloudLanding({ manifest }: { manifest: CloudManifest }) 
             <Network size={14} />
             Pipeline map
           </button>
+          <button
+            onClick={() => setView("notes")}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
+              view === "notes" ? "bg-slate-800 text-slate-100" : "text-slate-500 hover:text-slate-300"
+            }`}
+          >
+            <PencilLine size={14} />
+            My notes
+          </button>
         </div>
+
+        {/* ── My notes view ──────────────────────────────────────────── */}
+        {view === "notes" && <CloudNotesList state={marginNotes} />}
 
         {/* ── Pipeline map view ──────────────────────────────────────── */}
         {view === "map" && (

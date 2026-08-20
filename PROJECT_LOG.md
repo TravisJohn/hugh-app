@@ -4135,3 +4135,52 @@ beside the sentence — otherwise a click on the wrong row would silently delete
 writing the learner cannot see from there. Two sittings in one day are still
 recordable; that now goes through the diary, with a line saying what the second
 one was.
+
+## The margin — jot while reading, review later (2026-08-20)
+
+Cloud Skills service pages carry a lot; reading one and remembering it are
+different things, and the honest response to that was reaching for a physical
+notebook. So Cloud Skills got a margin.
+
+**Why not the `/notes` workspace.** The first instinct was to dock `/notes`
+beside the write-up. It does not fit: `/notes` is screenshot-first — a `notes`
+row has no body column, and every thread hangs off an uploaded image read by a
+vision model. Embedding it would have brought a notebook tree, an upload pane
+and a vision Coach, and still left nowhere to type a sentence. What was actually
+wanted was a *margin*, not a notebook: your own words next to the paragraph that
+finally made sense.
+
+**Migration 045, `learner_notes`.** One row per learner per thing-being-read,
+keyed `(surface, ref_id)` rather than `(provider, service_id)`. Identical work
+today, and it means the second surface to want a margin is a component drop, not
+a second table. Each row snapshots its own `ref_label` and `ref_href`, rewritten
+on every save — the alternative, a per-surface resolver turning `aws/s3` into
+"Amazon S3", would force every future surface to register one before its notes
+could be listed at all. A blank body deletes the row, so a service you opened
+and thought about leaves no empty card behind.
+
+**The two halves.**
+
+- *The margin.* The right rail became tabs — **Ask** (the existing assistant,
+  untouched) and **Notes**. Each section heading grew a hover `＋` that pulls
+  `**Gotchas** — ` into the pad: facing a blank box after two thousand words is
+  when a learner closes it. The note is read during the server render, so the
+  pad opens populated rather than filling in.
+- *The spine.* `/cloud` gained a third view beside Browse and Pipeline map. Every
+  annotated service, collapsed to a preview line, expanded in place with the
+  markdown rendered, searchable across what you wrote and not only what it was
+  about. Capture without review is how a notebook becomes a drawer.
+
+**Autosave carries the whole feature.** This replaces paper, and paper never
+loses a sentence. Debounced at 800ms with three separate exits — blur, tab
+hidden, unmount — the last two using `fetch(keepalive)` so a save survives the
+page closing. Everything mutable is a ref, because a stale closure here would
+save the previous sentence. The status is always on screen; a save that fails
+says so and offers a retry rather than going quiet.
+
+Tabs, not a third column: at `max-w-6xl` a third column costs the write-up a
+third of its width, trading away the readability of the thing being annotated.
+No tokens are spent anywhere in this feature — Cloud Skills browsing stays
+zero-runtime-AI.
+
+25 unit tests on the pure module. Migration 045 is **not yet applied**.
