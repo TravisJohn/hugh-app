@@ -32,15 +32,28 @@ interface Props {
   onPick:   (effort: number) => void;
   /** Taller segments for the diary, where the control stands alone. */
   size?:    "sm" | "md";
+  /**
+   * The segment that means "clear this", if any — set it where the control
+   * edits something already on the record, leave it off where the control is
+   * only filling in a form. Clicking a rating you have already given is the
+   * natural way to take it back, and without it the only way down from a
+   * mis-click is to delete the entry outright.
+   */
+  clearAt?: number | null;
 }
 
-export default function EffortPicker({ value, busy = false, subject, onPick, size = "sm" }: Props) {
+export default function EffortPicker({
+  value, busy = false, subject, onPick, size = "sm", clearAt = null,
+}: Props) {
   // Hovering previews what clicking would record, so the scale can be read by
   // trying it rather than by consulting a legend.
   const [hover, setHover] = useState(0);
   const shown = hover || value;
 
   const dims = size === "md" ? "h-5 w-2.5" : "h-4 w-1.5";
+
+  const words = (n: number) =>
+    n === clearAt ? `clear — currently ${n}, ${EFFORT_WORDS[n]}` : `${n} — ${EFFORT_WORDS[n]}`;
 
   return (
     <div
@@ -56,8 +69,12 @@ export default function EffortPicker({ value, busy = false, subject, onPick, siz
           disabled={busy}
           onMouseEnter={() => setHover(n)}
           onClick={e => { e.stopPropagation(); onPick(n); }}
-          title={`${n} — ${EFFORT_WORDS[n]}`}
-          aria-label={`Log ${subject} at effort ${n}, ${EFFORT_WORDS[n]}`}
+          title={words(n)}
+          aria-label={
+            n === clearAt
+              ? `Clear the effort rating for ${subject}`
+              : `Log ${subject} at effort ${n}, ${EFFORT_WORDS[n]}`
+          }
           className={`${dims} rounded-[2px] transition-colors disabled:cursor-not-allowed ${
             n <= shown ? EFFORT_SWATCHES[n] : "bg-slate-800 hover:bg-slate-700"
           }`}

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { summariseSkills, archivedSkills, type SkillSummary } from "@/lib/monitor/skills";
+import { summariseSkills, archivedSkills, resolveTick, type SkillSummary } from "@/lib/monitor/skills";
 import {
   sortApplications, summariseApplications, buildChart, historyFor,
   type ApplicationStats, type ChartColumn,
@@ -63,12 +63,57 @@ export interface MonitorSkillsState {
   restore:    (skillId: string) => Promise<void>;
   logEntry:   (skillId: string, note: string, effort: number | null) => Promise<void>;
   removeEntry:(skillId: string, entryId: string) => Promise<void>;
+  /**
+   * Set how hard today was, from the Today picker — replacing that skill's bare
+   * tick rather than stacking another one, and clearing the day when the
+   * rating already showing is clicked again. See resolveTick for why.
+   */
+  setTodaysEffort: (skillId: string, effort: number) => Promise<void>;
+  /** Re-rate one entry from the diary, or null to drop it back to a bare tick. */
+  setEntryEffort: (skillId: string, entryId: string, effort: number | null) => Promise<void>;
   dismissError: () => void;
 }
 
 async function readError(res: Response, fallback: string): Promise<string> {
   const body = await res.json().catch(() => null) as { error?: string } | null;
   return body?.error ?? fallback;
+}
+
+// The three entry requests, each throwing a message worth showing. Kept apart
+// from the callbacks below because setTodaysEffort composes two of them in one
+// action, and duplicating the fetch there is how the two paths start to drift.
+
+async function postEntry(
+  skillId: string, note: string, effort: number | null,
+): Promise<MonitorSkillEntry> {
+  const res = await fetch(`/api/monitor/skills/${skillId}/entries`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ note, effort }),
+  });
+  if (!res.ok) throw new Error(await readError(res, "Couldn't log that."));
+  const { entry } = await res.json() as { entry: MonitorSkillEntry };
+  return entry;
+}
+
+async function deleteEntry(skillId: string, entryId: string): Promise<void> {
+  const res = await fetch(`/api/monitor/skills/${skillId}/entries?entryId=${entryId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(await readError(res, "Couldn't remove that entry."));
+}
+
+async function patchEntryEffort(
+  skillId: string, entryId: string, effort: number | null,
+): Promise<MonitorSkillEntry> {
+  const res = await fetch(`/api/monitor/skills/${skillId}/entries?entryId=${entryId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ effort }),
+  });
+  if (!res.ok) throw new Error(await readError(res, "Couldn't change that rating."));
+  const { entry } = await res.json() as { entry: MonitorSkillEntry };
+  return entry;
 }
 
 export function useMonitorSkills(): MonitorSkillsState {
@@ -162,13 +207,7 @@ export function useMonitorSkills(): MonitorSkillsState {
   const logEntry = useCallback(async (skillId: string, note: string, effort: number | null) => {
     setBusy(true); setError(null);
     try {
-      const res = await fetch(`/api/monitor/skills/${skillId}/entries`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ note, effort }),
-      });
-      if (!res.ok) throw new Error(await readError(res, "Couldn't log that."));
-      const { entry } = await res.json() as { entry: MonitorSkillEntry };
+      const entry = await postEntry(skillId, note, effort);
       setEntries(prev => [entry, ...prev]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't log that.");
@@ -180,13 +219,51 @@ export function useMonitorSkills(): MonitorSkillsState {
   const removeEntry = useCallback(async (skillId: string, entryId: string) => {
     setBusy(true); setError(null);
     try {
-      const res = await fetch(`/api/monitor/skills/${skillId}/entries?entryId=${entryId}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error(await readError(res, "Couldn't remove that entry."));
+      await deleteEntry(skillId, entryId);
       setEntries(prev => prev.filter(e => e.id !== entryId));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't remove that entry.");
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  const setTodaysEffort = useCallback(async (skillId: string, effort: number) => {
+    const summary = summaries.find(s => s.skill.id === skillId);
+    if (!summary) return;
+    const action = resolveTick(summary, effort);
+
+    setBusy(true); setError(null);
+    try {
+      if (action.kind !== "create") {
+        // Deleted before the replacement goes in, and applied to local state as
+        // each one lands: if the insert then fails, the day reads as untouched
+        // rather than as still carrying the rating the learner just rejected.
+        for (const id of action.removeIds) {
+          await deleteEntry(skillId, id);
+          setEntries(prev => prev.filter(e => e.id !== id));
+        }
+      }
+      if (action.kind !== "clear") {
+        const entry = await postEntry(skillId, "", action.effort);
+        setEntries(prev => [entry, ...prev]);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't log that.");
+    } finally {
+      setBusy(false);
+    }
+  }, [summaries]);
+
+  const setEntryEffort = useCallback(async (
+    skillId: string, entryId: string, effort: number | null,
+  ) => {
+    setBusy(true); setError(null);
+    try {
+      const updated = await patchEntryEffort(skillId, entryId, effort);
+      setEntries(prev => prev.map(e => (e.id === entryId ? updated : e)));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't change that rating.");
     } finally {
       setBusy(false);
     }
@@ -205,6 +282,8 @@ export function useMonitorSkills(): MonitorSkillsState {
     restore,
     logEntry,
     removeEntry,
+    setTodaysEffort,
+    setEntryEffort,
     dismissError: () => setError(null),
   };
 }

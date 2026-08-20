@@ -1,22 +1,25 @@
 "use client";
 
-import { todaysEffort, touchLabel, type SkillSummary } from "@/lib/monitor/skills";
+import { todaysBareEffort, todaysEffort, touchLabel, type SkillSummary } from "@/lib/monitor/skills";
 import EffortPicker, { EFFORT_WORDS } from "./EffortPicker";
 
 // Today, in one card: every skill, how hard you went at it, and one click to
 // log it. This is the thing that has to be fast — a tracker that costs more
 // than a moment gets abandoned in week three.
 //
-// Clicking a segment on an already-logged skill records a *second* session at
-// that effort rather than editing the first. Two sittings in one day is real,
-// and the cell keeps the harder of them. Removing an entry is done in the diary
-// below, where you can see which one you are removing.
+// Clicking a segment re-rates today rather than stacking a second entry, and
+// clicking the rating already showing clears the day. A tracker you can only
+// ever revise upward flatters you: because a cell shades by the day's peak, an
+// appended lower rating would change nothing you can see, so a mis-click would
+// be permanent. A genuine second sitting still goes in through the diary below,
+// with a line saying what it was.
 
 interface Props {
   summaries:  SkillSummary[];
   selectedId: string | null;
   busy:       boolean;
   onSelect:   (skillId: string) => void;
+  /** Sets today's rating for that skill — or clears it, if it was already there. */
   onTick:     (skillId: string, effort: number) => void;
 }
 
@@ -31,6 +34,9 @@ export default function SkillTickList({ summaries, selectedId, busy, onSelect, o
       <div className="flex flex-col gap-1">
         {summaries.map(s => {
           const effort = todaysEffort(s);
+          // Only a bare tick is the picker's to clear; a rating that came from
+          // a written entry is edited in the diary, beside its sentence.
+          const clearAt = todaysBareEffort(s) || null;
           return (
             <div
               key={s.skill.id}
@@ -43,6 +49,7 @@ export default function SkillTickList({ summaries, selectedId, busy, onSelect, o
                 value={effort}
                 busy={busy}
                 subject={s.skill.name}
+                clearAt={clearAt}
                 onPick={n => onTick(s.skill.id, n)}
               />
 

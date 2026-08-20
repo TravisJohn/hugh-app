@@ -77,7 +77,7 @@ export default function SkillsView({ state }: { state: MonitorSkillsState }) {
               summaries={summaries}
               selectedId={selected?.skill.id ?? null}
               onSelect={state.select}
-              onTick={(id, effort) => state.logEntry(id, "", effort)}
+              onTick={state.setTodaysEffort}
               busy={state.busy}
             />
             {selected && (
@@ -85,6 +85,8 @@ export default function SkillsView({ state }: { state: MonitorSkillsState }) {
                 summary={selected}
                 onSave={(note, effort) => state.logEntry(selected.skill.id, note, effort)}
                 onRemove={entryId => state.removeEntry(selected.skill.id, entryId)}
+                onSetEffort={(entryId, effort) =>
+                  state.setEntryEffort(selected.skill.id, entryId, effort)}
                 busy={state.busy}
               />
             )}

@@ -10,6 +10,9 @@ import {
   archivedSkills,
   normaliseEffort,
   todaysEffort,
+  todaysBareEffort,
+  todaysEntries,
+  resolveTick,
   EFFORT_WHEN_UNRECORDED,
   isTickedToday,
   currentRunDays,
@@ -406,5 +409,89 @@ describe("isTickedToday / currentRunDays / touchLabel", () => {
 
   it("still labels a skill whose last entry predates the heatmap window", () => {
     expect(touchLabel(sum(["2025-08-01"]), NOW)).toBe("last: 320d");
+  });
+});
+
+describe("todaysEntries / todaysBareEffort", () => {
+  it("returns only today's entries, newest first", () => {
+    const s = summariseSkills([skill()], [
+      entry({ id: "old", entry_date: "2026-06-10" }),
+      entry({ id: "morning", created_at: "2026-06-17T08:00:00.000Z" }),
+      entry({ id: "evening", created_at: "2026-06-17T20:00:00.000Z" }),
+    ], NOW)[0];
+    expect(todaysEntries(s, NOW).map(e => e.id)).toEqual(["evening", "morning"]);
+  });
+
+  it("ignores written entries — the Today picker owns bare ticks only", () => {
+    // A rating attached to a sentence is edited in the diary, beside the
+    // sentence. If the picker could clear it, a click on the wrong row would
+    // silently delete writing the learner cannot see from there.
+    const s = summariseSkills([skill()], [
+      entry({ id: "written", effort: 5, note: "long sitting on frames" }),
+      entry({ id: "tick", effort: 2 }),
+    ], NOW)[0];
+    expect(todaysEffort(s, NOW)).toBe(5);
+    expect(todaysBareEffort(s, NOW)).toBe(2);
+  });
+
+  it("reads an unrated bare tick as 1, the same as the heatmap shades it", () => {
+    const s = summariseSkills([skill()], [entry({ effort: null })], NOW)[0];
+    expect(todaysBareEffort(s, NOW)).toBe(EFFORT_WHEN_UNRECORDED);
+  });
+
+  it("is zero when today holds nothing bare", () => {
+    const s = summariseSkills([skill()], [entry({ note: "wrote it up", effort: 4 })], NOW)[0];
+    expect(todaysBareEffort(s, NOW)).toBe(0);
+  });
+});
+
+describe("resolveTick", () => {
+  it("creates the first tick of the day", () => {
+    const s = summariseSkills([skill()], [], NOW)[0];
+    expect(resolveTick(s, 3, NOW)).toEqual({ kind: "create", effort: 3 });
+  });
+
+  it("replaces rather than appends, so a mis-tick can be brought back down", () => {
+    // The whole point. A cell shades by the day's peak, so an appended 1 after
+    // an accidental 4 would change nothing visible and the 4 would be permanent
+    // — a record that can only be revised upward overstates.
+    const s = summariseSkills([skill()], [entry({ id: "oops", effort: 4 })], NOW)[0];
+    expect(resolveTick(s, 1, NOW)).toEqual({ kind: "replace", removeIds: ["oops"], effort: 1 });
+  });
+
+  it("clears the day when the rating already showing is clicked again", () => {
+    const s = summariseSkills([skill()], [entry({ id: "t", effort: 4 })], NOW)[0];
+    expect(resolveTick(s, 4, NOW)).toEqual({ kind: "clear", removeIds: ["t"] });
+  });
+
+  it("collapses several bare ticks into one, so the day cannot keep a stale peak", () => {
+    // Entries logged before this behaviour existed stack up. Replacing must
+    // clear all of them, or the old peak keeps shading the cell.
+    const s = summariseSkills([skill()], [
+      entry({ id: "a", effort: 4, created_at: "2026-06-17T09:00:00.000Z" }),
+      entry({ id: "b", effort: 2, created_at: "2026-06-17T18:00:00.000Z" }),
+    ], NOW)[0];
+    const action = resolveTick(s, 1, NOW);
+    expect(action.kind).toBe("replace");
+    expect(action.kind === "replace" && action.removeIds.sort()).toEqual(["a", "b"]);
+  });
+
+  it("leaves a written entry alone and only ever touches the bare tick", () => {
+    const s = summariseSkills([skill()], [
+      entry({ id: "written", effort: 5, note: "solved the window frame thing" }),
+      entry({ id: "tick", effort: 2 }),
+    ], NOW)[0];
+    expect(resolveTick(s, 2, NOW)).toEqual({ kind: "clear", removeIds: ["tick"] });
+    expect(resolveTick(s, 3, NOW)).toEqual({ kind: "replace", removeIds: ["tick"], effort: 3 });
+  });
+
+  it("creates when today holds only a written entry, never rewriting it", () => {
+    const s = summariseSkills([skill()], [entry({ id: "w", effort: 5, note: "hi" })], NOW)[0];
+    expect(resolveTick(s, 5, NOW)).toEqual({ kind: "create", effort: 5 });
+  });
+
+  it("ignores yesterday's tick when resolving today's click", () => {
+    const s = summariseSkills([skill()], [entry({ id: "y", entry_date: "2026-06-16", effort: 4 })], NOW)[0];
+    expect(resolveTick(s, 4, NOW)).toEqual({ kind: "create", effort: 4 });
   });
 });

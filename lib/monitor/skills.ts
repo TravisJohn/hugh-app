@@ -248,3 +248,60 @@ export function touchLabel(summary: SkillSummary, now: Date = new Date()): strin
   if (gap === 1) return "yesterday";
   return `last: ${gap}d`;
 }
+
+/** Today's entries for a skill, newest first. */
+export function todaysEntries(summary: SkillSummary, now: Date = new Date()): MonitorSkillEntry[] {
+  const today = todayISO(now);
+  return summary.entries.filter(e => e.entry_date === today);
+}
+
+/**
+ * The hardest *bare tick* logged today — an entry with no note — 0 if none.
+ *
+ * Separate from `todaysEffort` because the two controls own different things.
+ * The Today picker owns bare ticks: it can replace and clear them freely,
+ * because a bare tick carries nothing but its rating. A written entry is the
+ * diary's, and is edited there, where you can see the sentence you are re-rating.
+ */
+export function todaysBareEffort(summary: SkillSummary, now: Date = new Date()): number {
+  return todaysEntries(summary, now)
+    .filter(e => e.note === null)
+    .reduce((peak, e) => Math.max(peak, e.effort ?? EFFORT_WHEN_UNRECORDED), 0);
+}
+
+/**
+ * What clicking segment `effort` on the Today picker should do.
+ *
+ * Three outcomes, and the reason there are three is that a hand-kept record has
+ * to be correctable. The original design appended an entry per click, on the
+ * grounds that two sittings in one day are real — but because a cell shades by
+ * the day's *peak*, appending a lower rating changes nothing you can see. That
+ * made a mis-tick permanent: rate a day 4 by accident and no click will ever
+ * bring it back down. A record that can only ever be revised upward overstates,
+ * which is the one thing this one must not do.
+ *
+ * So the picker now replaces its own tick instead of stacking a new one, and
+ * clicking the segment already filled by a bare tick clears the day. A genuine
+ * second session still goes in through the diary, with a line about what it was.
+ */
+export type TickAction =
+  /** Nothing bare logged today — write the first one. */
+  | { kind: "create";  effort: number }
+  /** Swap today's bare ticks for a single one at the new rating. */
+  | { kind: "replace"; removeIds: string[]; effort: number }
+  /** Clicked the rating already showing — take the day back off the record. */
+  | { kind: "clear";   removeIds: string[] };
+
+export function resolveTick(
+  summary: SkillSummary,
+  effort: number,
+  now: Date = new Date(),
+): TickAction {
+  const bare = todaysEntries(summary, now).filter(e => e.note === null);
+  if (bare.length === 0) return { kind: "create", effort };
+
+  const removeIds = bare.map(e => e.id);
+  return effort === todaysBareEffort(summary, now)
+    ? { kind: "clear", removeIds }
+    : { kind: "replace", removeIds, effort };
+}

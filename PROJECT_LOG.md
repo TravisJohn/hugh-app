@@ -4104,3 +4104,34 @@ bounded and comparable between days; intensity still lives in the per-surface
 grids, where each day is measured against its own surface.
 
 Monitor is complete: Skills, Résumés and Cover Letters, Applications, Your Usage.
+
+## Skill effort became editable (2026-08-20)
+
+Reported from use: a skill's effort rating could not be changed once clicked.
+The cause was not a missing button but the write model. Effort belongs to an
+*entry*, a cell shades by the day's **peak** entry, and the Today picker only
+ever inserted — so an accidental 4 could never be brought down, because an
+appended 1 loses to the peak and changes nothing visible. Bare ticks were also
+absent from the diary list, which filtered to entries with a note, so the mis-tick
+could not even be found and deleted. A record that can only be revised upward
+overstates, which is the one thing this one must not do.
+
+Three changes, no migration — `effort` already exists on the row.
+
+- **`resolveTick` in `lib/monitor/skills.ts`** (pure, 9 new tests) decides what a
+  click means: create the day's first tick, replace the ticks already there, or
+  clear the day when the rating already showing is clicked again. Several stacked
+  bare ticks collapse into one, so a legacy day cannot keep a stale peak.
+- **`PATCH /api/monitor/skills/[id]/entries`** re-rates an existing entry;
+  `effort: null` drops it back to a bare tick. Unlike POST it rejects a malformed
+  rating rather than storing NULL — POST is forgiving because losing the fact of a
+  session costs more than losing its rating, but a PATCH *is* the rating.
+- **The diary lists every entry**, bare ticks included, each with an inline
+  picker. Clicking the rating a row already has clears it.
+
+The split of ownership is the load-bearing part: the Today picker may replace and
+clear **bare ticks only**. A rating attached to a sentence is edited in the diary,
+beside the sentence — otherwise a click on the wrong row would silently delete
+writing the learner cannot see from there. Two sittings in one day are still
+recordable; that now goes through the diary, with a line saying what the second
+one was.

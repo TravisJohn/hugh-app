@@ -111,3 +111,48 @@ export async function DELETE(
     return NextResponse.json({ error: "Couldn't remove that entry." }, { status: 502 });
   }
 }
+
+// PATCH /api/monitor/skills/[id]/entries?entryId=… { effort } → { entry }
+//
+// Re-rate a session that is already on the record. Ratings are guesses made in
+// the moment, and a guess you cannot revise stops being a record and becomes a
+// claim — so every entry stays editable for as long as it exists.
+//
+// `effort: null` clears the rating back to a bare tick. Any other unusable
+// value is a 400 rather than a silent NULL: POST is forgiving because losing
+// the fact that a session happened costs more than losing its rating, but a
+// PATCH *is* the rating, so quietly wiping it would do the opposite of what
+// was asked.
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const userId = await getAuthenticatedUserId(request);
+  if (!userId) return unauth();
+
+  const { id: skillId } = await params;
+  const entryId = request.nextUrl.searchParams.get("entryId");
+  if (!entryId) return NextResponse.json({ error: "entryId required" }, { status: 400 });
+
+  const body = (await request.json().catch(() => ({}))) as { effort?: unknown };
+  const effort = body.effort === null ? null : normaliseEffort(body.effort);
+  if (effort === null && body.effort !== null) {
+    return NextResponse.json({ error: "Effort is 1-5, or null to clear it." }, { status: 400 });
+  }
+
+  try {
+    const db = createServiceClient();
+    const { data, error } = await db
+      .from("monitor_skill_entries")
+      .update({ effort })
+      .eq("id", entryId).eq("skill_id", skillId).eq("user_id", userId)
+      .select("*").maybeSingle();
+    if (error) throw error;
+    if (!data) return NextResponse.json({ error: "No such entry." }, { status: 404 });
+
+    return NextResponse.json({ entry: data as MonitorSkillEntry });
+  } catch (e) {
+    console.error("[monitor/entries] update failed:", e);
+    return NextResponse.json({ error: "Couldn't change that rating." }, { status: 502 });
+  }
+}
