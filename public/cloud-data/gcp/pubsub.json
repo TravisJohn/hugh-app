@@ -1,23 +1,52 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "note": "Reviewed 2026-08-20: nothing contradicted, but the overview fetch returned no verbatim passages for the delivery guarantee, ordering keys or the BigQuery/Cloud Storage subscriptions — the summariser said outright it could not quote them. Same failure as gcp/bigquery. Left UNVERIFIED on purpose: no quote, no citation. The claims need the dedicated exactly-once-delivery and ordering pages next pass."
+  },
   "id": "pubsub",
   "provider": "gcp",
   "name": "Pub/Sub",
-  "groups": ["streaming"],
+  "groups": [
+    "streaming"
+  ],
   "oneLiner": "Global, serverless messaging for event ingestion and fan-out.",
   "whatItIs": "Pub/Sub is Google Cloud's fully-managed, serverless messaging service. Publishers send messages to a topic; subscribers receive them via subscriptions — decoupling producers from consumers. Unlike shard-based systems, Pub/Sub has no capacity units to provision: it auto-scales to millions of messages per second globally. It's the default event backbone on GCP for ingesting streams, fanning one event out to many services, and buffering between systems. It pairs naturally with Dataflow for processing and BigQuery for landing data.",
   "inPractice": {
     "narrative": "Services and devices publish events to a Pub/Sub topic. One subscription feeds a Dataflow pipeline that processes the stream in real time and writes to BigQuery; another subscription triggers a Cloud Function for a side effect; a Pub/Sub BigQuery subscription can even write straight to a table. Because it's serverless, traffic can spike 100× with nothing to rescale. Pub/Sub is the fan-out hub the rest of the pipeline subscribes to.",
-    "flow": ["Services / devices publish", "Pub/Sub topic", "Dataflow subscription", "BigQuery", "Looker"],
+    "flow": [
+      "Services / devices publish",
+      "Pub/Sub topic",
+      "Dataflow subscription",
+      "BigQuery",
+      "Looker"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "Topics & subscriptions", "detail": "Publishers write to a topic; each subscription is an independent stream of that topic's messages to a consumer. Many subscriptions = fan-out to many consumers." },
-    { "term": "Push vs pull", "detail": "Pull subscriptions have consumers fetch messages; push subscriptions POST messages to an endpoint (e.g. a Cloud Run/Function). BigQuery and Cloud Storage subscriptions write directly to those sinks." },
-    { "term": "Serverless auto-scaling", "detail": "No shards or partitions to size — Pub/Sub scales capacity automatically to demand, which is its headline difference from Kinesis/Event Hubs." },
-    { "term": "At-least-once + acks", "detail": "Messages are delivered at least once and must be acknowledged; unacked messages are redelivered, so consumers handle duplicates (or use exactly-once delivery where enabled)." },
-    { "term": "Ordering keys", "detail": "By default order isn't guaranteed; supplying an ordering key gives in-order delivery for messages sharing that key." },
-    { "term": "Pub/Sub Lite", "detail": "A cheaper, zonal, capacity-provisioned variant for very high-throughput, cost-sensitive workloads that don't need global/serverless behaviour." }
+    {
+      "term": "Topics & subscriptions",
+      "detail": "Publishers write to a topic; each subscription is an independent stream of that topic's messages to a consumer. Many subscriptions = fan-out to many consumers."
+    },
+    {
+      "term": "Push vs pull",
+      "detail": "Pull subscriptions have consumers fetch messages; push subscriptions POST messages to an endpoint (e.g. a Cloud Run/Function). BigQuery and Cloud Storage subscriptions write directly to those sinks."
+    },
+    {
+      "term": "Serverless auto-scaling",
+      "detail": "No shards or partitions to size — Pub/Sub scales capacity automatically to demand, which is its headline difference from Kinesis/Event Hubs."
+    },
+    {
+      "term": "At-least-once + acks",
+      "detail": "Messages are delivered at least once and must be acknowledged; unacked messages are redelivered, so consumers handle duplicates (or use exactly-once delivery where enabled)."
+    },
+    {
+      "term": "Ordering keys",
+      "detail": "By default order isn't guaranteed; supplying an ordering key gives in-order delivery for messages sharing that key."
+    },
+    {
+      "term": "Pub/Sub Lite",
+      "detail": "A cheaper, zonal, capacity-provisioned variant for very high-throughput, cost-sensitive workloads that don't need global/serverless behaviour."
+    }
   ],
   "whenToUse": [
     "Serverless event ingestion that must scale without capacity planning.",
@@ -33,12 +62,30 @@
     "Simple in-region task queues where Cloud Tasks fits better."
   ],
   "keyFacts": [
-    { "label": "Model", "value": "Serverless publish/subscribe messaging (topics + subscriptions)." },
-    { "label": "Scaling", "value": "Automatic — no shards/partitions to provision." },
-    { "label": "Delivery", "value": "At-least-once (exactly-once available); ack-based." },
-    { "label": "Ordering", "value": "Optional per ordering key; not global by default." },
-    { "label": "Direct sinks", "value": "BigQuery and Cloud Storage subscriptions." },
-    { "label": "Billing", "value": "Per GB of message throughput (plus retained storage)." }
+    {
+      "label": "Model",
+      "value": "Serverless publish/subscribe messaging (topics + subscriptions)."
+    },
+    {
+      "label": "Scaling",
+      "value": "Automatic — no shards/partitions to provision."
+    },
+    {
+      "label": "Delivery",
+      "value": "At-least-once (exactly-once available); ack-based."
+    },
+    {
+      "label": "Ordering",
+      "value": "Optional per ordering key; not global by default."
+    },
+    {
+      "label": "Direct sinks",
+      "value": "BigQuery and Cloud Storage subscriptions."
+    },
+    {
+      "label": "Billing",
+      "value": "Per GB of message throughput (plus retained storage)."
+    }
   ],
   "pricingShape": "Standard Pub/Sub bills mainly by data volume — GB of messages published and delivered — with no shards or minimum capacity, so it scales to zero cost when idle and up automatically under load. Retained/unacked message storage and some egress add smaller charges. This volume-based, serverless pricing is simpler than shard-hour models but can be pricier at very high sustained throughput, which is exactly where Pub/Sub Lite's provisioned, lower-unit-cost model wins. The lever is throughput and retention, not capacity tuning.",
   "gotchas": [
@@ -49,8 +96,18 @@
     "Very high sustained volume can be costly on standard pricing; evaluate Lite for those cases."
   ],
   "equivalents": [
-    { "provider": "aws", "id": "kinesis-data-streams", "name": "Kinesis Data Streams", "note": "Shard-based streaming; Pub/Sub avoids capacity units by auto-scaling." },
-    { "provider": "azure", "id": "event-hubs", "name": "Event Hubs", "note": "Partitioned, Kafka-compatible ingestion; more shard-like than Pub/Sub." }
+    {
+      "provider": "aws",
+      "id": "kinesis-data-streams",
+      "name": "Kinesis Data Streams",
+      "note": "Shard-based streaming; Pub/Sub avoids capacity units by auto-scaling."
+    },
+    {
+      "provider": "azure",
+      "id": "event-hubs",
+      "name": "Event Hubs",
+      "note": "Partitioned, Kafka-compatible ingestion; more shard-like than Pub/Sub."
+    }
   ],
   "docsUrl": "https://cloud.google.com/pubsub/docs"
 }

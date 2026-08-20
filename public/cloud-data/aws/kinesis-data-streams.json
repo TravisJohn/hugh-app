@@ -1,23 +1,53 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "verified": "2026-08-20",
+    "method": "manual",
+    "note": "Three of six cited and every number confirmed exactly — 24-hour minimum retention, 8760 hours (365 days) maximum, 1 MB/s and 1,000 records/s per shard. Gap for next pass: AWS now documents a third capacity option, On-demand Advantage mode, which raises enhanced fan-out consumers from 20 to 50. Not yet in this write-up."
+  },
   "id": "kinesis-data-streams",
   "provider": "aws",
   "name": "Kinesis Data Streams",
-  "groups": ["streaming"],
+  "groups": [
+    "streaming"
+  ],
   "oneLiner": "Real-time, ordered event streaming for high-throughput ingestion.",
   "whatItIs": "Kinesis Data Streams is AWS's managed service for ingesting large volumes of real-time event data — clickstreams, IoT telemetry, logs, application events — and making them available to consumers within milliseconds. Producers write records to a stream; the stream retains them for a window (up to a year) so multiple independent consumers can read at their own pace. It's the durable, replayable pipe between event producers and the systems that process them (Flink, Lambda, analytics). Think of it as the AWS-native equivalent of Apache Kafka's core streaming role.",
   "inPractice": {
     "narrative": "A website emits clickstream events. Producers push them into a Kinesis Data Stream, which buffers and orders them durably. A Managed Flink application (or a Lambda) consumes the stream in real time to compute rolling metrics, while another consumer (Kinesis Data Firehose) lands the raw events in S3 for later batch analysis. Because the stream retains data, a new consumer can be added later and replay history. Kinesis is the ingestion backbone the processors hang off.",
-    "flow": ["Clickstream / IoT producers", "Kinesis Data Streams", "Managed Flink / Lambda", "S3 / dashboards"],
+    "flow": [
+      "Clickstream / IoT producers",
+      "Kinesis Data Streams",
+      "Managed Flink / Lambda",
+      "S3 / dashboards"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "Shards & capacity modes", "detail": "In provisioned mode a stream's throughput is the sum of its shards (~1 MB/s in, 2 MB/s out each); On-Demand mode auto-scales capacity so you don't manage shards." },
-    { "term": "Records & partition key", "detail": "Each record carries a partition key that maps it to a shard; the same key always goes to the same shard, preserving per-key ordering." },
-    { "term": "Retention & replay", "detail": "Data is retained 24 hours by default, extendable up to 365 days, so consumers can replay or catch up — a key difference from a fire-and-forget queue." },
-    { "term": "Consumers & fan-out", "detail": "Multiple consumers read the same stream; Enhanced Fan-Out gives each its own dedicated 2 MB/s throughput and lower latency." },
-    { "term": "Ordering", "detail": "Ordering is guaranteed within a shard, not across shards — design partition keys around the ordering you actually need." },
-    { "term": "Firehose vs Streams", "detail": "Data Firehose is the sibling for zero-admin delivery to S3/Redshift/OpenSearch with buffering; Streams is for custom, low-latency, multi-consumer processing." }
+    {
+      "term": "Shards & capacity modes",
+      "detail": "In provisioned mode a stream's throughput is the sum of its shards (~1 MB/s in, 2 MB/s out each); On-Demand mode auto-scales capacity so you don't manage shards."
+    },
+    {
+      "term": "Records & partition key",
+      "detail": "Each record carries a partition key that maps it to a shard; the same key always goes to the same shard, preserving per-key ordering."
+    },
+    {
+      "term": "Retention & replay",
+      "detail": "Data is retained 24 hours by default, extendable up to 365 days, so consumers can replay or catch up — a key difference from a fire-and-forget queue."
+    },
+    {
+      "term": "Consumers & fan-out",
+      "detail": "Multiple consumers read the same stream; Enhanced Fan-Out gives each its own dedicated 2 MB/s throughput and lower latency."
+    },
+    {
+      "term": "Ordering",
+      "detail": "Ordering is guaranteed within a shard, not across shards — design partition keys around the ordering you actually need."
+    },
+    {
+      "term": "Firehose vs Streams",
+      "detail": "Data Firehose is the sibling for zero-admin delivery to S3/Redshift/OpenSearch with buffering; Streams is for custom, low-latency, multi-consumer processing."
+    }
   ],
   "whenToUse": [
     "Ingesting high-volume real-time events (clickstream, IoT, logs) durably.",
@@ -33,12 +63,45 @@
     "Teams committed to the Kafka ecosystem/APIs — consider Amazon MSK (managed Kafka)."
   ],
   "keyFacts": [
-    { "label": "Role", "value": "Durable, ordered real-time event ingestion stream." },
-    { "label": "Capacity", "value": "Provisioned (shards, ~1 MB/s in each) or On-Demand (auto-scaling)." },
-    { "label": "Retention", "value": "24 hours default, up to 365 days." },
-    { "label": "Ordering", "value": "Guaranteed within a shard (by partition key)." },
-    { "label": "Fan-out", "value": "Multiple consumers; Enhanced Fan-Out for dedicated throughput." },
-    { "label": "Billing", "value": "Per shard-hour + PUT payload units (provisioned), or per-throughput (On-Demand)." }
+    {
+      "label": "Role",
+      "value": "Durable, ordered real-time event ingestion stream."
+    },
+    {
+      "label": "Capacity",
+      "value": "Provisioned (shards, ~1 MB/s in each) or On-Demand (auto-scaling).",
+      "source": {
+        "url": "https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html",
+        "quote": "Each shard can support up to 1 MB/sec or 1,000 records/sec write throughput or up to 2 MB/sec or 2,000 records/sec read throughput. … By default, new data streams created with the on-demand capacity mode have 4 MB/s of write and 8 MB/s of read throughput.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Retention",
+      "value": "24 hours default, up to 365 days.",
+      "source": {
+        "url": "https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html",
+        "quote": "The minimum value of a data stream's retention period is 24 hours. … The maximum value of a stream's retention period is 8760 hours (365 days).",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Ordering",
+      "value": "Guaranteed within a shard (by partition key)."
+    },
+    {
+      "label": "Fan-out",
+      "value": "Multiple consumers; Enhanced Fan-Out for dedicated throughput.",
+      "source": {
+        "url": "https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html",
+        "quote": "With Kinesis On-demand Advantage mode, you can create up to 50 registered consumers (Enhanced Fan-out). With Kinesis On-Demand Standard and Kinesis Provisioned modes, you can create up to 20 registered consumers (Enhanced Fan-out Limit) for each data stream.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Billing",
+      "value": "Per shard-hour + PUT payload units (provisioned), or per-throughput (On-Demand)."
+    }
   ],
   "pricingShape": "In provisioned mode you pay per shard-hour plus per million PUT payload units, so cost scales with how many shards you keep and how much you write — over-provisioning shards for peak wastes money at trough. On-Demand mode removes shard management and bills by data written/read at a higher per-GB rate, which is simpler and often cheaper for spiky or unpredictable traffic. Extended retention and Enhanced Fan-Out add charges. The main lever is matching capacity mode to your traffic pattern.",
   "gotchas": [
@@ -49,8 +112,18 @@
     "It's not a task queue — 'at-least-once' delivery and no per-message ack means consumers must handle duplicates and checkpointing."
   ],
   "equivalents": [
-    { "provider": "gcp", "id": "pubsub", "name": "Pub/Sub", "note": "Serverless messaging; auto-scales without shards but is topic/subscription-based rather than shard-ordered." },
-    { "provider": "azure", "id": "event-hubs", "name": "Event Hubs", "note": "Partitioned event ingestion, Kafka-compatible; partitions play the role of shards." }
+    {
+      "provider": "gcp",
+      "id": "pubsub",
+      "name": "Pub/Sub",
+      "note": "Serverless messaging; auto-scales without shards but is topic/subscription-based rather than shard-ordered."
+    },
+    {
+      "provider": "azure",
+      "id": "event-hubs",
+      "name": "Event Hubs",
+      "note": "Partitioned event ingestion, Kafka-compatible; partitions play the role of shards."
+    }
   ],
   "docsUrl": "https://docs.aws.amazon.com/streams/latest/dev/introduction.html"
 }
