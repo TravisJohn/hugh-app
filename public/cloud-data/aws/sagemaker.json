@@ -1,15 +1,18 @@
 {
   "meta": {
-    "authored": "2026-07"
+    "authored": "2026-07",
+    "verified": "2026-08-20",
+    "method": "manual",
+    "note": "RENAMED, and unusually: on 3 December 2024 “Amazon SageMaker was renamed to Amazon SageMaker AI”, and the bare name “Amazon SageMaker” was simultaneously reused for a wider unified data/analytics/AI platform. So the old name still exists but now denotes something bigger — a page titled “Amazon SageMaker” describing only the ML lifecycle now teaches the wrong mental model, which is worse than a plainly stale name. Slug kept as sagemaker because AWS states the API namespaces, CLI, CloudFormation resources and console URLs are all unchanged."
   },
   "id": "sagemaker",
   "provider": "aws",
-  "name": "Amazon SageMaker",
+  "name": "Amazon SageMaker AI",
   "groups": [
     "ml"
   ],
   "oneLiner": "End-to-end platform to build, train and deploy machine-learning models.",
-  "whatItIs": "SageMaker is AWS's managed machine-learning platform, covering the whole lifecycle: prepare data, build and train models on managed compute, tune them, then deploy to real-time or batch endpoints — without provisioning ML infrastructure yourself. It spans notebooks (Studio), built-in algorithms, bring-your-own frameworks (PyTorch/TensorFlow), distributed training, hyperparameter tuning, a model registry, pipelines for MLOps, and hosting. The newer SageMaker also folds in data and analytics tooling. It's the place ML/data-science teams on AWS take a model from experiment to production.",
+  "whatItIs": "SageMaker is AWS's managed machine-learning platform, covering the whole lifecycle: prepare data, build and train models on managed compute, tune them, then deploy to real-time or batch endpoints — without provisioning ML infrastructure yourself. It spans notebooks (Studio), built-in algorithms, bring-your-own frameworks (PyTorch/TensorFlow), distributed training, hyperparameter tuning, a model registry, pipelines for MLOps, and hosting. The newer SageMaker also folds in data and analytics tooling. It's the place ML/data-science teams on AWS take a model from experiment to production. Note the naming: on 3 December 2024 the ML service itself was renamed Amazon SageMaker AI, and the bare name “Amazon SageMaker” was reused for a much larger unified platform for data, analytics and AI — SageMaker AI plus SageMaker Lakehouse, Unified Studio, SQL Analytics (Redshift), Data and AI Governance, and Bedrock. Everything on this page is SageMaker AI. The API namespaces, CLI commands, CloudFormation resources and console URLs all still say `sagemaker`.",
   "inPractice": {
     "narrative": "A data scientist pulls training data from S3 into a SageMaker Studio notebook, experiments, then launches a managed training job on GPU instances that spin up, train, and shut down. A tuning job finds good hyperparameters; the best model is registered and deployed to a real-time endpoint that the app calls for predictions. SageMaker Pipelines automates retraining as new data lands. The managed compute exists only while jobs run — you don't keep a GPU cluster idle.",
     "flow": [
@@ -63,7 +66,12 @@
   "keyFacts": [
     {
       "label": "Scope",
-      "value": "Full ML lifecycle: prep, train, tune, deploy, monitor."
+      "value": "Full ML lifecycle: prep, train, tune, deploy, monitor.",
+      "source": {
+        "url": "https://docs.aws.amazon.com/sagemaker/latest/dg/whatis.html",
+        "quote": "Amazon SageMaker AI is a fully managed machine learning (ML) service. With SageMaker AI, data scientists and developers can quickly and confidently build, train, and deploy ML models into a production-ready hosted environment.",
+        "checked": "2026-08-20"
+      }
     },
     {
       "label": "Compute",
@@ -71,7 +79,12 @@
     },
     {
       "label": "Frameworks",
-      "value": "Built-in algorithms + PyTorch/TensorFlow/custom containers."
+      "value": "Built-in algorithms + PyTorch/TensorFlow/custom containers.",
+      "source": {
+        "url": "https://docs.aws.amazon.com/sagemaker/latest/dg/whatis.html",
+        "quote": "SageMaker AI provides managed ML algorithms to run efficiently against extremely large data in a distributed environment. With built-in support for bring-your-own-algorithms and frameworks, SageMaker AI offers flexible distributed training options that adjust to your specific workflows.",
+        "checked": "2026-08-20"
+      }
     },
     {
       "label": "Inference",
@@ -108,5 +121,6 @@
       "note": "End-to-end ML platform; the direct analogue on Azure."
     }
   ],
-  "docsUrl": "https://docs.aws.amazon.com/sagemaker/"
+  "docsUrl": "https://docs.aws.amazon.com/sagemaker/latest/dg/whatis.html",
+  "short": "formerly Amazon SageMaker"
 }

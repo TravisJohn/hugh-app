@@ -1,23 +1,53 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "verified": "2026-08-20",
+    "method": "manual",
+    "note": "Platform branding updated: Databricks now calls it the Data Intelligence Platform. “Lakehouse” is kept here because Databricks still uses it for the ARCHITECTURE in the same docs — this was a branding shift, not a replacement, and deleting the word would lose the thing a learner actually needs to understand. Photon, serverless SQL warehouses and DBU billing were not on the introduction page and need their own sources next pass."
+  },
   "id": "databricks",
   "provider": "azure",
   "name": "Azure Databricks",
-  "groups": ["compute"],
+  "groups": [
+    "compute"
+  ],
   "oneLiner": "First-party lakehouse platform — managed Spark, Delta Lake and ML on Azure.",
   "whatItIs": "Azure Databricks is the Databricks lakehouse platform delivered as a first-party Azure service — jointly engineered with Microsoft, sold and billed through Azure, and deeply integrated with Entra ID, ADLS, Synapse and Power BI. Like Databricks elsewhere it's built on Apache Spark and the open Delta Lake format, combining cheap lake storage (ADLS) with warehouse-grade reliability (ACID on files). One platform spans data engineering (Spark ETL), SQL analytics (Databricks SQL), and ML/AI with notebooks, jobs and Unity Catalog governance. Its first-party status — native Azure portal experience, networking and identity — is what distinguishes it from the AWS/GCP deployments.",
   "inPractice": {
     "narrative": "Raw data lands in ADLS. Azure Databricks runs Spark to transform it into Delta tables (bronze/silver/gold) in the lake with ACID guarantees. Analysts query gold tables via Databricks SQL or connect Power BI directly; data scientists train models with MLflow; Unity Catalog and Entra ID govern access. Because it's first-party, identity and networking are native Azure. One platform carries data from raw lake files to BI and ML on Azure.",
-    "flow": ["ADLS (raw)", "Azure Databricks (Spark + Delta Lake)", "Delta gold tables", "Databricks SQL / Power BI / ML"],
+    "flow": [
+      "ADLS (raw)",
+      "Azure Databricks (Spark + Delta Lake)",
+      "Delta gold tables",
+      "Databricks SQL / Power BI / ML"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "First-party integration", "detail": "Provisioned and billed through Azure, with native Entra ID (Azure AD) auth, VNet injection, and tight ADLS/Synapse/Power BI integration — a smoother Azure experience than third-party deployments." },
-    { "term": "Lakehouse + Delta Lake", "detail": "Warehouse-grade ACID, schema and time travel on open Parquet files in ADLS — one copy of data for ETL, ML and SQL." },
-    { "term": "Clusters & Photon", "detail": "Managed, auto-scaling Spark clusters (spot-capable) with the Photon engine for fast SQL/DataFrame workloads; serverless options remove cluster management." },
-    { "term": "Databricks SQL", "detail": "SQL warehouses and dashboards over lakehouse tables; Power BI connects directly for downstream BI." },
-    { "term": "Unity Catalog", "detail": "Centralised governance — catalog, lineage and fine-grained access — across workspaces, integrated with Azure identity." },
-    { "term": "MLflow & notebooks", "detail": "Collaborative notebooks and MLflow for experiment tracking, model registry and deployment on one platform." }
+    {
+      "term": "First-party integration",
+      "detail": "Provisioned and billed through Azure, with native Entra ID (Azure AD) auth, VNet injection, and tight ADLS/Synapse/Power BI integration — a smoother Azure experience than third-party deployments."
+    },
+    {
+      "term": "Lakehouse + Delta Lake",
+      "detail": "Warehouse-grade ACID, schema and time travel on open Parquet files in ADLS — one copy of data for ETL, ML and SQL."
+    },
+    {
+      "term": "Clusters & Photon",
+      "detail": "Managed, auto-scaling Spark clusters (spot-capable) with the Photon engine for fast SQL/DataFrame workloads; serverless options remove cluster management."
+    },
+    {
+      "term": "Databricks SQL",
+      "detail": "SQL warehouses and dashboards over lakehouse tables; Power BI connects directly for downstream BI."
+    },
+    {
+      "term": "Unity Catalog",
+      "detail": "Centralised governance — catalog, lineage and fine-grained access — across workspaces, integrated with Azure identity."
+    },
+    {
+      "term": "MLflow & notebooks",
+      "detail": "Collaborative notebooks and MLflow for experiment tracking, model registry and deployment on one platform."
+    }
   ],
   "whenToUse": [
     "A unified lakehouse for ETL, SQL analytics and ML on Azure.",
@@ -33,12 +63,40 @@
     "Teams wanting only Microsoft-native tooling with no third-party engine."
   ],
   "keyFacts": [
-    { "label": "Type", "value": "First-party lakehouse platform (Spark + Delta Lake) on Azure." },
-    { "label": "Storage", "value": "Open Delta tables on ADLS." },
-    { "label": "Identity/net", "value": "Native Entra ID auth and VNet injection." },
-    { "label": "Engines", "value": "Spark clusters, Photon, serverless SQL warehouses." },
-    { "label": "Governance", "value": "Unity Catalog integrated with Azure identity." },
-    { "label": "Billing", "value": "DBUs via Azure + Azure VM/storage underneath." }
+    {
+      "label": "Type",
+      "value": "First-party Databricks Data Intelligence Platform — lakehouse architecture (Spark + Delta Lake) on Azure.",
+      "source": {
+        "url": "https://docs.databricks.com/aws/en/introduction/",
+        "quote": "The Databricks Data Intelligence Platform integrates with cloud storage and security in your cloud account, and manages and deploys cloud infrastructure for you.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Storage",
+      "value": "Open Delta tables on ADLS."
+    },
+    {
+      "label": "Identity/net",
+      "value": "Native Entra ID auth and VNet injection."
+    },
+    {
+      "label": "Engines",
+      "value": "Spark clusters, Photon, serverless SQL warehouses."
+    },
+    {
+      "label": "Governance",
+      "value": "Unity Catalog integrated with Azure identity.",
+      "source": {
+        "url": "https://docs.databricks.com/aws/en/introduction/",
+        "quote": "Unity Catalog provides a unified data governance model for the data lakehouse.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Billing",
+      "value": "DBUs via Azure + Azure VM/storage underneath."
+    }
   ],
   "pricingShape": "Azure Databricks bills in DBUs (by workload type and tier) through your Azure invoice, on top of the underlying Azure VM compute and ADLS storage. Two cost layers as on other clouds — Azure infrastructure plus the DBU premium — but it's all on one Azure bill. Levers: job clusters over all-purpose for scheduled work, auto-terminate idle clusters, spot VMs and Photon/serverless for efficiency, right-sizing, and Azure reservations for steady compute. Idle interactive clusters burning both VMs and DBUs remain the classic waste.",
   "gotchas": [
@@ -49,8 +107,18 @@
     "Delta still needs OPTIMIZE/VACUUM and small-file management for performance/cost."
   ],
   "equivalents": [
-    { "provider": "aws", "id": "databricks", "name": "Databricks on AWS", "note": "Same platform on AWS over S3 (third-party, not first-party)." },
-    { "provider": "gcp", "id": "databricks", "name": "Databricks on Google Cloud", "note": "Same platform on GCP over Cloud Storage." }
+    {
+      "provider": "aws",
+      "id": "databricks",
+      "name": "Databricks on AWS",
+      "note": "Same platform on AWS over S3 (third-party, not first-party)."
+    },
+    {
+      "provider": "gcp",
+      "id": "databricks",
+      "name": "Databricks on Google Cloud",
+      "note": "Same platform on GCP over Cloud Storage."
+    }
   ],
   "docsUrl": "https://learn.microsoft.com/azure/databricks/"
 }

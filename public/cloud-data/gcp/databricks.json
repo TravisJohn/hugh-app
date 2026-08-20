@@ -1,23 +1,53 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "verified": "2026-08-20",
+    "method": "manual",
+    "note": "Platform branding updated: Databricks now calls it the Data Intelligence Platform. “Lakehouse” is kept here because Databricks still uses it for the ARCHITECTURE in the same docs — this was a branding shift, not a replacement, and deleting the word would lose the thing a learner actually needs to understand. Photon, serverless SQL warehouses and DBU billing were not on the introduction page and need their own sources next pass."
+  },
   "id": "databricks",
   "provider": "gcp",
   "name": "Databricks on Google Cloud",
-  "groups": ["compute"],
+  "groups": [
+    "compute"
+  ],
   "oneLiner": "Lakehouse platform — managed Spark, Delta Lake and ML on GCP.",
   "whatItIs": "Databricks is a unified analytics platform from the creators of Apache Spark, available as a managed offering on Google Cloud. Its central idea is the lakehouse: combine cheap open lake storage (Cloud Storage) with warehouse-grade reliability via the open Delta Lake format (ACID on files). One platform covers data engineering (Spark ETL), SQL analytics (Databricks SQL), and ML/AI, with collaborative notebooks, job scheduling and Unity Catalog governance. On GCP it runs on GKE and integrates with BigQuery and Cloud Storage. It's a cloud-portable platform — near-identical across AWS, Azure and GCP — attractive to teams wanting one consistent lakehouse regardless of cloud.",
   "inPractice": {
     "narrative": "Raw data lands in Cloud Storage. Databricks runs Spark jobs to transform it into Delta tables in bronze/silver/gold layers, keeping the data open in GCS but with ACID guarantees. Analysts query gold tables via Databricks SQL (or read them from BigQuery), data scientists train models with MLflow, and Unity Catalog governs access. One platform spans raw lake files through to BI and ML on Google Cloud.",
-    "flow": ["Cloud Storage (raw)", "Databricks (Spark + Delta Lake)", "Delta gold tables", "Databricks SQL / BigQuery / ML"],
+    "flow": [
+      "Cloud Storage (raw)",
+      "Databricks (Spark + Delta Lake)",
+      "Delta gold tables",
+      "Databricks SQL / BigQuery / ML"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "Lakehouse", "detail": "Warehouse-like reliability on open lake storage — one copy of data serving ETL, ML and SQL, avoiding a separate warehouse silo." },
-    { "term": "Delta Lake", "detail": "Open table format adding ACID transactions, schema enforcement, merges and time travel to Parquet files in Cloud Storage — the lakehouse foundation." },
-    { "term": "Runs on GKE", "detail": "On GCP, Databricks clusters run on Google Kubernetes Engine; you get managed, auto-scaling Spark without operating the cluster." },
-    { "term": "Databricks SQL & Photon", "detail": "SQL warehouses with the Photon engine give warehouse-style BI over lakehouse tables; BigQuery connectivity lets the two coexist." },
-    { "term": "Unity Catalog", "detail": "Centralised catalog, lineage and fine-grained access governance across workspaces and data." },
-    { "term": "MLflow & notebooks", "detail": "Collaborative notebooks plus MLflow experiment tracking, model registry and deployment on one platform." }
+    {
+      "term": "Lakehouse",
+      "detail": "Warehouse-like reliability on open lake storage — one copy of data serving ETL, ML and SQL, avoiding a separate warehouse silo."
+    },
+    {
+      "term": "Delta Lake",
+      "detail": "Open table format adding ACID transactions, schema enforcement, merges and time travel to Parquet files in Cloud Storage — the lakehouse foundation."
+    },
+    {
+      "term": "Runs on GKE",
+      "detail": "On GCP, Databricks clusters run on Google Kubernetes Engine; you get managed, auto-scaling Spark without operating the cluster."
+    },
+    {
+      "term": "Databricks SQL & Photon",
+      "detail": "SQL warehouses with the Photon engine give warehouse-style BI over lakehouse tables; BigQuery connectivity lets the two coexist."
+    },
+    {
+      "term": "Unity Catalog",
+      "detail": "Centralised catalog, lineage and fine-grained access governance across workspaces and data."
+    },
+    {
+      "term": "MLflow & notebooks",
+      "detail": "Collaborative notebooks plus MLflow experiment tracking, model registry and deployment on one platform."
+    }
   ],
   "whenToUse": [
     "A unified lakehouse for ETL, SQL analytics and ML on GCP.",
@@ -33,12 +63,40 @@
     "Teams wanting only Google-native, single-vendor tooling."
   ],
   "keyFacts": [
-    { "label": "Type", "value": "Lakehouse platform (Spark + Delta Lake) on GCP." },
-    { "label": "Storage", "value": "Open Delta tables on Cloud Storage." },
-    { "label": "Runtime", "value": "Runs on GKE; auto-scaling Spark + Photon." },
-    { "label": "Governance", "value": "Unity Catalog (catalog, lineage, access)." },
-    { "label": "Coexists with", "value": "BigQuery and Cloud Storage." },
-    { "label": "Billing", "value": "DBUs (Databricks) + GCP compute/storage underneath." }
+    {
+      "label": "Type",
+      "value": "Databricks Data Intelligence Platform — lakehouse architecture (Spark + Delta Lake) on GCP.",
+      "source": {
+        "url": "https://docs.databricks.com/aws/en/introduction/",
+        "quote": "The Databricks Data Intelligence Platform integrates with cloud storage and security in your cloud account, and manages and deploys cloud infrastructure for you.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Storage",
+      "value": "Open Delta tables on Cloud Storage."
+    },
+    {
+      "label": "Runtime",
+      "value": "Runs on GKE; auto-scaling Spark + Photon."
+    },
+    {
+      "label": "Governance",
+      "value": "Unity Catalog (catalog, lineage, access).",
+      "source": {
+        "url": "https://docs.databricks.com/aws/en/introduction/",
+        "quote": "Unity Catalog provides a unified data governance model for the data lakehouse.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Coexists with",
+      "value": "BigQuery and Cloud Storage."
+    },
+    {
+      "label": "Billing",
+      "value": "DBUs (Databricks) + GCP compute/storage underneath."
+    }
   ],
   "pricingShape": "Databricks on GCP bills in DBUs by workload type and tier, on top of the underlying Google Cloud compute (GKE/Compute Engine) and Cloud Storage you pay Google for. Two bills again: GCP infrastructure plus the Databricks DBU premium. Levers mirror the other clouds: prefer job clusters over all-purpose for scheduled work, auto-terminate idle clusters, use preemptible VMs and Photon/serverless for efficiency, and right-size. Idle interactive clusters that burn both GCP compute and DBUs are the usual source of waste.",
   "gotchas": [
@@ -49,8 +107,18 @@
     "Deciding where BigQuery ends and Databricks begins avoids duplicated, costly data estates."
   ],
   "equivalents": [
-    { "provider": "aws", "id": "databricks", "name": "Databricks on AWS", "note": "Same platform on AWS over S3." },
-    { "provider": "azure", "id": "databricks", "name": "Azure Databricks", "note": "First-party Azure service; same platform, deeper Azure integration." }
+    {
+      "provider": "aws",
+      "id": "databricks",
+      "name": "Databricks on AWS",
+      "note": "Same platform on AWS over S3."
+    },
+    {
+      "provider": "azure",
+      "id": "databricks",
+      "name": "Azure Databricks",
+      "note": "First-party Azure service; same platform, deeper Azure integration."
+    }
   ],
   "docsUrl": "https://docs.databricks.com/gcp/"
 }

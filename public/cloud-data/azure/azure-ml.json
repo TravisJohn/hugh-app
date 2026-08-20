@@ -1,6 +1,9 @@
 {
   "meta": {
-    "authored": "2026-07"
+    "authored": "2026-07",
+    "verified": "2026-08-20",
+    "method": "manual",
+    "note": "Four of six cited; nothing contradicted. Gap worth filling later: this write-up says nothing about generative AI, but Azure ML now ships a model catalog and prompt flow for LLM applications, and serverless compute alongside the older cluster model. “Scale to zero” is not stated on the overview page and is left uncited."
   },
   "id": "azure-ml",
   "provider": "azure",
@@ -63,7 +66,12 @@
   "keyFacts": [
     {
       "label": "Scope",
-      "value": "Full ML lifecycle: prep, train, tune, deploy, monitor."
+      "value": "Full ML lifecycle: prep, train, tune, deploy, monitor.",
+      "source": {
+        "url": "https://learn.microsoft.com/en-us/azure/machine-learning/overview-what-is-azure-machine-learning",
+        "quote": "Azure Machine Learning is a cloud service that accelerates and manages the machine learning (ML) project lifecycle. ML professionals, data scientists, and engineers use it in their daily workflows to train and deploy models and manage machine learning operations (MLOps).",
+        "checked": "2026-08-20"
+      }
     },
     {
       "label": "Compute",
@@ -71,15 +79,30 @@
     },
     {
       "label": "Build modes",
-      "value": "Code-first SDK/CLI, AutoML, and low-code Designer."
+      "value": "Code-first SDK/CLI, AutoML, and low-code Designer.",
+      "source": {
+        "url": "https://learn.microsoft.com/en-us/azure/machine-learning/overview-what-is-azure-machine-learning",
+        "quote": "Azure Machine Learning designer: Use the designer to train and deploy ML models without writing any code. Drag and drop datasets and components to create ML pipelines. … Automated machine learning UI … Python SDK (v2) … Azure CLI (v2).",
+        "checked": "2026-08-20"
+      }
     },
     {
       "label": "Inference",
-      "value": "Managed online (real-time) and batch endpoints."
+      "value": "Managed online (real-time) and batch endpoints.",
+      "source": {
+        "url": "https://learn.microsoft.com/en-us/azure/machine-learning/overview-what-is-azure-machine-learning",
+        "quote": "The Azure Machine Learning managed endpoints abstract the required infrastructure for both batch or real-time (online) model scoring (inferencing).",
+        "checked": "2026-08-20"
+      }
     },
     {
       "label": "MLOps",
-      "value": "Pipelines + Azure DevOps/GitHub CI/CD, model registry."
+      "value": "Pipelines + Azure DevOps/GitHub CI/CD, model registry.",
+      "source": {
+        "url": "https://learn.microsoft.com/en-us/azure/machine-learning/overview-what-is-azure-machine-learning",
+        "quote": "Some key features enabling MLOps include: Git integration, MLflow integration, Machine learning pipeline scheduling, Azure Event Grid integration for custom triggers, Ease of use with CI/CD tools like GitHub Actions or Azure DevOps.",
+        "checked": "2026-08-20"
+      }
     },
     {
       "label": "Billing",
@@ -98,7 +121,7 @@
     {
       "provider": "aws",
       "id": "sagemaker",
-      "name": "Amazon SageMaker",
+      "name": "Amazon SageMaker AI",
       "note": "End-to-end ML platform; the direct analogue on AWS."
     },
     {

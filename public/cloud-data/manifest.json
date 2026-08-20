@@ -128,7 +128,8 @@
     {
       "id": "sagemaker",
       "provider": "aws",
-      "name": "Amazon SageMaker",
+      "name": "Amazon SageMaker AI",
+      "short": "formerly Amazon SageMaker",
       "groups": [
         "ml"
       ],

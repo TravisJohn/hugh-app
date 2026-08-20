@@ -111,7 +111,7 @@
     {
       "provider": "aws",
       "id": "sagemaker",
-      "name": "Amazon SageMaker",
+      "name": "Amazon SageMaker AI",
       "note": "End-to-end ML platform; the direct analogue on AWS (Bedrock covers GenAI APIs)."
     },
     {
