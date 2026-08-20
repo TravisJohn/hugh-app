@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Workflow,
   ChevronRight,
+  Quote,
 } from "lucide-react";
 import {
   GROUP_LABELS,
@@ -21,6 +22,7 @@ import {
 import MarginProvider from "@/components/margin/MarginProvider";
 import StubButton from "@/components/margin/StubButton";
 import ServiceRail from "./ServiceRail";
+import ProvenanceNote from "./ProvenanceNote";
 
 const PROVIDER_ACCENT: Record<CloudProvider, string> = {
   aws: "text-amber-300",
@@ -81,6 +83,8 @@ export default function ServiceDetail({
             </span>
           ))}
         </div>
+
+        <ProvenanceNote meta={service.meta} keyFacts={service.keyFacts} />
 
         {/* The provider spans both columns: the pad is docked right, but the
             buttons that feed it sit on the headings on the left. */}
@@ -200,7 +204,25 @@ export default function ServiceDetail({
                         <th className="w-1/3 px-4 py-2 text-left align-top font-medium text-slate-400">
                           {f.label}
                         </th>
-                        <td className="px-4 py-2 text-slate-200">{f.value}</td>
+                        <td className="px-4 py-2 text-slate-200">
+                          {f.value}
+                          {/* The quote travels with the link. A bare link asks
+                              the reader to go and re-derive the finding; the
+                              quote lets them see at a glance whether the source
+                              really says what the fact claims. */}
+                          {f.source && (
+                            <a
+                              href={f.source.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={`"${f.source.quote}" — checked ${f.source.checked}`}
+                              className="ml-1.5 inline-flex translate-y-[1px] text-emerald-400/70 transition-colors hover:text-emerald-300"
+                              aria-label={`Source for ${f.label}, checked ${f.source.checked}`}
+                            >
+                              <Quote size={11} />
+                            </a>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

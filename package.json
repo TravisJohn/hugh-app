@@ -14,7 +14,9 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "health": "tsx scripts/health-check.ts"
+    "health": "tsx scripts/health-check.ts",
+    "cloud": "tsx scripts/cloud-meta.ts",
+    "cloud:check": "tsx scripts/cloud-meta.ts --check"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",

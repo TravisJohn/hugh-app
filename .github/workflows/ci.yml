@@ -57,6 +57,12 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit --pretty false
 
+      # Cloud Skills content is hand- and AI-edited JSON that nothing type-checks
+      # at runtime (the loader casts). This is the only thing standing between a
+      # bad edit and a broken service page.
+      - name: Cloud content integrity
+        run: npm run cloud:check
+
       - name: Unit tests
         run: npm test
 

@@ -1,4 +1,5 @@
 {
+  "meta": { "authored": "2026-07" },
   "id": "logic-apps",
   "provider": "azure",
   "name": "Azure Logic Apps",

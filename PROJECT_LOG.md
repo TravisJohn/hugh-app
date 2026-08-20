@@ -4184,3 +4184,59 @@ No tokens are spent anywhere in this feature — Cloud Skills browsing stays
 zero-runtime-AI.
 
 25 unit tests on the pure module. Migration 045 is **not yet applied**.
+
+## Cloud Skills provenance — saying what has actually been checked (2026-08-20)
+
+Cloud Skills is 63 AI-authored write-ups, ~37,000 words, and Travis is the only
+developer — he cannot QA it alone. The goal he set was content that is grounded.
+
+**The reframe.** 100% correct is not reachable by any pipeline: a sentence like
+"S3 is the shared floor everything else stands on" is editorial, not checkable.
+What is reachable is **0% unaccounted for** — every factual claim either carries
+a citation to an official doc page, with the supporting quote, or is visibly
+marked as unverified. The failure mode of AI-generated reference content is that
+solid and shaky prose look identical; that is the thing to fix.
+
+**The pilot, run by hand against live AWS docs before building anything.** Six
+`keyFacts` on Amazon S3: four supported with quotes, two unsupported by the pages
+fetched, and one **contradicted** — max object size is 48.8 TiB (10,000 parts ×
+5 GiB), not the 5 TB stored. Hugh was teaching a superseded number on its
+flagship service. Fixed.
+
+Four things the pilot proved that the plan had only guessed at:
+- **A fact lives in more than one field.** The stale 5 TB was in `keyFacts` *and*
+  in `coreConcepts`. Checking only the structured facts would have left the prose
+  still teaching it.
+- **The hub `docsUrl` is not a citation source.** Six claims needed three
+  different AWS pages, none of them `docs.aws.amazon.com/s3/`.
+- **"Unsupported" is not "wrong."** Two of six simply were not on the pages
+  fetched; both are almost certainly true. A ledger that collapses these into
+  "failed" sends a reviewer chasing correct content.
+- **The dangerous one:** the S3 FAQ says 99.99% and the SLA page says 99.9%, and
+  they mean different things — design target versus contractual commitment. A
+  fixer trusting the first page it found would have replaced a correct fact with
+  a wrong one. **The pipeline proposes; the human disposes.** Nothing auto-applies.
+  That distinction is now stated in the fact itself.
+
+**What shipped.**
+- `ServiceMeta` (`authored` / `verified` / `method` / `note`) and an optional
+  `source` (url + verbatim quote + date) on each `Fact`. `meta` is OPTIONAL and a
+  missing one reads as *unverified*, never as fine — the same stance as an
+  unknown model falling back to the most expensive rate in `lib/pricing.ts`.
+- `lib/cloud/provenance.ts` — pure, 13 tests. Staleness is **computed** from
+  dates, never stored: a stored status would itself go stale, which is the exact
+  failure this layer exists to fix. Quarter = 90 days, stale = 180.
+- `scripts/cloud-meta.ts` — `--check` (structural integrity), `--backfill`
+  (stamps `meta.authored`), and a default review-queue report ordered
+  least-known-first. It imports the same pure module the app renders from, so the
+  queue and the learner-facing line can never disagree. The backfill inserts text
+  rather than round-tripping JSON: 63 files, 65 insertions, 1 line each.
+- `npm run cloud:check` is now a CI step. The loader casts rather than validates,
+  so this is the only thing between a bad content edit and a broken page.
+- `ProvenanceNote` on every service page — a quiet line, not a banner, saying
+  when the write-up was last checked and how many of its key facts carry a
+  citation. Cited facts get a quote icon linking the source, with the verbatim
+  quote in the tooltip.
+
+Today: 1 service verified, 62 unverified, 4 of 378 key facts cited. That number
+is meant to be embarrassing and is meant to go up quarterly.

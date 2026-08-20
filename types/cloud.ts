@@ -98,10 +98,29 @@ export interface Equivalent {
   note?: string;
 }
 
+/**
+ * Where a claim was checked, and what the source actually said.
+ *
+ * The quote is stored, not just the URL. A bare link asks the reader to go and
+ * re-derive the finding; a quote lets them see in one glance whether the source
+ * really says what the fact claims. It is also what makes a later re-check
+ * cheap — you can tell whether the DOCS changed or the write-up drifted.
+ */
+export interface FactSource {
+  /** The exact page the claim was verified against — not a hub or landing page. */
+  url: string;
+  /** Verbatim from that page. Never paraphrased. */
+  quote: string;
+  /** YYYY-MM-DD the check was made. */
+  checked: string;
+}
+
 /** A labelled key fact — used for the limits / pricing-shape table. */
 export interface Fact {
   label: string;
   value: string;
+  /** Present only where the claim has actually been checked against a source. */
+  source?: FactSource;
 }
 
 /** One core concept the learner should know for this service. */
@@ -124,8 +143,33 @@ export interface InPractice {
   highlight?: number;
 }
 
+/**
+ * When this write-up was produced and when it was last checked.
+ *
+ * Deliberately records dates and nothing derived. Whether a service counts as
+ * "stale" is computed at read time from `verified` (see lib/cloud/provenance.ts)
+ * — a stored status would itself go out of date, which is the exact failure this
+ * whole layer exists to fix.
+ *
+ * Optional on purpose: a service with no `meta` reads as UNVERIFIED, never as
+ * fine. Same stance as an unknown model falling back to the most expensive rate
+ * in lib/pricing.ts — an unknown must never be quietly flattering.
+ */
+export interface ServiceMeta {
+  /** When the write-up was authored, YYYY-MM or YYYY-MM-DD. */
+  authored?: string;
+  /** Last verification pass, YYYY-MM-DD. Absent means never checked. */
+  verified?: string;
+  /** How that pass was done — "manual" (a human with the docs) or "pipeline". */
+  method?: "manual" | "pipeline";
+  /** Anything a reviewer needs the next reviewer to know. */
+  note?: string;
+}
+
 /** A full service write-up — "everything you need to know" for one service. */
 export interface Service {
+  /** Provenance. Absent = never verified; see lib/cloud/provenance.ts. */
+  meta?: ServiceMeta;
   id: string;
   provider: CloudProvider;
   /** Product name, e.g. "Amazon S3". */
