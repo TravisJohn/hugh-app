@@ -1,23 +1,53 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "verified": "2026-08-20",
+    "method": "manual",
+    "note": "CONTRADICTED and fixed. The write-up listed “Consumption, Premium, Dedicated”. Microsoft now offers Flex Consumption (GA, and the recommended plan for new serverless apps), Premium, Dedicated and Container Apps, with Consumption marked legacy — so the write-up named the deprecated plan as the primary one and omitted the current default entirely. Also worth noting next pass: Linux Consumption retires on 30 September 2028, and timeouts are now unbounded on Flex/Premium/Dedicated rather than capped at 10 minutes."
+  },
   "id": "azure-functions",
   "provider": "azure",
   "name": "Azure Functions",
-  "groups": ["serverless"],
+  "groups": [
+    "serverless"
+  ],
   "oneLiner": "Event-driven serverless compute for glue and lightweight ETL.",
   "whatItIs": "Azure Functions is Azure's serverless compute service: you write a function and it runs in response to a trigger — a blob landing in storage, an Event Hubs/Service Bus message, an HTTP request, a timer — scaling automatically and (on the Consumption plan) billing only while it runs. Its distinctive feature is the trigger/binding model: declarative bindings wire inputs and outputs (storage, queues, Cosmos DB) to your function with little boilerplate. In data pipelines it's the event-driven glue that reacts to events, does small transforms, and kicks off heavier services like Data Factory or Databricks. Not for long heavy compute — for short, event-driven tasks.",
   "inPractice": {
     "narrative": "A blob lands in ADLS. A blob-triggered Azure Function validates it, writes a record to Cosmos DB via an output binding, and drops a message on a queue that triggers a Data Factory pipeline for the heavy processing. A timer-triggered function calls an API nightly and lands the result in storage. Each runs only when its trigger fires and, on Consumption, costs nothing idle. Functions is the connective glue, not the big-data engine.",
-    "flow": ["Trigger (blob / Event Hubs / HTTP / timer)", "Azure Function", "output binding / start ADF / write Cosmos", "downstream pipeline"],
+    "flow": [
+      "Trigger (blob / Event Hubs / HTTP / timer)",
+      "Azure Function",
+      "output binding / start ADF / write Cosmos",
+      "downstream pipeline"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "Triggers & bindings", "detail": "The signature model: a trigger starts the function (blob, queue, Event Hubs, HTTP, timer), and input/output bindings declaratively connect data sources/sinks with minimal code." },
-    { "term": "Hosting plans", "detail": "Consumption (true serverless, scale-to-zero, pay-per-execution), Premium (pre-warmed instances, no cold starts, VNet), and Dedicated/App Service (runs on existing plan) — the plan drives scaling and cost." },
-    { "term": "Pay-per-execution (Consumption)", "detail": "Billed by executions and GB-seconds (memory × duration); idle costs nothing on Consumption — serverless economics." },
-    { "term": "Stateless + Durable Functions", "detail": "Functions are stateless by default; Durable Functions add orchestration for stateful workflows (chaining, fan-out/fan-in) without external plumbing." },
-    { "term": "Cold starts", "detail": "Consumption plan functions can cold-start on scale-out; the Premium plan keeps instances warm for latency-sensitive workloads." },
-    { "term": "Scale controller", "detail": "Azure monitors trigger sources (e.g. queue length, event lag) and scales function instances out/in automatically." }
+    {
+      "term": "Triggers & bindings",
+      "detail": "The signature model: a trigger starts the function (blob, queue, Event Hubs, HTTP, timer), and input/output bindings declaratively connect data sources/sinks with minimal code."
+    },
+    {
+      "term": "Hosting plans",
+      "detail": "Consumption (true serverless, scale-to-zero, pay-per-execution), Premium (pre-warmed instances, no cold starts, VNet), and Dedicated/App Service (runs on existing plan) — the plan drives scaling and cost."
+    },
+    {
+      "term": "Pay-per-execution (Consumption)",
+      "detail": "Billed by executions and GB-seconds (memory × duration); idle costs nothing on Consumption — serverless economics."
+    },
+    {
+      "term": "Stateless + Durable Functions",
+      "detail": "Functions are stateless by default; Durable Functions add orchestration for stateful workflows (chaining, fan-out/fan-in) without external plumbing."
+    },
+    {
+      "term": "Cold starts",
+      "detail": "Consumption plan functions can cold-start on scale-out; the Premium plan keeps instances warm for latency-sensitive workloads."
+    },
+    {
+      "term": "Scale controller",
+      "detail": "Azure monitors trigger sources (e.g. queue length, event lag) and scales function instances out/in automatically."
+    }
   ],
   "whenToUse": [
     "Event-driven glue between Azure services (blob→process→queue).",
@@ -33,12 +63,40 @@
     "Complex microservice apps better suited to Container Apps/AKS."
   ],
   "keyFacts": [
-    { "label": "Model", "value": "Serverless, trigger/binding-based functions." },
-    { "label": "Plans", "value": "Consumption (scale-to-zero), Premium (warm/VNet), Dedicated." },
-    { "label": "Triggers", "value": "Blob, Queue, Event Hubs, Service Bus, HTTP, Timer, Cosmos DB." },
-    { "label": "Stateful option", "value": "Durable Functions for orchestrations." },
-    { "label": "Scaling", "value": "Automatic via the scale controller (trigger-aware)." },
-    { "label": "Billing", "value": "Consumption: per execution + GB-seconds; Premium/Dedicated: per instance." }
+    {
+      "label": "Model",
+      "value": "Serverless, trigger/binding-based functions."
+    },
+    {
+      "label": "Plans",
+      "value": "Plans: Flex Consumption (default for new serverless apps), Premium (warm/VNet), Dedicated, Container Apps. Consumption is legacy.",
+      "source": {
+        "url": "https://learn.microsoft.com/en-us/azure/azure-functions/functions-scale",
+        "quote": "The Consumption plan is a legacy hosting plan. For new serverless function apps, use the Flex Consumption plan. For existing Consumption plan apps, migrate to the Flex Consumption plan.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Triggers",
+      "value": "Blob, Queue, Event Hubs, Service Bus, HTTP, Timer, Cosmos DB."
+    },
+    {
+      "label": "Stateful option",
+      "value": "Durable Functions for orchestrations."
+    },
+    {
+      "label": "Scaling",
+      "value": "Automatic via the scale controller (trigger-aware).",
+      "source": {
+        "url": "https://learn.microsoft.com/en-us/azure/azure-functions/functions-scale",
+        "quote": "Flex Consumption plan: Fast event-driven scaling decisions are calculated on a per-function basis, called per-function scaling … Premium plan: Event driven. Scale out automatically, even during periods of high load.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Billing",
+      "value": "Consumption: per execution + GB-seconds; Premium/Dedicated: per instance."
+    }
   ],
   "pricingShape": "On the Consumption plan you pay per execution plus GB-seconds (memory × duration) with a free grant — idle costs nothing and busy scales with work, like other FaaS. The Premium plan removes cold starts and adds VNet/always-ready instances but bills for reserved pre-warmed capacity (a standing cost), and the Dedicated plan runs on an App Service plan you already pay for. Levers: choose the plan to match latency/throughput needs (don't pay Premium if Consumption's cold starts are acceptable), right-size memory, and keep functions fast.",
   "gotchas": [
@@ -49,8 +107,18 @@
     "Long/heavy work doesn't belong here — trigger Data Factory/Databricks instead of forcing it into a function."
   ],
   "equivalents": [
-    { "provider": "aws", "id": "lambda", "name": "AWS Lambda", "note": "Event-driven serverless functions; the direct analogue on AWS." },
-    { "provider": "gcp", "id": "cloud-functions", "name": "Cloud Functions", "note": "Event-driven serverless functions; the direct analogue on GCP." }
+    {
+      "provider": "aws",
+      "id": "lambda",
+      "name": "AWS Lambda",
+      "note": "Event-driven serverless functions; the direct analogue on AWS."
+    },
+    {
+      "provider": "gcp",
+      "id": "cloud-functions",
+      "name": "Cloud Run functions",
+      "note": "Event-driven serverless functions; the direct analogue on GCP."
+    }
   ],
   "docsUrl": "https://learn.microsoft.com/azure/azure-functions/"
 }

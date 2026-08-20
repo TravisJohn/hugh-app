@@ -115,7 +115,7 @@
     {
       "provider": "gcp",
       "id": "cloud-functions",
-      "name": "Cloud Functions",
+      "name": "Cloud Run functions",
       "note": "Event-driven serverless functions; the direct analogue on GCP."
     },
     {

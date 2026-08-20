@@ -1,24 +1,54 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "verified": "2026-08-20",
+    "method": "manual",
+    "note": "Three of six cited; nothing contradicted. The S3-bucket deployment model is described on the getting-started page rather than the overview, so it is left uncited. Worth adding later: schedulers and workers run as Fargate containers, and Airflow v3 support has arrived."
+  },
   "id": "mwaa",
   "provider": "aws",
   "name": "Amazon MWAA",
   "short": "Managed Workflows for Apache Airflow",
-  "groups": ["orchestration"],
+  "groups": [
+    "orchestration"
+  ],
   "oneLiner": "Managed Apache Airflow for authoring and scheduling data pipelines.",
   "whatItIs": "MWAA is AWS's managed Apache Airflow. Airflow is the de-facto open-source tool for orchestrating data pipelines: you define workflows as DAGs (directed acyclic graphs) in Python, and Airflow schedules them, runs the tasks in order, handles retries and dependencies, and shows it all in a web UI. MWAA runs and scales the Airflow environment (scheduler, workers, web server, metadata DB) for you, so you get standard Airflow without operating the infrastructure. It's the coordinator that says 'run the ingest, then the transform, then load the warehouse' across your other AWS services.",
   "inPractice": {
     "narrative": "A nightly pipeline must run in order: pull data to S3, run a Glue ETL job, then trigger a Redshift load, and alert on failure. An engineer writes an Airflow DAG in Python with those tasks and dependencies; MWAA schedules it, runs each step via AWS operators, retries failures and surfaces the run in the Airflow UI. MWAA doesn't move the data itself — it conducts the other services in the right order at the right time.",
-    "flow": ["Airflow DAG (Python)", "MWAA scheduler", "Glue / Redshift / S3 tasks", "alerts + UI"],
+    "flow": [
+      "Airflow DAG (Python)",
+      "MWAA scheduler",
+      "Glue / Redshift / S3 tasks",
+      "alerts + UI"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "DAGs", "detail": "Workflows are Python-defined directed acyclic graphs of tasks with dependencies. Code-as-config makes pipelines versionable, testable and dynamic." },
-    { "term": "Operators & providers", "detail": "Tasks use operators (e.g. GlueJobOperator, RedshiftSQLOperator, S3 sensors) from Airflow provider packages to talk to AWS and external systems." },
-    { "term": "Scheduler, workers, web server", "detail": "Airflow's components: the scheduler triggers DAGs, workers execute tasks, the web server serves the UI. MWAA provisions and autoscales these." },
-    { "term": "DAGs from S3", "detail": "You upload DAG files, plugins and requirements to an S3 bucket; MWAA syncs them into the environment — that's how you deploy pipelines." },
-    { "term": "Environment sizing & autoscaling", "detail": "You pick an environment class (small/medium/large) and MWAA autoscales workers between min/max to match task load." },
-    { "term": "Retries, backfills, sensors", "detail": "Built-in retry policies, backfilling of past runs, and sensors that wait for external conditions make robust scheduling straightforward." }
+    {
+      "term": "DAGs",
+      "detail": "Workflows are Python-defined directed acyclic graphs of tasks with dependencies. Code-as-config makes pipelines versionable, testable and dynamic."
+    },
+    {
+      "term": "Operators & providers",
+      "detail": "Tasks use operators (e.g. GlueJobOperator, RedshiftSQLOperator, S3 sensors) from Airflow provider packages to talk to AWS and external systems."
+    },
+    {
+      "term": "Scheduler, workers, web server",
+      "detail": "Airflow's components: the scheduler triggers DAGs, workers execute tasks, the web server serves the UI. MWAA provisions and autoscales these."
+    },
+    {
+      "term": "DAGs from S3",
+      "detail": "You upload DAG files, plugins and requirements to an S3 bucket; MWAA syncs them into the environment — that's how you deploy pipelines."
+    },
+    {
+      "term": "Environment sizing & autoscaling",
+      "detail": "You pick an environment class (small/medium/large) and MWAA autoscales workers between min/max to match task load."
+    },
+    {
+      "term": "Retries, backfills, sensors",
+      "detail": "Built-in retry policies, backfilling of past runs, and sensors that wait for external conditions make robust scheduling straightforward."
+    }
   ],
   "whenToUse": [
     "Orchestrating multi-step data pipelines across AWS services in a set order.",
@@ -34,12 +64,45 @@
     "Tiny workloads where an always-on Airflow environment isn't cost-justified."
   ],
   "keyFacts": [
-    { "label": "Engine", "value": "Managed Apache Airflow (open-source, Python DAGs)." },
-    { "label": "Role", "value": "Batch pipeline scheduling and dependency orchestration." },
-    { "label": "Deploy", "value": "DAGs/plugins/requirements uploaded via S3." },
-    { "label": "Scaling", "value": "Environment class + worker autoscaling." },
-    { "label": "Integrations", "value": "Airflow AWS provider operators + community providers." },
-    { "label": "Billing", "value": "Per environment-hour + worker/scheduler usage + storage." }
+    {
+      "label": "Engine",
+      "value": "Managed Apache Airflow (open-source, Python DAGs).",
+      "source": {
+        "url": "https://docs.aws.amazon.com/mwaa/latest/userguide/what-is-mwaa.html",
+        "quote": "Use Amazon Managed Workflows for Apache Airflow, a managed service for Apache Airflow, to set up and run data pipelines in the cloud at scale. … With Amazon MWAA, you can use Apache Airflow and Python to create workflows without managing infrastructure.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Role",
+      "value": "Batch pipeline scheduling and dependency orchestration."
+    },
+    {
+      "label": "Deploy",
+      "value": "DAGs/plugins/requirements uploaded via S3."
+    },
+    {
+      "label": "Scaling",
+      "value": "Environment class + worker autoscaling.",
+      "source": {
+        "url": "https://docs.aws.amazon.com/mwaa/latest/userguide/what-is-mwaa.html",
+        "quote": "Automatic scaling – Automatically scale Apache Airflow workers (the compute resources that run your tasks) by setting minimum and maximum limits.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Integrations",
+      "value": "Airflow AWS provider operators + community providers.",
+      "source": {
+        "url": "https://docs.aws.amazon.com/mwaa/latest/userguide/what-is-mwaa.html",
+        "quote": "Amazon MWAA supports open-source integrations with Amazon Athena, AWS Batch, Amazon CloudWatch, Amazon DynamoDB, AWS DataSync, Amazon EMR … as well as hundreds of built-in and community-created operators and sensors.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Billing",
+      "value": "Per environment-hour + worker/scheduler usage + storage."
+    }
   ],
   "pricingShape": "MWAA bills for the environment being up: an hourly charge by environment size, plus additional worker/scheduler compute as it autoscales, plus a little storage for the metadata DB. Because Airflow's scheduler runs continuously, there's a baseline cost even when no DAGs are executing — an idle environment isn't free, unlike per-invocation services. So MWAA is economical when you have steady orchestration needs; for occasional or purely event-driven flows, Step Functions' pay-per-transition model is often cheaper.",
   "gotchas": [
@@ -50,8 +113,18 @@
     "Scheduler/worker sizing matters: too small and DAGs queue and lag their schedules."
   ],
   "equivalents": [
-    { "provider": "gcp", "id": "cloud-composer", "name": "Cloud Composer", "note": "Managed Airflow on GCP — the direct analogue." },
-    { "provider": "azure", "id": "data-factory", "name": "Azure Data Factory", "note": "ADF pipelines orchestrate on Azure; it also offers Managed Airflow." }
+    {
+      "provider": "gcp",
+      "id": "cloud-composer",
+      "name": "Managed Service for Apache Airflow",
+      "note": "Managed Airflow on GCP — the direct analogue."
+    },
+    {
+      "provider": "azure",
+      "id": "data-factory",
+      "name": "Azure Data Factory",
+      "note": "ADF pipelines orchestrate on Azure; it also offers Managed Airflow."
+    }
   ],
   "docsUrl": "https://docs.aws.amazon.com/mwaa/"
 }

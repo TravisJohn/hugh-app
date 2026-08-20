@@ -1,23 +1,53 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "verified": "2026-08-20",
+    "method": "manual",
+    "note": "RENAMED and RE-VERSIONED: Cloud Composer is becoming Managed Service for Apache Airflow, with generations Managed Airflow Gen 3 (recommended), Gen 2, and Legacy Gen 1 replacing the old Composer 1/2/3 numbering. The write-up's “Composer 2 autoscales workers on GKE” is doubly out of date: Gen 3 is now the recommendation, and it hides the cluster entirely rather than exposing GKE. Slug kept as cloud-composer; the docs still live under /composer/docs."
+  },
   "id": "cloud-composer",
   "provider": "gcp",
-  "name": "Cloud Composer",
-  "groups": ["orchestration"],
+  "name": "Managed Service for Apache Airflow",
+  "groups": [
+    "orchestration"
+  ],
   "oneLiner": "Managed Apache Airflow for orchestrating Google Cloud data workflows.",
   "whatItIs": "Cloud Composer is Google Cloud's managed Apache Airflow. Like MWAA on AWS, it runs standard Airflow — Python-defined DAGs, scheduler, workers, web UI — so you orchestrate pipelines without operating the infrastructure. It's tightly wired into GCP, with operators for BigQuery, Dataflow, Dataproc, Cloud Storage and more, so a DAG can say 'load to GCS, run a Dataflow job, then a BigQuery transform' and Composer will schedule and supervise it. It runs on GKE under the hood but you mostly interact with plain Airflow.",
   "inPractice": {
     "narrative": "A daily pipeline must land files in Cloud Storage, kick off a Dataflow job to process them, then run a BigQuery query to build a reporting table — in order, with retries and alerting. An engineer writes an Airflow DAG using GCP operators; Cloud Composer schedules it, runs each task against the right service, and shows the run in the Airflow UI. Composer conducts the pipeline; the actual work happens in Dataflow and BigQuery.",
-    "flow": ["Airflow DAG (Python)", "Cloud Composer scheduler", "GCS / Dataflow / BigQuery tasks", "alerts + UI"],
+    "flow": [
+      "Airflow DAG (Python)",
+      "Cloud Composer scheduler",
+      "GCS / Dataflow / BigQuery tasks",
+      "alerts + UI"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "DAGs", "detail": "Python-defined directed acyclic graphs of tasks with dependencies — the same Airflow model as MWAA, versionable and dynamic." },
-    { "term": "GCP operators", "detail": "Provider operators for BigQuery, Dataflow, Dataproc, Cloud Storage, Pub/Sub and more let tasks drive GCP services directly." },
-    { "term": "DAGs from a GCS bucket", "detail": "Composer syncs DAG files and plugins from an associated Cloud Storage bucket into the environment — that's the deploy mechanism." },
-    { "term": "Composer 2 (autoscaling on GKE)", "detail": "Composer 2 runs Airflow on autoscaling GKE with Workload Identity, scaling workers to load and improving cost/isolation over Composer 1." },
-    { "term": "Environments", "detail": "You create a Composer environment (a managed Airflow deployment); sizing and node config determine capacity and cost." },
-    { "term": "Retries, sensors, backfills", "detail": "Standard Airflow robustness: retry policies, sensors that wait for conditions, and backfilling historical runs." }
+    {
+      "term": "DAGs",
+      "detail": "Python-defined directed acyclic graphs of tasks with dependencies — the same Airflow model as MWAA, versionable and dynamic."
+    },
+    {
+      "term": "GCP operators",
+      "detail": "Provider operators for BigQuery, Dataflow, Dataproc, Cloud Storage, Pub/Sub and more let tasks drive GCP services directly."
+    },
+    {
+      "term": "DAGs from a GCS bucket",
+      "detail": "Composer syncs DAG files and plugins from an associated Cloud Storage bucket into the environment — that's the deploy mechanism."
+    },
+    {
+      "term": "Composer 2 (autoscaling on GKE)",
+      "detail": "Composer 2 runs Airflow on autoscaling GKE with Workload Identity, scaling workers to load and improving cost/isolation over Composer 1."
+    },
+    {
+      "term": "Environments",
+      "detail": "You create a Composer environment (a managed Airflow deployment); sizing and node config determine capacity and cost."
+    },
+    {
+      "term": "Retries, sensors, backfills",
+      "detail": "Standard Airflow robustness: retry policies, sensors that wait for conditions, and backfilling historical runs."
+    }
   ],
   "whenToUse": [
     "Orchestrating multi-step GCP data pipelines in a defined order.",
@@ -33,12 +63,40 @@
     "Tiny/occasional needs where an always-on environment isn't cost-justified."
   ],
   "keyFacts": [
-    { "label": "Engine", "value": "Managed Apache Airflow (Python DAGs) on GKE." },
-    { "label": "Role", "value": "Batch pipeline scheduling and dependency orchestration." },
-    { "label": "Deploy", "value": "DAGs synced from an associated Cloud Storage bucket." },
-    { "label": "Scaling", "value": "Composer 2 autoscales workers on GKE." },
-    { "label": "Integrations", "value": "BigQuery, Dataflow, Dataproc, GCS, Pub/Sub operators." },
-    { "label": "Billing", "value": "Per environment (compute/GKE nodes + Airflow components)." }
+    {
+      "label": "Engine",
+      "value": "Managed Apache Airflow (Python DAGs); Gen 3 hides the underlying cluster.",
+      "source": {
+        "url": "https://docs.cloud.google.com/composer/docs/composer-versioning-overview",
+        "quote": "Cloud Composer is evolving to become Managed Service for Apache Airflow. … Managed Airflow (Gen 3): This version has simplified network setup and hides infrastructure components including the environment's cluster and environment's dependencies on other services.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Role",
+      "value": "Batch pipeline scheduling and dependency orchestration."
+    },
+    {
+      "label": "Deploy",
+      "value": "DAGs synced from an associated Cloud Storage bucket."
+    },
+    {
+      "label": "Scaling",
+      "value": "Scaling: Gen 3 is recommended and scales automatically; Gen 2 autoscales its own cluster.",
+      "source": {
+        "url": "https://docs.cloud.google.com/composer/docs/composer-versioning-overview",
+        "quote": "Managed Airflow (Gen 2): In this version, the environment's cluster scales automatically to meet the resource demands. … Google recommends migration to Managed Airflow (Gen 3).",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Integrations",
+      "value": "BigQuery, Dataflow, Dataproc, GCS, Pub/Sub operators."
+    },
+    {
+      "label": "Billing",
+      "value": "Per environment (compute/GKE nodes + Airflow components)."
+    }
   ],
   "pricingShape": "Composer bills for the environment's underlying resources — the GKE compute, database and storage that run Airflow — for as long as the environment exists. Composer 2's autoscaling reduces worker cost at low load, but the scheduler/web components mean a baseline cost even when idle: an environment left running isn't free. As with MWAA, it's economical for steady orchestration and less so for rare or purely event-driven flows, where lighter Google Cloud Workflows/Functions may be cheaper.",
   "gotchas": [
@@ -49,8 +107,19 @@
     "Airflow/Composer version upgrades can break DAGs and providers; validate before upgrading prod."
   ],
   "equivalents": [
-    { "provider": "aws", "id": "mwaa", "name": "Amazon MWAA", "note": "Managed Airflow on AWS — the direct analogue." },
-    { "provider": "azure", "id": "data-factory", "name": "Azure Data Factory", "note": "ADF pipelines orchestrate on Azure; it also offers Managed Airflow." }
+    {
+      "provider": "aws",
+      "id": "mwaa",
+      "name": "Amazon MWAA",
+      "note": "Managed Airflow on AWS — the direct analogue."
+    },
+    {
+      "provider": "azure",
+      "id": "data-factory",
+      "name": "Azure Data Factory",
+      "note": "ADF pipelines orchestrate on Azure; it also offers Managed Airflow."
+    }
   ],
-  "docsUrl": "https://cloud.google.com/composer/docs"
+  "docsUrl": "https://cloud.google.com/composer/docs",
+  "short": "formerly Cloud Composer"
 }

@@ -1,23 +1,53 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "verified": "2026-08-20",
+    "method": "manual",
+    "note": "Four of six cited; nothing contradicted, one understatement corrected — the connector count is now documented as 1,400+, not 1000+. Gap for later: Logic Apps now supports AI agents and LLMs in workflows, and a hybrid hosting option that runs the runtime on your own infrastructure. Neither is mentioned in this write-up."
+  },
   "id": "logic-apps",
   "provider": "azure",
   "name": "Azure Logic Apps",
-  "groups": ["orchestration"],
+  "groups": [
+    "orchestration"
+  ],
   "oneLiner": "Low-code workflow orchestration and integration across 1000+ connectors.",
   "whatItIs": "Azure Logic Apps is Azure's low-code workflow and integration service. You build workflows visually in a designer as a trigger plus a series of actions, wiring together Azure services, SaaS apps and on-prem systems through a huge library of pre-built connectors (1000+). It's serverless in the Consumption model — pay per action executed, nothing to run idle. While it overlaps with orchestration, its sweet spot is integration and business-process automation: reacting to events, moving data between systems, and coordinating steps with conditions, loops and error handling. In data platforms it's often used to glue services and trigger pipelines, complementing Data Factory's data-movement focus.",
   "inPractice": {
     "narrative": "When a file arrives in Blob storage, a Logic App triggers: it calls an API to enrich the data, drops a message on Service Bus that kicks off a Data Factory pipeline, and posts a status to Teams — all built by connecting pre-made connectors in a visual designer, no server to manage. On failure it retries and alerts. Logic Apps is the low-code integrator that reacts to events and coordinates the steps across Azure and SaaS systems.",
-    "flow": ["Event (Blob / API / schedule)", "Logic App (connectors + actions)", "Service Bus → Data Factory / APIs", "notify (Teams)"],
+    "flow": [
+      "Event (Blob / API / schedule)",
+      "Logic App (connectors + actions)",
+      "Service Bus → Data Factory / APIs",
+      "notify (Teams)"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "Trigger + actions", "detail": "Every workflow starts with a trigger (event, schedule, HTTP) followed by actions; you assemble them in a visual designer (or JSON/Bicep) — low-code by design." },
-    { "term": "1000+ connectors", "detail": "Pre-built connectors to Azure services, Microsoft 365, Salesforce, SAP, databases, and on-prem systems (via the on-premises data gateway) make integration the headline strength." },
-    { "term": "Control flow", "detail": "Conditions, switches, loops (for-each), scopes and retry/error-handling policies let workflows branch and recover without code." },
-    { "term": "Consumption vs Standard", "detail": "Consumption is pay-per-action serverless; Standard runs on the single-tenant Logic Apps runtime (predictable pricing, VNet, local dev) for higher-scale/enterprise needs." },
-    { "term": "Stateful vs stateless", "detail": "Standard supports stateful workflows (full run history/durability) and stateless (lower latency, less history) — a performance/cost trade-off." },
-    { "term": "Enterprise integration", "detail": "B2B/EDI and message-schema features (Integration Account) support enterprise integration scenarios beyond simple automation." }
+    {
+      "term": "Trigger + actions",
+      "detail": "Every workflow starts with a trigger (event, schedule, HTTP) followed by actions; you assemble them in a visual designer (or JSON/Bicep) — low-code by design."
+    },
+    {
+      "term": "1000+ connectors",
+      "detail": "Pre-built connectors to Azure services, Microsoft 365, Salesforce, SAP, databases, and on-prem systems (via the on-premises data gateway) make integration the headline strength."
+    },
+    {
+      "term": "Control flow",
+      "detail": "Conditions, switches, loops (for-each), scopes and retry/error-handling policies let workflows branch and recover without code."
+    },
+    {
+      "term": "Consumption vs Standard",
+      "detail": "Consumption is pay-per-action serverless; Standard runs on the single-tenant Logic Apps runtime (predictable pricing, VNet, local dev) for higher-scale/enterprise needs."
+    },
+    {
+      "term": "Stateful vs stateless",
+      "detail": "Standard supports stateful workflows (full run history/durability) and stateless (lower latency, less history) — a performance/cost trade-off."
+    },
+    {
+      "term": "Enterprise integration",
+      "detail": "B2B/EDI and message-schema features (Integration Account) support enterprise integration scenarios beyond simple automation."
+    }
   ],
   "whenToUse": [
     "Low-code integration and automation across Azure, SaaS and on-prem.",
@@ -33,12 +63,50 @@
     "Purely programmatic orchestration teams prefer to define in code."
   ],
   "keyFacts": [
-    { "label": "Type", "value": "Low-code workflow/integration orchestration." },
-    { "label": "Connectors", "value": "1000+ (Azure, M365, SaaS, on-prem via gateway)." },
-    { "label": "Design", "value": "Visual designer; also JSON/Bicep definitions." },
-    { "label": "Plans", "value": "Consumption (per-action serverless) and Standard (single-tenant)." },
-    { "label": "Workflows", "value": "Stateful or stateless (Standard)." },
-    { "label": "Billing", "value": "Consumption: per action/connector execution; Standard: hosting plan." }
+    {
+      "label": "Type",
+      "value": "Low-code workflow/integration orchestration.",
+      "source": {
+        "url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-overview",
+        "quote": "Azure Logic Apps is a cloud platform where you can create and run automated workflows in, across, and outside the software ecosystems in your enterprise or organization. … Azure Logic Apps includes low-code-no-code tools.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Connectors",
+      "value": "Connectors: 1,400+ (Azure, M365, SaaS, on-prem via gateway).",
+      "source": {
+        "url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-overview",
+        "quote": "The Azure Logic Apps platform provides 1,400+ prebuilt connectors that you can use to integrate your workflows with various services, systems, apps, and data.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Design",
+      "value": "Visual designer; also JSON/Bicep definitions."
+    },
+    {
+      "label": "Plans",
+      "value": "Consumption (per-action serverless) and Standard (single-tenant).",
+      "source": {
+        "url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-overview",
+        "quote": "A Consumption logic app resource that supports a single workflow, which is hosted and run in multitenant Azure Logic Apps … A Standard logic app resource that supports multiple workflows, which are hosted and run in single-tenant Azure Logic Apps.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Workflows",
+      "value": "Stateful or stateless (Standard).",
+      "source": {
+        "url": "https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-overview",
+        "quote": "A single logic app resource can have multiple stateful and stateless workflows.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Billing",
+      "value": "Consumption: per action/connector execution; Standard: hosting plan."
+    }
   ],
   "pricingShape": "Consumption Logic Apps bill per action executed, with premium/enterprise connectors costing more than standard ones — so cost scales with how many actions and which connectors run, and idle workflows cost nothing. Standard runs on a hosting plan (single-tenant Logic Apps runtime) with more predictable, capacity-based pricing plus VNet and local development — better for high-volume or enterprise needs. The levers are choosing Consumption vs Standard by volume, minimising unnecessary actions/connector calls, and watching premium-connector usage, which is a common source of unexpected cost.",
   "gotchas": [
@@ -49,8 +117,18 @@
     "Consumption vs Standard differ in features (VNet, stateless, pricing) — pick deliberately for scale."
   ],
   "equivalents": [
-    { "provider": "aws", "id": "step-functions", "name": "AWS Step Functions", "note": "Serverless state-machine orchestration; more code/state-machine, less low-code-connector." },
-    { "provider": "gcp", "id": "workflows", "name": "Cloud Workflows", "note": "Serverless YAML-defined orchestration of GCP services and APIs." }
+    {
+      "provider": "aws",
+      "id": "step-functions",
+      "name": "AWS Step Functions",
+      "note": "Serverless state-machine orchestration; more code/state-machine, less low-code-connector."
+    },
+    {
+      "provider": "gcp",
+      "id": "workflows",
+      "name": "Cloud Workflows",
+      "note": "Serverless YAML-defined orchestration of GCP services and APIs."
+    }
   ],
   "docsUrl": "https://learn.microsoft.com/azure/logic-apps/"
 }

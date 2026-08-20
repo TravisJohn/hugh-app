@@ -365,7 +365,8 @@
     {
       "id": "cloud-composer",
       "provider": "gcp",
-      "name": "Cloud Composer",
+      "name": "Managed Service for Apache Airflow",
+      "short": "formerly Cloud Composer",
       "groups": [
         "orchestration"
       ],
@@ -415,7 +416,8 @@
     {
       "id": "cloud-functions",
       "provider": "gcp",
-      "name": "Cloud Functions",
+      "name": "Cloud Run functions",
+      "short": "formerly Cloud Functions",
       "groups": [
         "serverless"
       ],
