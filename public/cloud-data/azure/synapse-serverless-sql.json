@@ -1,23 +1,52 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "verified": "2026-08-20",
+    "method": "manual",
+    "note": "Five of six cited; nothing contradicted. The page now carries a Fabric notice steering new data-warehouse workloads to Microsoft Fabric Data Warehouse — that is the source that confirms the Fabric-successor claim on azure/synapse-analytics, which batch 1 had to leave uncited."
+  },
   "id": "synapse-serverless-sql",
   "provider": "azure",
   "name": "Synapse Serverless SQL",
-  "groups": ["warehouse"],
+  "groups": [
+    "warehouse"
+  ],
   "oneLiner": "Query files in the data lake with on-demand, pay-per-query SQL.",
   "whatItIs": "Serverless SQL is the on-demand query engine inside Azure Synapse: it runs T-SQL directly over files in ADLS (Parquet, CSV, JSON, Delta) with nothing to provision and billing only for data processed. It's the Azure equivalent of 'SQL over the lake' — the same idea as Athena on AWS. You point it at files with OPENROWSET or define external tables, and analysts query them as if they were database tables. It ships as an always-available endpoint in every Synapse workspace, so there's no cluster to start.",
   "inPractice": {
     "narrative": "Curated Parquet lands in ADLS from a Spark or pipeline job. Instead of loading it into a provisioned warehouse, analysts query it directly with serverless SQL — either ad-hoc via OPENROWSET or through external tables and views. Power BI can connect for lightweight reporting. It's the cheap, no-setup way to explore or serve lake data before (or instead of) committing to a dedicated SQL pool.",
-    "flow": ["ADLS (Parquet / Delta)", "Serverless SQL (OPENROWSET / external tables)", "Power BI / ad-hoc analysis"],
+    "flow": [
+      "ADLS (Parquet / Delta)",
+      "Serverless SQL (OPENROWSET / external tables)",
+      "Power BI / ad-hoc analysis"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "OPENROWSET", "detail": "Query a file or folder in ADLS inline without defining a table — the fastest way to peek at lake data with SQL." },
-    { "term": "External tables & views", "detail": "Define reusable schemas over lake files (via external data sources and file formats), then query them like normal tables; views layer logic on top." },
-    { "term": "Pay-per-data-processed", "detail": "You're billed per TB the query processes from the lake — so file format, compression and partitioning drive both speed and cost, exactly like Athena." },
-    { "term": "Always-on endpoint", "detail": "Every Synapse workspace has a built-in serverless SQL endpoint — no provisioning, no pausing; it's just there when you query." },
-    { "term": "Format support", "detail": "Reads Parquet, CSV, JSON and Delta Lake; Parquet/Delta are far cheaper to query than raw CSV/JSON." },
-    { "term": "Filename/partition functions", "detail": "filepath() and filename() let queries prune to specific partitions/folders, cutting data processed." }
+    {
+      "term": "OPENROWSET",
+      "detail": "Query a file or folder in ADLS inline without defining a table — the fastest way to peek at lake data with SQL."
+    },
+    {
+      "term": "External tables & views",
+      "detail": "Define reusable schemas over lake files (via external data sources and file formats), then query them like normal tables; views layer logic on top."
+    },
+    {
+      "term": "Pay-per-data-processed",
+      "detail": "You're billed per TB the query processes from the lake — so file format, compression and partitioning drive both speed and cost, exactly like Athena."
+    },
+    {
+      "term": "Always-on endpoint",
+      "detail": "Every Synapse workspace has a built-in serverless SQL endpoint — no provisioning, no pausing; it's just there when you query."
+    },
+    {
+      "term": "Format support",
+      "detail": "Reads Parquet, CSV, JSON and Delta Lake; Parquet/Delta are far cheaper to query than raw CSV/JSON."
+    },
+    {
+      "term": "Filename/partition functions",
+      "detail": "filepath() and filename() let queries prune to specific partitions/folders, cutting data processed."
+    }
   ],
   "whenToUse": [
     "Ad-hoc T-SQL exploration of files in ADLS with no infrastructure.",
@@ -33,12 +62,55 @@
     "Sub-second interactive apps — there's per-query overhead."
   ],
   "keyFacts": [
-    { "label": "Model", "value": "Serverless, on-demand T-SQL over ADLS files." },
-    { "label": "Billing", "value": "Per TB of data processed (with a small minimum per query)." },
-    { "label": "Formats", "value": "Parquet, CSV, JSON, Delta Lake." },
-    { "label": "Access", "value": "OPENROWSET (inline) or external tables/views." },
-    { "label": "Provisioning", "value": "None — built-in endpoint in every Synapse workspace." },
-    { "label": "Best for", "value": "Exploration and light serving, not heavy concurrent BI." }
+    {
+      "label": "Model",
+      "value": "Serverless, on-demand T-SQL over ADLS files.",
+      "source": {
+        "url": "https://learn.microsoft.com/en-us/azure/synapse-analytics/sql/on-demand-workspace-overview",
+        "quote": "Serverless SQL pool is a query service over the data in your data lake. … A familiar T-SQL syntax to query data in place without the need to copy or load data into a specialized store.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Billing",
+      "value": "Per TB of data processed (with a small minimum per query).",
+      "source": {
+        "url": "https://learn.microsoft.com/en-us/azure/synapse-analytics/sql/on-demand-workspace-overview",
+        "quote": "There's no charge for resources reserved. You are only being charged for the data processed by queries you run, hence this model is a true pay-per-use model.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Formats",
+      "value": "Parquet, CSV, JSON, Delta Lake.",
+      "source": {
+        "url": "https://learn.microsoft.com/en-us/azure/synapse-analytics/sql/on-demand-workspace-overview",
+        "quote": "Quickly reason about the data in various formats (Parquet, CSV, JSON) in your data lake … Query DELTA format.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Access",
+      "value": "OPENROWSET (inline) or external tables/views.",
+      "source": {
+        "url": "https://learn.microsoft.com/en-us/azure/synapse-analytics/sql/on-demand-workspace-overview",
+        "quote": "serverless SQL pool extends the existing OPENROWSET function … External resources – data sources, file formats, and tables.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Provisioning",
+      "value": "None — built-in endpoint in every Synapse workspace.",
+      "source": {
+        "url": "https://learn.microsoft.com/en-us/azure/synapse-analytics/sql/on-demand-workspace-overview",
+        "quote": "Serverless SQL pool is serverless, hence there's no infrastructure to setup or clusters to maintain. A default endpoint for this service is provided within every Azure Synapse workspace.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Best for",
+      "value": "Exploration and light serving, not heavy concurrent BI."
+    }
   ],
   "pricingShape": "Billed purely on data processed per query (per TB), so there is no idle cost — no queries, no compute charge beyond the underlying ADLS storage. The entire cost lever is how much data each query reads: Parquet/Delta plus partition pruning can turn a terabyte scan into gigabytes. A careless query over raw CSV, or over an unpartitioned folder, both runs slowly and costs more. There's a minimum data-processed charge per query to be aware of for very small reads.",
   "gotchas": [
@@ -49,8 +121,18 @@
     "Not sized for many concurrent low-latency queries; heavy BI belongs on a dedicated pool or Power BI import."
   ],
   "equivalents": [
-    { "provider": "aws", "id": "athena", "name": "Amazon Athena", "note": "The direct analogue — serverless, pay-per-scan SQL over object-store files." },
-    { "provider": "gcp", "id": "biglake", "name": "BigLake", "note": "Query lake files as tables; BigQuery external tables serve the same on-demand role." }
+    {
+      "provider": "aws",
+      "id": "athena",
+      "name": "Amazon Athena",
+      "note": "The direct analogue — serverless, pay-per-scan SQL over object-store files."
+    },
+    {
+      "provider": "gcp",
+      "id": "biglake",
+      "name": "Lakehouse for Apache Iceberg",
+      "note": "Query lake files as tables; BigQuery external tables serve the same on-demand role."
+    }
   ],
   "docsUrl": "https://learn.microsoft.com/azure/synapse-analytics/sql/on-demand-workspace-overview"
 }

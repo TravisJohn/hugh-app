@@ -3,7 +3,7 @@
     "authored": "2026-07",
     "verified": "2026-08-20",
     "method": "manual",
-    "note": "Six key facts reviewed; four carry a citation. The pause/scale cost-control claim was not on the overview page. The claim that Microsoft Fabric is the successor for greenfield is UNSUPPORTED — neither the Synapse overview nor the Fabric decision guide mentions the other. It reads as editorial direction rather than documented fact, so the text stands but carries no citation."
+    "note": "Six key facts reviewed; five carry a citation. The pause/scale cost-control claim was not on the overview page. The Fabric-successor claim was UNSUPPORTED in batch 1 — neither the Synapse overview nor the Fabric decision guide mentioned the other — but batch 2 found the notice on the serverless SQL pool page, which steers new warehousing to Fabric and offers a dedicated-pool upgrade path. Now cited."
   },
   "id": "synapse-analytics",
   "provider": "azure",
@@ -105,7 +105,12 @@
     },
     {
       "label": "Direction",
-      "value": "Microsoft Fabric is the newer SaaS successor for greenfield."
+      "value": "Microsoft Fabric is the newer SaaS successor for greenfield.",
+      "source": {
+        "url": "https://learn.microsoft.com/en-us/azure/synapse-analytics/sql/on-demand-workspace-overview",
+        "quote": "Microsoft Fabric Data Warehouse is an enterprise scale relational warehouse on a data lake foundation … If you're new to data warehousing, start with Fabric Data Warehouse. Existing dedicated SQL pool workloads can upgrade to Fabric to access new capabilities.",
+        "checked": "2026-08-20"
+      }
     }
   ],
   "pricingShape": "The dedicated SQL pool bills per hour by DWU size while it's running (pause it and compute billing stops; storage persists) — so right-sizing and pausing off-hours is the main saver. The serverless SQL pool bills per TB of data processed with nothing to provision. Spark pools bill per vCore-hour while a session runs, and pipelines bill by activity/data-movement. Storage in ADLS is separate. Net: a provisioned warehouse you must manage for cost, alongside pay-per-use serverless and Spark for spiky work.",

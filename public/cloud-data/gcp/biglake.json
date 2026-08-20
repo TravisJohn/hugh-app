@@ -1,23 +1,53 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "verified": "2026-08-20",
+    "method": "manual",
+    "note": "RENAMED: BigLake became Lakehouse for Apache Iceberg on 20 April 2026, and BigLake metastore became the Lakehouse runtime catalog. Google notes that APIs, client libraries, CLI commands and IAM names still say BigLake — so this is a presentational rename and code-level references remain valid. File slug kept as biglake so links resolve."
+  },
   "id": "biglake",
   "provider": "gcp",
-  "name": "BigLake",
-  "groups": ["warehouse"],
+  "name": "Lakehouse for Apache Iceberg",
+  "groups": [
+    "warehouse"
+  ],
   "oneLiner": "Query and govern data in Cloud Storage and other lakes as BigQuery tables.",
   "whatItIs": "BigLake lets you treat files in Cloud Storage (and even S3 or ADLS) as governed BigQuery tables — without loading them. It's the piece that turns a plain object-store data lake into a 'lakehouse': you get BigQuery's SQL engine and fine-grained security (row/column-level access) over open formats like Parquet and Iceberg that live outside BigQuery's own storage. The point is one governance and access model across managed warehouse data and open lake data, so analysts and Spark jobs query the same tables under the same rules.",
   "inPractice": {
     "narrative": "A team keeps large open-format tables (Parquet/Iceberg) in Cloud Storage to stay portable and to share with Spark. They wrap those files in BigLake tables so BigQuery can query them in place, and apply row- and column-level policies centrally (often via Dataplex). Analysts run BigQuery SQL, Spark jobs read the same tables, and everyone is governed identically — no copy into the warehouse, no second set of permissions.",
-    "flow": ["Cloud Storage (Parquet / Iceberg)", "BigLake tables + policies", "BigQuery / Spark query", "Dashboards & notebooks"],
+    "flow": [
+      "Cloud Storage (Parquet / Iceberg)",
+      "BigLake tables + policies",
+      "BigQuery / Spark query",
+      "Dashboards & notebooks"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "Query-in-place over open formats", "detail": "BigLake tables point at files (Parquet, ORC, Avro, Iceberg) in Cloud Storage or other clouds; BigQuery queries them without ingestion, so the data stays open and portable." },
-    { "term": "Fine-grained governance", "detail": "Row-level and column-level security and data masking apply to external lake data the same way they do to native BigQuery tables — the main thing plain external tables lack." },
-    { "term": "Metastore / Iceberg support", "detail": "BigLake supports Apache Iceberg tables and a metastore so multiple engines (BigQuery, Spark, Trino) share one table definition and consistent reads." },
-    { "term": "Access delegation", "detail": "Users query through the BigLake table without needing direct IAM access to the underlying bucket — access is delegated via a connection, centralising control." },
-    { "term": "Cross-cloud", "detail": "BigLake (with BigQuery Omni) can query data sitting in S3 or ADLS, so one SQL surface spans clouds." },
-    { "term": "Dataplex integration", "detail": "Dataplex manages catalog, policies and quality; BigLake enforces the access those policies define at query time." }
+    {
+      "term": "Query-in-place over open formats",
+      "detail": "BigLake tables point at files (Parquet, ORC, Avro, Iceberg) in Cloud Storage or other clouds; BigQuery queries them without ingestion, so the data stays open and portable."
+    },
+    {
+      "term": "Fine-grained governance",
+      "detail": "Row-level and column-level security and data masking apply to external lake data the same way they do to native BigQuery tables — the main thing plain external tables lack."
+    },
+    {
+      "term": "Metastore / Iceberg support",
+      "detail": "BigLake supports Apache Iceberg tables and a metastore so multiple engines (BigQuery, Spark, Trino) share one table definition and consistent reads."
+    },
+    {
+      "term": "Access delegation",
+      "detail": "Users query through the BigLake table without needing direct IAM access to the underlying bucket — access is delegated via a connection, centralising control."
+    },
+    {
+      "term": "Cross-cloud",
+      "detail": "BigLake (with BigQuery Omni) can query data sitting in S3 or ADLS, so one SQL surface spans clouds."
+    },
+    {
+      "term": "Dataplex integration",
+      "detail": "Dataplex manages catalog, policies and quality; BigLake enforces the access those policies define at query time."
+    }
   ],
   "whenToUse": [
     "Building a lakehouse: SQL + governance over open-format files in Cloud Storage.",
@@ -33,12 +63,35 @@
     "Teams not on BigQuery at all — the value is BigQuery-centric governance."
   ],
   "keyFacts": [
-    { "label": "Role", "value": "Governed query layer over lake files (a lakehouse enabler)." },
-    { "label": "Engines", "value": "BigQuery plus Spark/Trino via a shared metastore." },
-    { "label": "Formats", "value": "Parquet, ORC, Avro, Apache Iceberg." },
-    { "label": "Security", "value": "Row-level, column-level and masking over external data." },
-    { "label": "Cross-cloud", "value": "Query S3/ADLS via BigQuery Omni." },
-    { "label": "Governs with", "value": "Dataplex for catalog/policy/quality." }
+    {
+      "label": "Role",
+      "value": "Governed storage engine for open Iceberg lakehouses (a lakehouse enabler).",
+      "source": {
+        "url": "https://docs.cloud.google.com/lakehouse/docs/introduction",
+        "quote": "Lakehouse for Apache Iceberg is a high-performance storage engine designed for building open data lakehouses that integrates the Apache Iceberg open table format with fully managed, enterprise-grade storage on Google Cloud.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Engines",
+      "value": "BigQuery plus Spark/Trino via a shared metastore."
+    },
+    {
+      "label": "Formats",
+      "value": "Parquet, ORC, Avro, Apache Iceberg."
+    },
+    {
+      "label": "Security",
+      "value": "Row-level, column-level and masking over external data."
+    },
+    {
+      "label": "Cross-cloud",
+      "value": "Query S3/ADLS via BigQuery Omni."
+    },
+    {
+      "label": "Governs with",
+      "value": "Governs with: Dataplex for catalog/policy/quality; the metastore is now the Lakehouse runtime catalog."
+    }
   ],
   "pricingShape": "BigLake itself is mostly a capability layer — you pay for the BigQuery compute that runs the queries (on-demand per TB scanned or reserved slots), plus Cloud Storage for the underlying files, and any cross-cloud/Omni querying. There's no separate 'BigLake cluster'. So the cost profile mirrors BigQuery: partition and cluster your open-format tables, use columnar formats, and scan only what you need. Governance features come without a separate compute charge.",
   "gotchas": [
@@ -49,8 +102,19 @@
     "Iceberg/metastore setup adds moving parts versus a plain external table; only worth it when multiple engines or governance are in play."
   ],
   "equivalents": [
-    { "provider": "aws", "id": "athena", "name": "Amazon Athena", "note": "Serverless SQL over S3; Lake Formation adds the governance BigLake bundles in." },
-    { "provider": "azure", "id": "synapse-serverless-sql", "name": "Synapse Serverless SQL", "note": "On-demand SQL over ADLS files; Purview/Synapse handle governance separately." }
+    {
+      "provider": "aws",
+      "id": "athena",
+      "name": "Amazon Athena",
+      "note": "Serverless SQL over S3; Lake Formation adds the governance BigLake bundles in."
+    },
+    {
+      "provider": "azure",
+      "id": "synapse-serverless-sql",
+      "name": "Synapse Serverless SQL",
+      "note": "On-demand SQL over ADLS files; Purview/Synapse handle governance separately."
+    }
   ],
-  "docsUrl": "https://cloud.google.com/biglake/docs"
+  "docsUrl": "https://docs.cloud.google.com/lakehouse/docs",
+  "short": "formerly BigLake"
 }

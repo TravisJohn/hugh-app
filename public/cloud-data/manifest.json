@@ -264,7 +264,8 @@
     {
       "id": "timestream",
       "provider": "aws",
-      "name": "Amazon Timestream",
+      "name": "Amazon Timestream for LiveAnalytics",
+      "short": "with Timestream for InfluxDB alongside",
       "groups": [
         "olap"
       ],
@@ -301,7 +302,8 @@
     {
       "id": "biglake",
       "provider": "gcp",
-      "name": "BigLake",
+      "name": "Lakehouse for Apache Iceberg",
+      "short": "formerly BigLake",
       "groups": [
         "warehouse"
       ],

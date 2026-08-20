@@ -1,23 +1,53 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "verified": "2026-08-20",
+    "method": "manual",
+    "note": "Two of six cited. The Presto/Trino engine, per-TB-scanned billing, Glue Data Catalog and the format list are not stated on the overview page and need a per-claim source next pass. Gap for later: Athena now also runs Apache Spark notebooks, which this write-up does not mention at all."
+  },
   "id": "athena",
   "provider": "aws",
   "name": "Amazon Athena",
-  "groups": ["warehouse"],
+  "groups": [
+    "warehouse"
+  ],
   "oneLiner": "Serverless SQL directly over files in S3 — no cluster to manage.",
   "whatItIs": "Athena runs SQL straight against files sitting in S3 — no servers, no loading, no cluster to size. You define a table over your Parquet/CSV/JSON in the Glue Data Catalog, then query it and pay only for the bytes scanned. It's built on Presto/Trino, so it's a distributed query engine, but you never see the machines. Athena is the go-to for ad-hoc exploration of lake data and for querying logs, without standing up a warehouse. Where Redshift is a warehouse you load into, Athena leaves the data where it is.",
   "inPractice": {
     "narrative": "Logs and events already sit as partitioned Parquet in S3. A crawler (or a table definition) registers them in the Glue Data Catalog, and analysts open Athena to run SQL — no infrastructure spun up, billed per query by data scanned. Results feed QuickSight dashboards or a notebook. It's the fastest way to ask a question of lake data without committing to a warehouse.",
-    "flow": ["S3 (Parquet)", "Glue Data Catalog", "Athena (SQL)", "QuickSight / notebooks"],
+    "flow": [
+      "S3 (Parquet)",
+      "Glue Data Catalog",
+      "Athena (SQL)",
+      "QuickSight / notebooks"
+    ],
     "highlight": 2
   },
   "coreConcepts": [
-    { "term": "Query-in-place", "detail": "Athena reads files in S3 directly; there is no ingestion step and no copy of the data. The Glue Data Catalog holds the table schemas it queries against." },
-    { "term": "Bytes-scanned billing", "detail": "You pay per TB the query reads from S3. Columnar formats (Parquet/ORC), compression and partition pruning are not just performance — they directly cut the bill." },
-    { "term": "Partitions & partition projection", "detail": "Hive-style partitions (e.g. dt=2026-07-01) let Athena skip irrelevant files. Partition projection computes partitions from a pattern so you don't have to register millions of them." },
-    { "term": "Presto/Trino engine", "detail": "ANSI SQL with rich functions, joins across large datasets, and federated connectors to other sources. Athena engine v3 is current." },
-    { "term": "Workgroups", "detail": "Isolate teams, set per-query data-scan limits and cost controls, and route results to specific S3 locations — the main guardrail against runaway spend." },
-    { "term": "CTAS & unload", "detail": "CREATE TABLE AS SELECT and UNLOAD write query results back to S3 as Parquet, handy for building curated tables or exporting." }
+    {
+      "term": "Query-in-place",
+      "detail": "Athena reads files in S3 directly; there is no ingestion step and no copy of the data. The Glue Data Catalog holds the table schemas it queries against."
+    },
+    {
+      "term": "Bytes-scanned billing",
+      "detail": "You pay per TB the query reads from S3. Columnar formats (Parquet/ORC), compression and partition pruning are not just performance — they directly cut the bill."
+    },
+    {
+      "term": "Partitions & partition projection",
+      "detail": "Hive-style partitions (e.g. dt=2026-07-01) let Athena skip irrelevant files. Partition projection computes partitions from a pattern so you don't have to register millions of them."
+    },
+    {
+      "term": "Presto/Trino engine",
+      "detail": "ANSI SQL with rich functions, joins across large datasets, and federated connectors to other sources. Athena engine v3 is current."
+    },
+    {
+      "term": "Workgroups",
+      "detail": "Isolate teams, set per-query data-scan limits and cost controls, and route results to specific S3 locations — the main guardrail against runaway spend."
+    },
+    {
+      "term": "CTAS & unload",
+      "detail": "CREATE TABLE AS SELECT and UNLOAD write query results back to S3 as Parquet, handy for building curated tables or exporting."
+    }
   ],
   "whenToUse": [
     "Ad-hoc SQL exploration of data already in S3, with no infrastructure to run.",
@@ -33,12 +63,40 @@
     "Row-level updates/transactions — it's read-oriented (Iceberg tables add some DML, but it's not an OLTP store)."
   ],
   "keyFacts": [
-    { "label": "Model", "value": "Serverless, distributed SQL (Presto/Trino) over S3 files." },
-    { "label": "Billing", "value": "Per TB of data scanned (plus S3 request costs)." },
-    { "label": "Catalog", "value": "Uses the Glue Data Catalog for table/schema metadata." },
-    { "label": "Formats", "value": "Parquet, ORC, CSV, JSON, Avro; Iceberg tables supported." },
-    { "label": "Ops", "value": "Nothing to provision, patch or scale." },
-    { "label": "Cost control", "value": "Workgroup per-query data-scan limits." }
+    {
+      "label": "Model",
+      "value": "Serverless, distributed SQL (Presto/Trino) over S3 files.",
+      "source": {
+        "url": "https://docs.aws.amazon.com/athena/latest/ug/what-is.html",
+        "quote": "Amazon Athena is an interactive query service that makes it easy to analyze data directly in Amazon Simple Storage Service (Amazon S3) using standard SQL.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Billing",
+      "value": "Per TB of data scanned (plus S3 request costs)."
+    },
+    {
+      "label": "Catalog",
+      "value": "Uses the Glue Data Catalog for table/schema metadata."
+    },
+    {
+      "label": "Formats",
+      "value": "Parquet, ORC, CSV, JSON, Avro; Iceberg tables supported."
+    },
+    {
+      "label": "Ops",
+      "value": "Nothing to provision, patch or scale.",
+      "source": {
+        "url": "https://docs.aws.amazon.com/athena/latest/ug/what-is.html",
+        "quote": "Athena SQL and Apache Spark on Amazon Athena are serverless, so there is no infrastructure to set up or manage, and you pay only for the queries you run.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Cost control",
+      "value": "Workgroup per-query data-scan limits."
+    }
   ],
   "pricingShape": "Almost entirely per-TB-scanned: a query that reads 1 TB of CSV costs far more than the same query over well-compressed, partitioned Parquet reading 10 GB. There's no cluster to pay for when idle — zero queries means (nearly) zero cost, aside from stored data in S3. The whole cost game is data layout: columnar format, compression, partitioning and only selecting needed columns. Workgroup scan limits stop a careless SELECT * over the whole lake from becoming a surprise invoice.",
   "gotchas": [
@@ -49,8 +107,18 @@
     "Per-query startup latency makes it a poor fit for sub-second interactive apps."
   ],
   "equivalents": [
-    { "provider": "gcp", "id": "biglake", "name": "BigLake", "note": "Query lake files as tables; BigQuery's own external tables play a similar role." },
-    { "provider": "azure", "id": "synapse-serverless-sql", "name": "Synapse Serverless SQL", "note": "On-demand, pay-per-query SQL directly over files in ADLS." }
+    {
+      "provider": "gcp",
+      "id": "biglake",
+      "name": "Lakehouse for Apache Iceberg",
+      "note": "Query lake files as tables; BigQuery's own external tables play a similar role."
+    },
+    {
+      "provider": "azure",
+      "id": "synapse-serverless-sql",
+      "name": "Synapse Serverless SQL",
+      "note": "On-demand, pay-per-query SQL directly over files in ADLS."
+    }
   ],
   "docsUrl": "https://docs.aws.amazon.com/athena/"
 }
