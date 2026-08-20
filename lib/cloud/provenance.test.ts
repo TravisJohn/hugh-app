@@ -93,7 +93,17 @@ describe("describeVerification", () => {
   it("names the date and how the check was done", () => {
     const line = describeVerification({ verified: "2026-08-20", method: "manual" }, NOW);
     expect(line).toMatch(/by hand/);
-    expect(line).toMatch(/20 August 2026/);
+    expect(line).toContain("20 August 2026");
+  });
+
+  it("formats the date identically whatever locale the renderer is in", () => {
+    // This runs during a SERVER render, so toLocaleDateString would use the
+    // server's locale — "August 20, 2026" on Vercel, "20 August 2026" on a
+    // machine set to en-GB. It shipped that way once and CI caught it; the
+    // assertion is here so it cannot come back.
+    const line = describeVerification({ verified: "2026-01-05" }, NOW);
+    expect(line).toContain("5 January 2026");
+    expect(line).not.toMatch(/January 5/);
   });
 
   it("warns as the check ages rather than presenting it as current", () => {

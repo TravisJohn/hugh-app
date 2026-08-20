@@ -29,6 +29,27 @@ export type VerificationStatus =
   /** Never checked against a source. The default, and never softened. */
   | "unverified";
 
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+/**
+ * "20 August 2026" — formatted explicitly, never via toLocaleDateString.
+ *
+ * This string is produced during a SERVER render, so a locale-aware formatter
+ * would use the server's locale (en-US on Vercel), not the learner's — the date
+ * would silently change shape between a dev machine and production while looking
+ * correct in both. Same reasoning as Monitor computing its header date in UTC
+ * rather than in a client effect. Client components, where the reader's own
+ * locale really is the right one, still use toLocaleDateString.
+ */
+function formatDay(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const month = MONTHS[m - 1];
+  return month ? `${d} ${month} ${y}` : iso;
+}
+
 /** Whole days between a YYYY-MM-DD date and now, UTC. Negative for the future. */
 function daysSince(date: string, now: Date): number | null {
   const then = Date.parse(`${date}T00:00:00.000Z`);
@@ -103,9 +124,7 @@ export function describeVerification(
     return "Not yet checked against official documentation — treat limits and numbers as indicative.";
   }
 
-  const on = new Date(`${meta!.verified!}T00:00:00.000Z`).toLocaleDateString(undefined, {
-    day: "numeric", month: "long", year: "numeric", timeZone: "UTC",
-  });
+  const on = formatDay(meta!.verified!);
   const how = meta!.method === "pipeline" ? "Checked" : "Checked by hand";
 
   if (status === "verified") return `${how} against official documentation on ${on}.`;
