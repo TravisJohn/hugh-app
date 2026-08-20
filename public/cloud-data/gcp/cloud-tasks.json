@@ -1,23 +1,51 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "note": "Not yet checked. Deferred from batch 5 to keep the session within budget, and chosen for deferral because both are long-stable primitives of the kind that held up perfectly in batch 3 — not because they are unimportant. Still in the queue; run `npm run cloud` to see them."
+  },
   "id": "cloud-tasks",
   "provider": "gcp",
   "name": "Cloud Tasks",
-  "groups": ["messaging"],
+  "groups": [
+    "messaging"
+  ],
   "oneLiner": "Managed task queue for decoupling and dispatching asynchronous work.",
   "whatItIs": "Cloud Tasks is Google Cloud's managed queue for dispatching asynchronous work to worker services. A producer enqueues a task — typically an HTTP request to be delivered later — and Cloud Tasks reliably dispatches it to a handler (Cloud Run, Cloud Functions, App Engine or any endpoint), with rate limiting, retries and scheduling. Its focus is explicit task execution and flow control: you decide how fast tasks are delivered and how failures retry. Where Pub/Sub is a streaming messaging bus for events fanned out to many subscribers, Cloud Tasks is about handing off individual units of work to be executed, decoupling the producer from slower back-end processing.",
   "inPractice": {
     "narrative": "A web request needs to kick off a slow job (say, generating a report) without making the user wait. The app enqueues a Cloud Task pointing at a worker endpoint and returns immediately. Cloud Tasks dispatches the task to the worker at a controlled rate, retrying on failure with backoff, so a burst of requests doesn't overwhelm the back end. It's the buffer that decouples the fast front end from slower asynchronous processing, with explicit control over dispatch rate.",
-    "flow": ["Producer (web app)", "Cloud Tasks queue", "worker (Cloud Run / Functions)", "downstream result"],
+    "flow": [
+      "Producer (web app)",
+      "Cloud Tasks queue",
+      "worker (Cloud Run / Functions)",
+      "downstream result"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "Task dispatch (HTTP targets)", "detail": "Tasks are usually HTTP requests Cloud Tasks delivers to a worker endpoint (Cloud Run/Functions/App Engine/any URL) — explicit hand-off of a unit of work." },
-    { "term": "Rate limiting & concurrency", "detail": "Per-queue controls on dispatch rate and max concurrent tasks protect back-ends from overload — a defining feature versus a raw stream." },
-    { "term": "Retries & backoff", "detail": "Configurable retry policies with exponential backoff make task execution reliable without custom retry code." },
-    { "term": "Scheduling", "detail": "Tasks can be scheduled for future delivery, enabling deferred/delayed work (e.g. run this in 10 minutes)." },
-    { "term": "Explicit vs implicit invocation", "detail": "Unlike Pub/Sub's publish-and-subscribe, the producer names the target and controls execution — task-oriented rather than event-broadcast." },
-    { "term": "Cloud Tasks vs Pub/Sub", "detail": "Cloud Tasks = dispatch individual tasks with flow control; Pub/Sub = high-throughput event messaging fanned out to many subscribers. Different jobs." }
+    {
+      "term": "Task dispatch (HTTP targets)",
+      "detail": "Tasks are usually HTTP requests Cloud Tasks delivers to a worker endpoint (Cloud Run/Functions/App Engine/any URL) — explicit hand-off of a unit of work."
+    },
+    {
+      "term": "Rate limiting & concurrency",
+      "detail": "Per-queue controls on dispatch rate and max concurrent tasks protect back-ends from overload — a defining feature versus a raw stream."
+    },
+    {
+      "term": "Retries & backoff",
+      "detail": "Configurable retry policies with exponential backoff make task execution reliable without custom retry code."
+    },
+    {
+      "term": "Scheduling",
+      "detail": "Tasks can be scheduled for future delivery, enabling deferred/delayed work (e.g. run this in 10 minutes)."
+    },
+    {
+      "term": "Explicit vs implicit invocation",
+      "detail": "Unlike Pub/Sub's publish-and-subscribe, the producer names the target and controls execution — task-oriented rather than event-broadcast."
+    },
+    {
+      "term": "Cloud Tasks vs Pub/Sub",
+      "detail": "Cloud Tasks = dispatch individual tasks with flow control; Pub/Sub = high-throughput event messaging fanned out to many subscribers. Different jobs."
+    }
   ],
   "whenToUse": [
     "Offloading slow work from a request path to async workers.",
@@ -33,12 +61,30 @@
     "Fan-out broadcast patterns — Pub/Sub fits better."
   ],
   "keyFacts": [
-    { "label": "Type", "value": "Managed task queue (async work dispatch)." },
-    { "label": "Targets", "value": "HTTP endpoints — Cloud Run, Functions, App Engine, any URL." },
-    { "label": "Flow control", "value": "Per-queue rate limiting and concurrency caps." },
-    { "label": "Reliability", "value": "Configurable retries with backoff; scheduled delivery." },
-    { "label": "Contrast", "value": "Task dispatch vs Pub/Sub event streaming." },
-    { "label": "Billing", "value": "Per task operation (with a free monthly tier)." }
+    {
+      "label": "Type",
+      "value": "Managed task queue (async work dispatch)."
+    },
+    {
+      "label": "Targets",
+      "value": "HTTP endpoints — Cloud Run, Functions, App Engine, any URL."
+    },
+    {
+      "label": "Flow control",
+      "value": "Per-queue rate limiting and concurrency caps."
+    },
+    {
+      "label": "Reliability",
+      "value": "Configurable retries with backoff; scheduled delivery."
+    },
+    {
+      "label": "Contrast",
+      "value": "Task dispatch vs Pub/Sub event streaming."
+    },
+    {
+      "label": "Billing",
+      "value": "Per task operation (with a free monthly tier)."
+    }
   ],
   "pricingShape": "Cloud Tasks bills per operation (roughly, per task dispatched) with a free monthly allotment, and nothing to provision — cost scales with task volume, and idle queues cost nothing. The worker services that execute tasks (Cloud Run/Functions) are billed separately for their own compute. The main lever is simply task volume; the flow-control features that make it valuable (rate limiting, retries) don't add a separate charge. It's an inexpensive way to add reliable, controlled async execution to an app.",
   "gotchas": [
@@ -49,8 +95,18 @@
     "Worker compute (Cloud Run/Functions) is a separate cost from the queue — budget both."
   ],
   "equivalents": [
-    { "provider": "aws", "id": "sqs", "name": "Amazon SQS", "note": "Managed work queue; consumers poll rather than Cloud Tasks pushing to endpoints." },
-    { "provider": "azure", "id": "service-bus", "name": "Azure Service Bus", "note": "Enterprise broker with queues + topics and richer messaging features." }
+    {
+      "provider": "aws",
+      "id": "sqs",
+      "name": "Amazon SQS",
+      "note": "Managed work queue; consumers poll rather than Cloud Tasks pushing to endpoints."
+    },
+    {
+      "provider": "azure",
+      "id": "service-bus",
+      "name": "Azure Service Bus",
+      "note": "Enterprise broker with queues + topics and richer messaging features."
+    }
   ],
   "docsUrl": "https://cloud.google.com/tasks/docs"
 }

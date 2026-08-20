@@ -1,23 +1,52 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "verified": "2026-08-20",
+    "method": "manual",
+    "note": "Three of six cited. Engine naming updated: AWS documents “Valkey, Memcached, and Redis OSS” — Redis is now explicitly “Redis OSS” following the licence change, and Valkey is listed first. Also new since this write-up: node-based Valkey clusters can enable durability via a Multi-AZ transactional log, which weakens the old “volatile by default” framing."
+  },
   "id": "elasticache",
   "provider": "aws",
   "name": "Amazon ElastiCache",
-  "groups": ["cache"],
+  "groups": [
+    "cache"
+  ],
   "oneLiner": "Managed in-memory Redis/Memcached for microsecond caching and speed.",
   "whatItIs": "ElastiCache is AWS's managed in-memory data store, running Redis (now also the OSS fork Valkey) or Memcached. It keeps hot data in RAM so reads return in microseconds instead of the milliseconds a database takes. The classic use is a cache sitting in front of a slower store (RDS, DynamoDB): the app checks the cache first and only hits the database on a miss, cutting latency and load. Beyond caching, Redis on ElastiCache also serves as a fast store for sessions, rate-limiters, leaderboards, queues and pub/sub. It's an accelerator, not a system of record.",
   "inPractice": {
     "narrative": "A high-traffic app reads a user's profile constantly. Instead of querying RDS every time, it caches the profile in ElastiCache (Redis): the first read populates the cache, subsequent reads return in microseconds, and the database only sees a fraction of the traffic. On a write, the app updates RDS and invalidates the cache entry. ElastiCache sits between the app and the database as a speed layer — it holds a copy of hot data, not the source of truth.",
-    "flow": ["Application", "ElastiCache (Redis) — hot reads", "RDS / DynamoDB (source of truth)"],
+    "flow": [
+      "Application",
+      "ElastiCache (Redis) — hot reads",
+      "RDS / DynamoDB (source of truth)"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "In-memory, microsecond latency", "detail": "Data lives in RAM, so reads/writes are sub-millisecond — orders of magnitude faster than disk-backed databases, at the cost of memory being finite and (by default) volatile." },
-    { "term": "Redis/Valkey vs Memcached", "detail": "Redis/Valkey offers rich data structures, persistence, replication and pub/sub; Memcached is a simpler, multi-threaded pure cache. Most new work picks Redis/Valkey." },
-    { "term": "Cache-aside pattern", "detail": "The common design: app reads cache, on a miss loads from the DB and populates the cache, and invalidates/updates on writes. TTLs bound staleness." },
-    { "term": "Cluster mode & replication", "detail": "Redis cluster mode shards data across nodes for scale; replicas provide read scaling and failover for availability." },
-    { "term": "Eviction & TTLs", "detail": "When memory fills, an eviction policy (e.g. LRU) drops keys; TTLs expire entries. Getting these right controls hit rate and staleness." },
-    { "term": "Serverless option", "detail": "ElastiCache Serverless removes node sizing, auto-scaling capacity to demand and billing by usage — simpler for variable workloads." }
+    {
+      "term": "In-memory, microsecond latency",
+      "detail": "Data lives in RAM, so reads/writes are sub-millisecond — orders of magnitude faster than disk-backed databases, at the cost of memory being finite and (by default) volatile."
+    },
+    {
+      "term": "Redis/Valkey vs Memcached",
+      "detail": "Redis/Valkey offers rich data structures, persistence, replication and pub/sub; Memcached is a simpler, multi-threaded pure cache. Most new work picks Redis/Valkey."
+    },
+    {
+      "term": "Cache-aside pattern",
+      "detail": "The common design: app reads cache, on a miss loads from the DB and populates the cache, and invalidates/updates on writes. TTLs bound staleness."
+    },
+    {
+      "term": "Cluster mode & replication",
+      "detail": "Redis cluster mode shards data across nodes for scale; replicas provide read scaling and failover for availability."
+    },
+    {
+      "term": "Eviction & TTLs",
+      "detail": "When memory fills, an eviction policy (e.g. LRU) drops keys; TTLs expire entries. Getting these right controls hit rate and staleness."
+    },
+    {
+      "term": "Serverless option",
+      "detail": "ElastiCache Serverless removes node sizing, auto-scaling capacity to demand and billing by usage — simpler for variable workloads."
+    }
   ],
   "whenToUse": [
     "Caching hot data to cut database load and latency (cache-aside).",
@@ -33,12 +62,45 @@
     "Data that must never be lost without careful persistence/replication design."
   ],
   "keyFacts": [
-    { "label": "Type", "value": "Managed in-memory cache/store (Redis/Valkey or Memcached)." },
-    { "label": "Latency", "value": "Microsecond reads/writes (RAM-backed)." },
-    { "label": "Scaling", "value": "Redis cluster-mode sharding + replicas; Serverless option." },
-    { "label": "Role", "value": "Accelerator in front of a durable store, not the source of truth." },
-    { "label": "Durability", "value": "Volatile by default; Redis persistence/replication optional." },
-    { "label": "Billing", "value": "Per node-hour (by memory/type) or Serverless per-usage." }
+    {
+      "label": "Type",
+      "value": "Managed in-memory cache/store — Valkey, Memcached or Redis OSS.",
+      "source": {
+        "url": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/WhatIs.html",
+        "quote": "Amazon ElastiCache works with the Valkey, Memcached, and Redis OSS engines.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Latency",
+      "value": "Microsecond reads/writes (RAM-backed)."
+    },
+    {
+      "label": "Scaling",
+      "value": "Redis cluster-mode sharding + replicas; Serverless option.",
+      "source": {
+        "url": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/WhatIs.html",
+        "quote": "You can operate Amazon ElastiCache in two formats. You can get started with a serverless cache or create a node-based cluster. … ElastiCache Serverless is compatible with Valkey 7.2 and higher, Memcached 1.6.22 and above, and Redis OSS 7.1.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Role",
+      "value": "Accelerator in front of a durable store, not the source of truth."
+    },
+    {
+      "label": "Durability",
+      "value": "Volatile by default; Redis persistence/replication optional.",
+      "source": {
+        "url": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/WhatIs.html",
+        "quote": "For node-based Valkey clusters, you can enable durability to persist your data in a distributed Multi-AZ transactional log. With durability enabled, your data is protected even if all cache nodes fail.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Billing",
+      "value": "Per node-hour (by memory/type) or Serverless per-usage."
+    }
   ],
   "pricingShape": "Node-based ElastiCache bills per node-hour by instance type (which sets the RAM you get), plus replicas for HA/read scaling and some data transfer — so cost tracks how much memory you keep online, running continuously. Reserved nodes cut cost for steady use. ElastiCache Serverless instead bills by data stored and requests, auto-scaling capacity, which suits spiky or unpredictable workloads. The main levers are sizing memory to your hot set (not your whole dataset), a good eviction/TTL policy to keep hit rates high, and choosing node vs serverless by traffic shape.",
   "gotchas": [
@@ -49,8 +111,18 @@
     "Redis persistence/replication must be configured deliberately if you need any durability."
   ],
   "equivalents": [
-    { "provider": "gcp", "id": "memorystore", "name": "Memorystore", "note": "Managed Redis/Memcached; the direct analogue on GCP." },
-    { "provider": "azure", "id": "azure-cache-redis", "name": "Azure Cache for Redis", "note": "Managed Redis; Azure's in-memory cache analogue." }
+    {
+      "provider": "gcp",
+      "id": "memorystore",
+      "name": "Memorystore",
+      "note": "Managed Redis/Memcached; the direct analogue on GCP."
+    },
+    {
+      "provider": "azure",
+      "id": "azure-cache-redis",
+      "name": "Azure Cache for Redis",
+      "note": "Managed Redis; Azure's in-memory cache analogue."
+    }
   ],
   "docsUrl": "https://docs.aws.amazon.com/elasticache/"
 }

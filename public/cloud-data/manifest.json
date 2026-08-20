@@ -538,7 +538,7 @@
       "id": "adls",
       "provider": "azure",
       "name": "Azure Data Lake Storage Gen2",
-      "short": "ADLS Gen2",
+      "short": "documented now as Azure Data Lake Storage; Gen2 is the generation",
       "groups": [
         "storage"
       ],
@@ -686,13 +686,14 @@
       "id": "azure-cache-redis",
       "provider": "azure",
       "name": "Azure Cache for Redis",
+      "short": "retiring — Microsoft recommends moving to Azure Managed Redis",
       "groups": [
         "cache"
       ],
       "stages": [
         "store"
       ],
-      "oneLiner": "Managed in-memory Redis for microsecond caching on Azure."
+      "oneLiner": "Managed in-memory Redis cache. Microsoft has announced retirement for all SKUs and recommends migrating to Azure Managed Redis."
     },
     {
       "id": "power-bi",

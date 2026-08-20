@@ -1,23 +1,51 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "note": "Not yet checked. Deferred from batch 5 to keep the session within budget, and chosen for deferral because both are long-stable primitives of the kind that held up perfectly in batch 3 — not because they are unimportant. Still in the queue; run `npm run cloud` to see them."
+  },
   "id": "bigtable",
   "provider": "gcp",
   "name": "Bigtable",
-  "groups": ["nosql"],
+  "groups": [
+    "nosql"
+  ],
   "oneLiner": "Low-latency, wide-column NoSQL for huge analytical and operational workloads.",
   "whatItIs": "Bigtable is Google Cloud's wide-column NoSQL database — the same technology that underpins Search, Maps and Gmail. It's built for enormous scale (petabytes) and very high throughput with consistent low latency, storing rows keyed by a single row key with columns grouped into families. It shines for time-series, IoT, financial ticks, and any workload with massive write/read volume and simple key-based access. It's not a document store or a general-purpose database — it's a sparse, sorted key-value/wide-column map optimised for scale and speed, and it speaks the HBase API.",
   "inPractice": {
     "narrative": "An IoT platform ingests millions of sensor readings per second. Each reading is written to Bigtable with a row key like device#timestamp, so recent data for a device is a fast contiguous range scan. Dashboards and serving apps read those ranges in milliseconds, while a Dataflow job also reads Bigtable (or its exports) to roll data into BigQuery for deep analytics. Bigtable is the high-throughput operational/time-series store; BigQuery is where the heavy analysis happens.",
-    "flow": ["High-volume sensors / events", "Bigtable (row-key ranges)", "serving apps + Dataflow", "BigQuery for analytics"],
+    "flow": [
+      "High-volume sensors / events",
+      "Bigtable (row-key ranges)",
+      "serving apps + Dataflow",
+      "BigQuery for analytics"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "Row key design", "detail": "Every access is by row key or key range; the key's structure determines performance. Sequential keys (like raw timestamps) cause hotspots — good design distributes writes while keeping useful ranges contiguous." },
-    { "term": "Wide-column model", "detail": "Rows have column families containing many sparse columns; data is stored sorted by row key. It's a map, not tables with joins." },
-    { "term": "Nodes & clusters", "detail": "Throughput scales roughly linearly with nodes; you add nodes for more QPS. Storage and compute scale, and you can resize without downtime." },
-    { "term": "HBase compatibility", "detail": "Bigtable exposes the Apache HBase API, so HBase apps and tools port over — easing migration from on-prem Hadoop." },
-    { "term": "Replication", "detail": "Multi-cluster replication gives high availability and geo-distribution with eventual consistency across clusters." },
-    { "term": "Time-series fit", "detail": "Its sorted-key range scans make it ideal for time-series/IoT/financial data where you read recent windows per entity." }
+    {
+      "term": "Row key design",
+      "detail": "Every access is by row key or key range; the key's structure determines performance. Sequential keys (like raw timestamps) cause hotspots — good design distributes writes while keeping useful ranges contiguous."
+    },
+    {
+      "term": "Wide-column model",
+      "detail": "Rows have column families containing many sparse columns; data is stored sorted by row key. It's a map, not tables with joins."
+    },
+    {
+      "term": "Nodes & clusters",
+      "detail": "Throughput scales roughly linearly with nodes; you add nodes for more QPS. Storage and compute scale, and you can resize without downtime."
+    },
+    {
+      "term": "HBase compatibility",
+      "detail": "Bigtable exposes the Apache HBase API, so HBase apps and tools port over — easing migration from on-prem Hadoop."
+    },
+    {
+      "term": "Replication",
+      "detail": "Multi-cluster replication gives high availability and geo-distribution with eventual consistency across clusters."
+    },
+    {
+      "term": "Time-series fit",
+      "detail": "Its sorted-key range scans make it ideal for time-series/IoT/financial data where you read recent windows per entity."
+    }
   ],
   "whenToUse": [
     "Very high-throughput reads/writes at massive (TB–PB) scale.",
@@ -33,12 +61,30 @@
     "Workloads without a clear row-key access pattern — the model punishes that."
   ],
   "keyFacts": [
-    { "label": "Model", "value": "Wide-column (sparse, sorted-by-key) NoSQL." },
-    { "label": "Scale", "value": "Petabytes; throughput scales ~linearly with nodes." },
-    { "label": "Latency", "value": "Consistent single-digit-ms at high QPS." },
-    { "label": "API", "value": "Apache HBase-compatible." },
-    { "label": "Access", "value": "By row key or key range (no secondary indexes/joins)." },
-    { "label": "Billing", "value": "Per node-hour + storage (SSD/HDD) + network." }
+    {
+      "label": "Model",
+      "value": "Wide-column (sparse, sorted-by-key) NoSQL."
+    },
+    {
+      "label": "Scale",
+      "value": "Petabytes; throughput scales ~linearly with nodes."
+    },
+    {
+      "label": "Latency",
+      "value": "Consistent single-digit-ms at high QPS."
+    },
+    {
+      "label": "API",
+      "value": "Apache HBase-compatible."
+    },
+    {
+      "label": "Access",
+      "value": "By row key or key range (no secondary indexes/joins)."
+    },
+    {
+      "label": "Billing",
+      "value": "Per node-hour + storage (SSD/HDD) + network."
+    }
   ],
   "pricingShape": "Bigtable (provisioned) bills mainly per node-hour for the cluster's nodes plus storage per GB-month (SSD costs more than HDD) and some network. Because you pay for nodes whether or not they're busy, there's a real baseline cost — it's economical at high, steady utilisation and expensive for small or idle workloads (which is why Firestore fits low-scale better). Throughput scales with nodes, so the levers are right-sizing node count to your QPS and choosing SSD vs HDD by latency needs. Autoscaling can adjust nodes to load.",
   "gotchas": [
@@ -49,8 +95,18 @@
     "Schema/key design mistakes are costly to fix later because everything hinges on the row key."
   ],
   "equivalents": [
-    { "provider": "aws", "id": "dynamodb", "name": "Amazon DynamoDB", "note": "Serverless key-value/document; DynamoDB scales to zero-ish, Bigtable is node-based." },
-    { "provider": "azure", "id": "cosmos-db", "name": "Azure Cosmos DB", "note": "Multi-model NoSQL; Cosmos has a wide-column (Cassandra) API among others." }
+    {
+      "provider": "aws",
+      "id": "dynamodb",
+      "name": "Amazon DynamoDB",
+      "note": "Serverless key-value/document; DynamoDB scales to zero-ish, Bigtable is node-based."
+    },
+    {
+      "provider": "azure",
+      "id": "cosmos-db",
+      "name": "Azure Cosmos DB",
+      "note": "Multi-model NoSQL; Cosmos has a wide-column (Cassandra) API among others."
+    }
   ],
   "docsUrl": "https://cloud.google.com/bigtable/docs"
 }

@@ -1,23 +1,52 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "verified": "2026-08-20",
+    "method": "manual",
+    "note": "Updated: Memorystore is now four distinct products — Valkey, Redis Cluster, Redis and Memcached — with Memcached marked deprecated. The write-up treated it as one service with engine choices, which no longer matches how Google documents it. The Valkey option reflects the wider industry move after Redis changed its licence; the same shift shows up in aws/elasticache."
+  },
   "id": "memorystore",
   "provider": "gcp",
   "name": "Memorystore",
-  "groups": ["cache"],
+  "groups": [
+    "cache"
+  ],
   "oneLiner": "Managed in-memory Redis/Memcached for microsecond caching on GCP.",
   "whatItIs": "Memorystore is Google Cloud's managed in-memory data store, offering Redis (and Valkey) and Memcached. It keeps hot data in RAM for microsecond reads, so it's the speed layer that sits in front of slower databases: the app checks Memorystore first and only queries Cloud SQL/Bigtable on a miss, cutting latency and load. Redis on Memorystore also backs sessions, rate limiters, leaderboards and pub/sub. Like all caches, it's an accelerator holding a copy of hot data — not the durable system of record.",
   "inPractice": {
     "narrative": "A busy service reads product data on every request. Rather than hit Cloud SQL each time, it caches results in Memorystore (Redis): the first read fills the cache, later reads return in microseconds, and the database sees only a fraction of the load. Writes update Cloud SQL and invalidate the cached key. Memorystore sits between the app and the database as a fast copy of hot data, not the source of truth.",
-    "flow": ["Application", "Memorystore (Redis) — hot reads", "Cloud SQL / Bigtable (source of truth)"],
+    "flow": [
+      "Application",
+      "Memorystore (Redis) — hot reads",
+      "Cloud SQL / Bigtable (source of truth)"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "In-memory, microsecond latency", "detail": "Data in RAM gives sub-millisecond access, far faster than disk-backed databases — but memory is finite and volatile by default." },
-    { "term": "Redis/Valkey vs Memcached", "detail": "Redis/Valkey brings rich data structures, replication, persistence and pub/sub; Memcached is a simpler pure cache. Most new workloads choose Redis/Valkey." },
-    { "term": "Cache-aside pattern", "detail": "App reads cache, loads from the database on a miss and populates the cache, invalidating on writes; TTLs bound staleness." },
-    { "term": "Tiers & replicas", "detail": "Standard tier adds a replica with automatic failover for HA; read replicas and clustering scale reads/capacity depending on the offering." },
-    { "term": "Eviction & TTLs", "detail": "Eviction policies (e.g. LRU) and TTLs manage a full cache and control staleness vs hit rate." },
-    { "term": "VPC-native", "detail": "Instances run inside your VPC for private, low-latency access from GCP compute — no public exposure by default." }
+    {
+      "term": "In-memory, microsecond latency",
+      "detail": "Data in RAM gives sub-millisecond access, far faster than disk-backed databases — but memory is finite and volatile by default."
+    },
+    {
+      "term": "Redis/Valkey vs Memcached",
+      "detail": "Redis/Valkey brings rich data structures, replication, persistence and pub/sub; Memcached is a simpler pure cache. Most new workloads choose Redis/Valkey."
+    },
+    {
+      "term": "Cache-aside pattern",
+      "detail": "App reads cache, loads from the database on a miss and populates the cache, invalidating on writes; TTLs bound staleness."
+    },
+    {
+      "term": "Tiers & replicas",
+      "detail": "Standard tier adds a replica with automatic failover for HA; read replicas and clustering scale reads/capacity depending on the offering."
+    },
+    {
+      "term": "Eviction & TTLs",
+      "detail": "Eviction policies (e.g. LRU) and TTLs manage a full cache and control staleness vs hit rate."
+    },
+    {
+      "term": "VPC-native",
+      "detail": "Instances run inside your VPC for private, low-latency access from GCP compute — no public exposure by default."
+    }
   ],
   "whenToUse": [
     "Caching hot data to reduce database load and latency (cache-aside).",
@@ -33,12 +62,35 @@
     "Data that cannot tolerate loss without careful persistence design."
   ],
   "keyFacts": [
-    { "label": "Type", "value": "Managed in-memory cache/store (Redis/Valkey or Memcached)." },
-    { "label": "Latency", "value": "Microsecond reads/writes (RAM-backed)." },
-    { "label": "HA", "value": "Standard tier replica with automatic failover." },
-    { "label": "Access", "value": "VPC-native, private connectivity." },
-    { "label": "Durability", "value": "Volatile by default; Redis persistence optional." },
-    { "label": "Billing", "value": "Per GB-hour of provisioned capacity by tier." }
+    {
+      "label": "Type",
+      "value": "Managed in-memory store: Memorystore for Valkey, for Redis Cluster, for Redis; Memcached is deprecated.",
+      "source": {
+        "url": "https://docs.cloud.google.com/memorystore/docs",
+        "quote": "Memorystore for Valkey — Managed Valkey for Google Cloud. Memorystore for Redis Cluster — Managed Redis Clusters for Google Cloud. Memorystore for Redis — Managed Redis for Google Cloud. Memorystore for Memcached — Managed Memcached for Google Cloud.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Latency",
+      "value": "Microsecond reads/writes (RAM-backed)."
+    },
+    {
+      "label": "HA",
+      "value": "Standard tier replica with automatic failover."
+    },
+    {
+      "label": "Access",
+      "value": "VPC-native, private connectivity."
+    },
+    {
+      "label": "Durability",
+      "value": "Volatile by default; Redis persistence optional."
+    },
+    {
+      "label": "Billing",
+      "value": "Per GB-hour of provisioned capacity by tier."
+    }
   ],
   "pricingShape": "Memorystore bills by provisioned capacity — GB-hours of memory by service tier — running continuously, plus the standby replica on the HA (Standard) tier. Cost therefore tracks how much RAM you keep online, so sizing to your hot working set rather than your whole dataset is the main lever, along with a good eviction/TTL policy to keep hit rates high. There's no per-request charge on the classic instances; you pay for capacity. Committed-use discounts help steady workloads.",
   "gotchas": [
@@ -49,8 +101,18 @@
     "Persistence/replication must be chosen deliberately if you need any durability."
   ],
   "equivalents": [
-    { "provider": "aws", "id": "elasticache", "name": "Amazon ElastiCache", "note": "Managed Redis/Memcached; the direct analogue on AWS." },
-    { "provider": "azure", "id": "azure-cache-redis", "name": "Azure Cache for Redis", "note": "Managed Redis; Azure's in-memory cache analogue." }
+    {
+      "provider": "aws",
+      "id": "elasticache",
+      "name": "Amazon ElastiCache",
+      "note": "Managed Redis/Memcached; the direct analogue on AWS."
+    },
+    {
+      "provider": "azure",
+      "id": "azure-cache-redis",
+      "name": "Azure Cache for Redis",
+      "note": "Managed Redis; Azure's in-memory cache analogue."
+    }
   ],
   "docsUrl": "https://cloud.google.com/memorystore/docs"
 }
