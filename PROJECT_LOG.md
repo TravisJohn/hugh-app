@@ -4240,3 +4240,46 @@ Four things the pilot proved that the plan had only guessed at:
 
 Today: 1 service verified, 62 unverified, 4 of 378 key facts cited. That number
 is meant to be embarrassing and is meant to go up quarterly.
+
+## Cloud Skills QA pass — 48 of 63 services verified (2026-08-20)
+
+Ran the verification loop the provenance layer was built for. Method: fetch the
+provider's own documentation, judge each claim against the fetched text, record
+verdict plus verbatim quote plus URL. No content generated; nothing auto-applied.
+
+**The headline result was not the one we set out to find.** The exercise started
+because S3's max object size was wrong (5 TB, actually 48.8 TiB). Across 48
+services and roughly 290 key facts, only **5 facts** were factually wrong. But
+**12 products had been renamed and 3 retired** — roughly one service in three had
+drifted its identity.
+
+Renames: Vertex AI → Gemini Enterprise Agent Platform · BigLake → Lakehouse for
+Apache Iceberg · Timestream → Timestream for LiveAnalytics (+ InfluxDB sibling) ·
+ADX's Fabric surface → Eventhouse · SageMaker → SageMaker AI · Databricks ×3 →
+Data Intelligence Platform · QuickSight → Quick Sight (inside Amazon Quick) ·
+Dataplex → Knowledge Catalog · Cloud Functions → Cloud Run functions ·
+Cloud Composer → Managed Service for Apache Airflow.
+
+Retirements: **Azure Cache for Redis, all SKUs** (successor: Azure Managed Redis)
+· Azure Data Box Heavy · AWS Glue for Ray.
+
+The two worst cases are the ones a cheap check would miss: **SageMaker and
+QuickSight both kept their old names while those names came to mean something
+bigger.** A stale name is obvious once you look; a name that quietly changed
+*meaning* is not. Link-checking was tried as a proxy and abandoned — 41 of 63
+URLs returned redirects, almost all cosmetic, and it missed every rename because
+the old URLs still resolve.
+
+Method notes worth keeping:
+- **No verbatim quote, no citation.** `gcp/bigquery` and `gcp/pubsub` are left
+  UNVERIFIED because their fetches returned no quotable text — in one case the
+  fetch tool answered from its own knowledge instead of the page, which is the
+  exact failure this method exists to prevent.
+- **`cloud:check` earned itself.** It caught a manifest/detail drift mid-batch,
+  before it shipped.
+- **The drift pattern does not predict individual services.** Batch 3 (streaming)
+  was spotless; batch 4, predicted quiet, produced two renames. `gcp/data-fusion`
+  was checked expecting a deprecation and had none.
+
+15 services remain unverified and are listed in the queue. Runbook (method,
+traps, batches): https://claude.ai/code/artifact/b7365c7f-4afa-4c3a-80eb-3629e07ef851
