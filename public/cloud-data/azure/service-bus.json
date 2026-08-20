@@ -1,23 +1,51 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "note": "Not yet checked (batch 6). Deferred to keep this session within budget. Left UNVERIFIED rather than given a date it has not earned — a provenance layer that overstates is worse than one that admits gaps. Run `npm run cloud` to see it in the queue."
+  },
   "id": "service-bus",
   "provider": "azure",
   "name": "Azure Service Bus",
-  "groups": ["messaging"],
+  "groups": [
+    "messaging"
+  ],
   "oneLiner": "Enterprise message broker with queues and topics for reliable decoupling.",
   "whatItIs": "Azure Service Bus is Azure's enterprise message broker — a fully-managed service for reliable, decoupled communication between applications and services. It offers queues (point-to-point) and topics/subscriptions (publish-subscribe fan-out), with enterprise messaging features: guaranteed ordering (sessions), exactly-once handling (dead-lettering, duplicate detection), transactions, and scheduled delivery. It's built for business-critical workloads where messages must not be lost or mishandled. In contrast to Event Hubs (high-throughput event streaming), Service Bus is about discrete commands/messages with rich delivery guarantees — the backbone for decoupling enterprise applications on Azure.",
   "inPractice": {
     "narrative": "An order system must reliably tell fulfilment, billing and notifications about each new order — without tight coupling. It publishes each order to a Service Bus topic; three subscriptions (fulfilment, billing, notifications) each receive their own copy and process independently, with dead-lettering catching failures and sessions preserving per-customer order. If a consumer is down, messages wait durably. Service Bus is the reliable broker decoupling enterprise services with strong delivery guarantees.",
-    "flow": ["Producer (order system)", "Service Bus topic", "subscriptions: fulfilment / billing / notify", "consumers"],
+    "flow": [
+      "Producer (order system)",
+      "Service Bus topic",
+      "subscriptions: fulfilment / billing / notify",
+      "consumers"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "Queues vs topics", "detail": "Queues are point-to-point (one consumer group competes for messages); topics with subscriptions fan out a copy of each message to multiple independent subscribers." },
-    { "term": "Sessions (ordering)", "detail": "Message sessions guarantee FIFO ordering and stateful handling for related messages (e.g. all messages for one order/customer)." },
-    { "term": "Dead-lettering & duplicate detection", "detail": "Failed or expired messages move to a dead-letter queue; duplicate detection discards repeats — enterprise reliability features beyond a basic queue." },
-    { "term": "At-least-once + transactions", "detail": "Reliable delivery with peek-lock, plus transactions that group operations atomically — for workloads where correctness matters." },
-    { "term": "Tiers", "detail": "Standard (shared, pay-per-operation) and Premium (dedicated messaging units, predictable performance, VNet, larger messages) for enterprise scale/isolation." },
-    { "term": "Service Bus vs Event Hubs", "detail": "Service Bus = discrete messages/commands with rich guarantees; Event Hubs = high-throughput event streaming. Different tools for different jobs." }
+    {
+      "term": "Queues vs topics",
+      "detail": "Queues are point-to-point (one consumer group competes for messages); topics with subscriptions fan out a copy of each message to multiple independent subscribers."
+    },
+    {
+      "term": "Sessions (ordering)",
+      "detail": "Message sessions guarantee FIFO ordering and stateful handling for related messages (e.g. all messages for one order/customer)."
+    },
+    {
+      "term": "Dead-lettering & duplicate detection",
+      "detail": "Failed or expired messages move to a dead-letter queue; duplicate detection discards repeats — enterprise reliability features beyond a basic queue."
+    },
+    {
+      "term": "At-least-once + transactions",
+      "detail": "Reliable delivery with peek-lock, plus transactions that group operations atomically — for workloads where correctness matters."
+    },
+    {
+      "term": "Tiers",
+      "detail": "Standard (shared, pay-per-operation) and Premium (dedicated messaging units, predictable performance, VNet, larger messages) for enterprise scale/isolation."
+    },
+    {
+      "term": "Service Bus vs Event Hubs",
+      "detail": "Service Bus = discrete messages/commands with rich guarantees; Event Hubs = high-throughput event streaming. Different tools for different jobs."
+    }
   ],
   "whenToUse": [
     "Reliable, decoupled communication between enterprise applications.",
@@ -33,12 +61,30 @@
     "Real-time analytics pipelines — that's a streaming service."
   ],
   "keyFacts": [
-    { "label": "Type", "value": "Enterprise managed message broker." },
-    { "label": "Patterns", "value": "Queues (point-to-point) and topics/subscriptions (pub-sub)." },
-    { "label": "Guarantees", "value": "Sessions (FIFO), dead-lettering, duplicate detection, transactions." },
-    { "label": "Tiers", "value": "Standard (per-operation) and Premium (messaging units, VNet)." },
-    { "label": "Contrast", "value": "Discrete messages vs Event Hubs streaming." },
-    { "label": "Billing", "value": "Standard: per operation + base; Premium: per messaging unit." }
+    {
+      "label": "Type",
+      "value": "Enterprise managed message broker."
+    },
+    {
+      "label": "Patterns",
+      "value": "Queues (point-to-point) and topics/subscriptions (pub-sub)."
+    },
+    {
+      "label": "Guarantees",
+      "value": "Sessions (FIFO), dead-lettering, duplicate detection, transactions."
+    },
+    {
+      "label": "Tiers",
+      "value": "Standard (per-operation) and Premium (messaging units, VNet)."
+    },
+    {
+      "label": "Contrast",
+      "value": "Discrete messages vs Event Hubs streaming."
+    },
+    {
+      "label": "Billing",
+      "value": "Standard: per operation + base; Premium: per messaging unit."
+    }
   ],
   "pricingShape": "Standard tier bills a base charge plus per-operation (messaging operations), suited to modest or variable workloads; Premium tier bills per messaging unit — dedicated capacity giving predictable performance, VNet isolation and larger messages — which is cost-effective and required at enterprise scale. So light workloads favour Standard's pay-per-use, while high-volume/critical workloads favour Premium's reserved capacity. The levers are choosing the tier by throughput and isolation needs, and being aware that the rich features (sessions, dead-lettering) are about reliability, not extra per-message fees.",
   "gotchas": [
@@ -49,8 +95,18 @@
     "Consumers should be idempotent — at-least-once delivery plus retries can reprocess messages."
   ],
   "equivalents": [
-    { "provider": "aws", "id": "sqs", "name": "Amazon SQS", "note": "Managed queue (SNS adds pub-sub); simpler than Service Bus's enterprise features." },
-    { "provider": "gcp", "id": "cloud-tasks", "name": "Cloud Tasks", "note": "Task dispatch queue (Pub/Sub covers pub-sub streaming)." }
+    {
+      "provider": "aws",
+      "id": "sqs",
+      "name": "Amazon SQS",
+      "note": "Managed queue (SNS adds pub-sub); simpler than Service Bus's enterprise features."
+    },
+    {
+      "provider": "gcp",
+      "id": "cloud-tasks",
+      "name": "Cloud Tasks",
+      "note": "Task dispatch queue (Pub/Sub covers pub-sub streaming)."
+    }
   ],
   "docsUrl": "https://learn.microsoft.com/azure/service-bus-messaging/"
 }

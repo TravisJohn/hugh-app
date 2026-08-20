@@ -1,23 +1,51 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "note": "Not yet checked (batch 7). Deferred to keep this session within budget. Left UNVERIFIED rather than given a date it has not earned — a provenance layer that overstates is worse than one that admits gaps. Run `npm run cloud` to see it in the queue."
+  },
   "id": "dataproc",
   "provider": "gcp",
   "name": "Dataproc",
-  "groups": ["compute"],
+  "groups": [
+    "compute"
+  ],
   "oneLiner": "Managed Spark and Hadoop for batch, streaming and ML workloads.",
   "whatItIs": "Dataproc is Google Cloud's managed Spark and Hadoop service. It runs the open-source big-data stack (Spark, Hadoop, Hive, Presto, Flink) on clusters GCP provisions in around 90 seconds — famously fast — so the cloud-native pattern is to create a cluster per job, run it, and delete it. Data lives in Cloud Storage rather than cluster HDFS, making clusters disposable compute. There's also Dataproc Serverless, where you submit a Spark job and skip cluster management entirely. It's the choice when you want real Spark control on GCP rather than the fully-abstracted Dataflow.",
   "inPractice": {
     "narrative": "A team has existing PySpark jobs and terabytes of data in Cloud Storage. They submit each job to Dataproc Serverless (or spin up an ephemeral cluster), which reads from GCS, processes at scale, and writes curated Parquet back to GCS. BigQuery then queries the results. Dataproc is picked over Dataflow when the team already has Spark/Hadoop code and wants to run it as-is with full control.",
-    "flow": ["Cloud Storage (raw)", "Dataproc Spark job", "Cloud Storage (curated Parquet)", "BigQuery"],
+    "flow": [
+      "Cloud Storage (raw)",
+      "Dataproc Spark job",
+      "Cloud Storage (curated Parquet)",
+      "BigQuery"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "Fast ephemeral clusters", "detail": "Clusters start in ~90 seconds, so the norm is job-scoped clusters: create, run, delete. You don't pay for idle infrastructure between jobs." },
-    { "term": "Dataproc Serverless", "detail": "Submit a Spark batch or session without creating a cluster; GCP sizes and runs it, billing for what the job uses — the no-ops option." },
-    { "term": "Storage on GCS", "detail": "Data sits in Cloud Storage (via the connector), not cluster HDFS, so clusters are disposable and multiple jobs share the same data." },
-    { "term": "Open-source stack", "detail": "Runs Spark, Hadoop, Hive, Presto/Trino, Flink and more with chosen versions and optional components/initialization actions for custom setup." },
-    { "term": "Autoscaling & preemptible VMs", "detail": "Clusters can autoscale, and using preemptible (Spot) secondary workers cuts cost significantly for fault-tolerant batch work." },
-    { "term": "Workflow templates", "detail": "Define a sequence of jobs (optionally on a managed ephemeral cluster) that Dataproc runs and cleans up — lightweight pipeline orchestration." }
+    {
+      "term": "Fast ephemeral clusters",
+      "detail": "Clusters start in ~90 seconds, so the norm is job-scoped clusters: create, run, delete. You don't pay for idle infrastructure between jobs."
+    },
+    {
+      "term": "Dataproc Serverless",
+      "detail": "Submit a Spark batch or session without creating a cluster; GCP sizes and runs it, billing for what the job uses — the no-ops option."
+    },
+    {
+      "term": "Storage on GCS",
+      "detail": "Data sits in Cloud Storage (via the connector), not cluster HDFS, so clusters are disposable and multiple jobs share the same data."
+    },
+    {
+      "term": "Open-source stack",
+      "detail": "Runs Spark, Hadoop, Hive, Presto/Trino, Flink and more with chosen versions and optional components/initialization actions for custom setup."
+    },
+    {
+      "term": "Autoscaling & preemptible VMs",
+      "detail": "Clusters can autoscale, and using preemptible (Spot) secondary workers cuts cost significantly for fault-tolerant batch work."
+    },
+    {
+      "term": "Workflow templates",
+      "detail": "Define a sequence of jobs (optionally on a managed ephemeral cluster) that Dataproc runs and cleans up — lightweight pipeline orchestration."
+    }
   ],
   "whenToUse": [
     "Running existing Spark/Hadoop/Hive code on GCP with minimal changes.",
@@ -33,12 +61,30 @@
     "Tiny occasional tasks — a Cloud Function or BigQuery job may be simpler."
   ],
   "keyFacts": [
-    { "label": "Frameworks", "value": "Spark, Hadoop, Hive, Presto/Trino, Flink, etc." },
-    { "label": "Cluster start", "value": "~90 seconds — designed for ephemeral, per-job clusters." },
-    { "label": "Serverless", "value": "Dataproc Serverless runs Spark with no cluster to manage." },
-    { "label": "Storage", "value": "Cloud Storage-backed (GCS connector); clusters disposable." },
-    { "label": "Cost saver", "value": "Preemptible VMs + autoscaling." },
-    { "label": "Billing", "value": "Compute Engine resources + small per-vCPU Dataproc premium (or Serverless per-usage)." }
+    {
+      "label": "Frameworks",
+      "value": "Spark, Hadoop, Hive, Presto/Trino, Flink, etc."
+    },
+    {
+      "label": "Cluster start",
+      "value": "~90 seconds — designed for ephemeral, per-job clusters."
+    },
+    {
+      "label": "Serverless",
+      "value": "Dataproc Serverless runs Spark with no cluster to manage."
+    },
+    {
+      "label": "Storage",
+      "value": "Cloud Storage-backed (GCS connector); clusters disposable."
+    },
+    {
+      "label": "Cost saver",
+      "value": "Preemptible VMs + autoscaling."
+    },
+    {
+      "label": "Billing",
+      "value": "Compute Engine resources + small per-vCPU Dataproc premium (or Serverless per-usage)."
+    }
   ],
   "pricingShape": "For clusters you pay for the underlying Compute Engine VMs plus a small Dataproc premium per vCPU while the cluster runs — so ephemeral clusters and preemptible workers keep costs low, and a forgotten running cluster is the main waste. Dataproc Serverless bills for the resources a job consumes with nothing idle. Storage is separate in Cloud Storage. Because clusters spin up so fast, the disciplined pattern (one cluster per job, deleted after) is easy and cheap; long-lived clusters only make sense for steady interactive use.",
   "gotchas": [
@@ -49,8 +95,18 @@
     "Choosing Dataproc when Dataflow's managed model would fit adds ops burden you didn't need."
   ],
   "equivalents": [
-    { "provider": "aws", "id": "emr", "name": "Amazon EMR", "note": "Managed Spark/Hadoop; the direct analogue with EC2/EKS/Serverless modes." },
-    { "provider": "azure", "id": "hdinsight", "name": "Azure HDInsight", "note": "Managed open-source clusters; Databricks is the common alternative on Azure." }
+    {
+      "provider": "aws",
+      "id": "emr",
+      "name": "Amazon EMR",
+      "note": "Managed Spark/Hadoop; the direct analogue with EC2/EKS/Serverless modes."
+    },
+    {
+      "provider": "azure",
+      "id": "hdinsight",
+      "name": "Azure HDInsight",
+      "note": "Managed open-source clusters; Databricks is the common alternative on Azure."
+    }
   ],
   "docsUrl": "https://cloud.google.com/dataproc/docs"
 }

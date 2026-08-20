@@ -1,24 +1,52 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "note": "Not yet checked (batch 6). Deferred to keep this session within budget. Left UNVERIFIED rather than given a date it has not earned — a provenance layer that overstates is worse than one that admits gaps. Run `npm run cloud` to see it in the queue."
+  },
   "id": "database-migration-service",
   "provider": "azure",
   "name": "Azure Database Migration Service",
   "short": "DMS",
-  "groups": ["movement"],
+  "groups": [
+    "movement"
+  ],
   "oneLiner": "Migrate and replicate databases into Azure with minimal downtime.",
   "whatItIs": "Azure Database Migration Service is Microsoft's managed tool for moving databases into Azure — from on-prem or other clouds into Azure SQL Database, SQL Managed Instance, PostgreSQL, MySQL and more. It supports both offline (one-time) and online (minimal-downtime, continuous-sync) migrations, keeping source and target in sync until you cut over. It pairs with the Azure Migrate ecosystem and the Data Migration Assistant, which assesses compatibility and flags issues before you move. In a data platform it's the bridge that gets operational databases onto Azure; for ongoing analytics CDC feeds, teams often complement it with Data Factory or Fabric/Synapse pipelines.",
   "inPractice": {
     "narrative": "A company is moving an on-prem SQL Server database to Azure SQL Managed Instance. The Data Migration Assistant first assesses compatibility. Then Azure DMS runs an online migration: it copies existing data and continuously syncs changes so the app keeps running, until the team cuts over to Azure with minimal downtime. Afterwards, that Azure database becomes the operational source feeding Synapse/Fabric for analytics. DMS is the low-downtime bridge onto Azure.",
-    "flow": ["Source DB (on-prem / other cloud)", "Azure DMS (offline / online sync)", "Azure SQL / PostgreSQL / MySQL", "Synapse / Fabric analytics"],
+    "flow": [
+      "Source DB (on-prem / other cloud)",
+      "Azure DMS (offline / online sync)",
+      "Azure SQL / PostgreSQL / MySQL",
+      "Synapse / Fabric analytics"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "Offline vs online migration", "detail": "Offline copies data once with downtime; online continuously syncs changes so cutover downtime is minimal — the equivalent of full-load vs full-load+CDC." },
-    { "term": "Assess first (DMA)", "detail": "The Data Migration Assistant evaluates source-to-target compatibility, flagging breaking changes and feature gaps before migration." },
-    { "term": "Supported targets", "detail": "Azure SQL Database, SQL Managed Instance, Azure Database for PostgreSQL and MySQL, among others — homogeneous and some heterogeneous paths." },
-    { "term": "Continuous sync & cutover", "detail": "Online mode keeps the target current until you choose a cutover moment, minimising the window the application is unavailable." },
-    { "term": "Azure Migrate ecosystem", "detail": "DMS sits within the broader Azure Migrate tooling for assessing and moving servers, databases and apps together." },
-    { "term": "Analytics CDC is separate", "detail": "For ongoing operational-to-analytics replication, teams typically use Data Factory/Fabric or native CDC rather than DMS, which is migration-focused." }
+    {
+      "term": "Offline vs online migration",
+      "detail": "Offline copies data once with downtime; online continuously syncs changes so cutover downtime is minimal — the equivalent of full-load vs full-load+CDC."
+    },
+    {
+      "term": "Assess first (DMA)",
+      "detail": "The Data Migration Assistant evaluates source-to-target compatibility, flagging breaking changes and feature gaps before migration."
+    },
+    {
+      "term": "Supported targets",
+      "detail": "Azure SQL Database, SQL Managed Instance, Azure Database for PostgreSQL and MySQL, among others — homogeneous and some heterogeneous paths."
+    },
+    {
+      "term": "Continuous sync & cutover",
+      "detail": "Online mode keeps the target current until you choose a cutover moment, minimising the window the application is unavailable."
+    },
+    {
+      "term": "Azure Migrate ecosystem",
+      "detail": "DMS sits within the broader Azure Migrate tooling for assessing and moving servers, databases and apps together."
+    },
+    {
+      "term": "Analytics CDC is separate",
+      "detail": "For ongoing operational-to-analytics replication, teams typically use Data Factory/Fabric or native CDC rather than DMS, which is migration-focused."
+    }
   ],
   "whenToUse": [
     "Migrating on-prem or other-cloud databases into Azure.",
@@ -34,12 +62,30 @@
     "App event streaming — that's Event Hubs, not DMS."
   ],
   "keyFacts": [
-    { "label": "Role", "value": "Managed database migration into Azure." },
-    { "label": "Modes", "value": "Offline (one-time) and online (minimal-downtime sync)." },
-    { "label": "Assess", "value": "Data Migration Assistant checks compatibility first." },
-    { "label": "Targets", "value": "Azure SQL DB / Managed Instance, PostgreSQL, MySQL, etc." },
-    { "label": "Ecosystem", "value": "Part of Azure Migrate tooling." },
-    { "label": "Billing", "value": "Managed service (compute for the migration project) + target/transfer costs." }
+    {
+      "label": "Role",
+      "value": "Managed database migration into Azure."
+    },
+    {
+      "label": "Modes",
+      "value": "Offline (one-time) and online (minimal-downtime sync)."
+    },
+    {
+      "label": "Assess",
+      "value": "Data Migration Assistant checks compatibility first."
+    },
+    {
+      "label": "Targets",
+      "value": "Azure SQL DB / Managed Instance, PostgreSQL, MySQL, etc."
+    },
+    {
+      "label": "Ecosystem",
+      "value": "Part of Azure Migrate tooling."
+    },
+    {
+      "label": "Billing",
+      "value": "Managed service (compute for the migration project) + target/transfer costs."
+    }
   ],
   "pricingShape": "Azure DMS's pricing centres on the migration compute it runs (with a widely-used lower-cost tier for standard migrations and a premium tier for demanding online migrations), for the duration of the migration project. Because migrations are typically time-bounded, cost is a project expense rather than an always-on bill — you spin it up, migrate, cut over, and tear it down. The target Azure database and any data transfer are billed separately. The lever is choosing the right service tier for your downtime/throughput needs and not leaving migration resources running after cutover.",
   "gotchas": [
@@ -50,8 +96,18 @@
     "Heterogeneous moves have limits; complex code/features may need manual conversion."
   ],
   "equivalents": [
-    { "provider": "aws", "id": "dms", "name": "AWS DMS", "note": "Database migration + ongoing CDC into S3/Redshift and more." },
-    { "provider": "gcp", "id": "datastream", "name": "Datastream", "note": "Serverless CDC into BigQuery; more analytics-CDC-focused (GCP also has Database Migration Service)." }
+    {
+      "provider": "aws",
+      "id": "dms",
+      "name": "AWS DMS",
+      "note": "Database migration + ongoing CDC into S3/Redshift and more."
+    },
+    {
+      "provider": "gcp",
+      "id": "datastream",
+      "name": "Datastream",
+      "note": "Serverless CDC into BigQuery; more analytics-CDC-focused (GCP also has Database Migration Service)."
+    }
   ],
   "docsUrl": "https://learn.microsoft.com/azure/dms/"
 }

@@ -1,23 +1,54 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "verified": "2026-08-20",
+    "method": "manual",
+    "note": "CONTRADICTED and fixed: the write-up listed Ray as a current job type alongside Spark and Python-shell. The docs now carry a dedicated page titled “AWS Glue for Ray end of support”, so Ray is on its way out and should not be taught as a live option. Three of six cited. Also worth adding later: Glue documents 70+ connectable data sources, and Glue Studio, interactive sessions and sensitive-data detection are all absent from this write-up."
+  },
   "id": "glue",
   "provider": "aws",
   "name": "AWS Glue",
-  "groups": ["integration"],
+  "groups": [
+    "integration"
+  ],
   "oneLiner": "Serverless Spark ETL plus a data catalog; crawlers infer schema for you.",
   "whatItIs": "Glue is AWS's serverless data-integration service. Its two big pieces are the ETL engine — managed Apache Spark (and a Python-shell option) that you write jobs for, with no clusters to run — and the Glue Data Catalog, a central metadata store of your tables and schemas that Athena, Redshift Spectrum and EMR all share. Crawlers can scan S3 and infer table schemas automatically. Glue is the usual way to clean and reshape raw lake data into curated, query-ready Parquet on AWS.",
   "inPractice": {
     "narrative": "Raw JSON/CSV lands in an S3 bronze bucket. A Glue crawler infers its schema and registers a table in the Data Catalog. A Glue Spark job then cleans, joins and rewrites the data as partitioned Parquet in a curated bucket, updating the catalog. Athena and Redshift Spectrum immediately query those tables — because they read the same catalog Glue writes to. Glue is the transformation step that turns a raw lake into an analysis-ready one.",
-    "flow": ["S3 (raw)", "Glue crawler → Data Catalog", "Glue Spark ETL job", "S3 (curated Parquet)", "Athena / Redshift"],
+    "flow": [
+      "S3 (raw)",
+      "Glue crawler → Data Catalog",
+      "Glue Spark ETL job",
+      "S3 (curated Parquet)",
+      "Athena / Redshift"
+    ],
     "highlight": 2
   },
   "coreConcepts": [
-    { "term": "Data Catalog", "detail": "A shared metastore of databases, tables and schemas (Hive-compatible). It's the single source of truth Athena, Spectrum, EMR and Lake Formation all reference." },
-    { "term": "Crawlers", "detail": "Jobs that scan a data source (e.g. S3 prefix), infer schema and partitions, and populate/refresh Catalog tables — saving manual DDL." },
-    { "term": "Glue ETL jobs (Spark)", "detail": "Serverless Spark jobs written in PySpark/Scala. You pick DPUs (workers); Glue spins them up, runs the job and tears them down — you never manage a cluster." },
-    { "term": "DynamicFrame", "detail": "Glue's Spark-DataFrame-like abstraction that tolerates messy, evolving schemas and offers built-in transforms; convertible to/from normal Spark DataFrames." },
-    { "term": "Glue Studio & jobs types", "detail": "A visual job builder, plus Python-shell jobs for lightweight tasks and Ray for Python-native scale — beyond full Spark." },
-    { "term": "Bookmarks", "detail": "Job bookmarks track what's already been processed so incremental runs skip old data — key for not reprocessing the whole lake each night." }
+    {
+      "term": "Data Catalog",
+      "detail": "A shared metastore of databases, tables and schemas (Hive-compatible). It's the single source of truth Athena, Spectrum, EMR and Lake Formation all reference."
+    },
+    {
+      "term": "Crawlers",
+      "detail": "Jobs that scan a data source (e.g. S3 prefix), infer schema and partitions, and populate/refresh Catalog tables — saving manual DDL."
+    },
+    {
+      "term": "Glue ETL jobs (Spark)",
+      "detail": "Serverless Spark jobs written in PySpark/Scala. You pick DPUs (workers); Glue spins them up, runs the job and tears them down — you never manage a cluster."
+    },
+    {
+      "term": "DynamicFrame",
+      "detail": "Glue's Spark-DataFrame-like abstraction that tolerates messy, evolving schemas and offers built-in transforms; convertible to/from normal Spark DataFrames."
+    },
+    {
+      "term": "Glue Studio & jobs types",
+      "detail": "A visual job builder, plus Python-shell jobs for lightweight tasks and Ray for Python-native scale — beyond full Spark."
+    },
+    {
+      "term": "Bookmarks",
+      "detail": "Job bookmarks track what's already been processed so incremental runs skip old data — key for not reprocessing the whole lake each night."
+    }
   ],
   "whenToUse": [
     "Serverless Spark ETL to clean and reshape S3 data into curated Parquet.",
@@ -33,12 +64,45 @@
     "Interactive, notebook-driven exploration as the primary mode — use EMR/Studio notebooks or Athena."
   ],
   "keyFacts": [
-    { "label": "Engine", "value": "Serverless Apache Spark (plus Python-shell and Ray jobs)." },
-    { "label": "Catalog", "value": "Glue Data Catalog — Hive-compatible metastore shared AWS-wide." },
-    { "label": "Billing", "value": "Per DPU-hour while jobs/crawlers run (per-second, 1-min min)." },
-    { "label": "Discovery", "value": "Crawlers infer schema and partitions automatically." },
-    { "label": "Incremental", "value": "Job bookmarks skip already-processed data." },
-    { "label": "Ops", "value": "No clusters to provision or manage." }
+    {
+      "label": "Engine",
+      "value": "Serverless Apache Spark (plus Python-shell jobs). Glue for Ray is reaching end of support.",
+      "source": {
+        "url": "https://docs.aws.amazon.com/glue/latest/dg/what-is-glue.html",
+        "quote": "AWS Glue is a serverless data integration service that makes it easy for analytics users to discover, prepare, move, and integrate data from multiple sources. … AWS Glue for Ray end of support.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Catalog",
+      "value": "Glue Data Catalog — Hive-compatible metastore shared AWS-wide.",
+      "source": {
+        "url": "https://docs.aws.amazon.com/glue/latest/dg/what-is-glue.html",
+        "quote": "With AWS Glue, you can discover and connect to more than 70 diverse data sources and manage your data in a centralized data catalog. … you can immediately search and query cataloged data using Amazon Athena, Amazon EMR, and Amazon Redshift Spectrum.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Billing",
+      "value": "Per DPU-hour while jobs/crawlers run (per-second, 1-min min)."
+    },
+    {
+      "label": "Discovery",
+      "value": "Crawlers infer schema and partitions automatically.",
+      "source": {
+        "url": "https://docs.aws.amazon.com/glue/latest/dg/what-is-glue.html",
+        "quote": "Automatically discover data – Use AWS Glue crawlers to automatically infer schema information and integrate it into your AWS Glue Data Catalog.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Incremental",
+      "value": "Job bookmarks skip already-processed data."
+    },
+    {
+      "label": "Ops",
+      "value": "No clusters to provision or manage."
+    }
   ],
   "pricingShape": "You pay per DPU-hour (data processing unit) for the time jobs and crawlers actually run, billed per-second with a small minimum — idle costs nothing because there's no standing cluster. The Data Catalog has a modest per-object storage and per-request charge that's negligible for most. Cost is driven by job runtime and worker count, so efficient Spark (right DPU count, partition pruning, bookmarks to avoid reprocessing) is what keeps the bill down. Crawlers add small recurring cost if scheduled frequently over large data.",
   "gotchas": [
@@ -49,8 +113,18 @@
     "DynamicFrames are convenient but sometimes slower/quirkier than plain Spark DataFrames — convert when you need raw Spark performance."
   ],
   "equivalents": [
-    { "provider": "gcp", "id": "data-fusion", "name": "Cloud Data Fusion", "note": "Managed, mostly-visual integration; Dataflow/Dataproc cover the Spark-ETL side." },
-    { "provider": "azure", "id": "data-factory", "name": "Azure Data Factory", "note": "Integration + orchestration; mapping data flows / Synapse Spark do the transform." }
+    {
+      "provider": "gcp",
+      "id": "data-fusion",
+      "name": "Cloud Data Fusion",
+      "note": "Managed, mostly-visual integration; Dataflow/Dataproc cover the Spark-ETL side."
+    },
+    {
+      "provider": "azure",
+      "id": "data-factory",
+      "name": "Azure Data Factory",
+      "note": "Integration + orchestration; mapping data flows / Synapse Spark do the transform."
+    }
   ],
   "docsUrl": "https://docs.aws.amazon.com/glue/"
 }

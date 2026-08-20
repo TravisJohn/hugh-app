@@ -1,23 +1,51 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "note": "Not yet checked (batch 6). Deferred to keep this session within budget. Left UNVERIFIED rather than given a date it has not earned — a provenance layer that overstates is worse than one that admits gaps. Run `npm run cloud` to see it in the queue."
+  },
   "id": "datastream",
   "provider": "gcp",
   "name": "Datastream",
-  "groups": ["movement"],
+  "groups": [
+    "movement"
+  ],
   "oneLiner": "Serverless change-data-capture (CDC) replication into BigQuery/Cloud Storage.",
   "whatItIs": "Datastream is Google Cloud's serverless change-data-capture service. It connects to source databases — Oracle, MySQL, PostgreSQL, SQL Server — reads their change logs, and streams inserts/updates/deletes in near-real-time to destinations like BigQuery and Cloud Storage. Its headline feature is a tight BigQuery integration that keeps warehouse tables continuously in sync with the source, so analysts always see fresh operational data without touching production. Being serverless, there's no replication instance to size. Datastream is the bridge that moves operational database changes into the GCP analytics world with low latency and low source impact.",
   "inPractice": {
     "narrative": "A production PostgreSQL database records transactions. Datastream captures its changes via CDC and replicates them straight into BigQuery, keeping mirrored tables continuously up to date. Analysts query the fresh data in BigQuery without ever hitting production. No replication server to manage — Datastream scales itself. It's the serverless pipe that keeps the warehouse in near-real-time sync with the operational database.",
-    "flow": ["Source DB (Cloud SQL / on-prem)", "Datastream (CDC)", "BigQuery / Cloud Storage", "analytics"],
+    "flow": [
+      "Source DB (Cloud SQL / on-prem)",
+      "Datastream (CDC)",
+      "BigQuery / Cloud Storage",
+      "analytics"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "Serverless CDC", "detail": "Reads source database change logs and streams row-level changes continuously, with no replication instance to provision — capacity scales automatically." },
-    { "term": "BigQuery integration", "detail": "A native destination that continuously applies changes to BigQuery tables (including backfill + ongoing sync), so the warehouse mirrors the source with low latency." },
-    { "term": "Cloud Storage destination", "detail": "Alternatively writes change events as files (Avro/JSON) to Cloud Storage for lake-based processing (e.g. with Dataflow/Dataproc)." },
-    { "term": "Backfill + stream", "detail": "An initial backfill copies existing data, then continuous streaming applies new changes — the standard CDC full-then-incremental pattern." },
-    { "term": "Source connectivity", "detail": "Connects to Oracle, MySQL, PostgreSQL and SQL Server, with private connectivity options for secure access to on-prem or VPC sources." },
-    { "term": "Low source impact", "detail": "Because it reads logs rather than repeatedly querying tables, it minimises load on the production database." }
+    {
+      "term": "Serverless CDC",
+      "detail": "Reads source database change logs and streams row-level changes continuously, with no replication instance to provision — capacity scales automatically."
+    },
+    {
+      "term": "BigQuery integration",
+      "detail": "A native destination that continuously applies changes to BigQuery tables (including backfill + ongoing sync), so the warehouse mirrors the source with low latency."
+    },
+    {
+      "term": "Cloud Storage destination",
+      "detail": "Alternatively writes change events as files (Avro/JSON) to Cloud Storage for lake-based processing (e.g. with Dataflow/Dataproc)."
+    },
+    {
+      "term": "Backfill + stream",
+      "detail": "An initial backfill copies existing data, then continuous streaming applies new changes — the standard CDC full-then-incremental pattern."
+    },
+    {
+      "term": "Source connectivity",
+      "detail": "Connects to Oracle, MySQL, PostgreSQL and SQL Server, with private connectivity options for secure access to on-prem or VPC sources."
+    },
+    {
+      "term": "Low source impact",
+      "detail": "Because it reads logs rather than repeatedly querying tables, it minimises load on the production database."
+    }
   ],
   "whenToUse": [
     "Continuously replicating operational databases into BigQuery for analytics.",
@@ -33,12 +61,30 @@
     "Sources it doesn't support — check connector coverage first."
   ],
   "keyFacts": [
-    { "label": "Role", "value": "Serverless change-data-capture replication." },
-    { "label": "Sources", "value": "Oracle, MySQL, PostgreSQL, SQL Server." },
-    { "label": "Destinations", "value": "BigQuery (native sync) and Cloud Storage." },
-    { "label": "Pattern", "value": "Backfill + continuous streaming." },
-    { "label": "Ops", "value": "Serverless — no replication instance to size." },
-    { "label": "Billing", "value": "Per GB of data processed (changes + backfill)." }
+    {
+      "label": "Role",
+      "value": "Serverless change-data-capture replication."
+    },
+    {
+      "label": "Sources",
+      "value": "Oracle, MySQL, PostgreSQL, SQL Server."
+    },
+    {
+      "label": "Destinations",
+      "value": "BigQuery (native sync) and Cloud Storage."
+    },
+    {
+      "label": "Pattern",
+      "value": "Backfill + continuous streaming."
+    },
+    {
+      "label": "Ops",
+      "value": "Serverless — no replication instance to size."
+    },
+    {
+      "label": "Billing",
+      "value": "Per GB of data processed (changes + backfill)."
+    }
   ],
   "pricingShape": "Datastream bills primarily by the volume of data it processes — the backfill plus the ongoing stream of changes (per GB) — with no instance to pay for since it's serverless. So cost tracks how much data changes and moves, not a provisioned capacity you leave running. Destination costs (BigQuery storage/compute, or Cloud Storage) are separate. The levers are limiting replicated tables/columns to what analytics needs and being mindful that very high-change-rate sources move more data. There's no idle-instance cost to forget about.",
   "gotchas": [
@@ -49,8 +95,18 @@
     "Private connectivity to on-prem/VPC sources needs network setup that's easy to misconfigure."
   ],
   "equivalents": [
-    { "provider": "aws", "id": "dms", "name": "AWS DMS", "note": "Database migration + CDC into S3/Redshift and more." },
-    { "provider": "azure", "id": "database-migration-service", "name": "Azure Database Migration Service", "note": "Managed database migration/replication into Azure." }
+    {
+      "provider": "aws",
+      "id": "dms",
+      "name": "AWS DMS",
+      "note": "Database migration + CDC into S3/Redshift and more."
+    },
+    {
+      "provider": "azure",
+      "id": "database-migration-service",
+      "name": "Azure Database Migration Service",
+      "note": "Managed database migration/replication into Azure."
+    }
   ],
   "docsUrl": "https://cloud.google.com/datastream/docs"
 }

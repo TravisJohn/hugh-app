@@ -1,23 +1,51 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "note": "Not yet checked (batch 7). Deferred to keep this session within budget. Left UNVERIFIED rather than given a date it has not earned — a provenance layer that overstates is worse than one that admits gaps. Run `npm run cloud` to see it in the queue."
+  },
   "id": "dataflow",
   "provider": "gcp",
   "name": "Dataflow",
-  "groups": ["streaming"],
+  "groups": [
+    "streaming"
+  ],
   "oneLiner": "Serverless Apache Beam for unified batch and streaming processing.",
   "whatItIs": "Dataflow is Google Cloud's fully-managed service for running Apache Beam pipelines — a single programming model that handles both batch and streaming the same way. You write a pipeline (Java, Python or via templates) describing transforms; Dataflow provisions workers, autoscales them, handles event-time windowing and exactly-once processing, and tears everything down when done. There are no clusters to manage. It's the natural processing partner to Pub/Sub: Pub/Sub ingests events, Dataflow computes over them, BigQuery stores the results. For heavy stateful streaming on GCP, Dataflow is the default.",
   "inPractice": {
     "narrative": "Events land in a Pub/Sub topic. A streaming Dataflow pipeline subscribes, applies windowed aggregations and enrichment (handling late data by event time), and writes rolling results into BigQuery continuously. The same Beam code can run as a batch job over historical files in Cloud Storage. Dataflow autoscales workers with the incoming rate, so a traffic spike just adds workers. It's the serverless compute doing the real-time math between Pub/Sub and BigQuery.",
-    "flow": ["Pub/Sub (events)", "Dataflow (Beam, windowed)", "BigQuery", "Looker dashboards"],
+    "flow": [
+      "Pub/Sub (events)",
+      "Dataflow (Beam, windowed)",
+      "BigQuery",
+      "Looker dashboards"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "Apache Beam model", "detail": "One SDK expresses both batch and streaming as PCollections and transforms; the same pipeline can run bounded (batch) or unbounded (streaming) with minimal change." },
-    { "term": "Serverless + autoscaling", "detail": "Dataflow provisions and autoscales worker VMs to the workload and removes them when finished — no cluster sizing, unlike Dataproc." },
-    { "term": "Windowing & event time", "detail": "Fixed, sliding and session windows with watermarks and triggers handle out-of-order and late data by event time — correct real-time aggregation." },
-    { "term": "Exactly-once", "detail": "Dataflow provides exactly-once processing semantics for its state and sinks like BigQuery, so results aren't double-counted on retries." },
-    { "term": "Templates", "detail": "Google-provided and custom templates let you launch common pipelines (e.g. Pub/Sub→BigQuery) without writing code — handy for standard moves." },
-    { "term": "Streaming Engine & Dataflow Prime", "detail": "Offloads state/shuffle to the backend and offers smarter resource autoscaling (Prime), improving efficiency for large streaming jobs." }
+    {
+      "term": "Apache Beam model",
+      "detail": "One SDK expresses both batch and streaming as PCollections and transforms; the same pipeline can run bounded (batch) or unbounded (streaming) with minimal change."
+    },
+    {
+      "term": "Serverless + autoscaling",
+      "detail": "Dataflow provisions and autoscales worker VMs to the workload and removes them when finished — no cluster sizing, unlike Dataproc."
+    },
+    {
+      "term": "Windowing & event time",
+      "detail": "Fixed, sliding and session windows with watermarks and triggers handle out-of-order and late data by event time — correct real-time aggregation."
+    },
+    {
+      "term": "Exactly-once",
+      "detail": "Dataflow provides exactly-once processing semantics for its state and sinks like BigQuery, so results aren't double-counted on retries."
+    },
+    {
+      "term": "Templates",
+      "detail": "Google-provided and custom templates let you launch common pipelines (e.g. Pub/Sub→BigQuery) without writing code — handy for standard moves."
+    },
+    {
+      "term": "Streaming Engine & Dataflow Prime",
+      "detail": "Offloads state/shuffle to the backend and offers smarter resource autoscaling (Prime), improving efficiency for large streaming jobs."
+    }
   ],
   "whenToUse": [
     "Stateful streaming processing over Pub/Sub into BigQuery.",
@@ -33,12 +61,30 @@
     "Teams unwilling to adopt the Beam model for very simple needs."
   ],
   "keyFacts": [
-    { "label": "Engine", "value": "Managed Apache Beam (unified batch + streaming)." },
-    { "label": "Ops", "value": "Serverless; autoscales workers, no clusters." },
-    { "label": "Semantics", "value": "Event-time windowing, watermarks, exactly-once." },
-    { "label": "SDKs", "value": "Java, Python (Beam); plus prebuilt templates." },
-    { "label": "Pairs with", "value": "Pub/Sub (source) and BigQuery (sink)." },
-    { "label": "Billing", "value": "Per worker vCPU/memory/time used (Streaming Engine/Prime options)." }
+    {
+      "label": "Engine",
+      "value": "Managed Apache Beam (unified batch + streaming)."
+    },
+    {
+      "label": "Ops",
+      "value": "Serverless; autoscales workers, no clusters."
+    },
+    {
+      "label": "Semantics",
+      "value": "Event-time windowing, watermarks, exactly-once."
+    },
+    {
+      "label": "SDKs",
+      "value": "Java, Python (Beam); plus prebuilt templates."
+    },
+    {
+      "label": "Pairs with",
+      "value": "Pub/Sub (source) and BigQuery (sink)."
+    },
+    {
+      "label": "Billing",
+      "value": "Per worker vCPU/memory/time used (Streaming Engine/Prime options)."
+    }
   ],
   "pricingShape": "You pay for the compute resources workers consume — vCPU, memory, and (for streaming) Streaming Engine/shuffle usage — for the duration of the job. Batch jobs finish and stop billing; streaming jobs run continuously, so their cost is 'resources × uptime', mitigated by autoscaling down at low load. Dataflow Prime shifts to a more usage-based (Data Compute Unit) model. There's no idle cluster between batch runs, which is the efficiency win over Dataproc. Efficient pipelines (good windowing, minimal shuffle) directly reduce worker time and cost.",
   "gotchas": [
@@ -49,8 +95,18 @@
     "Hot keys cause worker skew and stalls; distribute keys to keep autoscaling effective."
   ],
   "equivalents": [
-    { "provider": "aws", "id": "kinesis-data-analytics", "name": "Managed Service for Apache Flink", "note": "Managed Flink for stateful streaming; different engine, similar role." },
-    { "provider": "azure", "id": "stream-analytics", "name": "Azure Stream Analytics", "note": "SQL-first managed stream processing; simpler but less flexible than Beam/Flink." }
+    {
+      "provider": "aws",
+      "id": "kinesis-data-analytics",
+      "name": "Managed Service for Apache Flink",
+      "note": "Managed Flink for stateful streaming; different engine, similar role."
+    },
+    {
+      "provider": "azure",
+      "id": "stream-analytics",
+      "name": "Azure Stream Analytics",
+      "note": "SQL-first managed stream processing; simpler but less flexible than Beam/Flink."
+    }
   ],
   "docsUrl": "https://cloud.google.com/dataflow/docs"
 }
