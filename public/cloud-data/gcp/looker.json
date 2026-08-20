@@ -1,23 +1,53 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "verified": "2026-08-20",
+    "method": "manual",
+    "note": "One of six cited; nothing contradicted. The Looker/Looker Studio split described here still holds. The in-database SQL generation and embedding/API claims were confirmed in substance but the fetch did not return them verbatim, so they are left uncited."
+  },
   "id": "looker",
   "provider": "gcp",
   "name": "Looker",
-  "groups": ["bi"],
+  "groups": [
+    "bi"
+  ],
   "oneLiner": "Governed BI and semantic modelling (LookML) over BigQuery and beyond.",
   "whatItIs": "Looker is Google Cloud's enterprise BI platform, and its defining feature is a governed semantic model called LookML: you define metrics, dimensions and relationships once in code, and every dashboard, report and query uses those consistent definitions. Rather than caching data, Looker generates SQL and queries the warehouse (especially BigQuery) live, so there's a single source of truth for 'what does revenue mean'. It's the serving/presentation layer where curated warehouse data becomes governed, trustworthy analytics. (Looker Studio — formerly Data Studio — is the separate, free, lightweight dashboarding tool.)",
   "inPractice": {
     "narrative": "Data is modelled in BigQuery. A data team defines the business metrics once in LookML — how revenue, churn and active users are calculated — and Looker generates SQL against BigQuery on demand. Analysts and business users then explore dashboards and build their own reports, all using the same governed definitions, so two teams' 'revenue' numbers always match. Looker is the semantic, governed serving layer on top of the warehouse.",
-    "flow": ["BigQuery (curated)", "Looker + LookML model", "governed dashboards & explores", "business users"],
+    "flow": [
+      "BigQuery (curated)",
+      "Looker + LookML model",
+      "governed dashboards & explores",
+      "business users"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "LookML semantic model", "detail": "A code-based modelling layer defining dimensions, measures and joins once, so all analytics share consistent, version-controlled metric definitions — Looker's core differentiator." },
-    { "term": "In-database (live SQL)", "detail": "Looker generates and runs SQL against the warehouse rather than extracting data, so results are always current and governance stays in the model — but query cost/perf lands on the warehouse." },
-    { "term": "Explores", "detail": "Curated, self-service query interfaces built from the model that let users drill and pivot without writing SQL, within governed guardrails." },
-    { "term": "Governance & single source of truth", "detail": "Because metrics live in LookML (in Git), definitions are consistent, reviewable and testable — the antidote to conflicting numbers across dashboards." },
-    { "term": "Embedding & APIs", "detail": "Powerful embedding and a full API make Looker a platform for data apps and embedded analytics, not just internal dashboards." },
-    { "term": "Looker vs Looker Studio", "detail": "Looker is the governed enterprise platform (LookML, licensed); Looker Studio is a separate free, ad-hoc dashboarding tool — don't conflate them." }
+    {
+      "term": "LookML semantic model",
+      "detail": "A code-based modelling layer defining dimensions, measures and joins once, so all analytics share consistent, version-controlled metric definitions — Looker's core differentiator."
+    },
+    {
+      "term": "In-database (live SQL)",
+      "detail": "Looker generates and runs SQL against the warehouse rather than extracting data, so results are always current and governance stays in the model — but query cost/perf lands on the warehouse."
+    },
+    {
+      "term": "Explores",
+      "detail": "Curated, self-service query interfaces built from the model that let users drill and pivot without writing SQL, within governed guardrails."
+    },
+    {
+      "term": "Governance & single source of truth",
+      "detail": "Because metrics live in LookML (in Git), definitions are consistent, reviewable and testable — the antidote to conflicting numbers across dashboards."
+    },
+    {
+      "term": "Embedding & APIs",
+      "detail": "Powerful embedding and a full API make Looker a platform for data apps and embedded analytics, not just internal dashboards."
+    },
+    {
+      "term": "Looker vs Looker Studio",
+      "detail": "Looker is the governed enterprise platform (LookML, licensed); Looker Studio is a separate free, ad-hoc dashboarding tool — don't conflate them."
+    }
   ],
   "whenToUse": [
     "Enterprise BI needing one governed definition of every metric.",
@@ -33,12 +63,35 @@
     "Offline/extract-first BI where live warehouse querying isn't wanted (cost/perf)."
   ],
   "keyFacts": [
-    { "label": "Type", "value": "Governed enterprise BI with a semantic model (LookML)." },
-    { "label": "Query mode", "value": "In-database — generates live SQL (esp. BigQuery)." },
-    { "label": "Differentiator", "value": "Single, version-controlled source of truth for metrics." },
-    { "label": "Extensibility", "value": "Strong embedding + full API for data apps." },
-    { "label": "Sibling", "value": "Looker Studio = separate free ad-hoc dashboards." },
-    { "label": "Billing", "value": "Platform + per-user licensing; warehouse query cost is separate." }
+    {
+      "label": "Type",
+      "value": "Governed enterprise BI with a semantic model (LookML).",
+      "source": {
+        "url": "https://docs.cloud.google.com/looker/docs/intro",
+        "quote": "Looker is a product that helps you explore, share, and visualize your company's data so that you can make better business decisions. … LookML is Looker's language for describing your SQL data and the options you want for your users.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Query mode",
+      "value": "In-database — generates live SQL (esp. BigQuery)."
+    },
+    {
+      "label": "Differentiator",
+      "value": "Single, version-controlled source of truth for metrics."
+    },
+    {
+      "label": "Extensibility",
+      "value": "Strong embedding + full API for data apps."
+    },
+    {
+      "label": "Sibling",
+      "value": "Looker Studio = separate free ad-hoc dashboards."
+    },
+    {
+      "label": "Billing",
+      "value": "Platform + per-user licensing; warehouse query cost is separate."
+    }
   ],
   "pricingShape": "Looker is licensed as a platform plus users (by role/type), and because it queries the warehouse live, you also pay the underlying BigQuery/warehouse compute for every query dashboards run. So there are two bills: Looker licensing and warehouse scanning. The levers are LookML modelling that produces efficient SQL (aggregate awareness, caching/PDTs to cut repeated scans) and right-sizing user licences. Looker Studio, by contrast, is free — the trade-off being no governed semantic layer. The governance value is what justifies Looker's cost over free tools.",
   "gotchas": [
@@ -49,8 +102,18 @@
     "Governance only holds if teams query through the model, not around it with ad-hoc SQL."
   ],
   "equivalents": [
-    { "provider": "aws", "id": "quicksight", "name": "Amazon QuickSight", "note": "Serverless BI with SPICE caching; lighter semantic modelling than LookML." },
-    { "provider": "azure", "id": "power-bi", "name": "Power BI", "note": "Microsoft's flagship BI; strong modelling (DAX) and Office/Fabric integration." }
+    {
+      "provider": "aws",
+      "id": "quicksight",
+      "name": "Amazon Quick Sight",
+      "note": "Serverless BI with SPICE caching; lighter semantic modelling than LookML."
+    },
+    {
+      "provider": "azure",
+      "id": "power-bi",
+      "name": "Power BI",
+      "note": "Microsoft's flagship BI; strong modelling (DAX) and Office/Fabric integration."
+    }
   ],
   "docsUrl": "https://cloud.google.com/looker/docs"
 }

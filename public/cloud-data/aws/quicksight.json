@@ -1,23 +1,53 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "verified": "2026-08-20",
+    "method": "manual",
+    "note": "RENAMED and ABSORBED: “Amazon Quick evolved from Amazon QuickSight. QuickSight continues as Amazon Quick Sight, a feature within Quick.” Same shape as the SageMaker case — the BI tool is now one feature of a larger AI product (alongside Quick Flows, Quick Automate, Quick Index, Quick Research). Independently corroborated by the Lake Formation docs, whose enforcement list now reads “Amazon Athena, Amazon Quick, Amazon Redshift Spectrum, Amazon EMR, and AWS Glue”. Slug kept: AWS states all existing APIs, SDKs and integrations still work."
+  },
   "id": "quicksight",
   "provider": "aws",
-  "name": "Amazon QuickSight",
-  "groups": ["bi"],
+  "name": "Amazon Quick Sight",
+  "groups": [
+    "bi"
+  ],
   "oneLiner": "Serverless BI dashboards and visual analytics over AWS data.",
-  "whatItIs": "QuickSight is AWS's serverless business-intelligence service — the dashboard-and-charts layer at the very end of the pipeline. It connects to Redshift, Athena, RDS, S3 and other sources, lets analysts build interactive dashboards, and serves them to business users in the browser. Its in-memory engine, SPICE, caches datasets for fast queries without hammering the warehouse. It's fully managed with no servers to run, per-session pricing options for occasional viewers, and increasingly embeds natural-language Q&A (Amazon Q). QuickSight is where curated data becomes the charts decision-makers actually look at.",
+  "whatItIs": "QuickSight is AWS's serverless business-intelligence service — the dashboard-and-charts layer at the very end of the pipeline. It connects to Redshift, Athena, RDS, S3 and other sources, lets analysts build interactive dashboards, and serves them to business users in the browser. Its in-memory engine, SPICE, caches datasets for fast queries without hammering the warehouse. It's fully managed with no servers to run, per-session pricing options for occasional viewers, and increasingly embeds natural-language Q&A (Amazon Q). QuickSight is where curated data becomes the charts decision-makers actually look at. On the naming: AWS has folded this into a larger AI service. Amazon Quick is now the umbrella product — automation, research, app building and analytics — and the BI tool continues inside it as Amazon Quick Sight. Existing QuickSight APIs, SDKs and integrations are unchanged, so code and docs URLs still say quicksight.",
   "inPractice": {
     "narrative": "Data has been cleaned and modelled in Redshift. An analyst connects QuickSight to it, ingests key tables into SPICE for speed, and builds a sales dashboard with filters and drill-downs. Business users open it in the browser to explore the numbers themselves — no SQL, no warehouse access. QuickSight is the serving/presentation layer: it turns the warehouse's tables into the visuals people make decisions from.",
-    "flow": ["Redshift / Athena (curated)", "QuickSight + SPICE", "interactive dashboards", "business users"],
+    "flow": [
+      "Redshift / Athena (curated)",
+      "QuickSight + SPICE",
+      "interactive dashboards",
+      "business users"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "SPICE engine", "detail": "An in-memory, columnar cache that holds datasets for fast, concurrent dashboard queries without re-hitting the source each time — the key to responsiveness and cost control." },
-    { "term": "Data sources", "detail": "Connects to Redshift, Athena, RDS/Aurora, S3, and many databases/SaaS; you can query live (direct) or ingest into SPICE." },
-    { "term": "Datasets, analyses, dashboards", "detail": "Datasets prepare/model data; analyses are the authoring canvas; dashboards are the published, shareable read-only views." },
-    { "term": "Serverless & session pricing", "detail": "No servers to manage; authors are billed by user, and readers can be billed per session (pay-per-session) — cost-effective for occasional viewers." },
-    { "term": "Row-level security", "detail": "Restrict which rows each user sees so one dashboard safely serves many teams/customers." },
-    { "term": "Amazon Q (NL Q&A)", "detail": "Natural-language questions and generative summaries let users ask for insights in plain English over their data." }
+    {
+      "term": "SPICE engine",
+      "detail": "An in-memory, columnar cache that holds datasets for fast, concurrent dashboard queries without re-hitting the source each time — the key to responsiveness and cost control."
+    },
+    {
+      "term": "Data sources",
+      "detail": "Connects to Redshift, Athena, RDS/Aurora, S3, and many databases/SaaS; you can query live (direct) or ingest into SPICE."
+    },
+    {
+      "term": "Datasets, analyses, dashboards",
+      "detail": "Datasets prepare/model data; analyses are the authoring canvas; dashboards are the published, shareable read-only views."
+    },
+    {
+      "term": "Serverless & session pricing",
+      "detail": "No servers to manage; authors are billed by user, and readers can be billed per session (pay-per-session) — cost-effective for occasional viewers."
+    },
+    {
+      "term": "Row-level security",
+      "detail": "Restrict which rows each user sees so one dashboard safely serves many teams/customers."
+    },
+    {
+      "term": "Amazon Q (NL Q&A)",
+      "detail": "Natural-language questions and generative summaries let users ask for insights in plain English over their data."
+    }
   ],
   "whenToUse": [
     "Dashboards and visual analytics over AWS-hosted data.",
@@ -33,12 +63,40 @@
     "Data outside AWS with no easy connector as the primary source."
   ],
   "keyFacts": [
-    { "label": "Type", "value": "Serverless BI / dashboarding." },
-    { "label": "Speed layer", "value": "SPICE in-memory columnar cache." },
-    { "label": "Sources", "value": "Redshift, Athena, RDS/Aurora, S3, many DBs/SaaS." },
-    { "label": "Security", "value": "Row-level security; SSO integration." },
-    { "label": "NL/AI", "value": "Amazon Q natural-language Q&A and summaries." },
-    { "label": "Billing", "value": "Per author + per reader (pay-per-session or per-user) + SPICE capacity." }
+    {
+      "label": "Type",
+      "value": "Serverless BI / dashboarding, delivered as Amazon Quick Sight inside Amazon Quick.",
+      "source": {
+        "url": "https://docs.aws.amazon.com/quicksight/latest/user/welcome.html",
+        "quote": "Amazon Quick Sight – Interactive data visualization and business intelligence. Connect to data sources, build dashboards, and embed analytics in applications.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Speed layer",
+      "value": "SPICE in-memory columnar cache."
+    },
+    {
+      "label": "Sources",
+      "value": "Redshift, Athena, RDS/Aurora, S3, many DBs/SaaS."
+    },
+    {
+      "label": "Security",
+      "value": "Row-level security; SSO integration."
+    },
+    {
+      "label": "NL/AI",
+      "value": "Amazon Q natural-language Q&A and summaries.",
+      "source": {
+        "url": "https://docs.aws.amazon.com/quicksight/latest/user/welcome.html",
+        "quote": "Amazon Quick is an AI-powered service for automating tasks, analyzing data, building web applications, and conducting research. You interact with Quick through natural language chat.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Billing",
+      "value": "Per author + per reader (pay-per-session or per-user) + SPICE capacity."
+    }
   ],
   "pricingShape": "QuickSight bills by users and SPICE capacity: authors pay a per-user subscription, while readers can be billed either per-user or pay-per-session (capped monthly) — the session model is what makes it cheap to give thousands of occasional viewers access. SPICE storage beyond the included allotment adds cost. There's no server to run. The main levers are choosing per-session vs per-user reader pricing by how often people view, and using SPICE to keep dashboards fast without driving up warehouse query cost.",
   "gotchas": [
@@ -49,8 +107,19 @@
     "Row-level security must be set up correctly or a shared dashboard leaks data across teams."
   ],
   "equivalents": [
-    { "provider": "gcp", "id": "looker", "name": "Looker", "note": "Governed BI with LookML semantic modelling; Looker Studio is the lighter free option." },
-    { "provider": "azure", "id": "power-bi", "name": "Power BI", "note": "Microsoft's flagship BI; deep Office/Fabric integration." }
+    {
+      "provider": "gcp",
+      "id": "looker",
+      "name": "Looker",
+      "note": "Governed BI with LookML semantic modelling; Looker Studio is the lighter free option."
+    },
+    {
+      "provider": "azure",
+      "id": "power-bi",
+      "name": "Power BI",
+      "note": "Microsoft's flagship BI; deep Office/Fabric integration."
+    }
   ],
-  "docsUrl": "https://docs.aws.amazon.com/quicksight/"
+  "docsUrl": "https://docs.aws.amazon.com/quicksight/latest/user/welcome.html",
+  "short": "formerly QuickSight; a feature within Amazon Quick"
 }

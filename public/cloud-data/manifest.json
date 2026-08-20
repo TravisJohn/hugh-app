@@ -178,7 +178,8 @@
     {
       "id": "quicksight",
       "provider": "aws",
-      "name": "Amazon QuickSight",
+      "name": "Amazon Quick Sight",
+      "short": "formerly QuickSight; a feature within Amazon Quick",
       "groups": [
         "bi"
       ],
@@ -376,7 +377,8 @@
     {
       "id": "dataplex",
       "provider": "gcp",
-      "name": "Dataplex",
+      "name": "Knowledge Catalog",
+      "short": "formerly Dataplex",
       "groups": [
         "governance"
       ],

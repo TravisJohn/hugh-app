@@ -1,23 +1,53 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "verified": "2026-08-20",
+    "method": "manual",
+    "note": "Four of six cited. Fact 0 updated: Power BI is now documented as a core Microsoft Fabric workload, which the write-up only hinted at through “Premium/Fabric capacity” in billing. No migration is required and the Power BI experience is unchanged, so this is positioning rather than disruption. Direct Lake mode is new and absent from the query-modes fact — worth adding next pass alongside Import/DirectQuery/composite."
+  },
   "id": "power-bi",
   "provider": "azure",
   "name": "Power BI",
-  "groups": ["bi"],
+  "groups": [
+    "bi"
+  ],
   "oneLiner": "Microsoft's flagship BI and self-service visual analytics platform.",
   "whatItIs": "Power BI is Microsoft's business-intelligence platform — the dashboard-and-report layer at the end of the pipeline, and one of the most widely used BI tools anywhere. Analysts build data models and reports in Power BI Desktop, then publish to the Power BI Service (cloud) where users consume them in the browser or Teams. It connects to Synapse, Azure SQL, ADLS and hundreds of other sources, and can either import data into its in-memory engine (VertiPaq) or query live (DirectQuery). Its modelling language is DAX. Power BI is now also the analytics surface of Microsoft Fabric. It's where curated data becomes the reports business users live in.",
   "inPractice": {
     "narrative": "Data is modelled in Synapse (or Fabric). An analyst connects Power BI, imports key tables into its in-memory model for speed, defines DAX measures, and builds an interactive report. They publish it to the Power BI Service, where colleagues view and slice it in the browser or inside Teams — with row-level security ensuring each region sees only its own data. Power BI is the presentation/serving layer turning warehouse tables into the reports people use daily.",
-    "flow": ["Synapse / Azure SQL / ADLS (curated)", "Power BI model (VertiPaq / DirectQuery)", "reports in Service / Teams", "business users"],
+    "flow": [
+      "Synapse / Azure SQL / ADLS (curated)",
+      "Power BI model (VertiPaq / DirectQuery)",
+      "reports in Service / Teams",
+      "business users"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "Desktop vs Service", "detail": "Power BI Desktop is the free authoring app (model + build reports); the Power BI Service is the cloud platform for publishing, sharing, refresh and governance." },
-    { "term": "Import vs DirectQuery", "detail": "Import loads data into the in-memory VertiPaq engine (fast, needs refresh); DirectQuery queries the source live (current data, load/cost on the source). Composite models mix both." },
-    { "term": "DAX & data modelling", "detail": "DAX is the formula language for measures/calculations over a star-schema model; good modelling is what makes reports fast and correct." },
-    { "term": "Row-level security (RLS)", "detail": "Rules restrict which rows each user sees, so one report safely serves many teams, regions or customers." },
-    { "term": "Capacities (Premium/Fabric)", "detail": "Shared capacity (Pro per-user) vs dedicated Premium/Fabric capacity (F SKUs) for large models, more refreshes and broad distribution without per-viewer licences." },
-    { "term": "Fabric integration", "detail": "Power BI is the BI experience within Microsoft Fabric, sitting over OneLake — the direction Microsoft is steering analytics." }
+    {
+      "term": "Desktop vs Service",
+      "detail": "Power BI Desktop is the free authoring app (model + build reports); the Power BI Service is the cloud platform for publishing, sharing, refresh and governance."
+    },
+    {
+      "term": "Import vs DirectQuery",
+      "detail": "Import loads data into the in-memory VertiPaq engine (fast, needs refresh); DirectQuery queries the source live (current data, load/cost on the source). Composite models mix both."
+    },
+    {
+      "term": "DAX & data modelling",
+      "detail": "DAX is the formula language for measures/calculations over a star-schema model; good modelling is what makes reports fast and correct."
+    },
+    {
+      "term": "Row-level security (RLS)",
+      "detail": "Rules restrict which rows each user sees, so one report safely serves many teams, regions or customers."
+    },
+    {
+      "term": "Capacities (Premium/Fabric)",
+      "detail": "Shared capacity (Pro per-user) vs dedicated Premium/Fabric capacity (F SKUs) for large models, more refreshes and broad distribution without per-viewer licences."
+    },
+    {
+      "term": "Fabric integration",
+      "detail": "Power BI is the BI experience within Microsoft Fabric, sitting over OneLake — the direction Microsoft is steering analytics."
+    }
   ],
   "whenToUse": [
     "Dashboards and reports for business users, especially Microsoft-stack orgs.",
@@ -33,12 +63,50 @@
     "Governed code-first semantic modelling across tools where a LookML-style layer is required."
   ],
   "keyFacts": [
-    { "label": "Type", "value": "BI / dashboarding + in-memory data modelling." },
-    { "label": "Authoring", "value": "Power BI Desktop (free); publish to the Service." },
-    { "label": "Query modes", "value": "Import (VertiPaq), DirectQuery, composite." },
-    { "label": "Language", "value": "DAX for measures; Power Query (M) for prep." },
-    { "label": "Security", "value": "Row-level security; Entra ID SSO." },
-    { "label": "Billing", "value": "Pro (per-user) or Premium/Fabric capacity (per-capacity)." }
+    {
+      "label": "Type",
+      "value": "BI / dashboarding + in-memory modelling; a core Microsoft Fabric workload.",
+      "source": {
+        "url": "https://learn.microsoft.com/en-us/power-bi/fundamentals/power-bi-overview",
+        "quote": "Power BI is a core component of Microsoft Fabric, providing analytics and visualization capabilities. … Microsoft Fabric is an all-in-one analytics platform that includes Power BI as one of its core workloads.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Authoring",
+      "value": "Power BI Desktop (free); publish to the Service.",
+      "source": {
+        "url": "https://learn.microsoft.com/en-us/power-bi/fundamentals/power-bi-overview",
+        "quote": "Power BI has two main components: Power BI Desktop and the Power BI service. Desktop is best for data modeling and report creation, while the service is ideal for sharing and collaboration.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Query modes",
+      "value": "Import (VertiPaq), DirectQuery, composite."
+    },
+    {
+      "label": "Language",
+      "value": "DAX for measures; Power Query (M) for prep.",
+      "source": {
+        "url": "https://learn.microsoft.com/en-us/power-bi/fundamentals/power-bi-overview",
+        "quote": "Use Power Query Editor for data transformation. Create data models with DAX, calculated columns, and relationships.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Security",
+      "value": "Row-level security; Entra ID SSO.",
+      "source": {
+        "url": "https://learn.microsoft.com/en-us/power-bi/fundamentals/power-bi-overview",
+        "quote": "Implement security with RLS, sensitivity labels, usage metrics, and audit logs.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Billing",
+      "value": "Pro (per-user) or Premium/Fabric capacity (per-capacity)."
+    }
   ],
   "pricingShape": "Power BI has two main models: Pro is a modest per-user monthly licence (author and share in shared capacity), while Premium Per User or dedicated Premium/Fabric capacity (F SKUs) provides larger models, more frequent refreshes, and — importantly — lets you distribute reports to many viewers without a per-viewer licence. So small teams pay per user; broad enterprise distribution favours capacity-based pricing. Underlying sources (Synapse, Azure SQL) are billed separately, and DirectQuery pushes query cost onto them. Levers: pick per-user vs capacity by audience size, prefer import mode for speed, and tune models.",
   "gotchas": [
@@ -49,8 +117,18 @@
     "Row-level security must be configured and tested or a shared report leaks data across audiences."
   ],
   "equivalents": [
-    { "provider": "aws", "id": "quicksight", "name": "Amazon QuickSight", "note": "Serverless BI with SPICE caching and pay-per-session viewers." },
-    { "provider": "gcp", "id": "looker", "name": "Looker", "note": "Governed BI with LookML semantic modelling; Looker Studio is the free lightweight option." }
+    {
+      "provider": "aws",
+      "id": "quicksight",
+      "name": "Amazon Quick Sight",
+      "note": "Serverless BI with SPICE caching and pay-per-session viewers."
+    },
+    {
+      "provider": "gcp",
+      "id": "looker",
+      "name": "Looker",
+      "note": "Governed BI with LookML semantic modelling; Looker Studio is the free lightweight option."
+    }
   ],
   "docsUrl": "https://learn.microsoft.com/power-bi/"
 }

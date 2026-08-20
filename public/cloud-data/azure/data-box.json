@@ -1,23 +1,53 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "verified": "2026-08-20",
+    "method": "manual",
+    "note": "CONTRADICTED and fixed — the first outright RETIREMENT found in this QA pass. The write-up listed Data Box Heavy as a current offline device; Microsoft states it “has been retired and is no longer available to order”. Next-generation devices are 120 TB and 525 TB usable, and the 80 TB device is being retired region by region as they roll out. AES-256 and NIST 800-88r1 wiping both confirmed."
+  },
   "id": "data-box",
   "provider": "azure",
   "name": "Azure Data Box",
-  "groups": ["movement"],
+  "groups": [
+    "movement"
+  ],
   "oneLiner": "Offline and online bulk data transfer of large datasets into Azure.",
   "whatItIs": "Azure Data Box is Microsoft's family of solutions for moving large datasets into Azure when the network isn't practical. The flagship is the offline path: Microsoft ships you a ruggedised physical storage appliance, you copy data onto it locally at LAN speed, ship it back, and Azure ingests it into your storage — the fastest way to move tens or hundreds of terabytes when uploading over the internet would take weeks. The family spans Data Box (the appliance), Data Box Disk, and Data Box Heavy, plus online options (Data Box Gateway / Azure Storage Mover / AzCopy) for network transfer. It's the bulk on-ramp that seeds an Azure data lake with existing archives.",
   "inPractice": {
     "narrative": "A company has 200 TB of historical files on-prem to move into ADLS, but their internet link would take months to upload it. They order an Azure Data Box appliance, copy the data onto it over the local network in days, and ship it back to Microsoft, who loads it into their Azure storage account. For ongoing, smaller syncs afterward they switch to an online tool like AzCopy or Storage Mover. Data Box is the offline bulk on-ramp for the initial heavy lift into the Azure lake.",
-    "flow": ["On-prem archive (100s of TB)", "Azure Data Box (ship appliance)", "ADLS / Blob (data lake)", "Synapse / Fabric processing"],
+    "flow": [
+      "On-prem archive (100s of TB)",
+      "Azure Data Box (ship appliance)",
+      "ADLS / Blob (data lake)",
+      "Synapse / Fabric processing"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "Offline shipping model", "detail": "For datasets too big for the network, Microsoft ships a physical device you fill locally and return; Azure ingests it — trading transit time for not saturating your link for weeks." },
-    { "term": "Device family", "detail": "Data Box (~terabytes-scale appliance), Data Box Disk (smaller, SSDs), and Data Box Heavy (very large) match different data volumes." },
-    { "term": "Online options", "detail": "Data Box Gateway, Azure Storage Mover and AzCopy handle network-based transfer and ongoing sync — the counterpart to the offline appliances." },
-    { "term": "Security", "detail": "Data is encrypted on the device (AES-256); the appliance is ruggedised and tamper-resistant, and wiped after ingestion per NIST guidelines." },
-    { "term": "Targets", "detail": "Ingests into Azure Blob/ADLS, seeding the data lake or migrating file archives into managed storage." },
-    { "term": "When to go offline", "detail": "The rule of thumb: if uploading over your available bandwidth would take longer than shipping a device, go offline; otherwise use an online tool." }
+    {
+      "term": "Offline shipping model",
+      "detail": "For datasets too big for the network, Microsoft ships a physical device you fill locally and return; Azure ingests it — trading transit time for not saturating your link for weeks."
+    },
+    {
+      "term": "Device family",
+      "detail": "Data Box (~terabytes-scale appliance), Data Box Disk (smaller, SSDs), and Data Box Heavy (very large) match different data volumes."
+    },
+    {
+      "term": "Online options",
+      "detail": "Data Box Gateway, Azure Storage Mover and AzCopy handle network-based transfer and ongoing sync — the counterpart to the offline appliances."
+    },
+    {
+      "term": "Security",
+      "detail": "Data is encrypted on the device (AES-256); the appliance is ruggedised and tamper-resistant, and wiped after ingestion per NIST guidelines."
+    },
+    {
+      "term": "Targets",
+      "detail": "Ingests into Azure Blob/ADLS, seeding the data lake or migrating file archives into managed storage."
+    },
+    {
+      "term": "When to go offline",
+      "detail": "The rule of thumb: if uploading over your available bandwidth would take longer than shipping a device, go offline; otherwise use an online tool."
+    }
   ],
   "whenToUse": [
     "One-time migration of very large datasets (10s–100s of TB+) into Azure.",
@@ -33,12 +63,45 @@
     "Smaller datasets that upload comfortably over the network."
   ],
   "keyFacts": [
-    { "label": "Role", "value": "Bulk data transfer into Azure — offline (appliance) and online." },
-    { "label": "Offline devices", "value": "Data Box, Data Box Disk, Data Box Heavy." },
-    { "label": "Online tools", "value": "Data Box Gateway, Storage Mover, AzCopy." },
-    { "label": "Security", "value": "AES-256 encryption; ruggedised, wiped after ingest." },
-    { "label": "Targets", "value": "Azure Blob / ADLS." },
-    { "label": "Billing", "value": "Per-device service + shipping (offline); egress/storage otherwise." }
+    {
+      "label": "Role",
+      "value": "Bulk data transfer into Azure — offline (appliance) and online.",
+      "source": {
+        "url": "https://learn.microsoft.com/en-us/azure/databox/data-box-overview",
+        "quote": "The Microsoft Azure Data Box cloud solution lets you send terabytes of data into and out of Azure in a quick, inexpensive, and reliable way. The secure data transfer is accelerated by shipping you a proprietary Data Box storage device.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Offline devices",
+      "value": "Data Box (120 TB / 525 TB next-gen) and Data Box Disk. Data Box Heavy is retired.",
+      "source": {
+        "url": "https://learn.microsoft.com/en-us/azure/databox/data-box-overview",
+        "quote": "Azure Data Box Heavy has been retired and is no longer available to order. As we expand the availability of next-generation devices across more regions, the Azure Data Box 80 TB device will be retired in those areas.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Online tools",
+      "value": "Data Box Gateway, Storage Mover, AzCopy."
+    },
+    {
+      "label": "Security",
+      "value": "AES-256 encryption; ruggedised, wiped after ingest.",
+      "source": {
+        "url": "https://learn.microsoft.com/en-us/azure/databox/data-box-overview",
+        "quote": "The data on the device is secured with AES 256-bit encryption at all times. … Once the data from your import order is uploaded to Azure, the disks on the device are wiped clean in accordance with NIST 800-88r1 standards.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Targets",
+      "value": "Azure Blob / ADLS."
+    },
+    {
+      "label": "Billing",
+      "value": "Per-device service + shipping (offline); egress/storage otherwise."
+    }
   ],
   "pricingShape": "For the offline appliances, Data Box bills a per-device service fee for the order (plus extra daily fees if you keep it beyond the included window) and shipping — a bounded, one-time migration cost. Online options like AzCopy are essentially free tooling where you pay the underlying storage and any egress. Destination Azure storage is billed separately. The economics question is transit time vs bandwidth: for network-impractical volumes the flat device fee beats weeks of throttled upload; for modest data, online transfer avoids the device fee entirely.",
   "gotchas": [
@@ -49,8 +112,18 @@
     "Choosing the wrong device size (Disk vs Box vs Heavy) means multiple trips or wasted capacity — size to the dataset."
   ],
   "equivalents": [
-    { "provider": "aws", "id": "datasync", "name": "AWS DataSync", "note": "Online bulk transfer; AWS Snow family is the offline-appliance counterpart to Data Box." },
-    { "provider": "gcp", "id": "storage-transfer", "name": "Storage Transfer Service", "note": "Online bulk transfer into Cloud Storage; Transfer Appliance is the offline counterpart." }
+    {
+      "provider": "aws",
+      "id": "datasync",
+      "name": "AWS DataSync",
+      "note": "Online bulk transfer; AWS Snow family is the offline-appliance counterpart to Data Box."
+    },
+    {
+      "provider": "gcp",
+      "id": "storage-transfer",
+      "name": "Storage Transfer Service",
+      "note": "Online bulk transfer into Cloud Storage; Transfer Appliance is the offline counterpart."
+    }
   ],
   "docsUrl": "https://learn.microsoft.com/azure/databox/"
 }
