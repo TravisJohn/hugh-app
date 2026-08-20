@@ -1,23 +1,53 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "verified": "2026-08-20",
+    "method": "manual",
+    "note": "All six key facts confirmed against the DynamoDB developer guide. Nothing contradicted."
+  },
   "id": "dynamodb",
   "provider": "aws",
   "name": "Amazon DynamoDB",
-  "groups": ["nosql"],
+  "groups": [
+    "nosql"
+  ],
   "oneLiner": "Serverless key-value and document NoSQL with single-digit-millisecond latency.",
   "whatItIs": "DynamoDB is AWS's fully-managed NoSQL database, built for predictable low latency at any scale. You store items (JSON-like documents) in tables and fetch them by key in single-digit milliseconds, whether the table has a thousand rows or a trillion. It's serverless — no servers to size, automatic scaling, replication baked in — which makes it the default operational datastore for high-traffic AWS applications: user sessions, shopping carts, game state, IoT device records. It is not for analytics; it's for fast, reliable reads and writes of known keys at massive scale.",
   "inPractice": {
     "narrative": "A high-traffic app stores each user's cart and profile in DynamoDB, keyed by user ID, so reads/writes stay a few milliseconds even at peak. For analytics, the team doesn't query DynamoDB directly — they stream changes via DynamoDB Streams (or export to S3) into the data lake, where Athena/Redshift analyse them. So DynamoDB is the fast operational store up front, feeding the analytical world downstream rather than being queried by it.",
-    "flow": ["High-traffic app", "DynamoDB (key-value reads/writes)", "DynamoDB Streams / S3 export", "S3 lake → Athena / Redshift"],
+    "flow": [
+      "High-traffic app",
+      "DynamoDB (key-value reads/writes)",
+      "DynamoDB Streams / S3 export",
+      "S3 lake → Athena / Redshift"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "Partition & sort key", "detail": "Items are addressed by a partition key (which distributes data) and optional sort key (ordering within a partition). Good key design is everything — it determines performance and avoids hot partitions." },
-    { "term": "Single-digit-ms at scale", "detail": "Managed partitioning spreads data/traffic so latency stays flat as the table grows — the core promise. DAX adds an in-memory cache for microsecond reads." },
-    { "term": "Capacity modes", "detail": "On-Demand (pay per request, auto-scales, no planning) or Provisioned (set read/write capacity units, cheaper for steady predictable load, with auto-scaling)." },
-    { "term": "Secondary indexes", "detail": "Global (GSI) and Local (LSI) secondary indexes allow queries on non-primary attributes — but you design them up front around access patterns." },
-    { "term": "Streams & CDC", "detail": "DynamoDB Streams emit item-level changes, enabling event-driven processing, replication and feeding analytics/lakes." },
-    { "term": "Single-table design", "detail": "A NoSQL modelling approach where multiple entity types share one table, shaped entirely around known access patterns rather than normalised relations." }
+    {
+      "term": "Partition & sort key",
+      "detail": "Items are addressed by a partition key (which distributes data) and optional sort key (ordering within a partition). Good key design is everything — it determines performance and avoids hot partitions."
+    },
+    {
+      "term": "Single-digit-ms at scale",
+      "detail": "Managed partitioning spreads data/traffic so latency stays flat as the table grows — the core promise. DAX adds an in-memory cache for microsecond reads."
+    },
+    {
+      "term": "Capacity modes",
+      "detail": "On-Demand (pay per request, auto-scales, no planning) or Provisioned (set read/write capacity units, cheaper for steady predictable load, with auto-scaling)."
+    },
+    {
+      "term": "Secondary indexes",
+      "detail": "Global (GSI) and Local (LSI) secondary indexes allow queries on non-primary attributes — but you design them up front around access patterns."
+    },
+    {
+      "term": "Streams & CDC",
+      "detail": "DynamoDB Streams emit item-level changes, enabling event-driven processing, replication and feeding analytics/lakes."
+    },
+    {
+      "term": "Single-table design",
+      "detail": "A NoSQL modelling approach where multiple entity types share one table, shaped entirely around known access patterns rather than normalised relations."
+    }
   ],
   "whenToUse": [
     "High-traffic operational apps needing fast key-based reads/writes.",
@@ -33,12 +63,60 @@
     "Large scans/reporting over the whole dataset — export to S3 and query there instead."
   ],
   "keyFacts": [
-    { "label": "Model", "value": "Serverless key-value + document NoSQL." },
-    { "label": "Latency", "value": "Single-digit ms (microseconds with DAX cache)." },
-    { "label": "Scale", "value": "Virtually unlimited; managed partitioning." },
-    { "label": "Capacity", "value": "On-Demand (per-request) or Provisioned (RCU/WCU)." },
-    { "label": "CDC", "value": "DynamoDB Streams for change capture." },
-    { "label": "Global", "value": "Global Tables for multi-region active-active replication." }
+    {
+      "label": "Model",
+      "value": "Serverless key-value + document NoSQL.",
+      "source": {
+        "url": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Introduction.html",
+        "quote": "As a NoSQL database, DynamoDB is purpose-built to deliver improved performance, scalability, manageability, and flexibility compared to traditional relational databases. To support a wide variety of use cases, DynamoDB supports both key-value and document data models.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Latency",
+      "value": "Single-digit ms (microseconds with DAX cache).",
+      "source": {
+        "url": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Introduction.html",
+        "quote": "DynamoDB delivers consistent single-digit millisecond performance for your application, whether you have 100 or 100 million users. … DAX delivers up to 10 times performance improvement – from milliseconds to microseconds.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Scale",
+      "value": "Virtually unlimited; managed partitioning.",
+      "source": {
+        "url": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Introduction.html",
+        "quote": "DynamoDB scales to support tables of virtually any size while providing consistent single-digit millisecond performance and high availability.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Capacity",
+      "value": "On-Demand (per-request) or Provisioned (RCU/WCU).",
+      "source": {
+        "url": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Introduction.html",
+        "quote": "DynamoDB has two capacity modes with their respective billing options for processing reads and writes on your tables: on-demand and provisioned.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "CDC",
+      "value": "DynamoDB Streams for change capture.",
+      "source": {
+        "url": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Introduction.html",
+        "quote": "DynamoDB supports streaming of item-level change data capture (CDC) records in near-real time. It offers two streaming models for CDC: DynamoDB Streams and Kinesis Data Streams for DynamoDB.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Global",
+      "value": "Global Tables for multi-region active-active replication.",
+      "source": {
+        "url": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Introduction.html",
+        "quote": "Global tables provide multi-active replication of your data across your chosen AWS Regions with 99.999% availability.",
+        "checked": "2026-08-20"
+      }
+    }
   ],
   "pricingShape": "Two models. On-Demand bills per read/write request plus storage — no capacity planning, scales to zero-ish when idle, ideal for spiky/unknown traffic but pricier per request. Provisioned bills for the read/write capacity units you reserve (with auto-scaling), cheaper for steady, predictable load if sized well. Storage is per GB-month. Extras — GSIs (which consume their own capacity), Streams, DAX, Global Tables and backups — add cost. The big levers are capacity mode choice, efficient key design (to avoid wasted throughput), and not over-indexing.",
   "gotchas": [
@@ -49,8 +127,18 @@
     "On-Demand is convenient but can cost far more than well-sized Provisioned for steady workloads — pick deliberately."
   ],
   "equivalents": [
-    { "provider": "gcp", "id": "bigtable", "name": "Bigtable", "note": "Wide-column NoSQL for huge scale; Firestore is closer for document/serverless use." },
-    { "provider": "azure", "id": "cosmos-db", "name": "Azure Cosmos DB", "note": "Multi-model, globally-distributed NoSQL; broader API surface than DynamoDB." }
+    {
+      "provider": "gcp",
+      "id": "bigtable",
+      "name": "Bigtable",
+      "note": "Wide-column NoSQL for huge scale; Firestore is closer for document/serverless use."
+    },
+    {
+      "provider": "azure",
+      "id": "cosmos-db",
+      "name": "Azure Cosmos DB",
+      "note": "Multi-model, globally-distributed NoSQL; broader API surface than DynamoDB."
+    }
   ],
   "docsUrl": "https://docs.aws.amazon.com/dynamodb/"
 }

@@ -1,23 +1,53 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "verified": "2026-08-20",
+    "method": "manual",
+    "note": "Six key facts reviewed against the Lambda quotas page; three carry a citation. The event-source list and per-request billing are not stated on the quotas page and are left uncited. Note for the next pass: AWS now also documents Lambda MicroVMs (8-hour max duration) and durable executions — a different surface from the 15-minute function timeout, which is unchanged."
+  },
   "id": "lambda",
   "provider": "aws",
   "name": "AWS Lambda",
-  "groups": ["serverless"],
+  "groups": [
+    "serverless"
+  ],
   "oneLiner": "Run event-driven code without servers — glue and lightweight ETL.",
   "whatItIs": "Lambda is AWS's serverless compute service: you upload a function, and AWS runs it in response to events — an S3 upload, a message on a stream, an API call, a schedule — scaling automatically from zero to thousands of concurrent executions and billing only for the time your code runs. There are no servers to provision or patch. In data platforms, Lambda is the connective tissue: it reacts to events, does small transformations, kicks off bigger jobs, and moves data between services. It's not for heavy long-running processing, but it's the go-to for lightweight, event-driven glue.",
   "inPractice": {
     "narrative": "A file lands in an S3 bucket. That event triggers a Lambda function that validates the file, writes a record to DynamoDB, and starts a Glue job for the heavy processing. Another Lambda, on a schedule, calls an API and drops the response into S3. Each function runs only when its event fires and costs nothing while idle. Lambda isn't doing the big data crunching — it's the event-driven glue wiring the pipeline's steps together.",
-    "flow": ["Event (S3 upload / stream / schedule)", "Lambda function", "trigger Glue / write DynamoDB / call API", "downstream pipeline"],
+    "flow": [
+      "Event (S3 upload / stream / schedule)",
+      "Lambda function",
+      "trigger Glue / write DynamoDB / call API",
+      "downstream pipeline"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "Event-driven triggers", "detail": "Functions run in response to events from 200+ sources — S3, DynamoDB/Kinesis streams, SQS, EventBridge schedules, API Gateway — so you write logic, not polling loops." },
-    { "term": "Pay-per-execution", "detail": "Billed by number of invocations and GB-seconds (memory × duration). Idle functions cost nothing — the essence of serverless economics." },
-    { "term": "Stateless & ephemeral", "detail": "Each invocation is stateless with a temporary execution environment; persistent state goes to S3/DynamoDB. Environments are reused (warm starts) when possible." },
-    { "term": "Limits: time & memory", "detail": "Max 15-minute execution and up to 10 GB memory (CPU scales with memory). These bounds are why Lambda is for short tasks, not long batch jobs." },
-    { "term": "Cold starts", "detail": "A first/scaled-out invocation initialises a new environment, adding latency; provisioned concurrency mitigates it for latency-sensitive paths." },
-    { "term": "Concurrency & scaling", "detail": "Lambda scales out by running many concurrent instances automatically; account/function concurrency limits and reserved concurrency govern this." }
+    {
+      "term": "Event-driven triggers",
+      "detail": "Functions run in response to events from 200+ sources — S3, DynamoDB/Kinesis streams, SQS, EventBridge schedules, API Gateway — so you write logic, not polling loops."
+    },
+    {
+      "term": "Pay-per-execution",
+      "detail": "Billed by number of invocations and GB-seconds (memory × duration). Idle functions cost nothing — the essence of serverless economics."
+    },
+    {
+      "term": "Stateless & ephemeral",
+      "detail": "Each invocation is stateless with a temporary execution environment; persistent state goes to S3/DynamoDB. Environments are reused (warm starts) when possible."
+    },
+    {
+      "term": "Limits: time & memory",
+      "detail": "Max 15-minute execution and up to 10 GB memory (CPU scales with memory). These bounds are why Lambda is for short tasks, not long batch jobs."
+    },
+    {
+      "term": "Cold starts",
+      "detail": "A first/scaled-out invocation initialises a new environment, adding latency; provisioned concurrency mitigates it for latency-sensitive paths."
+    },
+    {
+      "term": "Concurrency & scaling",
+      "detail": "Lambda scales out by running many concurrent instances automatically; account/function concurrency limits and reserved concurrency govern this."
+    }
   ],
   "whenToUse": [
     "Event-driven glue between AWS services (S3→process→notify).",
@@ -33,12 +63,45 @@
     "Ultra-low-latency paths sensitive to cold starts (without provisioned concurrency)."
   ],
   "keyFacts": [
-    { "label": "Model", "value": "Serverless, event-driven functions; scales to zero." },
-    { "label": "Max duration", "value": "15 minutes per invocation." },
-    { "label": "Memory", "value": "Up to 10 GB (CPU scales with memory)." },
-    { "label": "Triggers", "value": "S3, DynamoDB/Kinesis, SQS, EventBridge, API Gateway, etc." },
-    { "label": "Scaling", "value": "Automatic concurrency; reserved/provisioned options." },
-    { "label": "Billing", "value": "Per request + GB-seconds (memory × duration)." }
+    {
+      "label": "Model",
+      "value": "Serverless, event-driven functions; scales to zero."
+    },
+    {
+      "label": "Max duration",
+      "value": "15 minutes per invocation.",
+      "source": {
+        "url": "https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html",
+        "quote": "Function timeout | 900 seconds (15 minutes)",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Memory",
+      "value": "Up to 10 GB (CPU scales with memory).",
+      "source": {
+        "url": "https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html",
+        "quote": "Function memory allocation | 128 MB to 10,240 MB, in 1-MB increments. Note: Lambda allocates CPU power in proportion to the amount of memory configured.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Triggers",
+      "value": "S3, DynamoDB/Kinesis, SQS, EventBridge, API Gateway, etc."
+    },
+    {
+      "label": "Scaling",
+      "value": "Automatic concurrency; reserved/provisioned options.",
+      "source": {
+        "url": "https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html",
+        "quote": "Concurrent executions | 1,000 | Tens of thousands",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Billing",
+      "value": "Per request + GB-seconds (memory × duration)."
+    }
   ],
   "pricingShape": "Lambda bills per request plus GB-seconds — memory allocated times execution duration — so an idle function costs nothing and a busy one costs in proportion to work done. There's a generous free tier. The levers are memory sizing (more memory means more CPU and often shorter duration, so the cheapest setting isn't always the lowest memory) and keeping functions fast. Provisioned concurrency (to kill cold starts) adds a standing charge. For sustained high-volume workloads, a continuously-running container can be cheaper than per-invocation Lambda — cross that bridge when throughput is steady.",
   "gotchas": [
@@ -49,8 +112,18 @@
     "Runaway recursion or event loops (e.g. a function writing to the bucket that triggers it) can explode invocations and cost."
   ],
   "equivalents": [
-    { "provider": "gcp", "id": "cloud-functions", "name": "Cloud Functions", "note": "Event-driven serverless functions; the direct analogue on GCP." },
-    { "provider": "azure", "id": "azure-functions", "name": "Azure Functions", "note": "Event-driven serverless compute; the direct analogue on Azure." }
+    {
+      "provider": "gcp",
+      "id": "cloud-functions",
+      "name": "Cloud Functions",
+      "note": "Event-driven serverless functions; the direct analogue on GCP."
+    },
+    {
+      "provider": "azure",
+      "id": "azure-functions",
+      "name": "Azure Functions",
+      "note": "Event-driven serverless compute; the direct analogue on Azure."
+    }
   ],
   "docsUrl": "https://docs.aws.amazon.com/lambda/"
 }

@@ -1,23 +1,51 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07"
+  },
   "id": "azure-ml",
   "provider": "azure",
   "name": "Azure Machine Learning",
-  "groups": ["ml"],
+  "groups": [
+    "ml"
+  ],
   "oneLiner": "End-to-end platform to train, deploy and manage machine-learning models.",
   "whatItIs": "Azure Machine Learning is Azure's managed platform for the full ML lifecycle: prepare data, train and tune models on managed compute, track experiments, register models, and deploy them to real-time or batch endpoints — with MLOps built in. It supports any framework (PyTorch, TensorFlow, scikit) plus automated ML and a designer for low-code building, and integrates with ADLS, Synapse and Azure DevOps/GitHub for CI/CD. It's the workspace Azure data-science teams use to take a model from experiment to governed production; for foundation-model/generative AI, Azure pairs it with Azure OpenAI Service.",
   "inPractice": {
     "narrative": "A team reads training data from ADLS into an Azure ML workspace, runs an AutoML or custom training job on a managed compute cluster that scales up for the job and back down after, and tracks metrics across runs. The winning model is registered, versioned, and deployed to a managed online endpoint the app calls. An Azure ML pipeline (wired into GitHub Actions) retrains and redeploys as data changes. Compute is consumed only during jobs and while endpoints are live.",
-    "flow": ["ADLS (training data)", "Azure ML training + AutoML", "model registry", "managed endpoint (online / batch)", "app predictions"],
+    "flow": [
+      "ADLS (training data)",
+      "Azure ML training + AutoML",
+      "model registry",
+      "managed endpoint (online / batch)",
+      "app predictions"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "Workspace", "detail": "The top-level container tying together compute, data assets, models, experiments and endpoints — the hub everything in Azure ML lives under." },
-    { "term": "Compute targets", "detail": "Managed compute instances (dev) and compute clusters (training) that autoscale and can scale to zero between jobs, so you pay for job time not idle nodes." },
-    { "term": "Automated ML & Designer", "detail": "AutoML tries algorithms/hyperparameters for you on tabular/vision/NLP tasks; the Designer offers drag-and-drop low-code pipelines — alongside full code-first SDK/CLI." },
-    { "term": "Jobs & experiments", "detail": "Training runs are tracked jobs with logged metrics, parameters and artifacts, making experiments reproducible and comparable." },
-    { "term": "Model registry & endpoints", "detail": "Register/version models, then deploy to managed online endpoints (real-time, autoscaled) or batch endpoints for bulk scoring." },
-    { "term": "MLOps integration", "detail": "Pipelines plus Azure DevOps/GitHub Actions enable CI/CD for models — automated train, evaluate, deploy with governance." }
+    {
+      "term": "Workspace",
+      "detail": "The top-level container tying together compute, data assets, models, experiments and endpoints — the hub everything in Azure ML lives under."
+    },
+    {
+      "term": "Compute targets",
+      "detail": "Managed compute instances (dev) and compute clusters (training) that autoscale and can scale to zero between jobs, so you pay for job time not idle nodes."
+    },
+    {
+      "term": "Automated ML & Designer",
+      "detail": "AutoML tries algorithms/hyperparameters for you on tabular/vision/NLP tasks; the Designer offers drag-and-drop low-code pipelines — alongside full code-first SDK/CLI."
+    },
+    {
+      "term": "Jobs & experiments",
+      "detail": "Training runs are tracked jobs with logged metrics, parameters and artifacts, making experiments reproducible and comparable."
+    },
+    {
+      "term": "Model registry & endpoints",
+      "detail": "Register/version models, then deploy to managed online endpoints (real-time, autoscaled) or batch endpoints for bulk scoring."
+    },
+    {
+      "term": "MLOps integration",
+      "detail": "Pipelines plus Azure DevOps/GitHub Actions enable CI/CD for models — automated train, evaluate, deploy with governance."
+    }
   ],
   "whenToUse": [
     "End-to-end ML on Azure: train, tune, deploy, monitor with governance.",
@@ -33,12 +61,30 @@
     "Purely analytical workloads with no ML component."
   ],
   "keyFacts": [
-    { "label": "Scope", "value": "Full ML lifecycle: prep, train, tune, deploy, monitor." },
-    { "label": "Compute", "value": "Managed instances + autoscaling clusters (scale to zero)." },
-    { "label": "Build modes", "value": "Code-first SDK/CLI, AutoML, and low-code Designer." },
-    { "label": "Inference", "value": "Managed online (real-time) and batch endpoints." },
-    { "label": "MLOps", "value": "Pipelines + Azure DevOps/GitHub CI/CD, model registry." },
-    { "label": "Billing", "value": "Underlying VM compute per job/endpoint + storage (no platform surcharge)." }
+    {
+      "label": "Scope",
+      "value": "Full ML lifecycle: prep, train, tune, deploy, monitor."
+    },
+    {
+      "label": "Compute",
+      "value": "Managed instances + autoscaling clusters (scale to zero)."
+    },
+    {
+      "label": "Build modes",
+      "value": "Code-first SDK/CLI, AutoML, and low-code Designer."
+    },
+    {
+      "label": "Inference",
+      "value": "Managed online (real-time) and batch endpoints."
+    },
+    {
+      "label": "MLOps",
+      "value": "Pipelines + Azure DevOps/GitHub CI/CD, model registry."
+    },
+    {
+      "label": "Billing",
+      "value": "Underlying VM compute per job/endpoint + storage (no platform surcharge)."
+    }
   ],
   "pricingShape": "Azure ML has no separate platform fee — you pay for the underlying Azure compute and storage. Training clusters bill for VM time while running and can scale to zero between jobs, so training cost is essentially job-time; dev compute instances bill until stopped. Managed online endpoints run continuously and bill for their VMs even when idle — the usual ML cost trap — so undeploy or use batch endpoints where possible. GPU VMs are pricey; low-priority/Spot VMs cut training cost. Levers: scale clusters to zero, stop idle compute instances, avoid idle online endpoints.",
   "gotchas": [
@@ -49,8 +95,18 @@
     "For generative AI, the model lives in Azure OpenAI, not Azure ML — don't conflate the two."
   ],
   "equivalents": [
-    { "provider": "aws", "id": "sagemaker", "name": "Amazon SageMaker", "note": "End-to-end ML platform; the direct analogue on AWS." },
-    { "provider": "gcp", "id": "vertex-ai", "name": "Vertex AI", "note": "Unified ML/GenAI platform; Vertex folds foundation models in more directly." }
+    {
+      "provider": "aws",
+      "id": "sagemaker",
+      "name": "Amazon SageMaker",
+      "note": "End-to-end ML platform; the direct analogue on AWS."
+    },
+    {
+      "provider": "gcp",
+      "id": "vertex-ai",
+      "name": "Gemini Enterprise Agent Platform",
+      "note": "Unified ML/GenAI platform; Vertex folds foundation models in more directly."
+    }
   ],
   "docsUrl": "https://learn.microsoft.com/azure/machine-learning/"
 }

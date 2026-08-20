@@ -1,23 +1,54 @@
 {
-  "meta": { "authored": "2026-07" },
+  "meta": {
+    "authored": "2026-07",
+    "verified": "2026-08-20",
+    "method": "manual",
+    "note": "RENAMED: Vertex AI became Gemini Enterprise Agent Platform at Google Cloud Next '26. Google states all former Vertex AI services are now delivered through this platform rather than standalone. File slug kept as vertex-ai so existing links resolve."
+  },
   "id": "vertex-ai",
   "provider": "gcp",
-  "name": "Vertex AI",
-  "groups": ["ml"],
+  "name": "Gemini Enterprise Agent Platform",
+  "groups": [
+    "ml"
+  ],
   "oneLiner": "Unified platform to build, train and deploy ML and generative-AI models.",
-  "whatItIs": "Vertex AI is Google Cloud's unified machine-learning platform, bringing training, tuning, deployment, MLOps and generative AI under one roof. You can build custom models (with any framework), use AutoML to train without much code, or call Google's foundation models — including Gemini — through the same platform. It integrates tightly with BigQuery (train on warehouse data, or use BigQuery ML), Cloud Storage and the rest of GCP. Vertex is where GCP data-science teams take models from notebook to production, and increasingly the front door for generative-AI apps on Google Cloud.",
+  "whatItIs": "Gemini Enterprise Agent Platform — announced at Google Cloud Next '26 as the evolution of Vertex AI — is Google Cloud's unified platform for machine learning, generative AI and agents. It brings training, tuning, deployment, MLOps and agent development under one roof. You can build custom models (with any framework), use AutoML to train without much code, or call Google's foundation models — including Gemini — through the same platform. It integrates tightly with BigQuery (train on warehouse data, or use BigQuery ML), Cloud Storage and the rest of GCP. Google now delivers all former Vertex AI services through this platform rather than as a standalone product, and it is the front door for generative-AI and agent applications on Google Cloud.",
   "inPractice": {
     "narrative": "A team trains a demand-forecasting model: they pull features from BigQuery, run a custom training job on Vertex (managed compute that scales up then releases), track experiments, and register the best model. They deploy it to a Vertex endpoint the app calls for predictions, and a pipeline retrains it weekly as fresh data lands in BigQuery. For a support-assistant feature, the same platform serves Gemini via the model garden. Managed compute runs only during jobs and while endpoints are live.",
-    "flow": ["BigQuery / Cloud Storage (features)", "Vertex training + tuning", "model registry", "Vertex endpoint", "app / GenAI predictions"],
+    "flow": [
+      "BigQuery / Cloud Storage (features)",
+      "Vertex training + tuning",
+      "model registry",
+      "Vertex endpoint",
+      "app / GenAI predictions"
+    ],
     "highlight": 1
   },
   "coreConcepts": [
-    { "term": "Custom training & AutoML", "detail": "Train your own models (any framework, managed compute incl. GPUs/TPUs) or let AutoML build models for tabular/vision/text with minimal code." },
-    { "term": "Model Garden & foundation models", "detail": "Access Google's foundation models (Gemini) and open/third-party models to tune, deploy or call via API — the generative-AI side." },
-    { "term": "Endpoints & prediction", "detail": "Deploy models to online endpoints for real-time inference or run batch prediction; managed and autoscaled." },
-    { "term": "Pipelines & registry (MLOps)", "detail": "Vertex Pipelines orchestrate repeatable train/eval/deploy steps; the Model Registry versions and governs models; Feature Store serves features consistently." },
-    { "term": "BigQuery integration", "detail": "Train on BigQuery data directly, or push models into BigQuery ML — minimal data movement between warehouse and ML." },
-    { "term": "Workbench notebooks", "detail": "Managed Jupyter environments for development, wired into the rest of Vertex and GCP data services." }
+    {
+      "term": "Custom training & AutoML",
+      "detail": "Train your own models (any framework, managed compute incl. GPUs/TPUs) or let AutoML build models for tabular/vision/text with minimal code."
+    },
+    {
+      "term": "Model Garden & foundation models",
+      "detail": "Access Google's foundation models (Gemini) and open/third-party models to tune, deploy or call via API — the generative-AI side."
+    },
+    {
+      "term": "Endpoints & prediction",
+      "detail": "Deploy models to online endpoints for real-time inference or run batch prediction; managed and autoscaled."
+    },
+    {
+      "term": "Agent Platform Pipelines & registry (MLOps)",
+      "detail": "Vertex Pipelines orchestrate repeatable train/eval/deploy steps; the Model Registry versions and governs models; Feature Store serves features consistently."
+    },
+    {
+      "term": "BigQuery integration",
+      "detail": "Train on BigQuery data directly, or push models into BigQuery ML — minimal data movement between warehouse and ML."
+    },
+    {
+      "term": "Workbench notebooks",
+      "detail": "Managed Jupyter environments for development, wired into the rest of Vertex and GCP data services."
+    }
   ],
   "whenToUse": [
     "End-to-end ML on GCP: build, train, tune, deploy, monitor.",
@@ -33,12 +64,40 @@
     "Teams with purely analytical (non-ML) needs."
   ],
   "keyFacts": [
-    { "label": "Scope", "value": "Unified ML + generative-AI lifecycle platform." },
-    { "label": "Training", "value": "Custom (any framework, GPU/TPU) or AutoML." },
-    { "label": "GenAI", "value": "Gemini + foundation models via Model Garden." },
-    { "label": "Inference", "value": "Online endpoints (autoscaled) and batch prediction." },
-    { "label": "MLOps", "value": "Pipelines, Model Registry, Feature Store." },
-    { "label": "Billing", "value": "Per compute (training/endpoints/notebooks) + prediction/API usage." }
+    {
+      "label": "Scope",
+      "value": "Unified ML, generative-AI and agent lifecycle platform (formerly Vertex AI).",
+      "source": {
+        "url": "https://cloud.google.com/products/gemini-enterprise-agent-platform",
+        "quote": "Gemini Enterprise Agent Platform (formerly Vertex AI) is a comprehensive platform for developers to build, scale, govern and optimize agents.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Training",
+      "value": "Custom (any framework, GPU/TPU) or AutoML."
+    },
+    {
+      "label": "GenAI",
+      "value": "Gemini + foundation models via Model Garden."
+    },
+    {
+      "label": "Inference",
+      "value": "Online endpoints (autoscaled) and batch prediction."
+    },
+    {
+      "label": "MLOps",
+      "value": "Agent Platform Pipelines, Model Registry, Feature Store.",
+      "source": {
+        "url": "https://docs.cloud.google.com/gemini-enterprise-agent-platform/vertex-ai-name-changes",
+        "quote": "With the introduction of Gemini Enterprise Agent Platform, some Vertex AI products and features have been renamed.",
+        "checked": "2026-08-20"
+      }
+    },
+    {
+      "label": "Billing",
+      "value": "Per compute (training/endpoints/notebooks) + prediction/API usage."
+    }
   ],
   "pricingShape": "Vertex bills for compute per phase: training jobs by the instance-time they use (spun up then released), notebooks while running, and deployed endpoints for as long as they're live — so idle online endpoints, like on any ML platform, bill even without traffic and are the main cost trap. GPU/TPU training is expensive; batch prediction avoids standing endpoints. Foundation-model/Gemini calls are billed by tokens/usage. Storage and BigQuery are separate. Levers: undeploy idle endpoints, right-size training hardware, prefer batch prediction where latency allows.",
   "gotchas": [
@@ -49,8 +108,19 @@
     "Generative-model usage is token-billed separately from training/hosting — track it distinctly."
   ],
   "equivalents": [
-    { "provider": "aws", "id": "sagemaker", "name": "Amazon SageMaker", "note": "End-to-end ML platform; the direct analogue on AWS (Bedrock covers GenAI APIs)." },
-    { "provider": "azure", "id": "azure-ml", "name": "Azure Machine Learning", "note": "End-to-end ML platform; Azure OpenAI covers the foundation-model side." }
+    {
+      "provider": "aws",
+      "id": "sagemaker",
+      "name": "Amazon SageMaker",
+      "note": "End-to-end ML platform; the direct analogue on AWS (Bedrock covers GenAI APIs)."
+    },
+    {
+      "provider": "azure",
+      "id": "azure-ml",
+      "name": "Azure Machine Learning",
+      "note": "End-to-end ML platform; Azure OpenAI covers the foundation-model side."
+    }
   ],
-  "docsUrl": "https://cloud.google.com/vertex-ai/docs"
+  "docsUrl": "https://docs.cloud.google.com/gemini-enterprise-agent-platform/overview",
+  "short": "formerly Vertex AI"
 }

@@ -1,70 +1,777 @@
 {
   "version": "2026-07",
   "services": [
-    { "id": "s3", "provider": "aws", "name": "Amazon S3", "short": "Simple Storage Service", "groups": ["storage"], "stages": ["store"], "oneLiner": "Virtually unlimited object storage — the default landing zone and data lake on AWS." },
-    { "id": "redshift", "provider": "aws", "name": "Amazon Redshift", "groups": ["warehouse"], "stages": ["serve"], "oneLiner": "Petabyte-scale columnar data warehouse for BI and analytics SQL." },
-    { "id": "athena", "provider": "aws", "name": "Amazon Athena", "groups": ["warehouse"], "stages": ["serve"], "oneLiner": "Serverless SQL directly over files in S3 — no cluster to manage." },
-    { "id": "glue", "provider": "aws", "name": "AWS Glue", "groups": ["integration"], "stages": ["process"], "oneLiner": "Serverless Spark ETL plus a data catalog; crawlers infer schema for you." },
-    { "id": "emr", "provider": "aws", "name": "Amazon EMR", "short": "Elastic MapReduce", "groups": ["compute"], "stages": ["process"], "oneLiner": "Managed Spark, Hadoop, Hive and Presto clusters for big-data processing." },
-    { "id": "kinesis-data-streams", "provider": "aws", "name": "Kinesis Data Streams", "groups": ["streaming"], "stages": ["ingest"], "oneLiner": "Real-time, ordered event streaming for high-throughput ingestion." },
-    { "id": "kinesis-data-analytics", "provider": "aws", "name": "Managed Service for Apache Flink", "short": "formerly Kinesis Data Analytics", "groups": ["streaming"], "stages": ["process"], "oneLiner": "Managed Apache Flink for real-time stream processing and analytics." },
-    { "id": "mwaa", "provider": "aws", "name": "Amazon MWAA", "short": "Managed Workflows for Apache Airflow", "groups": ["orchestration"], "stages": ["orchestrate"], "oneLiner": "Managed Apache Airflow for authoring and scheduling data pipelines." },
-    { "id": "lake-formation", "provider": "aws", "name": "AWS Lake Formation", "groups": ["governance"], "stages": ["govern"], "oneLiner": "Central permissions and governance layer over an S3 data lake." },
-    { "id": "dynamodb", "provider": "aws", "name": "Amazon DynamoDB", "groups": ["nosql"], "stages": ["store"], "oneLiner": "Serverless key-value and document NoSQL with single-digit-millisecond latency." },
-    { "id": "sagemaker", "provider": "aws", "name": "Amazon SageMaker", "groups": ["ml"], "stages": ["serve"], "oneLiner": "End-to-end platform to build, train and deploy machine-learning models." },
-    { "id": "lambda", "provider": "aws", "name": "AWS Lambda", "groups": ["serverless"], "stages": ["process"], "oneLiner": "Run event-driven code without servers — glue and lightweight ETL." },
-    { "id": "rds", "provider": "aws", "name": "Amazon RDS", "short": "Relational Database Service", "groups": ["relational"], "stages": ["store"], "oneLiner": "Managed relational databases (PostgreSQL, MySQL, etc.) — the OLTP source of truth." },
-    { "id": "elasticache", "provider": "aws", "name": "Amazon ElastiCache", "groups": ["cache"], "stages": ["store"], "oneLiner": "Managed in-memory Redis/Memcached for microsecond caching and speed." },
-    { "id": "quicksight", "provider": "aws", "name": "Amazon QuickSight", "groups": ["bi"], "stages": ["serve"], "oneLiner": "Serverless BI dashboards and visual analytics over AWS data." },
-    { "id": "dms", "provider": "aws", "name": "AWS DMS", "short": "Database Migration Service", "groups": ["movement"], "stages": ["ingest"], "oneLiner": "Migrate and continuously replicate (CDC) databases into AWS." },
-    { "id": "datasync", "provider": "aws", "name": "AWS DataSync", "groups": ["movement"], "stages": ["ingest"], "oneLiner": "Fast, managed bulk data transfer from on-prem/other clouds into AWS storage." },
-    { "id": "databricks", "provider": "aws", "name": "Databricks on AWS", "groups": ["compute"], "stages": ["process"], "oneLiner": "Lakehouse platform — managed Spark, Delta Lake and ML on AWS." },
-    { "id": "step-functions", "provider": "aws", "name": "AWS Step Functions", "groups": ["orchestration"], "stages": ["orchestrate"], "oneLiner": "Serverless workflow orchestration as state machines across AWS services." },
-    { "id": "msk", "provider": "aws", "name": "Amazon MSK", "short": "Managed Streaming for Apache Kafka", "groups": ["streaming"], "stages": ["ingest"], "oneLiner": "Fully-managed Apache Kafka for streaming ingestion and event backbones." },
-    { "id": "sqs", "provider": "aws", "name": "Amazon SQS", "short": "Simple Queue Service", "groups": ["messaging"], "stages": ["ingest"], "oneLiner": "Managed message queue for decoupling and buffering between services." },
-    { "id": "timestream", "provider": "aws", "name": "Amazon Timestream", "groups": ["olap"], "stages": ["serve"], "oneLiner": "Serverless time-series database for IoT and operational metrics at scale." },
-
-    { "id": "cloud-storage", "provider": "gcp", "name": "Cloud Storage", "short": "GCS", "groups": ["storage"], "stages": ["store"], "oneLiner": "Unified object storage — the data-lake foundation across Google Cloud." },
-    { "id": "bigquery", "provider": "gcp", "name": "BigQuery", "groups": ["warehouse"], "stages": ["serve"], "oneLiner": "Serverless, petabyte-scale data warehouse with decoupled storage and compute." },
-    { "id": "biglake", "provider": "gcp", "name": "BigLake", "groups": ["warehouse"], "stages": ["serve"], "oneLiner": "Query and govern data in Cloud Storage and other lakes as BigQuery tables." },
-    { "id": "data-fusion", "provider": "gcp", "name": "Cloud Data Fusion", "groups": ["integration"], "stages": ["process"], "oneLiner": "Managed, visual (CDAP) data-integration and ETL pipelines." },
-    { "id": "dataproc", "provider": "gcp", "name": "Dataproc", "groups": ["compute"], "stages": ["process"], "oneLiner": "Managed Spark and Hadoop for batch, streaming and ML workloads." },
-    { "id": "pubsub", "provider": "gcp", "name": "Pub/Sub", "groups": ["streaming"], "stages": ["ingest"], "oneLiner": "Global, serverless messaging for event ingestion and fan-out." },
-    { "id": "dataflow", "provider": "gcp", "name": "Dataflow", "groups": ["streaming"], "stages": ["process"], "oneLiner": "Serverless Apache Beam for unified batch and streaming processing." },
-    { "id": "cloud-composer", "provider": "gcp", "name": "Cloud Composer", "groups": ["orchestration"], "stages": ["orchestrate"], "oneLiner": "Managed Apache Airflow for orchestrating Google Cloud data workflows." },
-    { "id": "dataplex", "provider": "gcp", "name": "Dataplex", "groups": ["governance"], "stages": ["govern"], "oneLiner": "Unified catalog, governance and quality across your lakes and warehouses." },
-    { "id": "bigtable", "provider": "gcp", "name": "Bigtable", "groups": ["nosql"], "stages": ["store"], "oneLiner": "Low-latency, wide-column NoSQL for huge analytical and operational workloads." },
-    { "id": "vertex-ai", "provider": "gcp", "name": "Vertex AI", "groups": ["ml"], "stages": ["serve"], "oneLiner": "Unified platform to build, train and deploy ML and generative-AI models." },
-    { "id": "cloud-functions", "provider": "gcp", "name": "Cloud Functions", "groups": ["serverless"], "stages": ["process"], "oneLiner": "Event-driven serverless functions for glue and lightweight processing." },
-    { "id": "cloud-sql", "provider": "gcp", "name": "Cloud SQL", "groups": ["relational"], "stages": ["store"], "oneLiner": "Managed relational databases (PostgreSQL, MySQL, SQL Server) — the OLTP source of truth." },
-    { "id": "memorystore", "provider": "gcp", "name": "Memorystore", "groups": ["cache"], "stages": ["store"], "oneLiner": "Managed in-memory Redis/Memcached for microsecond caching on GCP." },
-    { "id": "looker", "provider": "gcp", "name": "Looker", "groups": ["bi"], "stages": ["serve"], "oneLiner": "Governed BI and semantic modelling (LookML) over BigQuery and beyond." },
-    { "id": "datastream", "provider": "gcp", "name": "Datastream", "groups": ["movement"], "stages": ["ingest"], "oneLiner": "Serverless change-data-capture (CDC) replication into BigQuery/Cloud Storage." },
-    { "id": "storage-transfer", "provider": "gcp", "name": "Storage Transfer Service", "groups": ["movement"], "stages": ["ingest"], "oneLiner": "Managed bulk data transfer from other clouds/on-prem into Cloud Storage." },
-    { "id": "databricks", "provider": "gcp", "name": "Databricks on Google Cloud", "groups": ["compute"], "stages": ["process"], "oneLiner": "Lakehouse platform — managed Spark, Delta Lake and ML on GCP." },
-    { "id": "workflows", "provider": "gcp", "name": "Cloud Workflows", "groups": ["orchestration"], "stages": ["orchestrate"], "oneLiner": "Serverless orchestration of Google Cloud services and APIs as steps." },
-    { "id": "managed-kafka", "provider": "gcp", "name": "Managed Service for Apache Kafka", "groups": ["streaming"], "stages": ["ingest"], "oneLiner": "Fully-managed Apache Kafka on Google Cloud for streaming ingestion." },
-    { "id": "cloud-tasks", "provider": "gcp", "name": "Cloud Tasks", "groups": ["messaging"], "stages": ["ingest"], "oneLiner": "Managed task queue for decoupling and dispatching asynchronous work." },
-
-    { "id": "adls", "provider": "azure", "name": "Azure Data Lake Storage Gen2", "short": "ADLS Gen2", "groups": ["storage"], "stages": ["store"], "oneLiner": "Hierarchical, analytics-optimised object storage built on Blob." },
-    { "id": "synapse-analytics", "provider": "azure", "name": "Azure Synapse Analytics", "groups": ["warehouse"], "stages": ["serve"], "oneLiner": "Enterprise analytics uniting a dedicated SQL warehouse, Spark and pipelines." },
-    { "id": "synapse-serverless-sql", "provider": "azure", "name": "Synapse Serverless SQL", "groups": ["warehouse"], "stages": ["serve"], "oneLiner": "Query files in the data lake with on-demand, pay-per-query SQL." },
-    { "id": "data-factory", "provider": "azure", "name": "Azure Data Factory", "short": "ADF", "groups": ["integration", "orchestration"], "stages": ["process", "orchestrate"], "oneLiner": "Cloud data integration for ETL/ELT plus pipeline orchestration (incl. Managed Airflow)." },
-    { "id": "hdinsight", "provider": "azure", "name": "Azure HDInsight", "groups": ["compute"], "stages": ["process"], "oneLiner": "Managed open-source clusters — Spark, Hadoop, Hive and Kafka." },
-    { "id": "event-hubs", "provider": "azure", "name": "Azure Event Hubs", "groups": ["streaming"], "stages": ["ingest"], "oneLiner": "Big-data streaming and event ingestion, Kafka-compatible." },
-    { "id": "stream-analytics", "provider": "azure", "name": "Azure Stream Analytics", "groups": ["streaming"], "stages": ["process"], "oneLiner": "Real-time, SQL-based stream processing over Event Hubs and IoT." },
-    { "id": "purview", "provider": "azure", "name": "Microsoft Purview", "groups": ["governance"], "stages": ["govern"], "oneLiner": "Unified data governance, catalog and lineage across your estate." },
-    { "id": "cosmos-db", "provider": "azure", "name": "Azure Cosmos DB", "groups": ["nosql"], "stages": ["store"], "oneLiner": "Globally distributed, multi-model NoSQL with turnkey replication." },
-    { "id": "azure-ml", "provider": "azure", "name": "Azure Machine Learning", "groups": ["ml"], "stages": ["serve"], "oneLiner": "End-to-end platform to train, deploy and manage machine-learning models." },
-    { "id": "azure-functions", "provider": "azure", "name": "Azure Functions", "groups": ["serverless"], "stages": ["process"], "oneLiner": "Event-driven serverless compute for glue and lightweight ETL." },
-    { "id": "azure-sql-database", "provider": "azure", "name": "Azure SQL Database", "groups": ["relational"], "stages": ["store"], "oneLiner": "Managed relational (SQL Server) database — the OLTP source of truth on Azure." },
-    { "id": "azure-cache-redis", "provider": "azure", "name": "Azure Cache for Redis", "groups": ["cache"], "stages": ["store"], "oneLiner": "Managed in-memory Redis for microsecond caching on Azure." },
-    { "id": "power-bi", "provider": "azure", "name": "Power BI", "groups": ["bi"], "stages": ["serve"], "oneLiner": "Microsoft's flagship BI and self-service visual analytics platform." },
-    { "id": "database-migration-service", "provider": "azure", "name": "Azure Database Migration Service", "short": "DMS", "groups": ["movement"], "stages": ["ingest"], "oneLiner": "Migrate and replicate databases into Azure with minimal downtime." },
-    { "id": "data-box", "provider": "azure", "name": "Azure Data Box", "groups": ["movement"], "stages": ["ingest"], "oneLiner": "Offline and online bulk data transfer of large datasets into Azure." },
-    { "id": "databricks", "provider": "azure", "name": "Azure Databricks", "groups": ["compute"], "stages": ["process"], "oneLiner": "First-party lakehouse platform — managed Spark, Delta Lake and ML on Azure." },
-    { "id": "logic-apps", "provider": "azure", "name": "Azure Logic Apps", "groups": ["orchestration"], "stages": ["orchestrate"], "oneLiner": "Low-code workflow orchestration and integration across 1000+ connectors." },
-    { "id": "service-bus", "provider": "azure", "name": "Azure Service Bus", "groups": ["messaging"], "stages": ["ingest"], "oneLiner": "Enterprise message broker with queues and topics for reliable decoupling." },
-    { "id": "data-explorer", "provider": "azure", "name": "Azure Data Explorer", "short": "Kusto / ADX", "groups": ["olap"], "stages": ["serve"], "oneLiner": "Fast, real-time analytics over logs, telemetry and time-series (KQL)." }
+    {
+      "id": "s3",
+      "provider": "aws",
+      "name": "Amazon S3",
+      "short": "Simple Storage Service",
+      "groups": [
+        "storage"
+      ],
+      "stages": [
+        "store"
+      ],
+      "oneLiner": "Virtually unlimited object storage — the default landing zone and data lake on AWS."
+    },
+    {
+      "id": "redshift",
+      "provider": "aws",
+      "name": "Amazon Redshift",
+      "groups": [
+        "warehouse"
+      ],
+      "stages": [
+        "serve"
+      ],
+      "oneLiner": "Petabyte-scale columnar data warehouse for BI and analytics SQL."
+    },
+    {
+      "id": "athena",
+      "provider": "aws",
+      "name": "Amazon Athena",
+      "groups": [
+        "warehouse"
+      ],
+      "stages": [
+        "serve"
+      ],
+      "oneLiner": "Serverless SQL directly over files in S3 — no cluster to manage."
+    },
+    {
+      "id": "glue",
+      "provider": "aws",
+      "name": "AWS Glue",
+      "groups": [
+        "integration"
+      ],
+      "stages": [
+        "process"
+      ],
+      "oneLiner": "Serverless Spark ETL plus a data catalog; crawlers infer schema for you."
+    },
+    {
+      "id": "emr",
+      "provider": "aws",
+      "name": "Amazon EMR",
+      "short": "Elastic MapReduce",
+      "groups": [
+        "compute"
+      ],
+      "stages": [
+        "process"
+      ],
+      "oneLiner": "Managed Spark, Hadoop, Hive and Presto clusters for big-data processing."
+    },
+    {
+      "id": "kinesis-data-streams",
+      "provider": "aws",
+      "name": "Kinesis Data Streams",
+      "groups": [
+        "streaming"
+      ],
+      "stages": [
+        "ingest"
+      ],
+      "oneLiner": "Real-time, ordered event streaming for high-throughput ingestion."
+    },
+    {
+      "id": "kinesis-data-analytics",
+      "provider": "aws",
+      "name": "Managed Service for Apache Flink",
+      "short": "formerly Kinesis Data Analytics",
+      "groups": [
+        "streaming"
+      ],
+      "stages": [
+        "process"
+      ],
+      "oneLiner": "Managed Apache Flink for real-time stream processing and analytics."
+    },
+    {
+      "id": "mwaa",
+      "provider": "aws",
+      "name": "Amazon MWAA",
+      "short": "Managed Workflows for Apache Airflow",
+      "groups": [
+        "orchestration"
+      ],
+      "stages": [
+        "orchestrate"
+      ],
+      "oneLiner": "Managed Apache Airflow for authoring and scheduling data pipelines."
+    },
+    {
+      "id": "lake-formation",
+      "provider": "aws",
+      "name": "AWS Lake Formation",
+      "groups": [
+        "governance"
+      ],
+      "stages": [
+        "govern"
+      ],
+      "oneLiner": "Central permissions and governance layer over an S3 data lake."
+    },
+    {
+      "id": "dynamodb",
+      "provider": "aws",
+      "name": "Amazon DynamoDB",
+      "groups": [
+        "nosql"
+      ],
+      "stages": [
+        "store"
+      ],
+      "oneLiner": "Serverless key-value and document NoSQL with single-digit-millisecond latency."
+    },
+    {
+      "id": "sagemaker",
+      "provider": "aws",
+      "name": "Amazon SageMaker",
+      "groups": [
+        "ml"
+      ],
+      "stages": [
+        "serve"
+      ],
+      "oneLiner": "End-to-end platform to build, train and deploy machine-learning models."
+    },
+    {
+      "id": "lambda",
+      "provider": "aws",
+      "name": "AWS Lambda",
+      "groups": [
+        "serverless"
+      ],
+      "stages": [
+        "process"
+      ],
+      "oneLiner": "Run event-driven code without servers — glue and lightweight ETL."
+    },
+    {
+      "id": "rds",
+      "provider": "aws",
+      "name": "Amazon RDS",
+      "short": "Relational Database Service",
+      "groups": [
+        "relational"
+      ],
+      "stages": [
+        "store"
+      ],
+      "oneLiner": "Managed relational databases (PostgreSQL, MySQL, etc.) — the OLTP source of truth."
+    },
+    {
+      "id": "elasticache",
+      "provider": "aws",
+      "name": "Amazon ElastiCache",
+      "groups": [
+        "cache"
+      ],
+      "stages": [
+        "store"
+      ],
+      "oneLiner": "Managed in-memory Redis/Memcached for microsecond caching and speed."
+    },
+    {
+      "id": "quicksight",
+      "provider": "aws",
+      "name": "Amazon QuickSight",
+      "groups": [
+        "bi"
+      ],
+      "stages": [
+        "serve"
+      ],
+      "oneLiner": "Serverless BI dashboards and visual analytics over AWS data."
+    },
+    {
+      "id": "dms",
+      "provider": "aws",
+      "name": "AWS DMS",
+      "short": "Database Migration Service",
+      "groups": [
+        "movement"
+      ],
+      "stages": [
+        "ingest"
+      ],
+      "oneLiner": "Migrate and continuously replicate (CDC) databases into AWS."
+    },
+    {
+      "id": "datasync",
+      "provider": "aws",
+      "name": "AWS DataSync",
+      "groups": [
+        "movement"
+      ],
+      "stages": [
+        "ingest"
+      ],
+      "oneLiner": "Fast, managed bulk data transfer from on-prem/other clouds into AWS storage."
+    },
+    {
+      "id": "databricks",
+      "provider": "aws",
+      "name": "Databricks on AWS",
+      "groups": [
+        "compute"
+      ],
+      "stages": [
+        "process"
+      ],
+      "oneLiner": "Lakehouse platform — managed Spark, Delta Lake and ML on AWS."
+    },
+    {
+      "id": "step-functions",
+      "provider": "aws",
+      "name": "AWS Step Functions",
+      "groups": [
+        "orchestration"
+      ],
+      "stages": [
+        "orchestrate"
+      ],
+      "oneLiner": "Serverless workflow orchestration as state machines across AWS services."
+    },
+    {
+      "id": "msk",
+      "provider": "aws",
+      "name": "Amazon MSK",
+      "short": "Managed Streaming for Apache Kafka",
+      "groups": [
+        "streaming"
+      ],
+      "stages": [
+        "ingest"
+      ],
+      "oneLiner": "Fully-managed Apache Kafka for streaming ingestion and event backbones."
+    },
+    {
+      "id": "sqs",
+      "provider": "aws",
+      "name": "Amazon SQS",
+      "short": "Simple Queue Service",
+      "groups": [
+        "messaging"
+      ],
+      "stages": [
+        "ingest"
+      ],
+      "oneLiner": "Managed message queue for decoupling and buffering between services."
+    },
+    {
+      "id": "timestream",
+      "provider": "aws",
+      "name": "Amazon Timestream",
+      "groups": [
+        "olap"
+      ],
+      "stages": [
+        "serve"
+      ],
+      "oneLiner": "Serverless time-series database for IoT and operational metrics at scale."
+    },
+    {
+      "id": "cloud-storage",
+      "provider": "gcp",
+      "name": "Cloud Storage",
+      "short": "GCS",
+      "groups": [
+        "storage"
+      ],
+      "stages": [
+        "store"
+      ],
+      "oneLiner": "Unified object storage — the data-lake foundation across Google Cloud."
+    },
+    {
+      "id": "bigquery",
+      "provider": "gcp",
+      "name": "BigQuery",
+      "groups": [
+        "warehouse"
+      ],
+      "stages": [
+        "serve"
+      ],
+      "oneLiner": "Serverless, petabyte-scale data warehouse with decoupled storage and compute."
+    },
+    {
+      "id": "biglake",
+      "provider": "gcp",
+      "name": "BigLake",
+      "groups": [
+        "warehouse"
+      ],
+      "stages": [
+        "serve"
+      ],
+      "oneLiner": "Query and govern data in Cloud Storage and other lakes as BigQuery tables."
+    },
+    {
+      "id": "data-fusion",
+      "provider": "gcp",
+      "name": "Cloud Data Fusion",
+      "groups": [
+        "integration"
+      ],
+      "stages": [
+        "process"
+      ],
+      "oneLiner": "Managed, visual (CDAP) data-integration and ETL pipelines."
+    },
+    {
+      "id": "dataproc",
+      "provider": "gcp",
+      "name": "Dataproc",
+      "groups": [
+        "compute"
+      ],
+      "stages": [
+        "process"
+      ],
+      "oneLiner": "Managed Spark and Hadoop for batch, streaming and ML workloads."
+    },
+    {
+      "id": "pubsub",
+      "provider": "gcp",
+      "name": "Pub/Sub",
+      "groups": [
+        "streaming"
+      ],
+      "stages": [
+        "ingest"
+      ],
+      "oneLiner": "Global, serverless messaging for event ingestion and fan-out."
+    },
+    {
+      "id": "dataflow",
+      "provider": "gcp",
+      "name": "Dataflow",
+      "groups": [
+        "streaming"
+      ],
+      "stages": [
+        "process"
+      ],
+      "oneLiner": "Serverless Apache Beam for unified batch and streaming processing."
+    },
+    {
+      "id": "cloud-composer",
+      "provider": "gcp",
+      "name": "Cloud Composer",
+      "groups": [
+        "orchestration"
+      ],
+      "stages": [
+        "orchestrate"
+      ],
+      "oneLiner": "Managed Apache Airflow for orchestrating Google Cloud data workflows."
+    },
+    {
+      "id": "dataplex",
+      "provider": "gcp",
+      "name": "Dataplex",
+      "groups": [
+        "governance"
+      ],
+      "stages": [
+        "govern"
+      ],
+      "oneLiner": "Unified catalog, governance and quality across your lakes and warehouses."
+    },
+    {
+      "id": "bigtable",
+      "provider": "gcp",
+      "name": "Bigtable",
+      "groups": [
+        "nosql"
+      ],
+      "stages": [
+        "store"
+      ],
+      "oneLiner": "Low-latency, wide-column NoSQL for huge analytical and operational workloads."
+    },
+    {
+      "id": "vertex-ai",
+      "provider": "gcp",
+      "name": "Gemini Enterprise Agent Platform",
+      "short": "formerly Vertex AI",
+      "groups": [
+        "ml"
+      ],
+      "stages": [
+        "serve"
+      ],
+      "oneLiner": "Unified platform to build, train and deploy ML and generative-AI models."
+    },
+    {
+      "id": "cloud-functions",
+      "provider": "gcp",
+      "name": "Cloud Functions",
+      "groups": [
+        "serverless"
+      ],
+      "stages": [
+        "process"
+      ],
+      "oneLiner": "Event-driven serverless functions for glue and lightweight processing."
+    },
+    {
+      "id": "cloud-sql",
+      "provider": "gcp",
+      "name": "Cloud SQL",
+      "groups": [
+        "relational"
+      ],
+      "stages": [
+        "store"
+      ],
+      "oneLiner": "Managed relational databases (PostgreSQL, MySQL, SQL Server) — the OLTP source of truth."
+    },
+    {
+      "id": "memorystore",
+      "provider": "gcp",
+      "name": "Memorystore",
+      "groups": [
+        "cache"
+      ],
+      "stages": [
+        "store"
+      ],
+      "oneLiner": "Managed in-memory Redis/Memcached for microsecond caching on GCP."
+    },
+    {
+      "id": "looker",
+      "provider": "gcp",
+      "name": "Looker",
+      "groups": [
+        "bi"
+      ],
+      "stages": [
+        "serve"
+      ],
+      "oneLiner": "Governed BI and semantic modelling (LookML) over BigQuery and beyond."
+    },
+    {
+      "id": "datastream",
+      "provider": "gcp",
+      "name": "Datastream",
+      "groups": [
+        "movement"
+      ],
+      "stages": [
+        "ingest"
+      ],
+      "oneLiner": "Serverless change-data-capture (CDC) replication into BigQuery/Cloud Storage."
+    },
+    {
+      "id": "storage-transfer",
+      "provider": "gcp",
+      "name": "Storage Transfer Service",
+      "groups": [
+        "movement"
+      ],
+      "stages": [
+        "ingest"
+      ],
+      "oneLiner": "Managed bulk data transfer from other clouds/on-prem into Cloud Storage."
+    },
+    {
+      "id": "databricks",
+      "provider": "gcp",
+      "name": "Databricks on Google Cloud",
+      "groups": [
+        "compute"
+      ],
+      "stages": [
+        "process"
+      ],
+      "oneLiner": "Lakehouse platform — managed Spark, Delta Lake and ML on GCP."
+    },
+    {
+      "id": "workflows",
+      "provider": "gcp",
+      "name": "Cloud Workflows",
+      "groups": [
+        "orchestration"
+      ],
+      "stages": [
+        "orchestrate"
+      ],
+      "oneLiner": "Serverless orchestration of Google Cloud services and APIs as steps."
+    },
+    {
+      "id": "managed-kafka",
+      "provider": "gcp",
+      "name": "Managed Service for Apache Kafka",
+      "groups": [
+        "streaming"
+      ],
+      "stages": [
+        "ingest"
+      ],
+      "oneLiner": "Fully-managed Apache Kafka on Google Cloud for streaming ingestion."
+    },
+    {
+      "id": "cloud-tasks",
+      "provider": "gcp",
+      "name": "Cloud Tasks",
+      "groups": [
+        "messaging"
+      ],
+      "stages": [
+        "ingest"
+      ],
+      "oneLiner": "Managed task queue for decoupling and dispatching asynchronous work."
+    },
+    {
+      "id": "adls",
+      "provider": "azure",
+      "name": "Azure Data Lake Storage Gen2",
+      "short": "ADLS Gen2",
+      "groups": [
+        "storage"
+      ],
+      "stages": [
+        "store"
+      ],
+      "oneLiner": "Hierarchical, analytics-optimised object storage built on Blob."
+    },
+    {
+      "id": "synapse-analytics",
+      "provider": "azure",
+      "name": "Azure Synapse Analytics",
+      "groups": [
+        "warehouse"
+      ],
+      "stages": [
+        "serve"
+      ],
+      "oneLiner": "Enterprise analytics uniting a dedicated SQL warehouse, Spark and pipelines."
+    },
+    {
+      "id": "synapse-serverless-sql",
+      "provider": "azure",
+      "name": "Synapse Serverless SQL",
+      "groups": [
+        "warehouse"
+      ],
+      "stages": [
+        "serve"
+      ],
+      "oneLiner": "Query files in the data lake with on-demand, pay-per-query SQL."
+    },
+    {
+      "id": "data-factory",
+      "provider": "azure",
+      "name": "Azure Data Factory",
+      "short": "ADF",
+      "groups": [
+        "integration",
+        "orchestration"
+      ],
+      "stages": [
+        "process",
+        "orchestrate"
+      ],
+      "oneLiner": "Cloud data integration for ETL/ELT plus pipeline orchestration (incl. Managed Airflow)."
+    },
+    {
+      "id": "hdinsight",
+      "provider": "azure",
+      "name": "Azure HDInsight",
+      "groups": [
+        "compute"
+      ],
+      "stages": [
+        "process"
+      ],
+      "oneLiner": "Managed open-source clusters — Spark, Hadoop, Hive and Kafka."
+    },
+    {
+      "id": "event-hubs",
+      "provider": "azure",
+      "name": "Azure Event Hubs",
+      "groups": [
+        "streaming"
+      ],
+      "stages": [
+        "ingest"
+      ],
+      "oneLiner": "Big-data streaming and event ingestion, Kafka-compatible."
+    },
+    {
+      "id": "stream-analytics",
+      "provider": "azure",
+      "name": "Azure Stream Analytics",
+      "groups": [
+        "streaming"
+      ],
+      "stages": [
+        "process"
+      ],
+      "oneLiner": "Real-time, SQL-based stream processing over Event Hubs and IoT."
+    },
+    {
+      "id": "purview",
+      "provider": "azure",
+      "name": "Microsoft Purview",
+      "groups": [
+        "governance"
+      ],
+      "stages": [
+        "govern"
+      ],
+      "oneLiner": "Unified data governance, catalog and lineage across your estate."
+    },
+    {
+      "id": "cosmos-db",
+      "provider": "azure",
+      "name": "Azure Cosmos DB",
+      "groups": [
+        "nosql"
+      ],
+      "stages": [
+        "store"
+      ],
+      "oneLiner": "Globally distributed, multi-model NoSQL with turnkey replication."
+    },
+    {
+      "id": "azure-ml",
+      "provider": "azure",
+      "name": "Azure Machine Learning",
+      "groups": [
+        "ml"
+      ],
+      "stages": [
+        "serve"
+      ],
+      "oneLiner": "End-to-end platform to train, deploy and manage machine-learning models."
+    },
+    {
+      "id": "azure-functions",
+      "provider": "azure",
+      "name": "Azure Functions",
+      "groups": [
+        "serverless"
+      ],
+      "stages": [
+        "process"
+      ],
+      "oneLiner": "Event-driven serverless compute for glue and lightweight ETL."
+    },
+    {
+      "id": "azure-sql-database",
+      "provider": "azure",
+      "name": "Azure SQL Database",
+      "groups": [
+        "relational"
+      ],
+      "stages": [
+        "store"
+      ],
+      "oneLiner": "Managed relational (SQL Server) database — the OLTP source of truth on Azure."
+    },
+    {
+      "id": "azure-cache-redis",
+      "provider": "azure",
+      "name": "Azure Cache for Redis",
+      "groups": [
+        "cache"
+      ],
+      "stages": [
+        "store"
+      ],
+      "oneLiner": "Managed in-memory Redis for microsecond caching on Azure."
+    },
+    {
+      "id": "power-bi",
+      "provider": "azure",
+      "name": "Power BI",
+      "groups": [
+        "bi"
+      ],
+      "stages": [
+        "serve"
+      ],
+      "oneLiner": "Microsoft's flagship BI and self-service visual analytics platform."
+    },
+    {
+      "id": "database-migration-service",
+      "provider": "azure",
+      "name": "Azure Database Migration Service",
+      "short": "DMS",
+      "groups": [
+        "movement"
+      ],
+      "stages": [
+        "ingest"
+      ],
+      "oneLiner": "Migrate and replicate databases into Azure with minimal downtime."
+    },
+    {
+      "id": "data-box",
+      "provider": "azure",
+      "name": "Azure Data Box",
+      "groups": [
+        "movement"
+      ],
+      "stages": [
+        "ingest"
+      ],
+      "oneLiner": "Offline and online bulk data transfer of large datasets into Azure."
+    },
+    {
+      "id": "databricks",
+      "provider": "azure",
+      "name": "Azure Databricks",
+      "groups": [
+        "compute"
+      ],
+      "stages": [
+        "process"
+      ],
+      "oneLiner": "First-party lakehouse platform — managed Spark, Delta Lake and ML on Azure."
+    },
+    {
+      "id": "logic-apps",
+      "provider": "azure",
+      "name": "Azure Logic Apps",
+      "groups": [
+        "orchestration"
+      ],
+      "stages": [
+        "orchestrate"
+      ],
+      "oneLiner": "Low-code workflow orchestration and integration across 1000+ connectors."
+    },
+    {
+      "id": "service-bus",
+      "provider": "azure",
+      "name": "Azure Service Bus",
+      "groups": [
+        "messaging"
+      ],
+      "stages": [
+        "ingest"
+      ],
+      "oneLiner": "Enterprise message broker with queues and topics for reliable decoupling."
+    },
+    {
+      "id": "data-explorer",
+      "provider": "azure",
+      "name": "Azure Data Explorer",
+      "short": "Kusto / ADX",
+      "groups": [
+        "olap"
+      ],
+      "stages": [
+        "serve"
+      ],
+      "oneLiner": "Fast, real-time analytics over logs, telemetry and time-series (KQL)."
+    }
   ]
 }
