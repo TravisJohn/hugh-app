@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { GraduationCap, Code2, Trophy, Cloud, NotebookPen } from "lucide-react";
+import { GraduationCap, Code2, Trophy, Cloud, NotebookPen, Activity } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import SignOutButton from "@/components/landing/SignOutButton";
@@ -10,7 +10,8 @@ import HeaderUsage from "@/components/usage/HeaderUsage";
 // "Learn" leads to the "What do you want to learn?" dashboard (/home/learn);
 // "Code" opens the coding-drill landing (/code/start); "Cases" opens The Case
 // Room (/cases); "Cloud Skills" opens the cloud-services reference (/cloud);
-// "Notes" opens the wrong-answer review workspace (/notes).
+// "Notes" opens the wrong-answer review workspace (/notes); "Monitor" opens the
+// hand-kept tracking surface (/monitor).
 export default async function HomePage() {
   const supabase = await createClient();
   const { user } = await verifyUserAccess(supabase);
@@ -76,7 +77,7 @@ export default async function HomePage() {
         </div>
 
         {/* ── Six activities, 2 rows × 3 cols: Learn · Code · Cases ──
-            Cloud Skills · Systems · Notes ─────────────────────────── */}
+            Cloud Skills · Notes · Monitor ─────────────────────────── */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-[clamp(0.5rem,2vh,1rem)] w-full max-w-4xl shrink-0">
 
           {/* Learn — the whole learning experience */}
@@ -195,6 +196,34 @@ export default async function HomePage() {
             </div>
             <span className="mt-auto text-xs font-semibold text-rose-400 transition-all group-hover:text-rose-300">
               Open →
+            </span>
+          </Link>
+
+          {/* Monitor — the tracking surface (Skills · Applications · Usage).
+              The subheading names all three views on purpose: Applications is
+              career admin rather than learning, and a learner should be able to
+              see that from the card instead of discovering it inside. */}
+          <Link
+            href="/monitor"
+            className="group flex flex-col gap-[clamp(0.4rem,1.2vh,0.75rem)] rounded-2xl border border-cyan-500/40 bg-cyan-900/10 p-[clamp(0.75rem,2.2vh,1.25rem)] shadow-lg shadow-cyan-900/20 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-cyan-400/60 hover:bg-cyan-900/20 hover:shadow-xl hover:shadow-cyan-500/20"
+          >
+            <div className="flex h-[clamp(2rem,4.2vh,2.75rem)] w-[clamp(2rem,4.2vh,2.75rem)] items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-400 transition-transform duration-300 group-hover:scale-110">
+              <Activity size={22} />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5 mb-1">
+                <p className="font-semibold text-slate-100 text-base">Monitor</p>
+                <span className="rounded-full bg-cyan-500/15 px-1.5 py-0.5 text-xs font-semibold text-cyan-400">
+                  New
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 leading-snug">
+                Your own record, kept by hand — skills you&apos;re learning, jobs you&apos;ve
+                applied for, and where your time on Hugh actually went.
+              </p>
+            </div>
+            <span className="mt-auto text-xs font-semibold text-cyan-400 transition-all group-hover:text-cyan-300">
+              Open Monitor →
             </span>
           </Link>
 

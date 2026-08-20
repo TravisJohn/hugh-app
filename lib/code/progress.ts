@@ -4,10 +4,15 @@
 //  2. buildHeatmap — a day-by-day attempt count for the no-streak calendar
 //     heatmap.
 // Both are pure functions over plain data so they're cheap to unit test and
-// don't care whether the rows came from Supabase or a fixture. Day bucketing
-// uses UTC dates (server-computed, no access to the learner's timezone) — an
-// accepted simplification, same class of imprecision GitHub's own
-// contribution graph has.
+// don't care whether the rows came from Supabase or a fixture.
+//
+// The day bucketing itself lives in lib/calendar.ts, shared with Monitor's
+// heatmaps — one ramp, one grid, one definition of "a day". Bucketing is UTC
+// and server-computed, with no access to the learner's timezone: an accepted
+// simplification, the same class of imprecision GitHub's own contribution
+// graph has.
+
+import { bucketByDay, type HeatmapDay } from "@/lib/calendar";
 
 /** One row from `code_drill_attempts`, as read from Supabase. */
 export interface DrillAttemptRow {
@@ -95,33 +100,20 @@ export function computeAllPackProgress(
   return out;
 }
 
-export interface HeatmapDay {
-  /** UTC calendar date, YYYY-MM-DD. */
-  date: string;
-  /** Attempts (pass or fail) logged on this day, across every pack. */
-  count: number;
-}
+// Re-exported so existing importers (/code/start, CodeLanding) keep taking the
+// type from here; the definition itself is shared with Monitor's heatmaps.
+export type { HeatmapDay };
 
 /**
  * A fixed trailing window of daily attempt counts, oldest first, ending today
  * (UTC) — the source for the no-streak calendar heatmap. `days` defaults to
  * 112 (16 weeks), a size that reads as a compact inline grid rather than a
  * full-year GitHub-style graph.
+ *
+ * A thin adapter over the shared bucketer: this function's only real job is
+ * knowing that a drill attempt's day comes from `created_at`, and that every
+ * attempt counts once whether it passed or failed.
  */
 export function buildHeatmap(attempts: DrillAttemptRow[], days = 112): HeatmapDay[] {
-  const counts = new Map<string, number>();
-  for (const a of attempts) {
-    const date = a.created_at.slice(0, 10); // YYYY-MM-DD prefix of an ISO timestamp
-    counts.set(date, (counts.get(date) ?? 0) + 1);
-  }
-
-  const today = new Date();
-  const todayUTC = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
-
-  const out: HeatmapDay[] = [];
-  for (let i = days - 1; i >= 0; i--) {
-    const date = new Date(todayUTC - i * 86_400_000).toISOString().slice(0, 10);
-    out.push({ date, count: counts.get(date) ?? 0 });
-  }
-  return out;
+  return bucketByDay(attempts.map(a => a.created_at), days);
 }

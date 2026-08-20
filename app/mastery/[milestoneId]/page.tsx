@@ -5,6 +5,7 @@ import { getRandomPersona } from "@/lib/personas";
 import { safeInternalPath } from "@/utils/safe-redirect";
 import MasteryClient from "./MasteryClient";
 import MasteryRealtimeClient from "./MasteryRealtimeClient";
+import RecordActivity from "@/components/monitor/RecordActivity";
 
 interface Props {
   params:       Promise<{ milestoneId: string }>;
@@ -59,16 +60,20 @@ export default async function MasteryPage({ params, searchParams }: Props) {
       `/mastery/${milestoneId}?classic=1` +
       (returnUrl ? `&returnUrl=${encodeURIComponent(returnUrl)}` : "");
     return (
-      <MasteryRealtimeClient
-        milestoneId={milestoneId}
-        milestoneTitle={milestone.title as string}
-        trackId={trackId}
-        returnUrl={returnUrl}
-        alreadyMastered={milestone.mastery_validated as boolean}
-        classicUrl={classicUrl}
-        summaryDoc={(milestone as { summary_doc?: string | null }).summary_doc ?? null}
-        summaryDocAt={(milestone as { summary_doc_at?: string | null }).summary_doc_at ?? null}
-      />
+      <>
+        {/* Records that this surface was used today. Renders nothing. */}
+        <RecordActivity feature="mastery" />
+        <MasteryRealtimeClient
+          milestoneId={milestoneId}
+          milestoneTitle={milestone.title as string}
+          trackId={trackId}
+          returnUrl={returnUrl}
+          alreadyMastered={milestone.mastery_validated as boolean}
+          classicUrl={classicUrl}
+          summaryDoc={(milestone as { summary_doc?: string | null }).summary_doc ?? null}
+          summaryDocAt={(milestone as { summary_doc_at?: string | null }).summary_doc_at ?? null}
+        />
+      </>
     );
   }
 

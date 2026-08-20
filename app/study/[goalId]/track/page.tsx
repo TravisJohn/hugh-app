@@ -7,6 +7,7 @@ import SignOutButton from "@/components/landing/SignOutButton";
 import HeaderUsage from "@/components/usage/HeaderUsage";
 import KanbanBoard from "@/components/tracker/KanbanBoard";
 import { type LearningGoal, type Track, type Milestone } from "@/types";
+import RecordActivity from "@/components/monitor/RecordActivity";
 
 interface Props {
   params:       Promise<{ goalId: string }>;
@@ -71,77 +72,81 @@ export default async function StudyTrackPage({ params, searchParams }: Props) {
                 "bg-slate-800 text-slate-400";
 
   return (
-    <div className="flex h-screen flex-col bg-[#0F172A] overflow-hidden">
+    <>
+      {/* Records that this surface was used today. Renders nothing. */}
+      <RecordActivity feature="learn" />
+      <div className="flex h-screen flex-col bg-[#0F172A] overflow-hidden">
 
-      {/* Header */}
-      <header className="flex shrink-0 items-center justify-between border-b border-slate-800 px-6 py-3">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/home/learn"
-            aria-label="Back to your goals"
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-          >
-            <ArrowLeft size={16} />
-          </Link>
-          <span className="font-serif text-base font-semibold text-white">Hugh.</span>
-        </div>
-
-        <div className="flex items-center gap-4 text-sm">
-          <HeaderUsage />
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-sm font-semibold text-slate-200">
-            {initial}
+        {/* Header */}
+        <header className="flex shrink-0 items-center justify-between border-b border-slate-800 px-6 py-3">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/home/learn"
+              aria-label="Back to your goals"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            >
+              <ArrowLeft size={16} />
+            </Link>
+            <span className="font-serif text-base font-semibold text-white">Hugh.</span>
           </div>
-          <span className="hidden sm:block text-slate-400">{user.email}</span>
-          <span className="hidden sm:block text-slate-700">|</span>
-          <SignOutButton />
-        </div>
-      </header>
 
-      {/* Goal context bar — the goal title plus a days-remaining reminder.
-          Replaces the old Track/Ask/Converse tabs and the
-          topic_description/title subtitle (both redundant now that the learner
-          follows one fixed pathway). */}
-      <div className="shrink-0 flex items-center gap-4 border-b border-slate-800 bg-slate-900/40 px-6 py-2.5">
-        <h1 className="min-w-0 truncate text-sm font-semibold text-slate-200" title={g.topic}>
-          {g.topic}
-        </h1>
-        <span className={`ml-auto flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold ${daysTone}`}>
-          <CalendarClock size={12} />
-          {daysLabel}
-        </span>
+          <div className="flex items-center gap-4 text-sm">
+            <HeaderUsage />
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-sm font-semibold text-slate-200">
+              {initial}
+            </div>
+            <span className="hidden sm:block text-slate-400">{user.email}</span>
+            <span className="hidden sm:block text-slate-700">|</span>
+            <SignOutButton />
+          </div>
+        </header>
+
+        {/* Goal context bar — the goal title plus a days-remaining reminder.
+            Replaces the old Track/Ask/Converse tabs and the
+            topic_description/title subtitle (both redundant now that the learner
+            follows one fixed pathway). */}
+        <div className="shrink-0 flex items-center gap-4 border-b border-slate-800 bg-slate-900/40 px-6 py-2.5">
+          <h1 className="min-w-0 truncate text-sm font-semibold text-slate-200" title={g.topic}>
+            {g.topic}
+          </h1>
+          <span className={`ml-auto flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold ${daysTone}`}>
+            <CalendarClock size={12} />
+            {daysLabel}
+          </span>
+        </div>
+
+        {t ? (
+          <>
+            {/* Kanban board */}
+            <div className="flex-1 overflow-hidden px-6 py-5">
+              <KanbanBoard initialMilestones={milestones} topicContext={g.topic} goalId={goalId} trackId={t.id} focusMilestoneId={t.focus_milestone_id} backlogPriorityMode={t.backlog_priority_mode} pulseId={pulseId} validatedId={validatedId} masteredId={masteredId} isPremium={isPremium} isAdmin={isAdmin} />
+            </div>
+          </>
+        ) : (
+          /* No linked track — shouldn't happen for new goals, graceful fallback for old ones */
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center px-6">
+            <p className="text-base font-semibold text-slate-300">Track not ready yet</p>
+            <p className="text-sm text-slate-500 max-w-xs leading-relaxed">
+              Your learning plan may still be generating. Refresh in a moment, or create one manually from the tracker.
+            </p>
+            <div className="flex gap-3">
+              <Link
+                href={`/study/${goalId}/track`}
+                className="rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors"
+              >
+                Refresh
+              </Link>
+              <Link
+                href="/tracker"
+                className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500 transition-colors"
+              >
+                Go to Tracker
+              </Link>
+            </div>
+          </div>
+        )}
+
       </div>
-
-      {t ? (
-        <>
-          {/* Kanban board */}
-          <div className="flex-1 overflow-hidden px-6 py-5">
-            <KanbanBoard initialMilestones={milestones} topicContext={g.topic} goalId={goalId} trackId={t.id} focusMilestoneId={t.focus_milestone_id} backlogPriorityMode={t.backlog_priority_mode} pulseId={pulseId} validatedId={validatedId} masteredId={masteredId} isPremium={isPremium} isAdmin={isAdmin} />
-          </div>
-        </>
-      ) : (
-        /* No linked track — shouldn't happen for new goals, graceful fallback for old ones */
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center px-6">
-          <p className="text-base font-semibold text-slate-300">Track not ready yet</p>
-          <p className="text-sm text-slate-500 max-w-xs leading-relaxed">
-            Your learning plan may still be generating. Refresh in a moment, or create one manually from the tracker.
-          </p>
-          <div className="flex gap-3">
-            <Link
-              href={`/study/${goalId}/track`}
-              className="rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors"
-            >
-              Refresh
-            </Link>
-            <Link
-              href="/tracker"
-              className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500 transition-colors"
-            >
-              Go to Tracker
-            </Link>
-          </div>
-        </div>
-      )}
-
-    </div>
+    </>
   );
 }

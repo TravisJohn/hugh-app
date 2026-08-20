@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import { safeInternalPath } from "@/utils/safe-redirect";
 import QuizClient from "./QuizClient";
+import RecordActivity from "@/components/monitor/RecordActivity";
 
 interface Props {
   params:       Promise<{ milestoneId: string }>;
@@ -43,11 +44,15 @@ export default async function ReviewQuizPage({ params, searchParams }: Props) {
   if ((count ?? 0) === 0) redirect(returnUrl);
 
   return (
-    <QuizClient
-      milestoneId={milestoneId}
-      milestoneTitle={milestone.title}
-      entryCount={count ?? 0}
-      returnUrl={returnUrl}
-    />
+    <>
+      {/* Records that this surface was used today. Renders nothing. */}
+      <RecordActivity feature="review" />
+      <QuizClient
+        milestoneId={milestoneId}
+        milestoneTitle={milestone.title}
+        entryCount={count ?? 0}
+        returnUrl={returnUrl}
+      />
+    </>
   );
 }

@@ -7,6 +7,7 @@ import SignOutButton from "@/components/landing/SignOutButton";
 import HeaderUsage from "@/components/usage/HeaderUsage";
 import AskWorkspace from "@/components/learn/AskWorkspace";
 import { type LearningGoal } from "@/types";
+import RecordActivity from "@/components/monitor/RecordActivity";
 
 interface Props {
   params:       Promise<{ goalId: string }>;
@@ -62,66 +63,70 @@ export default async function StudyAskPage({ params, searchParams }: Props) {
   const chatTopic = focusTitle ? `${g.topic}: ${focusTitle}` : g.topic;
 
   return (
-    <div className="relative flex h-screen flex-col bg-[#0A0F1E] overflow-hidden">
+    <>
+      {/* Records that this surface was used today. Renders nothing. */}
+      <RecordActivity feature="ask" />
+      <div className="relative flex h-screen flex-col bg-[#0A0F1E] overflow-hidden">
 
-      {/* Breathing orbs */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="animate-breathe absolute top-0 left-0 h-[500px] w-[500px] -translate-x-1/3 -translate-y-1/3 rounded-full bg-violet-500/12 blur-3xl" />
-        <div className="animate-breathe-delayed absolute bottom-0 right-0 h-[600px] w-[600px] translate-x-1/3 translate-y-1/3 rounded-full bg-sky-500/8 blur-3xl" />
-      </div>
-
-      {/* Header — back goes to the tracker board */}
-      <header className="relative flex shrink-0 items-center justify-between border-b border-slate-800 px-6 py-3">
-        <div className="flex items-center gap-3">
-          <Link
-            href={`/study/${goalId}/track`}
-            aria-label="Back to the track board"
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-          >
-            <ArrowLeft size={16} />
-          </Link>
-          <span className="font-serif text-base font-semibold text-white">Hugh.</span>
+        {/* Breathing orbs */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="animate-breathe absolute top-0 left-0 h-[500px] w-[500px] -translate-x-1/3 -translate-y-1/3 rounded-full bg-violet-500/12 blur-3xl" />
+          <div className="animate-breathe-delayed absolute bottom-0 right-0 h-[600px] w-[600px] translate-x-1/3 translate-y-1/3 rounded-full bg-sky-500/8 blur-3xl" />
         </div>
 
-        <div className="flex items-center gap-4 text-sm">
-          <HeaderUsage />
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-800 text-sm font-semibold text-slate-300">
-            {initial}
-          </div>
-          <span className="hidden sm:block text-slate-500">{user.email}</span>
-          <span className="hidden sm:block text-slate-700">|</span>
-          <SignOutButton />
-        </div>
-      </header>
-
-      {/* Milestone focus strip — persists with the focused milestone */}
-      {focusTitle && (
-        <div className="relative shrink-0 flex items-center gap-2.5 border-b border-violet-500/20 bg-violet-500/5 px-6 py-2">
-          <MilestoneIcon size={13} className="shrink-0 text-violet-400" />
-          <span className="text-xs text-slate-500">Focused on</span>
-          <span className="rounded-full bg-violet-900/50 px-2.5 py-0.5 text-xs font-semibold text-violet-300 truncate max-w-xs">
-            {focusTitle}
-          </span>
-          {urlMilestone && (
+        {/* Header — back goes to the tracker board */}
+        <header className="relative flex shrink-0 items-center justify-between border-b border-slate-800 px-6 py-3">
+          <div className="flex items-center gap-3">
             <Link
-              href={`/study/${goalId}/ask`}
-              className="ml-auto shrink-0 text-xs text-slate-600 hover:text-slate-400 transition-colors flex items-center gap-1"
+              href={`/study/${goalId}/track`}
+              aria-label="Back to the track board"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-colors"
             >
-              <X size={11} />
-              Clear focus
+              <ArrowLeft size={16} />
             </Link>
-          )}
-        </div>
-      )}
+            <span className="font-serif text-base font-semibold text-white">Hugh.</span>
+          </div>
 
-      {/* Chat + checklist side-rail */}
-      <AskWorkspace
-        topic={chatTopic}
-        goalId={goalId}
-        milestoneId={focusId ?? undefined}
-        milestoneTitle={focusTitle ?? undefined}
-      />
+          <div className="flex items-center gap-4 text-sm">
+            <HeaderUsage />
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-800 text-sm font-semibold text-slate-300">
+              {initial}
+            </div>
+            <span className="hidden sm:block text-slate-500">{user.email}</span>
+            <span className="hidden sm:block text-slate-700">|</span>
+            <SignOutButton />
+          </div>
+        </header>
 
-    </div>
+        {/* Milestone focus strip — persists with the focused milestone */}
+        {focusTitle && (
+          <div className="relative shrink-0 flex items-center gap-2.5 border-b border-violet-500/20 bg-violet-500/5 px-6 py-2">
+            <MilestoneIcon size={13} className="shrink-0 text-violet-400" />
+            <span className="text-xs text-slate-500">Focused on</span>
+            <span className="rounded-full bg-violet-900/50 px-2.5 py-0.5 text-xs font-semibold text-violet-300 truncate max-w-xs">
+              {focusTitle}
+            </span>
+            {urlMilestone && (
+              <Link
+                href={`/study/${goalId}/ask`}
+                className="ml-auto shrink-0 text-xs text-slate-600 hover:text-slate-400 transition-colors flex items-center gap-1"
+              >
+                <X size={11} />
+                Clear focus
+              </Link>
+            )}
+          </div>
+        )}
+
+        {/* Chat + checklist side-rail */}
+        <AskWorkspace
+          topic={chatTopic}
+          goalId={goalId}
+          milestoneId={focusId ?? undefined}
+          milestoneTitle={focusTitle ?? undefined}
+        />
+
+      </div>
+    </>
   );
 }

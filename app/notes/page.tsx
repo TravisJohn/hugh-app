@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import NotesWorkspace from "@/components/notes/NotesWorkspace";
+import RecordActivity from "@/components/monitor/RecordActivity";
 
 // The Notes workspace — capture a test screenshot + your reasoning, then let
 // Hugh (the Coach) read both and correct your thinking. Auth-gated like the rest
@@ -10,5 +11,17 @@ export default async function NotesPage() {
   const supabase = await createClient();
   await verifyUserAccess(supabase);
 
-  return <NotesWorkspace />;
+  return (
+
+    <>
+
+      {/* Records that this surface was used today. Renders nothing. */}
+
+      <RecordActivity feature="notes" />
+
+      <NotesWorkspace />
+
+    </>
+
+  );
 }

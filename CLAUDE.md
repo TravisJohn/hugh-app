@@ -24,6 +24,7 @@ legacy surface.**
 | `/cases` · `/cases/lab` | The Case Room (judgment cases) · Case Lab (long-form + CSV) |
 | `/cloud` | Cloud-services reference with an assistant |
 | `/notes` | Screenshot + reasoning workspace with per-image Coach threads |
+| `/monitor` | Monitor — hand-kept tracking: Skills · Job Applications (résumés/cover letters + applications) · Your Usage |
 | `/interview/[room]` | Legacy mock-interview loop (not linked from `/home`) |
 | `/admin` | Admin console — users, approvals, usage and cost |
 
@@ -87,6 +88,15 @@ budget and then spends against it invisibly.
 - Retry loops accumulate tokens across attempts — a discarded attempt still costs
   money and must still be logged.
 
+**`activity_events` is not `usage_logs`.** Monitor's Usage view reads a separate
+table that records *that a surface was used*, one row per learner per surface per
+day. Do not merge the two. `usage_logs` records token spend, and three surfaces
+spend nothing — Cases and Case Lab are static JSON, code drills run in Pyodide —
+so their calendars would be permanently blank on `usage_logs` alone. Adding page
+views to `usage_logs` would also corrupt the per-row per-model cost maths. The
+two also speak different vocabularies: `usage_logs.feature` is route-level
+(`learn/chat`), `activity_events.feature` is surface-level (`ask`).
+
 ## Environment Variables
 All secrets live in `.env.local` (never committed). See `.env.example` for the
 full list with notes on what each one gates.
@@ -119,14 +129,16 @@ app/                        # Pages and API routes only — no business logic he
   study/[goalId]/           # track board, ask page
   review/ · mastery/        # milestone review quiz, prove-mastery
   code/ · cases/ · cloud/ · notes/ · interview/ · tracker/ · admin/
+  monitor/                  # Monitor — Skills · Applications · Usage (tabs, ?view=)
 components/                 # one folder per surface, plus ui/ primitives
 lib/
   supabase/                 # client.ts (browser), server.ts (routes), service.ts
   claude/                   # prompts and parsers
+  calendar.ts               # calendar-heatmap bucketing (pure, tested, shared)
   pricing.ts                # per-model rates (pure, tested)
   usage.ts                  # logging, quota gates (server-only)
   tracker/ · learn/ · code/ · cases/ · case-lab/ · cloud/ · notes/ ·
-  mastery/ · documents/ · askcode/ · pomodoro/ · architecture/
+  mastery/ · documents/ · askcode/ · pomodoro/ · architecture/ · monitor/
 hooks/                      # useInterview, useNotes, usePomodoro, …
 types/                      # Shared TypeScript interfaces
 utils/                      # Pure helpers
@@ -165,11 +177,17 @@ Every screen must fit within the viewport height. Use `h-screen`, flex column
 layouts, and `min-h-0` on flex children to prevent overflow. If content risks
 overflowing, reduce padding or font sizes — never add scroll.
 
-**Exception — the Notes workspace (`/notes`).** Notes is a document-style tool for
-reviewing long screenshots and coaching threads, so its three panes (tree ·
-screenshots · thread) each scroll *internally* while the page itself stays locked
-to the viewport (`h-screen`, no page scroll). This is the only screen permitted to
-scroll inside its panes.
+**Exception — the two records tools, `/notes` and `/monitor`.** Both are
+document-style tools rather than teaching surfaces: they hold a growing pile of
+the learner's own material, so their panes scroll *internally* while the page
+itself stays locked to the viewport (`h-screen`, no page scroll). Notes has three
+panes (tree · screenshots · thread); Monitor has two per view. Six skills fit a
+screen, but forty job applications and half a year of diary entries do not.
+
+These are the only two screens permitted to scroll inside their panes, and the
+exception is drawn at *records tools*, not at "screens with a lot on them". A
+teaching surface that outgrows the viewport should lose padding or gain
+pagination — never a scrollbar.
 
 Those panes are also user-resizable and individually collapsible. The geometry
 lives in `lib/notes/layout.ts` (pure, unit-tested) and is driven by

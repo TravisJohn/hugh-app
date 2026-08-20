@@ -3,6 +3,7 @@ import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import { loadManifest } from "@/lib/cases/loader";
 import CaseLanding from "@/components/cases/CaseLanding";
 import type { CaseProgress } from "@/types/cases";
+import RecordActivity from "@/components/monitor/RecordActivity";
 
 // The Case Room library. Auth-gated like the rest of the learner area. Reads
 // only the manifest (lazy — full cases load on their own page) plus this
@@ -30,5 +31,17 @@ export default async function CasesPage() {
     }
   }
 
-  return <CaseLanding manifest={manifest} progress={progress} />;
+  return (
+
+    <>
+
+      {/* Records that this surface was used today. Renders nothing. */}
+
+      <RecordActivity feature="cases" />
+
+      <CaseLanding manifest={manifest} progress={progress} />
+
+    </>
+
+  );
 }

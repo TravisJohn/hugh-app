@@ -3453,3 +3453,636 @@ viewport, and that is an edit to the architecture rules); whether Applications
 belongs in Hugh at all, being the first surface with no connection to data and
 analytics and therefore exactly the drift the topic gate exists to prevent; and
 whether Monitor takes the empty sixth slot on `/home`.
+
+## Monitor: the four questions answered, PRD written (2026-08-20)
+
+Travis answered all four questions the prototype left open. Every one went the
+way the prototype recommended, with one addition.
+
+- **Tabs, not routes.** One `/monitor` shell, three tabs, with Applications able
+  to open a full-width detail view the way `/notes` does. Tab state goes in the
+  URL (`?view=`) so the back button and bookmarks work.
+- **Monitor gets the Notes scroll exception.** Page locked to the viewport,
+  panes scroll internally. That is an edit to Architecture Rule 4 in CLAUDE.md,
+  and it ships in the same pass as the code rather than trailing it.
+- **Applications ships to everyone**, not gated to one account — with a proper
+  subheading on the card explaining what it is. That is the addition, and it is
+  the right answer to the concern rather than a decoration on it: the risk was
+  never that the feature exists, it was that a learner opens a learning tool and
+  finds career admin unannounced. Worth being precise about what did and did not
+  change — the topic gate is untouched, because Monitor never sends what the
+  learner typed to a model. Applications widens what Hugh *holds*, not what Hugh
+  *teaches*.
+- **Monitor takes the sixth home slot**, cyan, filling the void the Systems card
+  left.
+
+`docs/monitor-prd.md` now carries the PRD and the architecture proposal: four
+tables across two migrations, the module structure, and three build phases
+(Skills · Applications · Usage). Two choices in it are worth flagging here
+because they are the ones that could have gone the other way.
+
+The heatmap is **promoted, not duplicated** — `ProgressHeatmap.tsx` moves to
+`components/ui/CalendarHeatmap.tsx` with a `unit` prop, and `/code/start` keeps
+a thin wrapper. Monitor needs that ramp three more times, and two implementations
+of one ramp is how the accent-versus-ramp separation starts to rot.
+
+The validated application palette gets a **unit test asserting its stacking
+order**, not a comment. Green above red fails deutan separation at ΔE 4.6; a
+comment gets tidied away by a later reader, a failing test explains itself.
+
+Phase C (Usage) is last on purpose. It is the only phase that reaches into ten
+live surfaces to instrument them, it is separable from the other two, and it is
+the one view whose value accrues over days instead of appearing the moment you
+type something in.
+
+Nothing is built. Awaiting approval on the architecture.
+
+## Monitor Phase A: shell, Skills, home card (2026-08-20)
+
+`/monitor` exists. Three tabs under one shell, Skills working end to end, the
+home grid back to a full six cards.
+
+**Migration 037** creates `monitor_skills`, `monitor_skill_entries` and
+`monitor_applications`, owner-only RLS on all three. Applications' table ships
+now even though its view is Phase B — the schema is settled and splitting it
+across two migrations would buy nothing. `activity_events` is deliberately not
+here; it is 038, with Phase C.
+
+The one schema decision worth restating: `monitor_skill_entries` has **no unique
+constraint on (skill_id, entry_date)**. One row is one session, not one day. Two
+sittings on window functions in a day are two entries, and the heatmap shades by
+count — a unique constraint would flatten five shades to on/off.
+
+### The heatmap got promoted, and it was worth it
+
+`ProgressHeatmap.tsx` moved to `components/ui/CalendarHeatmap.tsx` with `unit`,
+`cellSize`, `caption` and `activeVerb` props; `/code/start` keeps a four-line
+wrapper that supplies its own wording, so it renders identically. The bucketing
+came out into **`lib/calendar.ts`** — not `lib/monitor/calendar.ts` as the PRD
+said, because `lib/code/progress.ts` consumes it and code drills must not depend
+on Monitor. `lib/pricing.ts` already set the precedent for a shared pure module
+at the lib root. `buildHeatmap` is now a three-line adapter over it, and the 16
+existing progress tests pass untouched, which is the evidence the refactor was
+behaviour-preserving.
+
+### 182 days, not 112
+
+The prototype's Skills notes carried a fifth question that never made it into
+"Before I build": how far back a row reaches. It was drawn at 182 days with 365
+offered. Phase A uses **182** — the value that was actually reviewed — rather
+than matching `/code/start`'s 112. A skill row is a full pane wide and the payoff
+of the view is seeing half a year at once. It is one constant if 365 is wanted.
+
+### What the pure module carries
+
+`lib/monitor/skills.ts` holds everything with a branch in it: name and note
+normalisation, entry-date validation, the skill-name folding that stops "Window
+Functions" becoming a second row beside "window functions", the summary
+derivation, and the tick labels. 35 tests. Three behaviours in there are product
+decisions, not plumbing:
+
+- A future entry date is rejected. It would shade a cell past the end of the
+  grid, where it can never be seen — the tick would silently do nothing.
+- Backdating is allowed. Remembering on Wednesday that you studied on Monday is
+  the normal case for a hand-kept record.
+- `touchLabel` says **"never"** plainly for a skill written down and never
+  touched. A skill you wrote down and did nothing about is the most useful thing
+  this view can show you; "not started yet" would blunt exactly that.
+
+The run counter (`currentRunDays`) resets to zero the moment today is untouched.
+Nothing celebrates it, warns it is at risk, or shows it after it breaks — it is a
+fact on the row. That is the stance `ProgressHeatmap` already took by refusing
+streak counts, and Monitor inherits it rather than reopening it.
+
+### One lint rule caught a real bug
+
+The header's date was a `useState` + `useEffect` pair to dodge a hydration
+mismatch. `react-hooks/set-state-in-effect` rejected it, and the rule was right
+about more than style: Monitor buckets days in **UTC server-side**, so a header
+rendered from the browser's local date could read "Wed 17 Jun" while a tick
+landed on the 18th. The date is now computed in the server component and passed
+down, so the banner agrees with what actually gets recorded.
+
+### Documentation shipped with the code, not after
+
+All four `CLAUDE.md` edits are in: the `/monitor` surface row, `lib/monitor/` and
+`lib/calendar.ts` in the folder map, the `activity_events` ≠ `usage_logs` note in
+the cost section, and Rule 4's scroll exception rewritten to cover **the two
+records tools**. That last one is deliberately drawn at records tools rather than
+"screens with a lot on them", so it cannot be cited by the next teaching surface
+that outgrows a viewport.
+
+### State
+
+Typecheck clean, lint clean, production build clean, 492 tests passing across 31
+files (56 of them new). Not yet verified in a browser: **migration 037 has to be
+applied by hand** in the Supabase Dashboard before `/monitor` can load anything.
+
+Phase B (Applications) next.
+
+## Effort on a skill entry (2026-08-20)
+
+A session is not just a session: half an hour of skimming and two hours of
+fighting a problem were both one tick, and a record that cannot tell them apart
+overstates the light days. Each entry now carries an effort rating, 1 (subpar) to
+5 (intensive). **Migration 038.**
+
+### This changed what the grid means
+
+The decision worth recording is not the column, it is the semantics. A cell now
+shades by the day's **peak effort**, not by how many sessions the day held. The
+heatmap answers *how hard did I go* instead of *how often did I show up*.
+
+Two alternatives were on the table and both were rejected. Summing effort across
+a day would let three easy sessions out-shade one hard one and would push a day
+past the top of the scale, where no shade exists for it. Leaving the grid
+counting sessions and treating effort as metadata would have made effort a field
+you fill in and never see — the kind that gets abandoned in a fortnight. Peak
+keeps the number on the cell and the number in the control the same number.
+
+The cost is real and worth stating: the grid no longer distinguishes one hard
+session from three hard sessions. That is the trade peak makes, and it was taken
+knowingly.
+
+### A second ramp, same family
+
+Effort is already a scale, so shading it relative to the grid's own busiest day
+would make an all-easy month and an all-brutal one render identically — exactly
+the comparison effort exists to support. `CalendarHeatmap` gained a `scale` prop:
+`relative` (four quartiles, unchanged, still what `/code/start` uses) and
+`absolute5` (five steps, one shade each). One more step, same emerald family, no
+new hue — the accent/ramp separation holds.
+
+### Rating costs one click, not two
+
+The tick box became five segments. Clicking segment N logs a session at that
+effort, so rating is the same single action ticking was. The moment recording a
+day takes two actions, the honest record becomes harder to keep than the
+flattering one, and the whole thing rots.
+
+Old entries stay NULL rather than being backfilled, and read as effort 1 when
+shading. A record may be incomplete; it must never invent its own contents.
+Under-stating old ticks is the acceptable direction to be wrong. Out-of-range
+ratings are stored as NULL rather than clamped — clamping a 9 to 5 would promote
+a typo into the strongest claim the scale can make — but the session is still
+recorded, because that it happened matters more than how it was rated.
+
+Green on lint, tsc, and 512 tests (17 new). Migration 038 needs a manual apply.
+
+## Monitor Phase B: Applications (2026-08-20)
+
+The Applications tab is live. Three panes — the numbers, the list, the documents
+— shaped like `/notes`, each scrolling internally while the page stays locked to
+the viewport.
+
+### The prototype caught the PRD in an error
+
+Two things in Phase B contradict the PRD I wrote, and in both cases the
+prototype was right and the PRD was my own drift away from a reviewed decision.
+
+**Status is a history, not a field.** The PRD dismissed a status-events table as
+"a funnel-over-time view nobody asked for". The prototype had already decided
+otherwise, in as many words: *a single mutable status column would erase the
+thing you actually want later — how long each stage took, and where applications
+die.* The concrete cost of the PRD's version: the Interviews tile would count
+only applications sitting at interview right now, so the single number measuring
+whether the applying is working would **fall every time an interview led to a
+rejection**. That is precisely backwards. Migration 039 adds
+`monitor_application_events`, and `summariseApplications` counts interviews from
+the history.
+
+**Three panes, not list ↔ detail.** The PRD simplified the layout to a list and a
+full-width detail; the prototype draws stats+chart · list · documents, which is
+the Notes shape the approved answer actually asked for.
+
+The lesson worth keeping: when a prototype has been reviewed, it outranks a
+document written afterwards from memory of it.
+
+### Two places hold status, and that is a managed risk
+
+`monitor_applications.status` stays as the current stage — the list, the pills
+and the chart read it, and it carries the CHECK that keeps the five statuses
+closed. The events table is the history. Two stores that must agree is exactly
+the shape of a future bug, so they are never constructed separately: one pure
+function (`statusChange`) builds the column patch and the history row from one
+input, and one route applies them. The event is written first, so a failure
+leaves a visible history entry the row hasn't caught up to, rather than a silent
+status change with no record of when.
+
+### The stack order is now enforced, not annotated
+
+`applications.test.ts` asserts `STATUS_STACK` literally, with the reason in the
+test body: green (offer) directly above red (rejected) drops deuteranope
+separation to dE 4.6 and the two ends of the chart stop being distinguishable.
+The test says, in its own comment, that the fix for a failure is to restore the
+order rather than update the expectation. A comment gets tidied; a failing test
+argues back.
+
+### Smaller calls worth recording
+
+- **The chart is the past re-coloured by the present.** A bar sits on the day it
+  was sent and takes the colour of where that application stands *now* — which
+  is the only version that answers whether a good week led anywhere.
+- **An unknown status is dropped from the chart, not counted.** Segment 0 is
+  "rejected", so piling unrecognised rows there would invent bad news out of a
+  data error.
+- **Applications are hard-deleted, unlike skills.** One recorded by mistake
+  carries no history worth keeping, and leaving it would overstate how much you
+  have sent — the number this view exists to report honestly. Two-click confirm.
+- **Every status stays available, including going backwards.** A search does not
+  run in one direction: a "rejected" typed in error must be undoable.
+- **Creating takes two fields and a date.** The documents are pasted afterwards.
+  A form demanding a cover letter up front is a form you skip when you are busy,
+  which is exactly when the record matters most.
+- **Saving a document is a button, never an autosave.** A debounce firing
+  mid-paste would store half a cover letter and call it the record.
+
+### The lint rule earned its keep again
+
+`react-hooks/set-state-in-effect` rejected the effect that reset the document
+draft when the tab changed. The fix was better than the code it replaced: the
+editor is keyed by tab and the detail pane keyed by application, so React
+remounts them with the right content instead of syncing state after the fact.
+No window in which one document's text sits under another's heading.
+
+Green on lint, tsc, 544 tests (32 new). **Migration 039 needs a manual apply.**
+Because 039 went to application history, Phase C's `activity_events` is now 040.
+
+## Documents as entities: résumés and cover letters (2026-08-20)
+
+Travis asked whether Hugh should store résumés and CVs — "so that the
+professional has a one-stop shop of all his professional affairs". Agreed, with
+the scope split: **documents as entities yes, file upload no**.
+
+**Migration 040.** `monitor_documents` (a CV you maintain) plus
+`monitor_document_versions` (v1, v2, v3), and applications now hold
+`resume_version_id` / `cover_letter_version_id`. The `resume_text` and
+`cover_letter` columns are migrated into documents and then dropped.
+
+### It fixes something Phase B got wrong
+
+`resume_text` modelled a CV as a property of one application, which it is not.
+Apply to twenty jobs with the same résumé and the database held twenty unrelated
+blobs of text with no way to know they were the same document. The record could
+not answer the question a job search actually asks.
+
+Now it can, and this is the whole return on the migration:
+
+> Analytics Engineer CV **v3** — sent to 7, 2 reached interview.
+> **v4** — sent to 11, 4 reached interview.
+
+CV versions measured against outcomes. No AI and no inference — it falls out of
+the join. Interviews are counted from the application history, so a version that
+won an interview and was later rejected keeps the credit, for the same reason
+the Interviews tile does.
+
+### The rules that keep the record honest
+
+- **ON DELETE SET NULL, never CASCADE.** Deleting a document must not delete the
+  applications sent with it. The application survives with an unknown
+  attachment — a gap in the record, where cascading would be a hole in it.
+- **A version's content is immutable.** There is deliberately no PATCH for it.
+  An application claims to have sent a particular version; rewriting that
+  version would make the claim false, and the record would be wrong in the one
+  way that matters — retrospectively. To change the text you add a version.
+- **`nextVersionNumber` is highest + 1, never count + 1.** Counting rows would
+  hand out "3" again after v3 was deleted, so two different texts could both
+  have been v3 and no application's claim would be checkable.
+- **The old columns are dropped, not left behind.** Two homes for a CV that must
+  agree is the exact failure this migration removes, and one of them would
+  silently become the stale one. Verified before writing the drop: three test
+  applications, none carrying pasted text, so nothing is lost.
+- **Filing is not a second chore.** Pasting text into an application creates the
+  version and attaches it in one gesture. A library you must visit separately is
+  a library that stays empty.
+
+### Where the boundary now sits
+
+The question behind the request — should Hugh be a one-stop shop for
+professional affairs — was answered narrowly on purpose. A document repository
+makes Applications correct. A career product is a different thing wearing this
+one's clothes.
+
+The line already in the PRD stands and was restated: **Monitor may hold
+career-admin data; no Hugh surface may teach against it.** A CV repository is
+fine. The moment something offers to *improve* your CV, Hugh has become a career
+assistant, and that deserves a deliberate decision rather than being the
+eleventh feature in a refinement pass.
+
+`job_description` and `notes` stay on the application, because they belong to
+that one application and are never reused. Only what you send more than once
+becomes a document.
+
+### Sensitivity
+
+A résumé is the most personal thing Hugh holds — address, phone, full employment
+history — and signup is open. RLS is owner-only with no shared or admin-readable
+path. Standing constraint recorded: **the admin console must never render
+document contents, only counts.**
+
+Green on lint, tsc, 567 tests (23 new). **Migration 040 needs a manual apply.**
+Because 040 went to documents, Phase C's `activity_events` is now 041.
+
+### Addendum: the destructive half got its own migration (2026-08-20)
+
+Supabase warned on 040, and the warning was pointing at one statement — the
+`DROP COLUMN` that removed `resume_text` and `cover_letter` after the backfill.
+Everything else in the file was `CREATE`, `ADD COLUMN`, `INSERT` or `UPDATE`.
+
+The exposure was nil in practice (all three applications had both columns NULL,
+verified before the migration was written), but the general point stands: this
+repo has no rollback tooling, migrations are forward-only and applied by hand,
+and a dropped column cannot be undone. So the drop moved to **041**, which can
+be run once 040 is confirmed working, and carries the check query to run first.
+
+Leaving the columns in place between the two is safe rather than a compromise:
+no code writes them and no type declares them, so they are inert — not a second
+home for a CV competing with the first. `activity_events` moves to 042.
+
+The rule worth keeping: **a destructive statement gets its own migration.** It
+costs one file and makes the dangerous step separately decidable.
+
+## Document files, and the attach pane (2026-08-20)
+
+Two changes, both Travis's call after being shown the trade-offs.
+
+**Files are in.** The text-only deferral is reversed: a version now carries the
+actual PDF/DOCX as well as its text. The reasoning that won is simple and was
+right — a résumé is not its words. It is a laid-out artifact, and the version
+you sent was a file, not a transcription of one.
+
+**Migration 042** adds `file_path`, `file_name`, `file_size` and `mime` to
+`monitor_document_versions`, plus a private `monitor-documents` Storage bucket.
+It follows `note-images` exactly rather than inventing a second scheme: objects
+keyed `<user_id>/<document_id>/<uuid>.<ext>`, owner-only policies on the first
+path segment, uploads through a service-role route.
+
+### The rules that make file storage safe here
+
+- **Text and file are both optional; a version must have one.** A database
+  CHECK, not just a route guard — "which version did I send" must never resolve
+  to an empty row. Keeping both is not redundancy: text is searchable and
+  readable inline, the file is the thing that was actually sent.
+- **The stored extension comes from our allowlist, never from the filename.**
+  The browser-reported MIME type is a hint, not proof. Deriving the extension
+  from a table we control means a mislabelled upload cannot name its own object
+  on disk. PDF, DOCX, DOC, RTF, ODT — an allowlist, never a blocklist.
+- **Signed URLs are minted per click and live five minutes**, never attached to
+  the documents listing. Most versions are never opened, and a list response
+  carrying a live URL to every résumé you have ever written is a far larger
+  thing to leak than one URL to the one you asked for. Notes uses an hour;
+  five minutes is right here because a CV is opened once, not read all session.
+- **A failed row insert removes the uploaded bytes.** Otherwise the bucket
+  accumulates objects no row can reach and no user can delete.
+- **5 MB**, checked in the browser before the upload and again on the server.
+  Half what Notes allows for screenshots, because there is no legitimate large
+  case for a CV.
+
+`readVersionInput` / `rejectBadVersion` / `writeVersion` are shared by both the
+create-document and add-version routes. Two paths doing the same thing is how
+one of them quietly ends up accepting a different size limit.
+
+### The attach UI became a fourth pane
+
+Attaching happens once per application; reading the job description happens
+constantly. A permanent pane for the rarer job taxes the commoner one, so the
+attach pane is hidden until wanted, and the other three narrow when it opens.
+The Résumé and Cover-letter tabs are gone from the detail pane, which now holds
+only what belongs to that one application: the job description and the notes.
+
+One thing kept always visible: a single line in the detail header saying what
+is attached. The commonest question about an attachment is "is there one?", and
+answering that should never cost a click — only changing it should.
+
+Both kinds now live in one pane rather than two tabs, because "what did I send
+them" is one question with two halves and answering it in two places meant
+checking twice.
+
+Green on lint, tsc, 572 tests. **Migration 042 needs a manual apply**, and it
+creates a Storage bucket as well as columns. `activity_events` moves to 043.
+
+## Documents becomes its own tab; the composer stops sulking (2026-08-20)
+
+Two pieces of feedback from testing, both right.
+
+### "Save and attach is unclickable"
+
+The note was never required, and the text was never required if a file was
+attached. What *was* required — and silently — was the **name**, which for a new
+résumé started empty. Fill in the file, the text and the note, skip the field at
+the top, and the button sat there dead with nothing saying why.
+
+The bug is not that a field was required. It is that **a disabled control would
+not explain itself**. Two fixes:
+
+- The name now fills itself in from the uploaded filename.
+  "cv-analytics-2026-06.pdf" is already the name of the thing, and asking
+  someone to retype it before anything can be saved is ceremony.
+- When the button is disabled it says the one reason, in order: the file is too
+  big, or attach a file or paste the text, or give it a name.
+
+The form also moved into `VersionComposer`, shared by the attach pane and the
+new Documents tab. Two copies of a form is how one of them ends up with a
+different size limit.
+
+### A repository you reach through an application is not a repository
+
+The sharper point. You could only add a résumé from inside an application's
+attach pane, which meant the library existed as a side effect of tracking a job.
+Backwards: the CVs exist whether or not you applied to anything today, and the
+applications refer to *them*.
+
+So **Documents is now a fourth Monitor tab** — Skills · Applications ·
+Documents · Usage. It has the library on the left (résumés and cover letters,
+each with ＋), and on the right one document's versions with what each one
+achieved, the file to open, rename and archive.
+
+This reopens the "three tabs" decision from the prototype, and that is fine:
+that decision was made before documents existed as a concept. Tabs were chosen
+over routes for one home card and one mental model, and a fourth tab costs
+neither.
+
+**The Applications left pane keeps the outcome readout but lost its write
+buttons.** The same data with two write paths is two places to look when one of
+them misbehaves. The tab manages; the pane reports, next to the chart, because
+both answer the same question — is any of this working?
+
+Green on lint, tsc, 576 tests. No migration: this is all UI over what 040 and
+042 already store.
+
+## Attaching becomes selection, not creation (2026-08-20)
+
+Travis attached the same résumé to two applications and got two documents. The
+data confirmed it: identical label, identical file, two rows — and the outcome
+stats split in half, each reading "sent to 1" instead of one CV reading
+"sent to 2". That is the exact number documents-as-entities exists to produce,
+so the bug defeated the feature rather than merely annoying.
+
+**The cause was my design, not a slip.** The attach pane led with a prominent
+"New résumé" button and hid the existing document's versions as small chips
+underneath it. The wrong action was the obvious one. A control that makes the
+destructive-to-your-data path the easy path is a broken control, however
+correct the code beneath it.
+
+Two fixes, because either alone leaves the trap half-open.
+
+**Attaching is now selection.** One `<select>` per kind, grouped by document,
+listing every version in the library — "Analytics Engineer CV → v2 ·
+cv-2026-06.pdf". Picking is the whole interaction. Adding a new one is still
+possible, because a bespoke cover letter is a real thing, but it is a text link
+below the dropdown rather than the headline, and the library itself is managed
+in the Documents tab.
+
+**The server folds a repeated name into a version.** Creating a document whose
+name matches an existing live one of the same kind (folded on case and spacing)
+now adds the next version to that document instead of a twin. Same rule as
+skills, for the same reason: "Senior DE CV" and "senior de cv" must not become
+two libraries of one résumé, each holding half the history.
+
+Kinds stay separate — "Halcyon" as both a CV and a cover letter is legitimate —
+and archived names are reusable.
+
+Green on lint, tsc, 580 tests (4 new on the folding rule). No migration.
+
+## Refining the library: order, discoverability, and looking without leaving (2026-08-20)
+
+Four changes to the document repository, all from testing it for real.
+
+**The tabs are now Skills · Résumés and Cover Letters · Applications · Your
+Usage.** Two things changed at once. The library moved *before* Applications,
+because that is the order you do things in — you write a CV before you apply
+with it — so the tab bar now states the dependency that had to be explained in
+prose. And "Documents" became "Résumés and Cover Letters": a filing-cabinet word
+replaced by the things themselves. The URL values are untouched
+(`?view=documents`), because renaming a label must not break a saved link.
+
+**Adding a document was invisible.** The only way to upload a CV was a 12-pixel
+＋ icon beside a small grey heading — the tab's entire purpose rendered as an
+afterthought, and Travis reasonably concluded it could not be done. It is now a
+full-width dashed **Add résumé** / **Add cover letter** button under each group,
+and an empty library shows the offer rather than a description of one. Third
+time this session that a correct implementation was defeated by the wrong thing
+being prominent; the pattern is worth naming.
+
+**"Where did it go?" was a fair question about archiving.** The archived list
+rendered nothing at all when empty, so the only route back was invisible until
+you had already used it. It is now a labelled, collapsible **Archived (n)**
+section that explains what archiving did — put away, not deleted, and the
+applications you sent these to still point at the exact version they got.
+
+**You can look at a document without leaving the page.** Hovering a version
+reveals its actions and its metadata; **Look at it** embeds the file inline in
+the pane, and **Download** saves it under its original filename via a signed URL
+carrying `Content-Disposition`.
+
+Hover deliberately does *not* fetch the file. A signed URL is minted per request
+and lives five minutes; spending one every time the cursor crosses a row would
+scatter live links to a résumé through the page as a side effect of moving the
+mouse. Hover reveals; one click fetches. The actions also respond to
+`focus-within`, because a control that exists only under a cursor is a control
+some people do not have.
+
+Green on lint, tsc, 580 tests. No migration.
+
+## One tab for the job search, and a link to the advert (2026-08-20)
+
+**Three tabs over four views.** Résumés and applications are one activity, so
+they now share a tab — **Skills · Job Applications · Your Usage** — with a
+sub-navigation inside it: *Résumés and Cover Letters*, then *Applications*.
+
+The tab bar and the view list have deliberately stopped being the same thing.
+`MONITOR_TABS` groups views; `tabForView` resolves the other way. The URL still
+names the **view** (`?view=documents`), so every link saved before the grouping
+still works and the sub-navigation costs no second parameter. Clicking the tab
+lands on the library rather than the tracker, because that is the order the work
+happens in — a document has to exist before an application can be sent with it.
+
+**A link to the advert.** Migration 043 adds `job_url`, asked for on the create
+form and shown in the detail header as the host name.
+
+Two things worth stating about it.
+
+`normaliseJobUrl` accepts **http and https only**, and that is a security rule
+rather than tidiness: the value is rendered as a clickable link, so accepting a
+`javascript:` or `data:` URL would let pasted text execute on click. A bare
+"example.com/jobs/1" gets https:// rather than a rejection, because that is what
+people paste. The link renders with `rel="noopener noreferrer"` — a job board
+has no business knowing which page sent you.
+
+And the honest caveat, which is in the UI and not only the migration: **a URL is
+a pointer, not an archive.** Listings come down when the role is filled, often
+within weeks. The thing that actually preserves the advert is the description
+pasted into the Job description tab, so the form says so at the point where it
+matters rather than leaving it to be discovered later.
+
+Green on lint, tsc, 588 tests (8 new on URL handling). Migration 043 needs a
+manual apply. `activity_events` moves to 044.
+
+## Monitor Phase C: Usage — the last view (2026-08-20)
+
+Monitor is complete. Every surface records that it was opened, and Your Usage
+draws a calendar per surface over twelve months.
+
+### The plan changed the instrumentation seam, and that was the whole phase
+
+The PRD said: instrument the API routes where one exists, fall back to a client
+ping only for the three surfaces that spend no tokens. That is wrong in exactly
+the way this table exists to prevent. **An API route records where you spent
+tokens, not where you showed up.** Browsing the cloud reference without asking
+it anything, reading a Notes page without invoking the Coach, or opening a track
+board without generating — none of those hit an instrumented route, so half the
+calendars would have under-reported precisely like `usage_logs` does.
+
+So: **one seam, uniformly.** `<RecordActivity feature="notes" />`, one line per
+page, ten pages. Simpler, more correct, and it removed the largest risk in the
+PRD's own §7 — it edits no live API route at all.
+
+A page visit therefore counts as usage. Intended: opening Notes and reading is
+using Notes, and the grid answers "did I show up".
+
+### Most calendars did not have to start empty
+
+Eight of the ten surfaces already had dated rows in this database. Migration 044
+seeds from them: `usage_logs` for the six that spend tokens, `code_drill_attempts`
+for drills, `case_attempts` for the Case Room, plus `note_images`,
+`note_messages` and `milestone_entries` for days work happened without a model
+being called. Every insert is `ON CONFLICT DO NOTHING`, so re-running is
+harmless and a seeded row can never overwrite a real one.
+
+`interview/*` and `tts` are excluded. The interview loop is legacy and off
+`/home`; a calendar would resurrect it as a visible surface. `tts` belongs to
+whichever surface was speaking and cannot be attributed to one.
+
+**Case Lab genuinely starts empty** — all-public, zero runtime AI, no table, no
+route, no trace anywhere. So does the code sandbox beyond its chat.
+
+### Two honesty decisions, both visible in the UI
+
+**The seam is stated.** Days before this migration count token spend and saved
+attempts; days after count visits. Those are not the same measurement, and the
+right pane says so rather than presenting one smooth series.
+
+**Caveats are per surface, not one footnote.** The gaps are different sizes:
+Case Lab has no history at all, Cloud has history only for the days its
+assistant was used. A single note at the bottom would have described one of them
+wrongly, so each card carries its own.
+
+### The registry is enforced, not documented
+
+`lib/monitor/features.ts` holds the ten surfaces, and `features.test.ts` reads
+the `app/` tree, extracts every `<RecordActivity feature="…">`, and asserts the
+two sets match exactly. A surface cannot be instrumented without appearing in
+the view, or appear in the view without being instrumented — the second being
+the worse failure, since an uninstrumented calendar reads as "never used" when
+it means "never recorded".
+
+That test caught the first real bug of the phase: `/study/[goalId]` is only a
+redirect, so `learn` had to mount on `/study/[goalId]/track`. Reading the
+migration also caught the second before it ran — `case_attempts` dates rows with
+`completed_at`, not `created_at`.
+
+### State
+
+Green on lint, tsc, 612 tests (24 new). **Migration 044 needs a manual apply**;
+it is additive plus seeding, with no destructive statements. Monitor's four
+views are all built: Skills, Résumés and Cover Letters, Applications, Your Usage.

@@ -1,4 +1,5 @@
 import DrillLoader from "@/components/code/DrillLoader";
+import RecordActivity from "@/components/monitor/RecordActivity";
 
 // Notebook-style drill for the Code pillar. Reads the picked practice pack from
 // the query (?pack=…) — the main path — or a legacy generated topic
@@ -12,5 +13,17 @@ export default async function CodeDrillPage({
   const sp = searchParams ? await searchParams : {};
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
-  return <DrillLoader pack={one(sp.pack)} topic={one(sp.topic)} context={one(sp.context)} focus={one(sp.focus)} />;
+  return (
+
+    <>
+
+      {/* Records that this surface was used today. Renders nothing. */}
+
+      <RecordActivity feature="code-drill" />
+
+      <DrillLoader pack={one(sp.pack)} topic={one(sp.topic)} context={one(sp.context)} focus={one(sp.focus)} />
+
+    </>
+
+  );
 }
