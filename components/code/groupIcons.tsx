@@ -1,4 +1,4 @@
-import { BarChart3, Braces, Brain, Globe, Sparkles, Workflow } from "lucide-react";
+import { BarChart3, Braces, Brain, Globe, Snowflake, Sparkles, Workflow } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { GroupIconKey } from "@/lib/code/groups";
 
@@ -15,4 +15,5 @@ export const GROUP_ICONS: Record<GroupIconKey, LucideIcon> = {
   sparkles: Sparkles,
   workflow: Workflow,
   globe:    Globe,
+  snowflake: Snowflake,
 };

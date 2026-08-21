@@ -175,7 +175,9 @@ describe("computeAllGroupHeat", () => {
   });
 
   it("omits groups with no packs in the language", () => {
-    expect(Object.keys(computeAllGroupHeat(ALL, [], "sql", NOW))).toEqual(["analysis"]);
+    // The Python-only territories drop out under the SQL pill; Snowflake is the
+    // mirror case, present here and absent from the Python list above.
+    expect(Object.keys(computeAllGroupHeat(ALL, [], "sql", NOW))).toEqual(["analysis", "snowflake"]);
   });
 
   it("rolls a pack's attempts up into its group", () => {

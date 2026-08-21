@@ -10,13 +10,15 @@
 // pandas DataFrame loaded into the Pyodide worker on demand. Packs about
 // scripting/orchestration/retrieval rather than tabular analysis (automation,
 // airflow, rag) use plain `dataKind: "rows"` instead — pandas doesn't fit
-// what they're teaching. The SQL packs (DuckDB) live in sqlPacks.ts. The
+// what they're teaching. The SQL packs (DuckDB) live in sqlPacks.ts, and the
+// Snowflake-dialect packs — same engine, plus a macro shim — in snowflakePacks.ts. The
 // dataset-less Python-fundamentals warm-up ("Let's Do This!", 9 parts) lives
 // in letsDoThisPacks.ts and is prepended to PACKS below.
 
 import { pdDataFrameLiteral, type DataRow, type DrillContent } from "./drillContent";
 import type { DrillLang } from "@/types/code";
 import { SQL_PACKS } from "./sqlPacks";
+import { SNOWFLAKE_PACKS } from "./snowflakePacks";
 import { AUTOMATION_PACKS } from "./automationPacks";
 import { AIRFLOW_PACKS } from "./airflowPacks";
 import { RAG_PACKS } from "./ragPacks";
@@ -535,6 +537,7 @@ export const PACKS: DrillPack[] = [
   ...AIRFLOW_PACKS,
   ...RAG_PACKS,
   ...SQL_PACKS,
+  ...SNOWFLAKE_PACKS,
 ];
 
 export function getPack(id: string): DrillPack | undefined {

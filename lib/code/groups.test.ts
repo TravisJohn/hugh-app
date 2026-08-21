@@ -87,13 +87,19 @@ describe("code groups", () => {
       const sql = packIdsForLang(analysis, "sql");
       expect(sql.every(id => id.startsWith("sql-"))).toBe(true);
       expect(sql.length).toBe(5);
+
+      // The Snowflake territory is SQL-only, so the Python pill sees nothing there.
+      const snowflake = CODE_GROUPS.find(g => g.id === "snowflake") as CodeGroup;
+      expect(packIdsForLang(snowflake, "python")).toEqual([]);
+      expect(packIdsForLang(snowflake, "sql").every(id => id.startsWith("snowflake-"))).toBe(true);
     });
 
     it("hides groups that have no packs in the active language", () => {
-      // Every group has Python packs today; only analysis carries SQL ones, so
-      // the SQL pill must not render five empty cells that branch into nothing.
-      expect(groupsForLang("python").map(g => g.id)).toEqual(CODE_GROUPS.map(g => g.id));
-      expect(groupsForLang("sql").map(g => g.id)).toEqual(["analysis"]);
+      // Snowflake is the only SQL-only territory, so the Python pill must not
+      // render it; and the SQL pill must not render the Python-only ones.
+      const python = groupsForLang("python").map(g => g.id);
+      expect(python).toEqual(CODE_GROUPS.map(g => g.id).filter(id => id !== "snowflake"));
+      expect(groupsForLang("sql").map(g => g.id)).toEqual(["analysis", "snowflake"]);
     });
 
     it("accounts for every pack of a language across the visible groups", () => {

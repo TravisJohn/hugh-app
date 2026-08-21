@@ -4283,3 +4283,49 @@ Method notes worth keeping:
 
 15 services remain unverified and are listed in the queue. Runbook (method,
 traps, batches): https://claude.ai/code/artifact/b7365c7f-4afa-4c3a-80eb-3629e07ef851
+
+## Snowflake SQL packs — dialect fluency in the Code pillar ✅
+
+Travis is building Snowflake SQL fluency, so the Code pillar gained a **Snowflake
+territory**: five packs, 45 cells, under the existing SQL pill.
+
+The engine question came first. SQL drills run on DuckDB-wasm, and there is no
+Snowflake in a browser, so the honest scope had to be measured rather than
+assumed. Probing ~57 distinctly-Snowflake constructs against a real DuckDB split
+them three ways:
+
+- **25 run verbatim** — QUALIFY, `::` casts, TRY_CAST, DATEDIFF, DATE_TRUNC,
+  LAST_DAY, DATE_PART, ARRAY_AGG, SPLIT/SPLIT_PART, MERGE INTO, PIVOT,
+  SELECT * EXCLUDE, GROUP BY ALL, ILIKE, APPROX_COUNT_DISTINCT, MEDIAN,
+  IGNORE NULLS windows, recursive CTEs.
+- **23 restored by a macro prelude** (`lib/code/snowflakeShim.ts`) — IFF, NVL,
+  NVL2, ZEROIFNULL, NULLIFZERO, DIV0, DECODE, TRY_TO_NUMBER, TO_DATE, TO_VARCHAR,
+  DATEADD, PARSE_JSON, GET_PATH, JSON_EXTRACT_PATH_TEXT, ARRAY_SIZE,
+  ARRAY_CONSTRUCT, ARRAY_CONTAINS, OBJECT_CONSTRUCT, REGEXP_SUBSTR, CHARINDEX,
+  STARTSWITH, EDITDISTANCE, TO_NUMBER.
+- **15 unreachable** — `:` VARIANT paths, LATERAL FLATTEN, TABLE(GENERATOR),
+  time travel, streams, tasks, stages/COPY INTO, warehouses, CLUSTER BY, GRANT,
+  LISTAGG…WITHIN GROUP, RATIO_TO_REPORT, RLIKE, SAMPLE (n ROWS).
+
+**Decision: a shim, not a transpiler.** The prelude only ADDS Snowflake spellings;
+no learner query is rewritten on the way in, so a green cell is syntax that runs
+in a Snowflake worksheet unchanged. Anything the shim can't express honestly is
+simply not drilled — a translator that mistranslates would teach wrong syntax
+with full confidence, which is worse than a gap. The semi-structured pack says so
+in its own outcome line rather than quietly substituting DuckDB's `->>` operator
+for Snowflake's `:` paths.
+
+Packs (all `lang: "sql"`, tag `Snowflake`, filed in the new `snowflake` group):
+`snowflake-essentials` (11 cells) · `snowflake-qualify` (9) · `snowflake-dates`
+(9) · `snowflake-semistructured` (9) · `snowflake-transform` (7).
+
+**Verification found a real divergence.** All 45 cells were executed against a
+real DuckDB with the real shim; 44 passed first run. The failure was not a typo:
+`120.5::INTEGER` is **120** on DuckDB (half-to-even) and **121** on Snowflake
+(half away from zero), so the cell would have marked the correct Snowflake answer
+wrong. The dataset lost its .5 boundary and the shim now carries the warning.
+
+Zero new runtime dependencies — verification ran from a scratchpad using
+`@duckdb/node-api` and esbuild, never the repo. Full suite 686 tests green, tsc
+and lint clean, production build passes. The `snowflake` group is SQL-only, so no
+language pill exceeds the pattern map's six cells.

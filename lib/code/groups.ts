@@ -19,10 +19,10 @@
 // components lives with the client component that renders it.
 //
 // Groups are language-agnostic: a group holds the pack ids for every language it
-// covers, and the UI filters by the active language pill. Today that means
-// "analysis" is the only group with SQL packs — see groupsForLang below, which
-// hides groups that are empty in the active language rather than rendering a
-// dead cell.
+// covers, and the UI filters by the active language pill. Today "analysis" holds
+// both Python and SQL packs, while "snowflake" is SQL-only — see groupsForLang
+// below, which hides groups that are empty in the active language rather than
+// rendering a dead cell.
 
 import { PACKS } from "./packs";
 import type { DrillLang } from "@/types/code";
@@ -34,7 +34,8 @@ export type GroupIconKey =
   | "brain"
   | "sparkles"
   | "workflow"
-  | "globe";
+  | "globe"
+  | "snowflake";
 
 export interface CodeGroup {
   /** Stable slug — used in UI state and, later, deep links. */
@@ -90,6 +91,20 @@ export const CODE_GROUPS: CodeGroup[] = [
       "sql-build-chart",
       "sql-linear-regression",
       "sql-forecasting",
+    ],
+  },
+  {
+    id: "snowflake",
+    label: "Snowflake",
+    tagline: "The dialect, drilled — QUALIFY, IFF, MERGE, semi-structured.",
+    icon: "snowflake",
+    accent: "#7dd3fc", // sky-300
+    packIds: [
+      "snowflake-essentials",
+      "snowflake-qualify",
+      "snowflake-dates",
+      "snowflake-semistructured",
+      "snowflake-transform",
     ],
   },
   {
