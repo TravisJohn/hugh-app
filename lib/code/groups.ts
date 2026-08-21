@@ -73,6 +73,8 @@ export const CODE_GROUPS: CodeGroup[] = [
       "lets-do-this-exceptions-typing-status",
       // JavaScript — same territory, surfaced when the JS pill is active.
       "js-lang-basics",
+      // R — base R only, so this leaf boots in seconds where the dplyr ones don't.
+      "r-lang-basics",
     ],
   },
   {
@@ -93,10 +95,12 @@ export const CODE_GROUPS: CodeGroup[] = [
       "sql-build-chart",
       "sql-linear-regression",
       "sql-forecasting",
-      // JavaScript — the same two moves the pandas packs open with, so the
-      // transfer between the three languages is visible in one branch.
+      // JavaScript and R — the same two moves the pandas packs open with, so the
+      // transfer between all four languages is visible in one branch.
       "js-clean-shape",
       "js-explore",
+      "r-clean-shape",
+      "r-explore",
     ],
   },
   {

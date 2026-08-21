@@ -56,7 +56,7 @@ export interface RunResult {
  *
  * Order is the order the pills render in.
  */
-export const DRILL_LANGS = ["python", "sql", "javascript"] as const;
+export const DRILL_LANGS = ["python", "sql", "javascript", "r"] as const;
 
 export type DrillLang = (typeof DRILL_LANGS)[number];
 

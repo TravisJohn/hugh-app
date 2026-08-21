@@ -4405,3 +4405,78 @@ One new dependency, `@codemirror/lang-javascript`, for editor highlighting. CI's
 audit is unaffected — it runs `npm audit --omit=dev --audit-level=high`, which
 reports 0. Full suite 844 tests green, tsc and lint clean, production build
 passes, and the worker chunk is confirmed self-contained in the build output.
+
+## R — the fourth language, and the R pill finally lights ✅
+
+Three packs, 27 cells, on WebR. The R pill had been sitting on `/code/start`
+greyed out with `ready: false` — a visible promise. It is now real.
+
+**R was the one runtime whose cost was measured before it was built**, because
+the npm package is ~48MB unpacked and that looked disqualifying. The spike ran
+WebR in real Chrome under Playwright, cold cache, with no cross-origin
+isolation — the only configuration Hugh can actually deploy:
+
+| | time to first cell | transfer | requests |
+|---|---|---|---|
+| base R | **4.2 s** | 11.9 MB | 4 |
+| with dplyr | **15.6 s** | 19.6 MB | 20 |
+
+Two things the 48MB figure had wrong. WebR does **not** bulk-download its
+virtual filesystem — four requests and 11.9MB reach a runnable cell, and
+`R.wasm` is 11.8MB over the wire, in Pyodide's range. And dplyr's cost is real
+but bounded and one-time: 16 packages, ~7.7MB (`vctrs`, `rlang`, `cli`,
+`tibble`, `pillar`, `tidyselect`…), cached thereafter.
+
+**So the packs are split by what they cost.** `r-lang-basics` is base R only and
+boots in about four seconds; only `r-clean-shape` and `r-explore` declare
+`preloadPackages: ["dplyr"]`. That field already existed for Pyodide and needed
+no change — a learner drilling vectors should not wait for tibble. Base R is
+used where base R is what an analyst types (`trimws`, `tolower`, `as.numeric`,
+`unique`, `which.max`) and dplyr only where dplyr is the idiom (`filter`,
+`mutate`, `rename`, `arrange`, `group_by`/`summarise`).
+
+**Three decisions inside the runtime.** WebR is loaded from **its own CDN**, not
+added to `package.json`: the npm ESM build carries a bare `import "module"` that
+only survives bundling, the package is 48MB, and Hugh already pulls Pyodide this
+way. The build confirms it stays a runtime import — the chunk holds the URL and
+one `import()`, not R. The channel is **PostMessage, not SharedArrayBuffer**:
+SAB needs COOP/COEP, and turning cross-origin isolation on would break Pyodide
+and DuckDB, which load from jsDelivr without the CORP headers COEP demands. The
+cost is that interrupts are unavailable, so a runaway loop is handled by closing
+the runtime and booting another — hence a 20s timeout rather than JavaScript's
+5s. And the result envelope is shaped **in TypeScript** from WebR's own
+`.toJs()` output rather than by a hand-rolled JSON writer in R, so the
+table/value decision is covered by `rRuntime.test.ts` instead of being R that
+nothing checks.
+
+Two seams needed widening, both of which would have failed silently. `resultVarOf`
+matched only `=`, so every R cell would have resolved to null and previewed
+nothing — it now reads `<-` too. And `rDataFrameLiteral` joins `pyRowsLiteral`
+and `jsRowsLiteral` so the rendered table and the executed setup stay one source
+of truth.
+
+**Verification found nothing, which is the point of running it.** All 27 cells
+were executed against real WebR — reset, prelude, setup, reference solution,
+then the cell's own assertions — and all 27 passed first run, every one
+resolving a result variable and producing a preview. The six cells returning
+data frames and dplyr tibbles all shape into tables rather than blobs. Method,
+repeatable: `esbuild` the packs into a scratchpad bundle, serve it beside a page
+that imports WebR from the CDN, drive it with the Playwright already in
+`node_modules`, and read the results back. This cannot be a CI gate the way the
+JavaScript packs are — WebR needs a browser and the network — so it stays the
+Snowflake-style pre-ship pass.
+
+`assert` is defined in an R prelude rather than using `stopifnot`, so a cell's
+check reads the same in all four languages, and it is `isTRUE(all(cond))` so a
+whole-vector comparison must match throughout rather than silently testing only
+the first element. The environment is wiped between cells with `all.names = TRUE`
+— without it R hides `.hugh_result` and a cell that produced nothing would
+preview the previous cell's answer.
+
+One deliberate divergence from the pandas and JavaScript explore datasets: North
+America is `"AM"`, not `"NA"`. In R the two-letter string sits one coercion away
+from the missing value, and the pack is about grouping, not NA handling.
+
+One new dependency, `@codemirror/legacy-modes`, for R highlighting — the
+CodeMirror org's own package, chosen over the third-party `codemirror-lang-r` at
+0.1.1. Full suite 870 tests green, tsc and lint clean, production build passes.

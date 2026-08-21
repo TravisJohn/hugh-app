@@ -22,6 +22,7 @@ import type { DrillLang } from "@/types/code";
 import { SQL_PACKS } from "./sqlPacks";
 import { SNOWFLAKE_PACKS } from "./snowflakePacks";
 import { JS_PACKS } from "./jsPacks";
+import { R_PACKS } from "./rPacks";
 import { AUTOMATION_PACKS } from "./automationPacks";
 import { AIRFLOW_PACKS } from "./airflowPacks";
 import { RAG_PACKS } from "./ragPacks";
@@ -542,6 +543,7 @@ export const PACKS: DrillPack[] = [
   ...SQL_PACKS,
   ...SNOWFLAKE_PACKS,
   ...JS_PACKS,
+  ...R_PACKS,
 ];
 
 export function getPack(id: string): DrillPack | undefined {

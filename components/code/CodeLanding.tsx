@@ -26,11 +26,11 @@ import type { PackProgressSummary, HeatmapDay } from "@/lib/code/progress";
 // and collapsing the pills with everything else would strand the learner there
 // with no way back to Python.
 
-const LANGUAGES: { id: DrillLang | "r"; label: string; ready: boolean }[] = [
+const LANGUAGES: { id: DrillLang; label: string; ready: boolean }[] = [
   { id: "python",     label: "Python",     ready: true },
   { id: "sql",        label: "SQL",        ready: true },
   { id: "javascript", label: "JavaScript", ready: true },
-  { id: "r",          label: "R",          ready: false },
+  { id: "r",          label: "R",          ready: true },
 ];
 
 export default function CodeLanding({
@@ -111,7 +111,7 @@ export default function CodeLanding({
                   key={lang.id}
                   type="button"
                   disabled={!lang.ready}
-                  onClick={() => lang.ready && switchLang(lang.id as DrillLang)}
+                  onClick={() => lang.ready && switchLang(lang.id)}
                   aria-pressed={active}
                   className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
                     active

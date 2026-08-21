@@ -174,6 +174,32 @@ function jsonRowsLiteral(rows: DataRow[]): string {
 }
 
 /**
+ * Render a structured dataset as the R `rows <- data.frame(...)` literal used
+ * for setup — the R counterpart to pyRowsLiteral and jsRowsLiteral.
+ *
+ * Column-wise rather than row-wise, because that is how a data.frame is built.
+ * `stringsAsFactors = FALSE` is explicit: it has been the default since R 4.0,
+ * but a drill's setup should not depend on the reader knowing which R they are
+ * on, and a factor where a character was expected changes what `sort` and
+ * comparison do.
+ */
+export function rDataFrameLiteral(rows: DataRow[], varName = "rows"): string {
+  const body = columnsOf(rows)
+    .map(col => {
+      const values = rows
+        .map(r => {
+          const v = r[col];
+          // JSON's string form is also R's, escaping included.
+          return typeof v === "string" ? JSON.stringify(v) : String(v);
+        })
+        .join(", ");
+      return `  ${col} = c(${values})`;
+    })
+    .join(",\n");
+  return `${varName} <- data.frame(\n${body},\n  stringsAsFactors = FALSE\n)`;
+}
+
+/**
  * The variable a cell produces — the name the "key" panel prints (and the same
  * one the hidden asserts check). A cell may set up a helper first (e.g. `s = …`)
  * before the line that actually produces its answer, so we take the LAST
@@ -183,9 +209,14 @@ function jsonRowsLiteral(rows: DataRow[]): string {
  * declared before the loop.
  */
 export function resultVarOf(cell: DrillCell): string | null {
-  // The optional const/let/var lets this read a JavaScript solution too;
-  // Python has no such keywords, so the same pattern serves both languages.
-  const matches = [...cell.solution.matchAll(/^(?:const|let|var)?\s*([A-Za-z_$][\w$]*)\s*=(?!=)/gm)];
+  // One pattern serves all four languages. The optional const/let/var reads a
+  // JavaScript solution (Python and R have no such keywords), and `<-` reads an
+  // R one — without it every R cell would resolve to null and preview nothing,
+  // since R assignment is not `=`. The `(?!=)` still guards against matching a
+  // comparison.
+  const matches = [
+    ...cell.solution.matchAll(/^(?:const|let|var)?\s*([A-Za-z_$][\w$]*)\s*(?:<-|=)(?!=)/gm),
+  ];
   return matches.length ? matches[matches.length - 1][1] : null;
 }
 

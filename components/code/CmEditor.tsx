@@ -5,6 +5,8 @@ import CodeMirror from "@uiw/react-codemirror";
 import { python } from "@codemirror/lang-python";
 import { sql } from "@codemirror/lang-sql";
 import { javascript } from "@codemirror/lang-javascript";
+import { StreamLanguage } from "@codemirror/language";
+import { r as rMode } from "@codemirror/legacy-modes/mode/r";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { keymap } from "@codemirror/view";
 import { Prec } from "@codemirror/state";
@@ -23,8 +25,17 @@ interface Props {
 }
 
 // The language grammar extension, memoised per language at module scope.
+// R has no first-party CodeMirror 6 package; the CodeMirror-maintained legacy
+// mode wrapped in StreamLanguage gives correct highlighting without pulling in
+// a third-party 0.1.x grammar.
 const langExtension = (lang: DrillLang) =>
-  lang === "sql" ? sql() : lang === "javascript" ? javascript() : python();
+  lang === "sql"
+    ? sql()
+    : lang === "javascript"
+      ? javascript()
+      : lang === "r"
+        ? StreamLanguage.define(rMode)
+        : python();
 
 /**
  * Thin CodeMirror 6 wrapper shared by the learner editor and Hugh's ghost

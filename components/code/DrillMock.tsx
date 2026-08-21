@@ -10,6 +10,8 @@ import {
 import { PyodideRunner } from "@/lib/code/pyodideClient";
 import { DuckDBRunner } from "@/lib/code/duckdbClient";
 import { JsRunner } from "@/lib/code/jsClient";
+import { RRunner } from "@/lib/code/rClient";
+import { emitResultR } from "@/lib/code/rRuntime";
 import {
   timerSecondsFor, resultVarOf, columnsOf,
   type DrillContent, type DrillCell, type DataRow,
@@ -139,6 +141,7 @@ function DataFrameTable({ dataset, focus, lang, tableName, isPandas }: { dataset
   const lit = (c: string) => focus.includes(c);
   const isSql = lang === "sql";
   const isJs = lang === "javascript";
+  const isR = lang === "r";
   const label = isSql ? tableName : isPandas ? "df" : "rows";
   return (
     <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/50">
@@ -200,6 +203,12 @@ function DataFrameTable({ dataset, focus, lang, tableName, isPandas }: { dataset
             Already loaded for you as <code className="rounded bg-slate-800/70 px-1 text-slate-300">rows</code> — an array of
             objects (your table). Walk it with <code className="rounded bg-slate-800/70 px-1 text-slate-300">rows.map(r =&gt; …)</code>, and read
             a field with <code className="rounded bg-slate-800/70 px-1 text-slate-300">r.{cols[0] ?? "col"}</code>.
+          </>
+        ) : isR ? (
+          <>
+            Already loaded for you as <code className="rounded bg-slate-800/70 px-1 text-slate-300">rows</code> — a data frame.
+            Take a column with <code className="rounded bg-slate-800/70 px-1 text-slate-300">rows${cols[0] ?? "col"}</code>, and
+            remember rows are indexed from <code className="rounded bg-slate-800/70 px-1 text-slate-300">1</code>, not 0.
           </>
         ) : (
           <>
@@ -295,6 +304,7 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
   const lang: DrillLang = content.lang ?? "python"; // which runtime executes the cells
   const isSql = lang === "sql";
   const isJs = lang === "javascript";
+  const isR = lang === "r";
   const isPandas = lang === "python" && content.dataKind === "dataframe"; // DataFrame packs
   // Which Pyodide packages to load during boot (outside the per-run timeout) —
   // a pack can ask for more than pandas (e.g. scikit-learn for the ML packs).
@@ -305,13 +315,11 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
     () => content.preloadPackages ?? (isPandas ? ["pandas"] : []),
     [content.preloadPackages, isPandas],
   );
-  const bootLabel = isSql
-    ? "SQL"
-    : isJs
-      ? "JavaScript"
-      : bootPackages.length
-        ? `Python + ${bootPackages.join(" + ")}`
-        : "Python";
+  const runtimeName = isSql ? "SQL" : isJs ? "JavaScript" : isR ? "R" : "Python";
+  // SQL and JavaScript have nothing to preload; Python and R both can.
+  const bootLabel = bootPackages.length
+    ? `${runtimeName} + ${bootPackages.join(" + ")}`
+    : runtimeName;
 
   const emptyCells = useCallback(
     (): CState[] => DRILL_CELLS.map(() => ({ code: "", status: "idle", attempts: 0, usedRef: false, overTime: false, error: null, practice: false })),
@@ -374,6 +382,7 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
     if (isSql) return withCols(`a SQL table named \`${tableName}\``);
     if (isPandas) return withCols("a pandas DataFrame named `df`");
     if (isJs) return withCols("a JavaScript array of objects named `rows`");
+    if (isR) return withCols("an R data frame named `rows`");
     return withCols("a Python list of dicts named `rows`");
   })();
 
@@ -385,7 +394,9 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
       ? "Answer with pandas over that DataFrame."
       : isJs
         ? "Answer with plain browser JavaScript over that array — no Node APIs, no npm packages, and no network calls."
-        : "It is a plain Python list of dicts, NOT a pandas DataFrame — answer with standard-library Python over this list unless the learner explicitly asks about pandas.";
+        : isR
+          ? "Answer with R. Base R for string and vector work, dplyr verbs for filtering, mutating and grouping — and remember R indexes from 1."
+          : "It is a plain Python list of dicts, NOT a pandas DataFrame — answer with standard-library Python over this list unless the learner explicitly asks about pandas.";
 
   const openChatForCard = useCallback((id: string) => { setChatCardId(id); setChatOpen(true); }, []);
   const handleChatOpen = useCallback((v: boolean) => { setChatOpen(v); if (!v) setChatCardId(null); }, []);
@@ -441,17 +452,23 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
       ? new DuckDBRunner()
       : isJs
         ? new JsRunner()
-        : new PyodideRunner();
+        : isR
+          ? new RRunner()
+          : new PyodideRunner();
     runnerRef.current = r;
     // Load heavy packages during boot (outside the run timeout) so the "ready"
     // gate covers the first multi-second download and cell runs stay fast.
     // Packs that need nothing extra (bootPackages empty) skip this entirely.
     r.init()
-      .then(() => (bootPackages.length && r instanceof PyodideRunner ? r.preload(bootPackages) : undefined))
+      .then(() =>
+        bootPackages.length && (r instanceof PyodideRunner || r instanceof RRunner)
+          ? r.preload(bootPackages)
+          : undefined,
+      )
       .then(() => setReady(true))
       .catch(e => setInitErr(String(e?.message ?? e)));
     return () => r.destroy();
-  }, [isSql, isJs, isPandas, bootPackages]);
+  }, [isSql, isJs, isR, isPandas, bootPackages]);
 
   // Precompute each cell's answer once Python is up, by running the reference
   // solution and printing its result variable. Deterministic, off the critical
@@ -472,7 +489,7 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
           const varName = resultVarOf(DRILL_CELLS[i]);
           if (!varName) continue;
           const priors = cumulative ? DRILL_CELLS.slice(0, i).map(c => c.solution).join("\n") : "";
-          const probe = isJs ? emitResultJs(varName) : emitResult(varName);
+          const probe = isJs ? emitResultJs(varName) : isR ? emitResultR(varName) : emitResult(varName);
           res = await runner.run(SCENARIO.setupCode + "\n" + priors + "\n" + DRILL_CELLS[i].solution, probe);
         }
         if (cancelled) return;
@@ -483,7 +500,7 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
       }
     })();
     return () => { cancelled = true; };
-  }, [ready, dataset, DRILL_CELLS, cumulative, SCENARIO.setupCode, isSql, isJs]);
+  }, [ready, dataset, DRILL_CELLS, cumulative, SCENARIO.setupCode, isSql, isJs, isR]);
 
   // Resets the countdown whenever the active cell or round changes. `timeLeft`
   // can't be computed as derived state — the ticking effect below independently
@@ -729,6 +746,22 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
                   <p className="mt-1.5 text-slate-500">
                     Plain JavaScript, running straight in your browser — no Node, no npm, no network. In real work you&apos;d
                     fetch this data yourself; here it&apos;s set up so you can focus on the moves.
+                  </p>
+                </>
+              ) : isR ? (
+                <>
+                  <p>
+                    <code className="rounded bg-slate-800/70 px-1 text-sky-200/90">rows</code> is already loaded for you — a data
+                    frame of {dataset.length} rows (columns:{" "}
+                    <span className="text-slate-300">{columnsOf(dataset).join(", ")}</span>). Take a column with{" "}
+                    <code className="rounded bg-slate-800/70 px-1 text-sky-200/90">rows${columnsOf(dataset)[0]}</code>, and inside a
+                    dplyr verb name it bare:{" "}
+                    <code className="rounded bg-slate-800/70 px-1 text-sky-200/90">filter(rows, {columnsOf(dataset)[0]} == …)</code>.
+                  </p>
+                  <p className="mt-1.5 text-slate-500">
+                    It&apos;s real R, running on WebR in your browser — and R indexes from 1, so{" "}
+                    <code className="rounded bg-slate-800/70 px-1 text-sky-200/90">rows${columnsOf(dataset)[0]}[1]</code> is the first
+                    value, not the second.
                   </p>
                 </>
               ) : (
