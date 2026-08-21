@@ -27,9 +27,10 @@ import type { PackProgressSummary, HeatmapDay } from "@/lib/code/progress";
 // with no way back to Python.
 
 const LANGUAGES: { id: DrillLang | "r"; label: string; ready: boolean }[] = [
-  { id: "python", label: "Python", ready: true },
-  { id: "sql",    label: "SQL",    ready: true },
-  { id: "r",      label: "R",      ready: false },
+  { id: "python",     label: "Python",     ready: true },
+  { id: "sql",        label: "SQL",        ready: true },
+  { id: "javascript", label: "JavaScript", ready: true },
+  { id: "r",          label: "R",          ready: false },
 ];
 
 export default function CodeLanding({

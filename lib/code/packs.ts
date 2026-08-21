@@ -13,12 +13,15 @@
 // what they're teaching. The SQL packs (DuckDB) live in sqlPacks.ts, and the
 // Snowflake-dialect packs — same engine, plus a macro shim — in snowflakePacks.ts. The
 // dataset-less Python-fundamentals warm-up ("Let's Do This!", 9 parts) lives
-// in letsDoThisPacks.ts and is prepended to PACKS below.
+// in letsDoThisPacks.ts and is prepended to PACKS below. The JavaScript packs
+// (jsPacks.ts) run in a Worker with no wasm behind them at all — see
+// lib/code/jsRuntime.ts.
 
 import { pdDataFrameLiteral, type DataRow, type DrillContent } from "./drillContent";
 import type { DrillLang } from "@/types/code";
 import { SQL_PACKS } from "./sqlPacks";
 import { SNOWFLAKE_PACKS } from "./snowflakePacks";
+import { JS_PACKS } from "./jsPacks";
 import { AUTOMATION_PACKS } from "./automationPacks";
 import { AIRFLOW_PACKS } from "./airflowPacks";
 import { RAG_PACKS } from "./ragPacks";
@@ -538,6 +541,7 @@ export const PACKS: DrillPack[] = [
   ...RAG_PACKS,
   ...SQL_PACKS,
   ...SNOWFLAKE_PACKS,
+  ...JS_PACKS,
 ];
 
 export function getPack(id: string): DrillPack | undefined {

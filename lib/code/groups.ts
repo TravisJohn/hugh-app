@@ -20,9 +20,9 @@
 //
 // Groups are language-agnostic: a group holds the pack ids for every language it
 // covers, and the UI filters by the active language pill. Today "analysis" holds
-// both Python and SQL packs, while "snowflake" is SQL-only — see groupsForLang
-// below, which hides groups that are empty in the active language rather than
-// rendering a dead cell.
+// Python, SQL and JavaScript packs, while "snowflake" is SQL-only — see
+// groupsForLang below, which hides groups that are empty in the active language
+// rather than rendering a dead cell.
 
 import { PACKS } from "./packs";
 import type { DrillLang } from "@/types/code";
@@ -71,6 +71,8 @@ export const CODE_GROUPS: CodeGroup[] = [
       "lets-do-this-oop",
       "lets-do-this-files-envs-logging",
       "lets-do-this-exceptions-typing-status",
+      // JavaScript — same territory, surfaced when the JS pill is active.
+      "js-lang-basics",
     ],
   },
   {
@@ -91,6 +93,10 @@ export const CODE_GROUPS: CodeGroup[] = [
       "sql-build-chart",
       "sql-linear-regression",
       "sql-forecasting",
+      // JavaScript — the same two moves the pandas packs open with, so the
+      // transfer between the three languages is visible in one branch.
+      "js-clean-shape",
+      "js-explore",
     ],
   },
   {
@@ -145,7 +151,7 @@ export const CODE_GROUPS: CodeGroup[] = [
     tagline: "Calling services, and standing one up yourself.",
     icon: "globe",
     accent: "#22d3ee", // cyan-400
-    packIds: ["lets-do-this-api-requests", "lets-do-this-api-routing"],
+    packIds: ["lets-do-this-api-requests", "lets-do-this-api-routing", "js-json"],
   },
 ];
 

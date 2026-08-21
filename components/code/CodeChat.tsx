@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { DrillLang } from "@/types/code";
 import Image from "next/image";
 import { X, Send, Loader2, Code2, Type, Pin, Check } from "lucide-react";
 import CmEditor from "./CmEditor";
@@ -18,6 +19,15 @@ interface Props {
   focusCard?: ChatCard | null;
   /** One-line dataset description, e.g. "a list of dicts named `rows` (columns: name, team, sales, region)". */
   datasetLabel?: string;
+  /**
+   * One sentence telling Hugh which language and data shape to answer in.
+   * Supplied by the drill, the only place that knows whether a Python pack is
+   * pandas or plain dicts. Omitted on the landing page, where there is no drill
+   * and so nothing true to say about the data.
+   */
+  langGuidance?: string;
+  /** Language for the code-mode composer's fence. Defaults to Python. */
+  lang?: DrillLang;
   /** Pin a message's text to a card for later reference. Omit to hide pinning. */
   onPin?: (cardId: string, text: string) => void;
 }
@@ -27,8 +37,8 @@ const WELCOME: Msg = {
   content: "Hey, I'm Hugh 👋 Ask about any step — or hit the code button to write a snippet inside your question.",
 };
 
-function codeFence(code: string): string {
-  return "```python\n" + code.trim() + "\n```";
+function codeFence(code: string, lang: DrillLang): string {
+  return "```" + lang + "\n" + code.trim() + "\n```";
 }
 
 /**
@@ -42,7 +52,9 @@ export default function CodeChat({
   open,
   onOpenChange,
   focusCard = null,
-  datasetLabel = "a Python list of dicts named `rows`",
+  datasetLabel,
+  langGuidance,
+  lang = "python",
   onPin,
 }: Props) {
   const [internalOpen, setInternalOpen] = useState(false);
@@ -61,15 +73,19 @@ export default function CodeChat({
 
   // What Hugh needs to answer about THIS drill rather than guessing.
   function buildContext(): string {
-    const parts = [
-      `The data is ${datasetLabel}. It is a plain Python list of dicts, NOT a pandas DataFrame — answer with standard-library Python over this list unless the learner explicitly asks about pandas.`,
-    ];
+    // Say nothing about the data unless the caller actually has some, and let
+    // the drill supply the language guidance. A hardcoded "it is a plain Python
+    // list of dicts, answer with standard-library Python" used to be sent on
+    // every SQL and pandas drill too, where it was simply untrue.
+    const parts: string[] = [];
+    if (datasetLabel) parts.push(`The data is ${datasetLabel}.`);
+    if (langGuidance) parts.push(langGuidance);
     if (focusCard) parts.push(`Current step — task: "${focusCard.task}". The reference solution is:\n${focusCard.solution}`);
     return parts.join("\n");
   }
 
   async function send() {
-    const text = codeMode ? codeFence(code) : draft.trim();
+    const text = codeMode ? codeFence(code, lang) : draft.trim();
     if (!text || loading) return;
     const next = [...messages, { role: "user" as const, content: text }];
     setMessages(next);

@@ -96,6 +96,30 @@ export function pyRowsLiteral(rows: DataRow[], varName = "rows"): string {
 }
 
 /**
+ * Render a structured dataset as the JavaScript `const rows = [...]` literal used
+ * for setup — the JS counterpart to pyRowsLiteral, keeping the rendered table and
+ * the executed setup in sync from one source.
+ *
+ * Keys are emitted BARE where they are valid identifiers, because that is what
+ * idiomatic JavaScript looks like and the packs teach reading a field as
+ * `r.city`. Quoting every key would model a habit the cells then contradict.
+ */
+export function jsRowsLiteral(rows: DataRow[], varName = "rows"): string {
+  const ident = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+  const body = rows
+    .map(
+      r =>
+        "  { " +
+        Object.entries(r)
+          .map(([k, v]) => `${ident.test(k) ? k : JSON.stringify(k)}: ${JSON.stringify(v)}`)
+          .join(", ") +
+        " }",
+    )
+    .join(",\n");
+  return `const ${varName} = [\n${body},\n];`;
+}
+
+/**
  * SQL column type for a value — VARCHAR for strings, INTEGER for whole numbers,
  * DOUBLE otherwise. Enough for the small, clean datasets the packs use.
  */
@@ -159,7 +183,9 @@ function jsonRowsLiteral(rows: DataRow[]): string {
  * declared before the loop.
  */
 export function resultVarOf(cell: DrillCell): string | null {
-  const matches = [...cell.solution.matchAll(/^([A-Za-z_]\w*)\s*=(?!=)/gm)];
+  // The optional const/let/var lets this read a JavaScript solution too;
+  // Python has no such keywords, so the same pattern serves both languages.
+  const matches = [...cell.solution.matchAll(/^(?:const|let|var)?\s*([A-Za-z_$][\w$]*)\s*=(?!=)/gm)];
   return matches.length ? matches[matches.length - 1][1] : null;
 }
 

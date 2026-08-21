@@ -44,8 +44,21 @@ export interface RunResult {
   error: string | null;
 }
 
-/** The languages a drill can be authored in (each backed by its own runtime). */
-export type DrillLang = "python" | "sql";
+/**
+ * The languages a drill can be authored in, each backed by its own runtime.
+ *
+ * This array is the SINGLE SOURCE OF TRUTH — `DrillLang` is derived from it,
+ * and the tests that must cover "every language" iterate it rather than a
+ * literal tuple. That matters: when the list was written out by hand in each
+ * test, adding a language silently skipped it everywhere, so a new language
+ * could ship without ever being checked against the leaf budget or the
+ * every-pack-is-filed guard.
+ *
+ * Order is the order the pills render in.
+ */
+export const DRILL_LANGS = ["python", "sql", "javascript"] as const;
+
+export type DrillLang = (typeof DRILL_LANGS)[number];
 
 /**
  * The uniform contract every drill runtime satisfies, so DrillMock can drive

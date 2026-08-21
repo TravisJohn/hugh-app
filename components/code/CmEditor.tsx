@@ -4,6 +4,7 @@ import { memo, useEffect, useMemo, useRef } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { python } from "@codemirror/lang-python";
 import { sql } from "@codemirror/lang-sql";
+import { javascript } from "@codemirror/lang-javascript";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { keymap } from "@codemirror/view";
 import { Prec } from "@codemirror/state";
@@ -22,7 +23,8 @@ interface Props {
 }
 
 // The language grammar extension, memoised per language at module scope.
-const langExtension = (lang: DrillLang) => (lang === "sql" ? sql() : python());
+const langExtension = (lang: DrillLang) =>
+  lang === "sql" ? sql() : lang === "javascript" ? javascript() : python();
 
 /**
  * Thin CodeMirror 6 wrapper shared by the learner editor and Hugh's ghost

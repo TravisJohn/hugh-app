@@ -4329,3 +4329,79 @@ Zero new runtime dependencies — verification ran from a scratchpad using
 `@duckdb/node-api` and esbuild, never the repo. Full suite 686 tests green, tsc
 and lint clean, production build passes. The `snowflake` group is SQL-only, so no
 language pill exceeds the pattern map's six cells.
+
+## JavaScript — the Code pillar's third language ✅
+
+Four packs, 36 cells, under a new **JavaScript** pill on `/code/start`. Scope is
+**data in JavaScript, not JavaScript**: shaping arrays of records, profiling
+them, and reading the JSON an API returns. The DOM, async, Node, npm and React
+are deliberately out — that is web development, and Hugh's line is data and
+analytics.
+
+**The seam held.** Adding a language cost a `DrillRunner` implementation, a pill,
+and content. Nothing downstream — heat, groups, progress, the editor — needed to
+know a third language existed.
+
+**Step 0 closed a hole first.** Three tests in `groups.test.ts` looped over a
+hardcoded `["python", "sql"]`, so a new language would have gone silently
+uncovered, including the leaf-budget cap. `DRILL_LANGS` in `types/code.ts` is now
+the single source of truth, `DrillLang` is derived from it, and those loops
+iterate it. Adding a language now extends every guard automatically.
+
+**The runtime is the cheapest of the three.** JavaScript is already in the
+browser: no Pyodide, no DuckDB-wasm, no CDN. `JsRunner` boots instantly, so its
+timeout is 5s against Pyodide's 15s (that budget is almost entirely package
+loading) and a hard reset costs nothing. Three pieces:
+
+- `lib/code/jsRuntime.ts` — pure and tested: envelope shaping, error formatting,
+  and `executeCell` itself.
+- `lib/code/js.worker.ts` — message plumbing only, so there is no second copy of
+  the semantics to drift.
+- `lib/code/jsClient.ts` — lifecycle, mirroring `PyodideRunner`.
+
+Two decisions inside it. `code` and `check` are **concatenated into one function
+body**, because they must share scope — the learner writes `const trimmed = …`
+and the assertions read it. A `try { code }` wrapper would attribute errors
+correctly but block-scope every `const` away from the check, so a `__phase`
+marker between the halves does the attribution instead; a crash in the check half
+reads "Check failed — ReferenceError: trimmed is not defined", which tells the
+learner their code ran fine and simply never made the binding. And the network
+globals are **shadowed as function parameters**, not deleted off the worker
+global: lexical, unleakable, and it cannot break the worker's own `postMessage`.
+That is an honesty boundary (a drill must not come to depend on the network), not
+a security one — `new Function` compiles in the caller's realm and no amount of
+shadowing changes that.
+
+**Verification became a permanent CI gate, not a one-off.** The SQL packs had to
+be verified once from a scratchpad because DuckDB is not a repo dependency.
+JavaScript needs nothing, so `jsPacks.test.ts` executes all 36 cells the way
+DrillMock does — setup, reference solution, then the cell's own assertions in the
+same scope — and also checks each one previews a valid envelope. A reference
+answer that stops passing its own assertions now fails the build.
+
+Two authoring rules are written into `jsPacks.ts` and enforced by that test:
+a cell's last line must be a plain `const x = …` (`resultVarOf` cannot see a
+destructuring pattern, so such a cell passes but previews the wrong value), and
+cells stick to what **Node 20** has, since CI runs Node 20 and `Object.groupBy`
+landed in Node 21. Reduce-based grouping and `[...arr].sort()` work everywhere an
+analyst will meet them anyway, and the copy-then-sort habit is worth teaching.
+
+**A pre-existing bug fell out of it.** `CodeChat` told Hugh *"It is a plain Python
+list of dicts … answer with standard-library Python"* unconditionally — on all 21
+SQL packs, on the pandas packs, and on the landing page where there is no drill
+at all. It also fenced every code-mode snippet as ` ```python `. The drill now
+supplies a `langGuidance` sentence (only it knows whether a Python pack is pandas
+or plain dicts) and the fence follows the active language. The data sentence is
+omitted entirely when there is no dataset.
+
+Packs, filed into existing **topic** groups rather than a per-language territory
+— the taxonomy is topics that span languages, and Snowflake is a territory only
+because it is a dialect: `js-lang-basics` (9 cells) in Language basics;
+`js-clean-shape` (9) and `js-explore` (9) in For analysis, mirroring the pandas
+packs cell-for-cell so the transfer is the lesson; `js-json` (9) in Working with
+APIs.
+
+One new dependency, `@codemirror/lang-javascript`, for editor highlighting. CI's
+audit is unaffected — it runs `npm audit --omit=dev --audit-level=high`, which
+reports 0. Full suite 844 tests green, tsc and lint clean, production build
+passes, and the worker chunk is confirmed self-contained in the build output.

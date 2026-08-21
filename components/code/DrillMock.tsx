@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { PyodideRunner } from "@/lib/code/pyodideClient";
 import { DuckDBRunner } from "@/lib/code/duckdbClient";
+import { JsRunner } from "@/lib/code/jsClient";
 import {
   timerSecondsFor, resultVarOf, columnsOf,
   type DrillContent, type DrillCell, type DataRow,
@@ -77,6 +78,11 @@ def _emit(_v):
     print(_json.dumps(_out, default=str))
 _emit(${varName})`;
 
+// The JavaScript equivalent. A one-liner rather than a serialiser written in
+// the target language, because the runtime injects __emit into every cell's
+// scope — the envelope shaping lives in lib/code/jsRuntime.ts, where it's tested.
+const emitResultJs = (varName: string) => `__emit(${varName});`;
+
 function parseResult(stdout: string): CellResult | null {
   const last = stdout.trim().split("\n").pop();
   if (!last) return null;
@@ -132,6 +138,7 @@ function DataFrameTable({ dataset, focus, lang, tableName, isPandas }: { dataset
   const cols = columnsOf(dataset);
   const lit = (c: string) => focus.includes(c);
   const isSql = lang === "sql";
+  const isJs = lang === "javascript";
   const label = isSql ? tableName : isPandas ? "df" : "rows";
   return (
     <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/50">
@@ -187,6 +194,12 @@ function DataFrameTable({ dataset, focus, lang, tableName, isPandas }: { dataset
             Already loaded for you as <code className="rounded bg-slate-800/70 px-1 text-slate-300">df</code> — a pandas DataFrame.
             Grab a column with <code className="rounded bg-slate-800/70 px-1 text-slate-300">df[&quot;{cols[0] ?? "col"}&quot;]</code>, and
             filter with <code className="rounded bg-slate-800/70 px-1 text-slate-300">df[df[&quot;{cols[0] ?? "col"}&quot;] == …]</code>.
+          </>
+        ) : isJs ? (
+          <>
+            Already loaded for you as <code className="rounded bg-slate-800/70 px-1 text-slate-300">rows</code> — an array of
+            objects (your table). Walk it with <code className="rounded bg-slate-800/70 px-1 text-slate-300">rows.map(r =&gt; …)</code>, and read
+            a field with <code className="rounded bg-slate-800/70 px-1 text-slate-300">r.{cols[0] ?? "col"}</code>.
           </>
         ) : (
           <>
@@ -281,6 +294,7 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
   const dataset = SCENARIO.dataset;                // structured table → dataframe + key panels
   const lang: DrillLang = content.lang ?? "python"; // which runtime executes the cells
   const isSql = lang === "sql";
+  const isJs = lang === "javascript";
   const isPandas = lang === "python" && content.dataKind === "dataframe"; // DataFrame packs
   // Which Pyodide packages to load during boot (outside the per-run timeout) —
   // a pack can ask for more than pandas (e.g. scikit-learn for the ML packs).
@@ -291,7 +305,13 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
     () => content.preloadPackages ?? (isPandas ? ["pandas"] : []),
     [content.preloadPackages, isPandas],
   );
-  const bootLabel = isSql ? "SQL" : bootPackages.length ? `Python + ${bootPackages.join(" + ")}` : "Python";
+  const bootLabel = isSql
+    ? "SQL"
+    : isJs
+      ? "JavaScript"
+      : bootPackages.length
+        ? `Python + ${bootPackages.join(" + ")}`
+        : "Python";
 
   const emptyCells = useCallback(
     (): CState[] => DRILL_CELLS.map(() => ({ code: "", status: "idle", attempts: 0, usedRef: false, overTime: false, error: null, practice: false })),
@@ -343,15 +363,29 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
     : null;
   const tableName = SCENARIO.tableName ?? "data";
   const cols = dataset ? columnsOf(dataset).join(", ") : "";
-  const datasetLabel = isSql
-    ? (dataset ? `a SQL table named \`${tableName}\` (columns: ${cols})` : `a SQL table named \`${tableName}\``)
+  // What the learner has been handed, phrased in the ACTIVE language's own
+  // terms. This sentence goes to Hugh as chat context, so a Python description
+  // on a SQL or JavaScript drill isn't cosmetic — it's a wrong brief.
+  const datasetLabel = (() => {
+    if (!dataset && !SCENARIO.setupCode.trim()) {
+      return "no shared data — each rep is a self-contained snippet";
+    }
+    const withCols = (s: string) => (dataset ? `${s} (columns: ${cols})` : s);
+    if (isSql) return withCols(`a SQL table named \`${tableName}\``);
+    if (isPandas) return withCols("a pandas DataFrame named `df`");
+    if (isJs) return withCols("a JavaScript array of objects named `rows`");
+    return withCols("a Python list of dicts named `rows`");
+  })();
+
+  // The second half of that brief: which language and idiom to answer in. Kept
+  // beside datasetLabel because the two are read together and must agree.
+  const langGuidance = isSql
+    ? "Answer with SQL for DuckDB, which is the engine running this drill in the browser."
     : isPandas
-      ? (dataset ? `a pandas DataFrame named \`df\` (columns: ${cols})` : "a pandas DataFrame named `df`")
-      : dataset
-        ? `a list of dicts named \`rows\` (columns: ${cols})`
-        : SCENARIO.setupCode.trim()
-          ? "a Python list of dicts named `rows`"
-          : "no shared data — each rep is a self-contained snippet";
+      ? "Answer with pandas over that DataFrame."
+      : isJs
+        ? "Answer with plain browser JavaScript over that array — no Node APIs, no npm packages, and no network calls."
+        : "It is a plain Python list of dicts, NOT a pandas DataFrame — answer with standard-library Python over this list unless the learner explicitly asks about pandas.";
 
   const openChatForCard = useCallback((id: string) => { setChatCardId(id); setChatOpen(true); }, []);
   const handleChatOpen = useCallback((v: boolean) => { setChatOpen(v); if (!v) setChatCardId(null); }, []);
@@ -403,7 +437,11 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
   }, []);
 
   useEffect(() => {
-    const r: DrillRunner = isSql ? new DuckDBRunner() : new PyodideRunner();
+    const r: DrillRunner = isSql
+      ? new DuckDBRunner()
+      : isJs
+        ? new JsRunner()
+        : new PyodideRunner();
     runnerRef.current = r;
     // Load heavy packages during boot (outside the run timeout) so the "ready"
     // gate covers the first multi-second download and cell runs stay fast.
@@ -413,7 +451,7 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
       .then(() => setReady(true))
       .catch(e => setInitErr(String(e?.message ?? e)));
     return () => r.destroy();
-  }, [isSql, isPandas, bootPackages]);
+  }, [isSql, isJs, isPandas, bootPackages]);
 
   // Precompute each cell's answer once Python is up, by running the reference
   // solution and printing its result variable. Deterministic, off the critical
@@ -434,7 +472,8 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
           const varName = resultVarOf(DRILL_CELLS[i]);
           if (!varName) continue;
           const priors = cumulative ? DRILL_CELLS.slice(0, i).map(c => c.solution).join("\n") : "";
-          res = await runner.run(SCENARIO.setupCode + "\n" + priors + "\n" + DRILL_CELLS[i].solution, emitResult(varName));
+          const probe = isJs ? emitResultJs(varName) : emitResult(varName);
+          res = await runner.run(SCENARIO.setupCode + "\n" + priors + "\n" + DRILL_CELLS[i].solution, probe);
         }
         if (cancelled) return;
         if (res.passed && res.stdout) {
@@ -444,7 +483,7 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
       }
     })();
     return () => { cancelled = true; };
-  }, [ready, dataset, DRILL_CELLS, cumulative, SCENARIO.setupCode, isSql]);
+  }, [ready, dataset, DRILL_CELLS, cumulative, SCENARIO.setupCode, isSql, isJs]);
 
   // Resets the countdown whenever the active cell or round changes. `timeLeft`
   // can't be computed as derived state — the ticking effect below independently
@@ -676,6 +715,20 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
                   <p className="mt-1.5 text-slate-500">
                     It&apos;s a real pandas DataFrame (runs on pandas in your browser) — the tool you&apos;d actually reach for.
                     In real work you&apos;d load it yourself; here it&apos;s set up so you can focus on the moves.
+                  </p>
+                </>
+              ) : isJs ? (
+                <>
+                  <p>
+                    <code className="rounded bg-slate-800/70 px-1 text-sky-200/90">rows</code> is already loaded for you — an array of{" "}
+                    {dataset.length} objects, one per record (columns:{" "}
+                    <span className="text-slate-300">{columnsOf(dataset).join(", ")}</span>). Read a field with{" "}
+                    <code className="rounded bg-slate-800/70 px-1 text-sky-200/90">r.{columnsOf(dataset)[0]}</code> inside{" "}
+                    <code className="rounded bg-slate-800/70 px-1 text-sky-200/90">rows.map(r =&gt; …)</code>.
+                  </p>
+                  <p className="mt-1.5 text-slate-500">
+                    Plain JavaScript, running straight in your browser — no Node, no npm, no network. In real work you&apos;d
+                    fetch this data yourself; here it&apos;s set up so you can focus on the moves.
                   </p>
                 </>
               ) : (
@@ -961,6 +1014,8 @@ export default function DrillMock({ content, packId }: { content: DrillContent; 
         onOpenChange={handleChatOpen}
         focusCard={focusCard}
         datasetLabel={datasetLabel}
+        langGuidance={langGuidance}
+        lang={lang}
         onPin={addPin}
       />
     </div>

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { DRILL_LANGS } from "@/types/code";
 import { PACKS } from "./packs";
 import {
   CODE_GROUPS,
@@ -64,7 +65,7 @@ describe("code groups", () => {
   // large should be split rather than allowed to silently break the layout.
   it("keeps every group within the leaf budget the branch layout can fit", () => {
     for (const g of CODE_GROUPS) {
-      for (const lang of ["python", "sql"] as const) {
+      for (const lang of DRILL_LANGS) {
         expect(packIdsForLang(g, lang).length).toBeLessThanOrEqual(8);
       }
     }
@@ -103,7 +104,7 @@ describe("code groups", () => {
     });
 
     it("accounts for every pack of a language across the visible groups", () => {
-      for (const lang of ["python", "sql"] as const) {
+      for (const lang of DRILL_LANGS) {
         const shown = groupsForLang(lang).flatMap(g => packIdsForLang(g, lang)).sort();
         const all = PACKS.filter(p => p.lang === lang).map(p => p.id).sort();
         expect(shown).toEqual(all);

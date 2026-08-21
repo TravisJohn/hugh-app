@@ -3,7 +3,8 @@ import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import CodeLanding from "@/components/code/CodeLanding";
 import { PACKS } from "@/lib/code/packs";
 import { computeAllPackProgress, buildHeatmap, type DrillAttemptRow } from "@/lib/code/progress";
-import { computeAllGroupHeat, computeAllPackHeat, type PackHeatInput } from "@/lib/code/heat";
+import { computeAllGroupHeat, computeAllPackHeat, type HeatReading, type PackHeatInput } from "@/lib/code/heat";
+import { DRILL_LANGS, type DrillLang } from "@/types/code";
 
 // The Code pillar landing — a picker of curated practice packs (see CodeLanding),
 // plus a practice-history summary: a per-pack tier badge (not started / in
@@ -30,18 +31,18 @@ export default async function CodeStartPage() {
 
   // Practice heat for the pattern map. Group heat is language-scoped (a group
   // cell sits above the leaves of the ACTIVE language only), but the language
-  // pill is client state — so both languages are computed here and the client
-  // picks one. Two small records beat shipping every attempt row to the browser
-  // and recomputing there.
+  // pill is client state — so every language is computed here and the client
+  // picks one. A handful of small records beats shipping every attempt row to
+  // the browser and recomputing there. Built from DRILL_LANGS so a new language
+  // is covered without editing this file.
   const packInputs: PackHeatInput[] = PACKS.map(p => ({
     id: p.id,
     lang: p.lang,
     repCount: p.content.cells.length,
   }));
-  const groupHeat = {
-    python: computeAllGroupHeat(packInputs, attempts, "python"),
-    sql: computeAllGroupHeat(packInputs, attempts, "sql"),
-  };
+  const groupHeat = Object.fromEntries(
+    DRILL_LANGS.map(lang => [lang, computeAllGroupHeat(packInputs, attempts, lang)]),
+  ) as Record<DrillLang, Record<string, HeatReading>>;
 
   // Per-pack heat is not language-scoped the way group heat is: a leaf belongs
   // to exactly one language already, so one record covers both pills.
