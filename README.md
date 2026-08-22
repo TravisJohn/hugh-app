@@ -84,6 +84,8 @@ for the exact command set this repo should eventually run on every push.
 [`DEPLOYMENT_READINESS_AUDIT.md`](./DEPLOYMENT_READINESS_AUDIT.md) — that
 gates public deployment.** Read it before deploying to production. It
 documents what's already fixed, what's still open, and the recommended
-remediation order. The intended host is [Vercel](https://vercel.com); there
+remediation order. Start with its **"Re-check: 22 August 2026"** section at
+the top — that is the current standing; the sections below it are the
+original 4 August record. The intended host is [Vercel](https://vercel.com); there
 is no `vercel.json` — project settings (env vars, build command) are
 configured directly in the Vercel dashboard.

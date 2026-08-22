@@ -4,8 +4,166 @@
 **Repository:** `D:\WEB PROJECTS\hugh`  
 **Framework:** Next.js 16.2.9, React 19.2.4, TypeScript 5.9.3, Supabase, Anthropic, OpenAI, ElevenLabs  
 **Decision:** **Not ready for production deployment**
+**Superseded — see "Re-check: 22 August 2026" below for current status.**
 
 The application has a sound foundation: strict TypeScript passes, the production build succeeds, all 294 unit tests pass, secrets are separated from client code, most tenant-owned data access is scoped correctly, and sensitive uploads use private storage with signed URLs. However, two directly exploitable security defects and several cost-control and deployment-safety gaps must be fixed before launch.
+
+---
+
+# Re-check: 22 August 2026
+
+The 4 August audit is **left unedited on purpose** — everything from
+"Executive summary" onward is the original record of what was found and why.
+This section is the current standing. Where the two disagree, this section is
+the newer fact.
+
+**Decision:** still **not ready for public deployment**, but for a much shorter
+list of reasons. Four of the six original release blockers are closed. What
+remains is concentrated almost entirely in one place: the **money path**.
+
+## Gates, re-run 22 August 2026
+
+| Check | 4 Aug | 22 Aug |
+|---|---|---|
+| `npm run build` | Pass | **Pass** (exit 0) |
+| `npx tsc --noEmit` | Pass | **Pass** — 0 real `any`, 0 `@ts-ignore`, 0 TODO/FIXME |
+| `npm test` | 294 tests / 23 files | **870 tests / 41 files, all green** |
+| `npm run lint` | **Fail** — 28 errors | **Clean** |
+| `npm audit --omit=dev` | **Fail** — 4 high | **0 vulnerabilities** (Next 16.3.1) |
+| CI | None | **Present** — secretless gate on `main` + PRs |
+| RLS | Gap at `profiles` | **Enabled on all 27 tables**, each with policies |
+| Secrets in git | Clean | **Clean** — only `.env.example` tracked |
+| Migrations | 032/033 drafted | **031-045 applied** per PROJECT_LOG / CONTINUITY |
+
+## Release blocker status
+
+| # | Blocker | Status |
+|---|---|---|
+| 1 | `profiles_owner` RLS self-promotion | **Closed** — 032 applied |
+| 2 | Unsafe `next`/`returnUrl` redirects | **Closed** — `utils/safe-redirect.ts` + 13 tests |
+| 3 | Vulnerable production dependencies | **Closed** — audit clean on Next 16.3.1 |
+| 4 | Approved/unblocked enforcement | **Closed** for the paid-AI surface |
+| 5 | Atomic usage reservation + rate limiting | **OPEN** — nothing built |
+| 6 | Mandatory CI gates | **Closed** — `.github/workflows/ci.yml` |
+
+## The one thing that needs a human, not a commit
+
+Email verification **auto-approves** the profile (`app/auth/confirm/route.ts:39`),
+granting full access to every paid AI route. That chains with blocker 5 and the
+findings below: the 100,000-token monthly cap is **not an enforceable financial
+control**. Anyone who can reach signup and verify an email address can spend the
+project's Anthropic / OpenAI / ElevenLabs budget, and the admin gauge may
+under-report it.
+
+Until blocker 5 is closed:
+
+1. **Set hard spend caps in the provider consoles** (Anthropic budget limit +
+   alert, OpenAI monthly usage limit). ElevenLabs is fixed-tier and self-caps.
+   This is the independent second control the original audit asked for under
+   HIGH-04, and it needs no code.
+2. **Do not expose a deployment with open signup.** Preview protection on, or
+   signup closed.
+3. **Leave `MASTERY_REALTIME_ENABLED` unset/false.** That route mints an OpenAI
+   Realtime ephemeral key, checks quota, and records no usage at all.
+
+## Open findings, ranked — the punch-list to work from
+
+### 1. Usage logging is fire-and-forget everywhere (new detail on HIGH-04)
+
+All **23** `logUsage` call sites are `void logUsage(...)`. **Zero are awaited.**
+On Vercel the invocation may freeze the moment the response returns, so the
+insert can be lost. The monthly cap then enforces against an under-counted log,
+and the admin cost gauge under-reports real spend.
+
+`after()` from `next/server` is already imported and used in
+`app/api/dashboard/goals/route.ts:95` and
+`app/api/dashboard/goals/document/approve/route.ts:64`. The fix is a mechanical
+`void logUsage(...)` → `after(() => logUsage(...))` sweep across those 23 sites.
+Cheapest large win available; do it first.
+
+### 2. Three paths spend tokens and log nothing (violates CLAUDE.md outright)
+
+CLAUDE.md: "A route that calls `enforceUsageGate` but never logs is a bug."
+
+- **`judgeTopicDomain`** (`lib/learn/topic-domain-server.ts:31`, Haiku) — called
+  from `dashboard/classify-topic`, `dashboard/goals/document/extract`, and
+  `dashboard/goals/document/approve`. Gated, never logged.
+- **`generateSessionAssessment`** (`lib/claude/assessSession.ts:19`, Sonnet) —
+  called from `api/interview/generate-session-assessment` **and** from
+  `app/interview/[room]/summary/page.tsx:78` on server render, with no gate and
+  no log. A page view triggers a Sonnet call for free.
+- **`app/api/architecture/chat/route.ts:83`** — `gpt-4o`, admin-gated, unlogged,
+  and inlines the model string instead of declaring `const MODEL`, which is a
+  second CLAUDE.md rule ("every route names its model once").
+
+The pattern behind all three: the provider call lives in a `lib/` helper that
+has no `userId`, so logging was never wired through. Fix the shape, not just the
+three instances — a helper that spends tokens should be unable to run without
+somewhere to log.
+
+### 3. TTS spend never counts against quota (HIGH-04, unchanged)
+
+`checkUsageAllowed` sums only `tokens_in + tokens_out` (`lib/usage.ts:113`).
+`tts_chars` is logged and then ignored, so ElevenLabs is unmetered per learner.
+
+### 4. No rate limiting, and the gate fails open (HIGH-05, unchanged)
+
+Only a monthly total exists. It is read-then-spend, so concurrent requests all
+pass the same check before any row is written. A failed usage query yields no
+rows, therefore a zero total, therefore allowed.
+
+### 5. No error boundaries (part of MEDIUM-07)
+
+Zero `error.tsx`, `global-error.tsx`, or `not-found.tsx` anywhere in `app/`.
+One `loading.tsx` (`app/tracker/[trackId]/`). Any render throw in production
+shows the raw Next error page.
+
+### 6. No observability (MEDIUM-07, unchanged)
+
+No error monitoring, structured logging, or runtime health endpoint.
+`npm run health` is a local CLI, not something production can be asked. A
+production failure would be reported by a user.
+
+### 7. Deploy payload (MEDIUM-10, unchanged)
+
+`public/` is 179 MB, 161 MB of it audio, 44 audio files tracked in git; `.git`
+is 183 MB. No `vercel.json`, no `.vercelignore`.
+
+### 8. No runtime input validation (MEDIUM-03, unchanged)
+
+No `zod`/`valibot` in the dependency tree. Handlers still cast
+`await request.json()` to a TypeScript type, so malformed input becomes a 500.
+
+## The structural finding — why increments are not yet small
+
+The suite is 870 tests across 41 files, and **every one is a pure-library unit
+test. Not one crosses an HTTP or auth boundary.**
+
+So the tests are deep exactly where the code is already safe — parsers, pricing,
+layout geometry, pack content — and silent exactly where a change can hurt:
+does this route still refuse a blocked user, does the quota still hold, does a
+cross-tenant id still 404, does a redirect still reject `//evil.example` at the
+route rather than only in the helper.
+
+That is the real answer to "small increments from a robust solution". A change
+to `lib/usage.ts` currently cannot break a test, so every increment near money
+or auth has to be hand-verified, and hand-verification is what stops increments
+from being small. The pure-module discipline in CLAUDE.md rule 7 is working; it
+simply stops one layer below the risk.
+
+## Recommended order
+
+1. **Findings 1 and 2** — mechanical, closes two standing CLAUDE.md violations,
+   makes spend visible before anything else is decided on top of it.
+2. **The integration-test layer** — two normal users plus one admin, proving:
+   blocked/unapproved gets 403, cross-tenant ids fail, concurrent quota attempts
+   cannot overspend, unsafe redirects are rejected at the route. This is the
+   step that makes every later increment small.
+3. **Findings 3 and 4** — quota correctness and rate limiting, built on tests
+   from step 2 that can prove they work.
+4. **Findings 5 and 7** — pre-launch chores.
+5. **Finding 6** — day one of production, not before.
+6. **Finding 8** — ongoing; add validation at each boundary as it is touched.
 
 ## Executive summary
 

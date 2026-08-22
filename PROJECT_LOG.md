@@ -4480,3 +4480,140 @@ from the missing value, and the pack is about grouping, not NA handling.
 One new dependency, `@codemirror/legacy-modes`, for R highlighting — the
 CodeMirror org's own package, chosen over the third-party `codemirror-lang-r` at
 0.1.1. Full suite 870 tests green, tsc and lint clean, production build passes.
+
+
+## Deployment-readiness re-check (2026-08-22)
+
+A full health pass ahead of deployment, re-running every gate from the 4 August
+audit and re-deriving what is still open. Written up as a new "Re-check:
+22 August 2026" section at the top of `DEPLOYMENT_READINESS_AUDIT.md`; the
+original audit below it is left unedited as the record.
+
+**The gates are in good shape.** Build passes, `tsc --noEmit` clean with zero
+real `any` and zero TODO/FIXME, lint clean, 870 tests across 41 files green,
+`npm audit --omit=dev` reports **0 vulnerabilities** on Next 16.3.1, CI runs
+secretless on every push, RLS is enabled on all 27 tables, and migrations
+031-045 are applied. Four of the six original release blockers are closed:
+the `profiles` RLS self-promotion hole, unsafe return URLs, vulnerable
+dependencies, and mandatory CI gates.
+
+**What is left is almost entirely the money path**, and one finding in it was
+new. Every one of the 23 `logUsage` call sites is `void logUsage(...)` and
+**none is awaited**. On Vercel the invocation can freeze once the response
+returns, so the insert may never land — which means the monthly cap enforces
+against an under-counted log and the admin cost gauge under-reports. `after()`
+is already used two routes over, so the fix is mechanical.
+
+Three paths also spend tokens and log nothing at all, each violating the
+CLAUDE.md rule directly: `judgeTopicDomain` (Haiku, three call sites),
+`generateSessionAssessment` (Sonnet — including from
+`app/interview/[room]/summary/page.tsx` on server render, ungated), and
+`app/api/architecture/chat` (gpt-4o, and it inlines the model string rather
+than binding `const MODEL`). The shape behind all three is the same: the
+provider call sits in a `lib/` helper with no `userId`, so logging was never
+threaded through. Worth fixing as a shape, not as three patches.
+
+Still open and unchanged from August: TTS characters never count against quota,
+there is no rate limiting and the gate fails open on a query error, there are no
+error boundaries anywhere in `app/`, no observability, a 179 MB `public/`, and
+no runtime input validation.
+
+**One item needs Travis rather than a commit.** Email verification auto-approves
+the profile, which grants access to every paid AI route; combined with the
+missing rate limiting that makes the 100k monthly cap unenforceable as a
+financial control. Hard spend caps in the Anthropic and OpenAI consoles are the
+independent second control, and they need no code.
+
+**The structural finding.** All 870 tests are pure-library unit tests; not one
+crosses an HTTP or auth boundary. The suite is therefore deep where the code is
+already safe and silent where a change can hurt. A change to `lib/usage.ts`
+cannot currently break a test, so every increment near money or auth is
+hand-verified — which is precisely what stops increments from being small. The
+recommended order puts the usage-logging fixes first, then an integration-test
+layer over auth/quota, then rate limiting built on tests that can prove it.
+
+
+## Cases statistics — a diagnostic, not a score (2026-08-22)
+
+Travis asked to gamify the Cases pillar: statistics a learner can follow to work
+out what to improve, covering both The Case Room and Case Lab. Explored as a
+mock-up before any code:
+
+**https://claude.ai/code/artifact/d8353404-2880-4b9e-9950-dcc5a104efc5**
+
+Two tabbed views — "Where you stand" and "Progression". Real case titles, facets,
+traps and the three-muscle model; the learner's results are invented.
+
+### The finding that shaped it
+
+The facets look like ready-made stat axes and are not. 100 Case Room cases carry
+**84 distinct `about` values and 103 `statistics` values**, so a learner who has
+played twelve cases lands in twelve buckets of n=1. The obvious build — a
+trap-by-muscle heatmap — would have been almost entirely noise wearing the
+costume of insight.
+
+Case Lab's `skill` facet is the right shape (Simpson's paradox x4, Confounding
+x4, Survivorship x3), and those same names already appear inside Case Room's
+`statistics`. **The trap is the one vocabulary both surfaces genuinely share** —
+it just needs normalising. That became the spine of the design.
+
+### The design, in four decisions
+
+**Two reads, never one number.** *How* you fail — the three muscles, already
+machine-scored, one orthogonal flag per case. *What* you fail on — the trap
+ledger. Neither collapses into the other.
+
+**The two surfaces are never averaged, and the mark's texture says why.** Solid =
+machine-scored (Case Room), hatched = self-reported (Case Lab), dashed = under
+n=3. This is what surfaces the single most valuable thing the page can say: on a
+trap where you score 100% in the Case Room and report you missed it in the Lab,
+you can *recognise* the trap among four labelled options but cannot *find* it in
+12,000 rows. A blended "Cases score" would have read 75% and taught nothing.
+
+**First-attempt only, with the inflation on show.** A replay of a case whose
+reveal you have read is not judgment. The "All attempts" toggle exists to display
+how much replays inflate the figure (Judgment 36% to 62%), not to offer a softer
+score.
+
+**No verdict under n=3.** Rows below the threshold show their plays and withhold
+the judgement. This turns the sparse-facet problem into the recommendation
+mechanic: "play next" is chosen by what Hugh does not yet know about the learner,
+not by content order or by what they are worst at.
+
+### The progression view
+
+Drawn in **attempt order, not calendar order** — a chart with empty Tuesdays
+measures the diary, not the judgment, and Monitor already owns the calendar
+question for both surfaces via `activity_events`. Rolling 5-attempt strong-rate
+as three small multiples rather than three lines on one chart; at this volume the
+series cross constantly and an overlay would produce a tangle that looks like
+analysis. The raw per-attempt squares sit under each line, so the interpretation
+never outranks the evidence.
+
+The centrepiece is that the view **audits its own trend for the trap the product
+teaches**. Judgment gains 43 points across the run while the share of hard cases
+falls by 43 points, so the page refuses to call it improvement: the honest
+statement is "your judgment improved *or* the cases got easier, and 14 attempts
+cannot separate the two." Mix shift, run on the progress chart.
+
+Also written down: what the view refuses to draw, and why — no second calendar,
+no streak (nothing here improves by being done daily, and a broken streak would
+punish a good week away), and no single "Cases" line.
+
+### Build cost
+
+Three of five panels run on data `case_attempts` already stores — `flags`,
+`choices`, `completed_at`. Two need something new:
+
+- **Trap ledger** — roughly 40 aliases mapping Case Room `facets.statistics` onto
+  Case Lab's `facets.skill` vocabulary. A pure, tested `lib/` module; no schema
+  change.
+- **Case Lab column** — migration 046, one row per learner per lab case:
+  `found | partly | missed`, captured with one tap after the teaching note.
+
+Case Lab stays self-graded. A grader needs runtime AI and would break the
+zero-token rule both surfaces hold, and self-rating already matches the grain of
+Monitor's hand-kept Skills view. The page states plainly that it is self-reported
+and will believe a learner who lies to themselves.
+
+Nothing here spends a token. Both surfaces stay zero-runtime-AI.
