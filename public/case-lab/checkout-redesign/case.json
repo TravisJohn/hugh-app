@@ -2,7 +2,12 @@
   "id": "checkout-redesign",
   "title": "The new checkout converts worse overall — do we roll it back?",
   "trap": "Simpson's paradox",
-  "facets": { "topic": "Product", "skill": ["Simpson's paradox"] },
+  "facets": {
+    "topic": "Product",
+    "skill": [
+      "Simpson's paradox"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the analyst on the growth team at Kettle",
@@ -15,21 +20,89 @@
     "file": "/case-lab/checkout-redesign/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "session_id", "type": "int", "description": "Unique checkout session identifier" },
-      { "name": "device", "type": "string", "description": "Device the session was on: desktop or mobile" },
-      { "name": "traffic_source", "type": "string", "description": "How the session arrived: organic, paid, email, or referral" },
-      { "name": "variant", "type": "string", "description": "Which checkout the session saw: old or new" },
-      { "name": "converted", "type": "int", "description": "1 if the session completed a purchase, else 0" }
+      {
+        "name": "session_id",
+        "type": "int",
+        "description": "Unique checkout session identifier"
+      },
+      {
+        "name": "device",
+        "type": "string",
+        "description": "Device the session was on: desktop or mobile"
+      },
+      {
+        "name": "traffic_source",
+        "type": "string",
+        "description": "How the session arrived: organic, paid, email, or referral"
+      },
+      {
+        "name": "variant",
+        "type": "string",
+        "description": "Which checkout the session saw: old or new"
+      },
+      {
+        "name": "converted",
+        "type": "int",
+        "description": "1 if the session completed a purchase, else 0"
+      }
     ],
     "sample": [
-      { "session_id": 1, "device": "desktop", "traffic_source": "referral", "variant": "old", "converted": 0 },
-      { "session_id": 2, "device": "desktop", "traffic_source": "email", "variant": "old", "converted": 0 },
-      { "session_id": 3, "device": "mobile", "traffic_source": "paid", "variant": "new", "converted": 0 },
-      { "session_id": 4, "device": "desktop", "traffic_source": "email", "variant": "old", "converted": 0 },
-      { "session_id": 5, "device": "mobile", "traffic_source": "referral", "variant": "new", "converted": 0 },
-      { "session_id": 6, "device": "desktop", "traffic_source": "referral", "variant": "new", "converted": 1 },
-      { "session_id": 7, "device": "mobile", "traffic_source": "email", "variant": "new", "converted": 1 },
-      { "session_id": 8, "device": "desktop", "traffic_source": "referral", "variant": "old", "converted": 0 }
+      {
+        "session_id": 1,
+        "device": "desktop",
+        "traffic_source": "referral",
+        "variant": "old",
+        "converted": 0
+      },
+      {
+        "session_id": 2,
+        "device": "desktop",
+        "traffic_source": "email",
+        "variant": "old",
+        "converted": 0
+      },
+      {
+        "session_id": 3,
+        "device": "mobile",
+        "traffic_source": "paid",
+        "variant": "new",
+        "converted": 0
+      },
+      {
+        "session_id": 4,
+        "device": "desktop",
+        "traffic_source": "email",
+        "variant": "old",
+        "converted": 0
+      },
+      {
+        "session_id": 5,
+        "device": "mobile",
+        "traffic_source": "referral",
+        "variant": "new",
+        "converted": 0
+      },
+      {
+        "session_id": 6,
+        "device": "desktop",
+        "traffic_source": "referral",
+        "variant": "new",
+        "converted": 1
+      },
+      {
+        "session_id": 7,
+        "device": "mobile",
+        "traffic_source": "email",
+        "variant": "new",
+        "converted": 1
+      },
+      {
+        "session_id": 8,
+        "device": "desktop",
+        "traffic_source": "referral",
+        "variant": "old",
+        "converted": 0
+      }
     ]
   },
   "guidingQuestions": [
@@ -58,11 +131,58 @@
       "Standardize: weight the within-device effects by the overall device mix to get the mix-adjusted effect (~+2.9 pts)."
     ],
     "numbers": [
-      { "label": "Naive overall gap (new − old)", "value": "−1.4 pts" },
-      { "label": "Within desktop (new − old)", "value": "+3.2 pts" },
-      { "label": "Within mobile (new − old)", "value": "+2.6 pts" },
-      { "label": "Mix-adjusted effect", "value": "≈ +2.9 pts (better)" }
+      {
+        "label": "Naive overall gap (new − old)",
+        "value": "−1.4 pts"
+      },
+      {
+        "label": "Within desktop (new − old)",
+        "value": "+3.2 pts"
+      },
+      {
+        "label": "Within mobile (new − old)",
+        "value": "+2.6 pts"
+      },
+      {
+        "label": "Mix-adjusted effect",
+        "value": "≈ +2.9 pts (better)"
+      }
     ],
     "lesson": "An overall average silently weights each subgroup by how many observations it contributes — and if a treatment is rolled out unevenly across subgroups, that weighting can flip the sign of the result. Before trusting an aggregate comparison, check that the groups have the same mix on anything that affects the outcome. Here the new checkout was better on every device; only the mobile-heavy rollout made it look worse. Keep the design, fix the rollout, and next time randomize (or at least balance) the assignment across segments."
+  },
+  "notebook": {
+    "intro": "Five steps, already written: reproduce the headline, test whether the comparison is fair, and see what the data says once it is.",
+    "cells": [
+      {
+        "title": "Reproduce the headline",
+        "explain": "Start by computing the exact number the stakeholder is quoting. If you cannot reproduce the claim, you are arguing about two different things.",
+        "code": "# Overall conversion rate by variant, as a percentage.\noverall = df.groupby(\"variant\")[\"converted\"].mean() * 100\nprint(f\"gap (new - old): {overall['new'] - overall['old']:+.2f} pts\")\noverall.round(2)",
+        "reads": "The headline is real: the new checkout does convert worse overall. That is the number you now have to explain, not dismiss."
+      },
+      {
+        "title": "Check the groups are comparable",
+        "explain": "An overall average only compares like with like if the two groups are built the same way. Before trusting it, look at how new and old sessions are spread across device.",
+        "code": "# What share of each variant's sessions came from each device?\nmix = pd.crosstab(df[\"variant\"], df[\"device\"], normalize=\"index\") * 100\nmix.round(1)",
+        "reads": "The two groups are not comparable. The new checkout is mostly mobile traffic and the old one is mostly desktop, so the overall averages are measuring device as much as they are measuring checkout."
+      },
+      {
+        "title": "Compare within each device",
+        "explain": "If the groups differ on a variable that also drives conversion, compare inside that variable instead of across it. Here that means new versus old within desktop, and within mobile.",
+        "code": "by_device = df.groupby([\"device\", \"variant\"])[\"converted\"].mean().unstack() * 100\nby_device[\"gap\"] = by_device[\"new\"] - by_device[\"old\"]\nby_device.round(2)",
+        "reads": "The sign flips. The new checkout wins on desktop and wins on mobile — it only loses overall. Winning every segment while losing the total is Simpson's paradox."
+      },
+      {
+        "title": "Standardise to one device mix",
+        "explain": "To get a single number that is not distorted by the uneven rollout, weight the within-device effects by one common device mix rather than by each variant's own.",
+        "code": "# Weight each device's effect by that device's share of ALL sessions.\nweights = df[\"device\"].value_counts(normalize=True)\nadjusted = (by_device[\"gap\"] * weights).sum()\nprint(f\"mix-adjusted effect: {adjusted:+.2f} pts\")\nweights.round(3)",
+        "reads": "Held to a common device mix, the new checkout is clearly better. The rollout, not the checkout, produced the alarming headline."
+      },
+      {
+        "title": "Put the two numbers side by side",
+        "explain": "The recommendation rests on the difference between these two figures — and on being able to say plainly why they disagree.",
+        "code": "naive = overall[\"new\"] - overall[\"old\"]\npd.DataFrame(\n    {\"effect (pts)\": [naive, adjusted]},\n    index=[\"naive overall\", \"mix-adjusted\"],\n).round(2)",
+        "reads": "Two defensible-looking numbers with opposite signs, from the same data. Which one you quote is a judgement about whether the comparison was fair — that judgement is the case."
+      }
+    ]
   }
 }

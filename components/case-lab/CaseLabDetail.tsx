@@ -17,6 +17,7 @@ import {
   Lightbulb,
 } from "lucide-react";
 import type { CaseLabCase } from "@/types/case-lab";
+import CaseLabNotebook from "./CaseLabNotebook";
 
 /**
  * The Case Lab case page. Presents the brief, guiding questions, and the dataset
@@ -27,7 +28,7 @@ import type { CaseLabCase } from "@/types/case-lab";
  */
 export default function CaseLabDetail({ c }: { c: CaseLabCase }) {
   const [revealed, setRevealed] = useState(false);
-  const { scenario, dataset, teachingNote } = c;
+  const { scenario, dataset, teachingNote, notebook } = c;
 
   return (
     <div className="min-h-screen bg-[#0A0F1E] text-slate-200">
@@ -183,6 +184,13 @@ export default function CaseLabDetail({ c }: { c: CaseLabCase }) {
             ))}
           </div>
         </section>
+
+        {/* Worked notebook — runs in-browser, opened on demand. Sits between the
+            dataset and the teaching note deliberately: after you have seen what
+            the data looks like, before anything gives the answer away. */}
+        {notebook && notebook.cells.length > 0 && (
+          <CaseLabNotebook notebook={notebook} csvPath={dataset.file} />
+        )}
 
         {/* Teaching note — revealed on demand */}
         <section className="mt-12">

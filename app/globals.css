@@ -188,3 +188,36 @@ body {
 *::-webkit-scrollbar-thumb:hover {
   background-color: #64748b;
 }
+
+/* ── pandas output tables (Case Lab worked notebook) ──────────────────────────
+   `DataFrame.to_html(classes="hugh-df")` emits a bare table with no styling of
+   its own. These rules are the only place that markup is dressed, so a cell's
+   result reads like the rest of the dark UI rather than like a 1996 web page. */
+.hugh-df {
+  border-collapse: collapse;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.hugh-df th,
+.hugh-df td {
+  padding: 4px 12px;
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.6);
+}
+
+.hugh-df thead th {
+  color: #94a3b8;
+  font-weight: 600;
+  border-bottom: 1px solid #334155;
+}
+
+/* Index labels (the row headers pandas puts in <tbody><th>) read as labels, not
+   as data, so they align left and pick up the accent colour. */
+.hugh-df tbody th {
+  color: #6ee7b7;
+  text-align: left;
+  font-weight: 500;
+}

@@ -4617,3 +4617,126 @@ Monitor's hand-kept Skills view. The page states plainly that it is self-reporte
 and will believe a learner who lies to themselves.
 
 Nothing here spends a token. Both surfaces stay zero-runtime-AI.
+
+---
+
+## Case Lab — the worked notebook (in-browser Python, under the brief)
+
+**Date:** 2026-08-22
+
+### The friction
+
+A Case Lab case handed the learner a problem and a CSV, and then stopped. To
+actually process the problem they had to leave: download the file, open a
+notebook somewhere, load it, and rebuild an environment before touching the
+first idea. Most of the distance between "I read the case" and "I worked the
+case" was setup, not thinking.
+
+### What shipped
+
+A runnable notebook on the case page, under the dataset and above the teaching
+note. It is collapsed by default and downloads nothing until opened.
+
+- The case CSV is bound as `df` **before the first cell runs**. No download, no
+  upload, no path, no environment.
+- The cells are the case's own `suggestedApproach` turned into runnable Python,
+  with the reasoning written above each one and a "what to look for" line that
+  appears only *after* the cell produces a result.
+- Every cell is editable. Following the method is the floor, not the ceiling.
+- Pilot: `checkout-redesign` (Simpson's paradox), five cells.
+
+### Decisions
+
+**Cells come from `suggestedApproach`, never from `teachingNote.howToGetThere`.**
+The first is the method; the second is the method with the answer already in it.
+The numbers appear from running the learner's own data, which is a different
+thing from reading them in a spoiler paragraph.
+
+**Collapsed by default, like the teaching note.** This does hand the analysis
+over, and that shifts a case from *discover it* to *follow it and understand
+why*. Anyone who wants to attempt it cold simply never opens the notebook, and
+the download-the-CSV path is untouched.
+
+**No assertions, no grading.** Case Lab v1 is explicitly no-grading and
+nothing-sealed. The moment cells check answers this becomes `/code/drill` with
+worse content, and a judgment surface turns into a puzzle.
+
+**Session mode was added to the existing `pyodide.worker.ts`, not a second
+worker.** Drills rebuild a fresh namespace per run so variables never leak
+between rungs; a notebook needs the opposite — one namespace, because cell 4
+reads what cell 3 defined. Add-only: the drill path is untouched. A second
+worker file would have meant two copies of the timeout / terminate-and-respawn
+logic, which is the most delicate code in there.
+
+**Zero runtime AI and zero server cost hold.** Pyodide is a CDN download, the
+CSV is a static asset, and no analysis leaves the browser. The cost is bytes,
+not tokens — roughly 20MB on first open — which is why boot is lazy and
+explicit rather than on page load.
+
+### The part worth knowing
+
+The interesting logic is invalidation, not execution. Cells share one namespace,
+so re-running cell 2 means the output still on screen for cells 3–5 was computed
+against a namespace that no longer exists. Those outputs go `stale` — dimmed and
+labelled, not silently left looking live. Editing a cell stales it and everything
+after it. "Run all" halts at the first error, because with a shared namespace
+every later cell would fail on a missing name and bury the real error under a
+pile of NameErrors.
+
+A hung cell is expensive here in a way it isn't for drills: killing the worker
+takes the whole namespace with it, not just the offending cell. So a restart is
+reported (`onSessionLost`) and every output is cleared, rather than letting the
+learner continue against an empty namespace and hit a baffling `NameError` three
+cells later.
+
+### Files
+
+- `lib/case-lab/notebook.ts` — pure cell-state rules (18 tests)
+- `lib/code/pyodide.worker.ts` — session mode: shared namespace, Jupyter-style
+  trailing-expression eval, DataFrames rendered as HTML
+- `lib/code/notebookClient.ts` — worker lifecycle, per-cell timeout, session loss
+- `hooks/useCaseNotebook.ts` — owns all notebook state
+- `components/case-lab/CaseLabNotebook.tsx` — the UI
+- `types/case-lab.ts` — optional `notebook` field (add-only; the other 37 cases
+  are unaffected and render exactly as before)
+
+### Verified
+
+Cells were authored against the real CSV in CPython first and checked against the
+teaching note's published figures: −1.38 vs −1.4, +3.19 vs +3.2, +2.61 vs +2.6,
++2.90 vs +2.9. Then driven end to end in a real browser (Playwright, logged in as
+the test learner): Pyodide booted, all five cells ran, every table rendered with
+those same numbers, and editing cell 1 staled all five. Lint clean, `tsc` clean,
+888 tests pass, production build succeeds.
+
+### Open
+
+- **The page now says the method twice.** "Suggested approach" and the notebook
+  cell explanations are the same five steps in different words. When a case has a
+  notebook, one of them should probably go — a content call, not a code one.
+- **37 cases still have no notebook.** Authoring is per case and cannot be
+  generated at runtime without breaking the zero-AI rule. Offline authoring is
+  fine and has precedent.
+- **`CaseLabDetail` scrolls**, and has since it was built, despite rule 4 naming
+  only `/notes` and `/monitor` as exceptions. The notebook makes the page longer;
+  it did not create the contradiction. Worth reconciling the rule deliberately.
+
+### Addendum — the notebook was costing every case page 583KB
+
+Measured after the fact, on a production build, with a real browser: a Case Lab
+case page was transferring **1204KB of JS, against 621KB for the lab landing**.
+The gap was CodeMirror — a 480KB chunk — pulled in by a static import of the
+notebook component in `CaseLabDetail`. Every one of the 38 case pages paid it,
+and 37 of them have no notebook to show.
+
+Fixed by splitting the cell list (the only thing that imports CodeMirror) into
+`components/case-lab/NotebookCells.tsx` behind a `next/dynamic` import. The
+collapsed card, the status handling and the hook are all light and stay eager.
+
+Re-measured: **640KB**, and a case page is now +19KB over the lab landing rather
+than +583KB. The editor is fetched when a learner opens a notebook, not before.
+Re-verified end to end on the production build afterwards — Pyodide boots, all
+five cells run, same numbers.
+
+The general rule this leaves behind: on a surface where a feature appears on a
+minority of pages, the heavy import belongs behind the disclosure, not beside it.

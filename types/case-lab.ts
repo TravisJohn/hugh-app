@@ -48,6 +48,38 @@ export interface CaseLabTeachingNote {
   lesson: string;                    // the transferable principle
 }
 
+/** ── The worked notebook (optional, per case) ────────────────────────────────
+ * A case may ship a runnable walkthrough: an ordered list of cells, each one
+ * explanation + Python. It runs entirely in the browser (Pyodide) against the
+ * case's own CSV, which is pre-bound as `df` — so the learner never downloads,
+ * uploads, or wires up anything to start analysing.
+ *
+ * The cells are authored from `suggestedApproach` (the METHOD), never from
+ * `teachingNote.howToGetThere` (the method WITH the answer). The numbers appear
+ * from running the learner's own data, not from a spoiler paragraph — and the
+ * whole notebook sits behind a disclosure, like the teaching note, so anyone
+ * who wants to attempt the case cold simply doesn't open it.
+ *
+ * ZERO runtime AI, zero server cost: Pyodide is a CDN download, the CSV is a
+ * static asset, and nothing leaves the browser.
+ */
+export interface CaseLabNotebookCell {
+  /** Short step label, e.g. "Reproduce the headline". */
+  title: string;
+  /** Why this step exists, in plain language. Rendered above the code. */
+  explain: string;
+  /** Runnable Python. `df`, `pd` and `np` are already in scope. */
+  code: string;
+  /** Optional "what to look for" hint, shown only AFTER the cell has run. */
+  reads?: string;
+}
+
+export interface CaseLabNotebook {
+  /** One-line framing shown when the notebook is expanded. */
+  intro: string;
+  cells: CaseLabNotebookCell[];
+}
+
 /** A full, playable long-form case. */
 export interface CaseLabCase {
   id: string;
@@ -64,6 +96,7 @@ export interface CaseLabCase {
   };
   guidingQuestions: string[];        // prompts to think about — NOT graded
   suggestedApproach?: string[];      // optional non-spoiling method scaffold — how to go about it
+  notebook?: CaseLabNotebook;        // optional runnable walkthrough — see above
   teachingNote: CaseLabTeachingNote;
 }
 
