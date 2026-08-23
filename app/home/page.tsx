@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { GraduationCap, Code2, Trophy, Cloud, NotebookPen, Activity } from "lucide-react";
+import { GraduationCap, Code2, Trophy, Cloud, NotebookPen, Activity, Headphones, Newspaper, PieChart, Briefcase } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import SignOutButton from "@/components/landing/SignOutButton";
@@ -11,7 +11,22 @@ import HeaderUsage from "@/components/usage/HeaderUsage";
 // "Code" opens the coding-drill landing (/code/start); "Cases" opens The Case
 // Room (/cases); "Cloud Skills" opens the cloud-services reference (/cloud);
 // "Notes" opens the wrong-answer review workspace (/notes); "Monitor" opens the
-// hand-kept tracking surface (/monitor).
+// hand-kept tracking surface (/monitor). Four further surfaces are announced
+// but not built — see COMING_SOON below.
+
+// Announced, not built. These are deliberately not Links and carry no href: a
+// card that navigates nowhere teaches a learner to distrust the whole grid.
+// They render as a compact strip rather than four more grid cards because
+// /home is h-screen with no scroll (Architecture Rule 4) and the six live
+// cards already need clamp() spacing to survive a laptop viewport. When one
+// ships, move it up into the grid as a full card and delete its entry here.
+const COMING_SOON = [
+  { name: "Listen",    Icon: Headphones, blurb: "High-level topics, read aloud — learn while your hands are busy." },
+  { name: "Updates",   Icon: Newspaper,  blurb: "What is moving right now across AI and data analytics." },
+  { name: "Visualize", Icon: PieChart,   blurb: "Practise turning a dataset into a chart that makes the point." },
+  { name: "Manage",    Icon: Briefcase,  blurb: "Take the manager's seat on a problem and make the calls." },
+] as const;
+
 export default async function HomePage() {
   const supabase = await createClient();
   const { user } = await verifyUserAccess(supabase);
@@ -227,6 +242,34 @@ export default async function HomePage() {
             </span>
           </Link>
 
+        </div>
+
+        {/* ── Coming soon: Listen · Updates · Visualize · Manage ────── */}
+        <div className="w-full max-w-4xl shrink-0">
+          <div className="mb-[clamp(0.25rem,1vh,0.5rem)] flex items-center gap-3">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-600">
+              Coming soon
+            </span>
+            <span className="h-px flex-1 bg-slate-800" />
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-[clamp(0.375rem,1.2vh,0.625rem)]">
+            {COMING_SOON.map(({ name, Icon, blurb }) => (
+              <div
+                key={name}
+                title={blurb}
+                aria-disabled="true"
+                className="flex cursor-default items-center gap-2 rounded-xl border border-dashed border-slate-800 bg-slate-900/30 px-2.5 py-[clamp(0.375rem,1.2vh,0.625rem)]"
+              >
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-800/60 text-slate-500">
+                  <Icon size={15} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-xs font-semibold text-slate-400">{name}</span>
+                  <span className="block truncate text-[10px] leading-tight text-slate-600">{blurb}</span>
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       </main>
     </div>

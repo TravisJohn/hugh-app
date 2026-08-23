@@ -4879,3 +4879,30 @@ nothing leaves the page. Two authoring rules worth keeping: cells come from
 `suggestedApproach` and never from `teachingNote.howToGetThere`, and no f-string
 may contain a quote character, because Pyodide's Python rejects nested same-type
 quotes inside f-strings.
+
+---
+
+## Four surfaces announced before they exist (2026-08-23)
+
+Travis named four additions to Hugh: **Listen** (high-level topics you can
+listen to), **Updates** (current events in AI and data analytics),
+**Visualize** (practise visualization skills), and **Manage** (handle a
+problem from the manager's seat). None are built. They are placed on `/home`
+as an announcement only, local for now — not linked, not routed, not deployed.
+
+### Why a strip and not four more cards
+
+`/home` is `h-screen` with no scroll (Architecture Rule 4), and the six live
+cards already needed `clamp()` vertical rhythm to stop the sixth clipping off
+a laptop viewport. A ten-card grid would have broken that rule outright. The
+four sit below the live grid as a compact 4-across strip — dashed border,
+muted slate, icon plus one line — visually a different weight class from a
+card you can actually open.
+
+They are plain `<div>`s with `aria-disabled`, not `Link`s with a dead `href`.
+A card that navigates nowhere teaches a learner to distrust the rest of the
+grid, which is the one thing an announcement must not cost.
+
+Markup comes from a module-level `COMING_SOON` array rather than four more
+copies of the twenty-line card block. When one ships, it gets promoted into
+the grid as a full card and its entry here is deleted.
