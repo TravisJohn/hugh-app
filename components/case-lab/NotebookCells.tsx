@@ -77,8 +77,16 @@ function NotebookCell({
   const running = state.status === "running";
   const stale = state.status === "stale";
 
+  // `data-status` exists so the QA driver (scripts/verify-notebooks.mjs) can read
+  // a cell's real lifecycle state instead of inferring it from Tailwind opacity
+  // classes — a restyle must not be able to turn the check green by accident.
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
+    <div
+      data-testid="nb-cell"
+      data-cell-index={index}
+      data-status={state.status}
+      className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5"
+    >
       {/* Reasoning */}
       <div className="flex gap-3">
         <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-800 text-xs font-semibold text-slate-400">
@@ -101,6 +109,7 @@ function NotebookCell({
         <button
           onClick={handleRun}
           disabled={busy}
+          data-testid="nb-run-cell"
           className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-300 transition-colors hover:border-emerald-500/50 hover:text-emerald-300 disabled:opacity-40"
         >
           {running ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}

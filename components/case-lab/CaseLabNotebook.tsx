@@ -53,7 +53,7 @@ export default function CaseLabNotebook({
 
   if (status === "closed") {
     return (
-      <section className="mt-12">
+      <section className="mt-12" data-testid="nb-section" data-status={status}>
         <div className="rounded-2xl border border-sky-500/30 bg-sky-500/5 p-8 text-center">
           <Terminal className="mx-auto text-sky-400" size={24} />
           <p className="mt-3 font-semibold text-slate-200">
@@ -68,6 +68,7 @@ export default function CaseLabNotebook({
           </p>
           <button
             onClick={nb.open}
+            data-testid="nb-open"
             className="mt-5 inline-flex items-center gap-2 rounded-xl border border-sky-500/40 bg-sky-500/10 px-5 py-2.5 text-sm font-semibold text-sky-300 transition-colors hover:bg-sky-500/20"
           >
             <Play size={16} />
@@ -79,7 +80,7 @@ export default function CaseLabNotebook({
   }
 
   return (
-    <section className="mt-12">
+    <section className="mt-12" data-testid="nb-section" data-status={status}>
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-widest text-slate-400">
@@ -88,12 +89,18 @@ export default function CaseLabNotebook({
         </h2>
         {status === "ready" && (
           <div className="flex items-center gap-2">
-            <span className="mr-1 text-xs text-slate-500">
+            <span
+              data-testid="nb-progress"
+              data-done={progress.done}
+              data-total={progress.total}
+              className="mr-1 text-xs text-slate-500"
+            >
               {progress.done} / {progress.total} run
             </span>
             <button
               onClick={nb.runAll}
               disabled={busy}
+              data-testid="nb-run-all"
               className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-500 disabled:opacity-40"
             >
               {busy ? (

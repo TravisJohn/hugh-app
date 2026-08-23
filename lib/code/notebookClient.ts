@@ -55,6 +55,12 @@ export class PyodideNotebook {
   private cells = new Map<number, Pending<CellRunResult>>();
   private sessions = new Map<number, Pending<DatasetSummary>>();
   private csv: string | null = null;
+  /**
+   * In flight while a restarted worker re-boots Pyodide and re-binds `df`.
+   * Cells must wait on it: the fresh worker has not run the session preamble
+   * yet, so anything sent early dies on `__hugh_render` not being defined.
+   */
+  private rebinding: Promise<DatasetSummary> | null = null;
 
   /** Called when a hung cell forced a restart and the namespace was lost. */
   onSessionLost: (() => void) | null = null;
@@ -126,9 +132,16 @@ export class PyodideNotebook {
   }
 
   /** Runs one cell in the shared namespace. */
-  runCell(code: string): Promise<CellRunResult> {
+  async runCell(code: string): Promise<CellRunResult> {
     if (!this.worker) {
-      return Promise.resolve({ output: null, error: "Python session is not running." });
+      return { output: null, error: "Python session is not running." };
+    }
+    // After a hang the notebook tells the learner to run from the top. Taking
+    // them at their word must not fail: wait for the replacement session to
+    // finish coming back rather than handing them an internal NameError.
+    if (this.rebinding) {
+      await this.rebinding;
+      this.rebinding = null;
     }
     const id = this.nextId++;
     return new Promise<CellRunResult>((resolve) => {
@@ -154,9 +167,12 @@ export class PyodideNotebook {
     this.worker?.terminate();
     this.clearPending();
     this.spawn();
-    if (this.csv !== null) {
-      void this.readyPromise?.then(() => this.bind()).catch(() => {});
-    }
+    this.rebinding =
+      this.csv !== null && this.readyPromise
+        ? this.readyPromise
+            .then(() => this.bind())
+            .catch(() => ({ rows: 0, columns: [] }) as DatasetSummary)
+        : null;
     this.onSessionLost?.();
   }
 
@@ -170,6 +186,7 @@ export class PyodideNotebook {
     this.worker?.terminate();
     this.worker = null;
     this.readyPromise = null;
+    this.rebinding = null;
     this.csv = null;
     this.onSessionLost = null;
     this.clearPending();

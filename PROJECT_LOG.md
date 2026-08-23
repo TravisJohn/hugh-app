@@ -4740,3 +4740,70 @@ five cells run, same numbers.
 
 The general rule this leaves behind: on a surface where a feature appears on a
 minority of pages, the heavy import belongs behind the disclosure, not beside it.
+
+---
+
+## Case Lab notebook — automated QA, and the bug it found
+
+**Date:** 2026-08-23
+
+### Why
+
+QA for the notebook was a person opening a case, waiting for Pyodide, running
+five cells, and trying to remember which invalidation rule to poke at. That does
+not scale past one case, and it is exactly the kind of checking that gets skipped
+when there is no time.
+
+`npm run qa:notebooks` replaces it. One command, no arguments: it starts a dev
+server if none is answering (and leaves a running one alone), signs in, and
+drives real headless Chromium over every case that ships a notebook.
+
+Per case: the notebook starts collapsed, Python boots and binds `df`, every cell
+runs clean, every cell renders something, the progress counter agrees, and no
+uncaught page errors. Then the rules, once: re-run stales below, edit stales
+itself and below, run-all halts at the first error with the error visible, and —
+behind `--slow` — a hung cell is stopped, the restart is explained, and the
+notebook still works afterwards.
+
+### Decisions
+
+**A real browser, not a headless Python checker.** Checking the cell pandas in
+plain Python would be faster and simpler, but it only proves the analysis is
+right — which is the half that was never in doubt. Everything that can actually
+break is on the browser side: worker boot, CSV binding, DataFrame-to-HTML, and
+the invalidation rules. Automating the easy half would have looked like coverage
+without being it.
+
+**`data-status` attributes on the notebook components.** The driver reads a
+cell's real lifecycle state instead of inferring it from Tailwind opacity
+classes. A restyle must not be able to turn the check green while the feature is
+broken.
+
+**Cases without a notebook are skipped, not failed.** 1 of 38 today. As cases
+gain notebooks they are picked up with no change to the script.
+
+**It does not check looks.** Spacing, colour, and whether the reasoning above
+each cell reads well stay human judgements.
+
+### The bug it found
+
+A hung cell terminates the worker and the client respawns one, re-booting Pyodide
+and re-binding the CSV in the background. Session status stayed `"ready"`
+throughout, so nothing on screen said recovery was still in progress — while the
+timeout message told the learner, in as many words, to "run from the top".
+
+Doing that within roughly six seconds failed with
+`NameError: name '__hugh_render' is not defined` — the replacement worker had not
+run the session preamble yet. The learner follows the instruction they were given
+and is punished with an internal symbol they have never seen.
+
+Fixed in `notebookClient.runCell`, which now awaits the pending re-bind before
+sending a cell. A Run clicked during recovery waits a few seconds instead of
+failing.
+
+Flipping session status back to `"booting"` was the obvious alternative and is
+wrong: that unmounts the cell list, which would take the message explaining the
+restart down with it.
+
+This is the first defect in this feature found by something other than a person
+looking at it.
