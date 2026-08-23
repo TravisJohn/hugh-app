@@ -4906,3 +4906,29 @@ grid, which is the one thing an announcement must not cost.
 Markup comes from a module-level `COMING_SOON` array rather than four more
 copies of the twenty-line card block. When one ships, it gets promoted into
 the grid as a full card and its entry here is deleted.
+
+## Theming parked before Stage 1 (2026-08-24)
+
+Multi-theme support (Midnight / Paper / Terminal / Dusk) was agreed in
+principle and then parked before any code was written. The two-stage plan
+stands: extract colours into tokens first, add the switcher second.
+
+Measuring the real scope changed the plan. There are 3,546 colour-utility
+sites across 215 files, not the ~2,800 estimated — but 2,110 of them are
+`slate-*`, so the chrome is the bulk of the work and the rest is hue.
+
+The finding worth keeping: **a `slate-*` → `chrome-*` rename would ship a bug.**
+`text-slate-700` is dim text on the dark page and must invert with the theme.
+`text-slate-900` is ink on a chip — `bg-amber-500 … text-slate-900` — and must
+never invert. Same colour family, opposite obligations. A numeric rename
+preserves that ambiguity and defers it to the moment a theme flips, when 2,110
+candidate sites make it unfindable. Stage 1 therefore mints role-named tokens
+(`surface-raised`, `ink-dim`, `ink-on-accent`), which costs human judgement on
+roughly 70 sites and leaves ~2,040 mechanical.
+
+Two smaller things surfaced while measuring. The four `@theme inline` tokens in
+`app/globals.css` have zero uses in the codebase — dead config — and `inline`
+with a literal hex compiles the value into the utility, so it could not have
+driven a runtime theme swap anyway. And two different page backgrounds are both
+in service as the full-screen ground, `#0F172A` and `#0A0F1E`; that needs
+deciding before tokenising, or one role gets two tokens permanently.
