@@ -2,7 +2,12 @@
   "id": "ticket-cluster-drift",
   "title": "Ticket clustering found 4 issue types — route tickets by cluster ID?",
   "trap": "Cluster instability",
-  "facets": { "topic": "Support", "skill": ["Cluster instability"] },
+  "facets": {
+    "topic": "Support",
+    "skill": [
+      "Cluster instability"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the support-ops analyst at Norwell",
@@ -15,23 +20,103 @@
     "file": "/case-lab/ticket-cluster-drift/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "ticket_id", "type": "int", "description": "Unique support ticket identifier" },
-      { "name": "urgency_score", "type": "float", "description": "Text-derived urgency score, 0-100" },
-      { "name": "complexity_score", "type": "float", "description": "Text-derived complexity score, 0-100" },
-      { "name": "cluster_run1", "type": "int", "description": "K-means(k=4) cluster label from the first run, fit on urgency_score/complexity_score (standardized)" },
-      { "name": "cluster_run2", "type": "int", "description": "K-means(k=4) cluster label from a second run — same tickets, same k, only the random initialization differs. Labels are pre-matched to run1's numbering for comparison." }
+      {
+        "name": "ticket_id",
+        "type": "int",
+        "description": "Unique support ticket identifier"
+      },
+      {
+        "name": "urgency_score",
+        "type": "float",
+        "description": "Text-derived urgency score, 0-100"
+      },
+      {
+        "name": "complexity_score",
+        "type": "float",
+        "description": "Text-derived complexity score, 0-100"
+      },
+      {
+        "name": "cluster_run1",
+        "type": "int",
+        "description": "K-means(k=4) cluster label from the first run, fit on urgency_score/complexity_score (standardized)"
+      },
+      {
+        "name": "cluster_run2",
+        "type": "int",
+        "description": "K-means(k=4) cluster label from a second run — same tickets, same k, only the random initialization differs. Labels are pre-matched to run1's numbering for comparison."
+      }
     ],
     "sample": [
-      { "ticket_id": 1, "urgency_score": 100.0, "complexity_score": 100.0, "cluster_run1": 0, "cluster_run2": 0 },
-      { "ticket_id": 2, "urgency_score": 59.9, "complexity_score": 48.1, "cluster_run1": 1, "cluster_run2": 3 },
-      { "ticket_id": 3, "urgency_score": 40.8, "complexity_score": 45.4, "cluster_run1": 2, "cluster_run2": 2 },
-      { "ticket_id": 4, "urgency_score": 43.3, "complexity_score": 39.8, "cluster_run1": 2, "cluster_run2": 2 },
-      { "ticket_id": 5, "urgency_score": 16.5, "complexity_score": 17.6, "cluster_run1": 2, "cluster_run2": 1 },
-      { "ticket_id": 6, "urgency_score": 81.8, "complexity_score": 56.5, "cluster_run1": 3, "cluster_run2": 3 },
-      { "ticket_id": 7, "urgency_score": 94.8, "complexity_score": 59.8, "cluster_run1": 3, "cluster_run2": 0 },
-      { "ticket_id": 8, "urgency_score": 28.5, "complexity_score": 37.7, "cluster_run1": 2, "cluster_run2": 2 },
-      { "ticket_id": 9, "urgency_score": 27.0, "complexity_score": 36.9, "cluster_run1": 2, "cluster_run2": 2 },
-      { "ticket_id": 10, "urgency_score": 40.7, "complexity_score": 42.1, "cluster_run1": 2, "cluster_run2": 2 }
+      {
+        "ticket_id": 1,
+        "urgency_score": 100.0,
+        "complexity_score": 100.0,
+        "cluster_run1": 0,
+        "cluster_run2": 0
+      },
+      {
+        "ticket_id": 2,
+        "urgency_score": 59.9,
+        "complexity_score": 48.1,
+        "cluster_run1": 1,
+        "cluster_run2": 3
+      },
+      {
+        "ticket_id": 3,
+        "urgency_score": 40.8,
+        "complexity_score": 45.4,
+        "cluster_run1": 2,
+        "cluster_run2": 2
+      },
+      {
+        "ticket_id": 4,
+        "urgency_score": 43.3,
+        "complexity_score": 39.8,
+        "cluster_run1": 2,
+        "cluster_run2": 2
+      },
+      {
+        "ticket_id": 5,
+        "urgency_score": 16.5,
+        "complexity_score": 17.6,
+        "cluster_run1": 2,
+        "cluster_run2": 1
+      },
+      {
+        "ticket_id": 6,
+        "urgency_score": 81.8,
+        "complexity_score": 56.5,
+        "cluster_run1": 3,
+        "cluster_run2": 3
+      },
+      {
+        "ticket_id": 7,
+        "urgency_score": 94.8,
+        "complexity_score": 59.8,
+        "cluster_run1": 3,
+        "cluster_run2": 0
+      },
+      {
+        "ticket_id": 8,
+        "urgency_score": 28.5,
+        "complexity_score": 37.7,
+        "cluster_run1": 2,
+        "cluster_run2": 2
+      },
+      {
+        "ticket_id": 9,
+        "urgency_score": 27.0,
+        "complexity_score": 36.9,
+        "cluster_run1": 2,
+        "cluster_run2": 2
+      },
+      {
+        "ticket_id": 10,
+        "urgency_score": 40.7,
+        "complexity_score": 42.1,
+        "cluster_run1": 2,
+        "cluster_run2": 2
+      }
     ]
   },
   "guidingQuestions": [
@@ -48,6 +133,41 @@
     "Consider whether the data actually supports 4 groups, or a smaller number.",
     "Frame the operational risk: a ticket router that sends roughly 1 in 4 tickets to a different queue than it would have a week earlier, with nothing in the ticket having changed."
   ],
+  "notebook": {
+    "intro": "Five steps: measure how reproducible the issue types are, see which tickets move, and state the routing risk.",
+    "cells": [
+      {
+        "title": "Measure reproducibility",
+        "explain": "Two runs on the same underlying population. Count how often a ticket lands in the same cluster.",
+        "code": "same = (df[\"cluster_run1\"] == df[\"cluster_run2\"]).mean()\nprint(f\"tickets landing in the same cluster on both runs: {same:.1%}\")\nprint(f\"tickets reshuffled: {1 - same:.1%}\")\npd.crosstab(df[\"cluster_run1\"], df[\"cluster_run2\"])",
+        "reads": "A large share of tickets change issue type between runs, with nothing in the ticket having changed."
+      },
+      {
+        "title": "See which tickets move",
+        "explain": "Measure how much closer each ticket sits to its own cluster centre than to the next nearest.",
+        "code": "feats = [\"urgency_score\", \"complexity_score\"]\nz = (df[feats] - df[feats].mean()) / df[feats].std()\ncentres = z.groupby(df[\"cluster_run1\"]).mean()\nd = np.sqrt(((z.values[:, None, :] - centres.values[None, :, :]) ** 2).sum(axis=2))\nd.sort(axis=1)\ndf[\"margin\"] = d[:, 1] - d[:, 0]\ndf[\"switched\"] = (df[\"cluster_run1\"] != df[\"cluster_run2\"]).astype(int)\ndf.groupby(\"switched\")[\"margin\"].agg([\"mean\", \"median\", \"size\"]).round(3)",
+        "reads": "Switchers sit near boundaries. Their assignment was close to arbitrary in the first place."
+      },
+      {
+        "title": "Look for the groups",
+        "explain": "Bucket urgency against complexity. Four real issue types would show as four separated concentrations.",
+        "code": "grid = pd.crosstab(\n    pd.qcut(df[\"urgency_score\"], 6, labels=False, duplicates=\"drop\"),\n    pd.qcut(df[\"complexity_score\"], 6, labels=False, duplicates=\"drop\"),\n)\ngrid.index.name = \"urgency band\"\ngrid.columns.name = \"complexity band\"\ngrid",
+        "reads": "The tickets fill the space rather than clumping. There are no four natural issue types here."
+      },
+      {
+        "title": "Ask what k the data supports",
+        "explain": "Count how many tickets sit close to a boundary at all.",
+        "code": "threshold = df[\"margin\"].median()\nnear = (df[\"margin\"] < threshold).mean()\nprint(f\"median separation margin: {threshold:.3f}\")\nprint(f\"tickets within that margin of another cluster: {near:.1%}\")\ndf[\"margin\"].describe().round(3)",
+        "reads": "With margins this small, four groups is an instruction the algorithm followed, not a pattern it found."
+      },
+      {
+        "title": "State the routing risk",
+        "explain": "Queue sizes follow cluster sizes. Compare what each run would have routed.",
+        "code": "run1 = df[\"cluster_run1\"].value_counts(normalize=True).sort_index() * 100\nrun2 = df[\"cluster_run2\"].value_counts(normalize=True).sort_index() * 100\nqueues = pd.DataFrame({\"run 1 (%)\": run1, \"run 2 (%)\": run2})\nqueues[\"shift (pts)\"] = queues[\"run 2 (%)\"] - queues[\"run 1 (%)\"]\nqueues.round(2)",
+        "reads": "A router built on this sends a large share of tickets to a different queue than it would have a week earlier, for no reason the ticket could explain."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "K-means found 4 clean issue-type clusters, and they look ready to route on — swap the keyword rules for cluster ID and let the model decide the queue.",
     "theTrap": "K-means converges to whichever partition is nearest its random starting point, not necessarily one true global answer — and when the underlying data doesn't actually contain 4 cleanly separated groups (this ticket population is really closer to 2 broad, overlapping flavors, with k=4 picked from an elbow-plot ritual rather than real structure), the extra clusters get carved out of the overlapping middle wherever the random initialization happens to land. Re-run the identical clustering on the identical tickets, changing only the random seed, and 28% of tickets land in a different cluster than before. Cluster ID here isn't measuring a stable property of the ticket — a large share of it is just which random start the algorithm happened to get that day.",
@@ -60,10 +180,22 @@
       "Conclude: k=4 doesn't reflect genuine structure here; cluster ID is not a stable enough signal to route production tickets on as-is."
     ],
     "numbers": [
-      { "label": "Tickets with the same cluster across two re-runs", "value": "≈ 72%" },
-      { "label": "Tickets reassigned to a different cluster", "value": "≈ 28% (~3,400 of 12,000)" },
-      { "label": "Adjusted Rand index between the two runs", "value": "≈ 0.49 (well below 1.0)" },
-      { "label": "Genuinely separated groups visible in the data", "value": "≈ 2, not 4" }
+      {
+        "label": "Tickets with the same cluster across two re-runs",
+        "value": "≈ 72%"
+      },
+      {
+        "label": "Tickets reassigned to a different cluster",
+        "value": "≈ 28% (~3,400 of 12,000)"
+      },
+      {
+        "label": "Adjusted Rand index between the two runs",
+        "value": "≈ 0.49 (well below 1.0)"
+      },
+      {
+        "label": "Genuinely separated groups visible in the data",
+        "value": "≈ 2, not 4"
+      }
     ],
     "lesson": "K-means always returns exactly k clusters, whether or not the data actually contains k separated groups — and when it doesn't, the extra boundaries are drawn wherever the random initialization lands, not by any real structure. Before making an operational decision (routing, budget, targeting) depend on a clustering result, re-run it with a different seed and measure agreement. Low reproducibility isn't a bug to shrug off — it's the clustering telling you the number of groups you asked for isn't the number of groups that's actually there."
   }

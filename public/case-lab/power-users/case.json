@@ -2,7 +2,12 @@
   "id": "power-users",
   "title": "Users who run 50+ workflows never churn — should we push everyone to 50?",
   "trap": "Survivorship bias",
-  "facets": { "topic": "Product", "skill": ["Survivorship bias"] },
+  "facets": {
+    "topic": "Product",
+    "skill": [
+      "Survivorship bias"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the growth analyst at Cadence",
@@ -15,23 +20,115 @@
     "file": "/case-lab/power-users/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "user_id", "type": "int", "description": "Unique user identifier" },
-      { "name": "plan", "type": "string", "description": "Plan: free, pro, or team" },
-      { "name": "engagement_score", "type": "float", "description": "Underlying engagement propensity (0-100), measured from early behaviour" },
-      { "name": "workflows_first_month", "type": "int", "description": "Workflows the user ran in their FIRST 30 days — available to every user regardless of tenure" },
-      { "name": "workflows_total", "type": "int", "description": "Total workflows the user has run to date (accumulates with tenure)" },
-      { "name": "tenure_months", "type": "int", "description": "Months since signup" },
-      { "name": "churned", "type": "int", "description": "1 if the user has churned, else 0" }
+      {
+        "name": "user_id",
+        "type": "int",
+        "description": "Unique user identifier"
+      },
+      {
+        "name": "plan",
+        "type": "string",
+        "description": "Plan: free, pro, or team"
+      },
+      {
+        "name": "engagement_score",
+        "type": "float",
+        "description": "Underlying engagement propensity (0-100), measured from early behaviour"
+      },
+      {
+        "name": "workflows_first_month",
+        "type": "int",
+        "description": "Workflows the user ran in their FIRST 30 days — available to every user regardless of tenure"
+      },
+      {
+        "name": "workflows_total",
+        "type": "int",
+        "description": "Total workflows the user has run to date (accumulates with tenure)"
+      },
+      {
+        "name": "tenure_months",
+        "type": "int",
+        "description": "Months since signup"
+      },
+      {
+        "name": "churned",
+        "type": "int",
+        "description": "1 if the user has churned, else 0"
+      }
     ],
     "sample": [
-      { "user_id": 1, "plan": "pro", "engagement_score": 11.6, "workflows_first_month": 6, "workflows_total": 9, "tenure_months": 1, "churned": 1 },
-      { "user_id": 2, "plan": "team", "engagement_score": 30.3, "workflows_first_month": 5, "workflows_total": 13, "tenure_months": 2, "churned": 1 },
-      { "user_id": 3, "plan": "free", "engagement_score": 46.3, "workflows_first_month": 6, "workflows_total": 24, "tenure_months": 4, "churned": 1 },
-      { "user_id": 4, "plan": "free", "engagement_score": 42.3, "workflows_first_month": 8, "workflows_total": 9, "tenure_months": 1, "churned": 1 },
-      { "user_id": 5, "plan": "free", "engagement_score": 79.7, "workflows_first_month": 7, "workflows_total": 224, "tenure_months": 25, "churned": 0 },
-      { "user_id": 6, "plan": "pro", "engagement_score": 64.7, "workflows_first_month": 12, "workflows_total": 96, "tenure_months": 13, "churned": 0 },
-      { "user_id": 7, "plan": "pro", "engagement_score": 49.9, "workflows_first_month": 11, "workflows_total": 64, "tenure_months": 10, "churned": 0 },
-      { "user_id": 8, "plan": "free", "engagement_score": 30.9, "workflows_first_month": 5, "workflows_total": 9, "tenure_months": 1, "churned": 1 }
+      {
+        "user_id": 1,
+        "plan": "pro",
+        "engagement_score": 11.6,
+        "workflows_first_month": 6,
+        "workflows_total": 9,
+        "tenure_months": 1,
+        "churned": 1
+      },
+      {
+        "user_id": 2,
+        "plan": "team",
+        "engagement_score": 30.3,
+        "workflows_first_month": 5,
+        "workflows_total": 13,
+        "tenure_months": 2,
+        "churned": 1
+      },
+      {
+        "user_id": 3,
+        "plan": "free",
+        "engagement_score": 46.3,
+        "workflows_first_month": 6,
+        "workflows_total": 24,
+        "tenure_months": 4,
+        "churned": 1
+      },
+      {
+        "user_id": 4,
+        "plan": "free",
+        "engagement_score": 42.3,
+        "workflows_first_month": 8,
+        "workflows_total": 9,
+        "tenure_months": 1,
+        "churned": 1
+      },
+      {
+        "user_id": 5,
+        "plan": "free",
+        "engagement_score": 79.7,
+        "workflows_first_month": 7,
+        "workflows_total": 224,
+        "tenure_months": 25,
+        "churned": 0
+      },
+      {
+        "user_id": 6,
+        "plan": "pro",
+        "engagement_score": 64.7,
+        "workflows_first_month": 12,
+        "workflows_total": 96,
+        "tenure_months": 13,
+        "churned": 0
+      },
+      {
+        "user_id": 7,
+        "plan": "pro",
+        "engagement_score": 49.9,
+        "workflows_first_month": 11,
+        "workflows_total": 64,
+        "tenure_months": 10,
+        "churned": 0
+      },
+      {
+        "user_id": 8,
+        "plan": "free",
+        "engagement_score": 30.9,
+        "workflows_first_month": 5,
+        "workflows_total": 9,
+        "tenure_months": 1,
+        "churned": 1
+      }
     ]
   },
   "guidingQuestions": [
@@ -48,6 +145,41 @@
     "Find a fair signal — one every user can generate early, before tenure differs. Compare how well workflows_first_month predicts churn versus the survivor-defined total.",
     "Recommend a target based on the early, equally-available signal, and note that engagement still confounds even that — the honest test is an experiment."
   ],
+  "notebook": {
+    "intro": "Five steps: reproduce the churn split, ask what it takes to qualify for it, then find a signal every user could actually generate.",
+    "cells": [
+      {
+        "title": "Reproduce the headline",
+        "explain": "Churn rate for users above and below the 50-workflow line.",
+        "code": "df[\"power_user\"] = (df[\"workflows_total\"] >= 50).astype(int)\nrates = df.groupby(\"power_user\")[\"churned\"].mean() * 100\nprint(\"churn rate by 50+ workflows (%)\")\nrates.round(2)",
+        "reads": "The split is as stark as claimed. The question is what membership of that group requires."
+      },
+      {
+        "title": "Ask what it takes to qualify",
+        "explain": "If reaching 50 workflows takes months of use, the group is defined by survival. Look at tenure on each side of the line.",
+        "code": "profile = df.groupby(\"power_user\")[[\"tenure_months\", \"workflows_total\"]].mean()\nprofile[\"n\"] = df.groupby(\"power_user\").size()\nprofile.round(2)",
+        "reads": "Power users have far longer tenure. You cannot accumulate 50 workflows and churn early — the threshold excludes churners by construction."
+      },
+      {
+        "title": "See the circularity",
+        "explain": "Totals accrue because a user stayed. Check how strongly the total tracks tenure rather than intensity.",
+        "code": "print(\"correlation of workflows_total with tenure_months:\")\nprint(round(df[\"workflows_total\"].corr(df[\"tenure_months\"]), 3))\nprint(\"correlation of workflows_first_month with tenure_months:\")\nprint(round(df[\"workflows_first_month\"].corr(df[\"tenure_months\"]), 3))",
+        "reads": "The total is largely a restatement of how long someone stayed. Saying long-stayers do not churn is close to circular."
+      },
+      {
+        "title": "Find a fair signal",
+        "explain": "workflows_first_month is available to every user in their first month, before tenure can differ. Compare how it predicts churn.",
+        "code": "df[\"first_month_band\"] = pd.qcut(df[\"workflows_first_month\"], 4, labels=False, duplicates=\"drop\")\nby_band = df.groupby(\"first_month_band\").agg(\n    churn_pct=(\"churned\", \"mean\"), users=(\"churned\", \"size\")\n)\nby_band[\"churn_pct\"] = by_band[\"churn_pct\"] * 100\nby_band.round(2)",
+        "reads": "Early activity does predict churn — but far more modestly than the survivor-defined threshold implied."
+      },
+      {
+        "title": "Set the two signals side by side",
+        "explain": "The spread each signal produces, so the difference between them is explicit.",
+        "code": "threshold_spread = rates[0] - rates[1]\nearly = df.groupby(\"first_month_band\")[\"churned\"].mean() * 100\nearly_spread = early.iloc[0] - early.iloc[-1]\npd.DataFrame(\n    {\"churn spread (pts)\": [threshold_spread, early_spread]},\n    index=[\"50+ total workflows (survivor-defined)\", \"first-month workflows (available to all)\"],\n).round(2)",
+        "reads": "Pushing everyone to 50 workflows targets a consequence of staying. The early signal is the one an intervention could actually move — and even that needs an experiment."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "Users with 50+ total workflows churn at ~1%, versus ~92% for everyone else — a 91-point gap. It looks like the single most powerful retention lever imaginable: get users to 50 workflows and churn all but disappears.",
     "theTrap": "Total workflow count is something you can only accumulate by sticking around. The 50+ group has been a customer for ~17 months on average; the under-50 group, ~2.7 months. A user who churns in week two literally cannot run 50 workflows, and a brand-new user hasn't had time to. So 'ran 50+ workflows' is essentially a restatement of 'survived a long time' — the comparison is close to circular. You're not discovering that workflows cause retention; you're measuring the outcome (retention) on the input (workflows) and finding they agree, because one produces the other.",
@@ -60,10 +192,22 @@
       "Note even that is confounded by engagement; conclude the '50-workflow' target is a mirage and recommend an activation experiment."
     ],
     "numbers": [
-      { "label": "Churn: 50+ total vs under 50", "value": "1.2% vs 92%" },
-      { "label": "Mean tenure: 50+ vs under 50", "value": "17.0 vs 2.7 months" },
-      { "label": "Naive 50+ churn gap", "value": "90.8 pts" },
-      { "label": "Fair early signal (first-month) gap", "value": "33.4 pts" }
+      {
+        "label": "Churn: 50+ total vs under 50",
+        "value": "1.2% vs 92%"
+      },
+      {
+        "label": "Mean tenure: 50+ vs under 50",
+        "value": "17.0 vs 2.7 months"
+      },
+      {
+        "label": "Naive 50+ churn gap",
+        "value": "90.8 pts"
+      },
+      {
+        "label": "Fair early signal (first-month) gap",
+        "value": "33.4 pts"
+      }
     ],
     "lesson": "Beware any metric that can only be reached by surviving — cumulative usage, tenure milestones, lifetime totals. Splitting on it compares survivors to everyone else, so it will always look like a miracle retention driver even when it causes nothing. The number is measuring the outcome you care about, not a cause of it. To find a real lever, use signals available to every user at the same point in their lifecycle, and confirm cause with an experiment rather than a threshold that only the retained can clear."
   }

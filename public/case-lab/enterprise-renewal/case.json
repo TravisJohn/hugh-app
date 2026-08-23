@@ -2,7 +2,12 @@
   "id": "enterprise-renewal",
   "title": "Enterprise accounts are our most loyal — should we bet the GTM on them?",
   "trap": "Survivorship bias",
-  "facets": { "topic": "Finance", "skill": ["Survivorship bias"] },
+  "facets": {
+    "topic": "Finance",
+    "skill": [
+      "Survivorship bias"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the RevOps analyst at Northwind",
@@ -15,24 +20,118 @@
     "file": "/case-lab/enterprise-renewal/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "account_id", "type": "int", "description": "Unique account identifier" },
-      { "name": "segment", "type": "string", "description": "Account size band: smb, mid, or enterprise" },
-      { "name": "signup_year", "type": "int", "description": "Year the account first signed a contract (2018-2025)" },
-      { "name": "acv", "type": "float", "description": "Annual contract value in dollars" },
-      { "name": "tenure_months", "type": "int", "description": "Total months the account has been a customer — whether it is still active or has since churned" },
-      { "name": "status", "type": "string", "description": "active (still a customer today) or churned (has since left)" }
+      {
+        "name": "account_id",
+        "type": "int",
+        "description": "Unique account identifier"
+      },
+      {
+        "name": "segment",
+        "type": "string",
+        "description": "Account size band: smb, mid, or enterprise"
+      },
+      {
+        "name": "signup_year",
+        "type": "int",
+        "description": "Year the account first signed a contract (2018-2025)"
+      },
+      {
+        "name": "acv",
+        "type": "float",
+        "description": "Annual contract value in dollars"
+      },
+      {
+        "name": "tenure_months",
+        "type": "int",
+        "description": "Total months the account has been a customer — whether it is still active or has since churned"
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "description": "active (still a customer today) or churned (has since left)"
+      }
     ],
     "sample": [
-      { "account_id": 1, "segment": "mid", "signup_year": 2025, "acv": 23374.0, "tenure_months": 12, "status": "active" },
-      { "account_id": 2, "segment": "smb", "signup_year": 2022, "acv": 2188.0, "tenure_months": 48, "status": "active" },
-      { "account_id": 3, "segment": "enterprise", "signup_year": 2022, "acv": 319986.0, "tenure_months": 48, "status": "active" },
-      { "account_id": 4, "segment": "mid", "signup_year": 2020, "acv": 55512.0, "tenure_months": 11, "status": "churned" },
-      { "account_id": 5, "segment": "smb", "signup_year": 2025, "acv": 1291.0, "tenure_months": 12, "status": "active" },
-      { "account_id": 6, "segment": "enterprise", "signup_year": 2018, "acv": 131715.0, "tenure_months": 7, "status": "churned" },
-      { "account_id": 7, "segment": "mid", "signup_year": 2020, "acv": 31346.0, "tenure_months": 57, "status": "churned" },
-      { "account_id": 8, "segment": "mid", "signup_year": 2025, "acv": 27470.0, "tenure_months": 12, "status": "active" },
-      { "account_id": 9, "segment": "smb", "signup_year": 2021, "acv": 7768.0, "tenure_months": 60, "status": "active" },
-      { "account_id": 10, "segment": "smb", "signup_year": 2019, "acv": 7001.0, "tenure_months": 73, "status": "churned" }
+      {
+        "account_id": 1,
+        "segment": "mid",
+        "signup_year": 2025,
+        "acv": 23374.0,
+        "tenure_months": 12,
+        "status": "active"
+      },
+      {
+        "account_id": 2,
+        "segment": "smb",
+        "signup_year": 2022,
+        "acv": 2188.0,
+        "tenure_months": 48,
+        "status": "active"
+      },
+      {
+        "account_id": 3,
+        "segment": "enterprise",
+        "signup_year": 2022,
+        "acv": 319986.0,
+        "tenure_months": 48,
+        "status": "active"
+      },
+      {
+        "account_id": 4,
+        "segment": "mid",
+        "signup_year": 2020,
+        "acv": 55512.0,
+        "tenure_months": 11,
+        "status": "churned"
+      },
+      {
+        "account_id": 5,
+        "segment": "smb",
+        "signup_year": 2025,
+        "acv": 1291.0,
+        "tenure_months": 12,
+        "status": "active"
+      },
+      {
+        "account_id": 6,
+        "segment": "enterprise",
+        "signup_year": 2018,
+        "acv": 131715.0,
+        "tenure_months": 7,
+        "status": "churned"
+      },
+      {
+        "account_id": 7,
+        "segment": "mid",
+        "signup_year": 2020,
+        "acv": 31346.0,
+        "tenure_months": 57,
+        "status": "churned"
+      },
+      {
+        "account_id": 8,
+        "segment": "mid",
+        "signup_year": 2025,
+        "acv": 27470.0,
+        "tenure_months": 12,
+        "status": "active"
+      },
+      {
+        "account_id": 9,
+        "segment": "smb",
+        "signup_year": 2021,
+        "acv": 7768.0,
+        "tenure_months": 60,
+        "status": "active"
+      },
+      {
+        "account_id": 10,
+        "segment": "smb",
+        "signup_year": 2019,
+        "acv": 7001.0,
+        "tenure_months": 73,
+        "status": "churned"
+      }
     ]
   },
   "guidingQuestions": [
@@ -49,6 +148,41 @@
     "Compute retention from signup — first-year churn and survival to 24 months by segment — the numbers that include the accounts that didn't make it.",
     "State both truths precisely (survivors sticky, segment risky) and turn it into what to fix — enterprise year-one onboarding — before scaling upmarket."
   ],
+  "notebook": {
+    "intro": "Five steps: reproduce the claim exactly as it was framed, notice what the framing filters out, then count the accounts that never made it.",
+    "cells": [
+      {
+        "title": "Reproduce the headline",
+        "explain": "Condition exactly as the stakeholder did — accounts past their first renewal — and compare segments.",
+        "code": "survivors = df[df[\"tenure_months\"] >= 12]\nrates = survivors.groupby(\"segment\")[\"status\"].apply(lambda s: (s == \"active\").mean()) * 100\nprint(\"still active, among accounts past their first renewal (%)\")\nrates.round(2)",
+        "reads": "Conditioned this way, enterprise does look like the stickiest segment."
+      },
+      {
+        "title": "Notice what the filter removed",
+        "explain": "That filter keeps survivors and silently drops everything that died young. Count what each segment lost to it.",
+        "code": "kept = survivors.groupby(\"segment\").size()\neveryone = df.groupby(\"segment\").size()\ndropped = pd.DataFrame({\"all accounts\": everyone, \"past renewal\": kept})\ndropped[\"dropped %\"] = (1 - dropped[\"past renewal\"] / dropped[\"all accounts\"]) * 100\ndropped.round(1)",
+        "reads": "The segment that looks stickiest is also the one that lost the largest share of its accounts before the filter even applied."
+      },
+      {
+        "title": "Un-condition on survival",
+        "explain": "Work from every account instead, so the early failures are counted rather than filtered away.",
+        "code": "first_year_churn = (\n    df.assign(died_young=((df[\"status\"] == \"churned\") & (df[\"tenure_months\"] < 12)).astype(int))\n    .groupby(\"segment\")[\"died_young\"].mean() * 100\n)\nprint(\"churned inside the first year, all accounts (%)\")\nfirst_year_churn.round(2)",
+        "reads": "Counting everyone reverses the impression the filtered view gave."
+      },
+      {
+        "title": "Survival from signup",
+        "explain": "The number that matters for a go-to-market bet: what share of accounts signed up ever reach two years.",
+        "code": "reached_24 = (df[\"tenure_months\"] >= 24).astype(int)\nsurvival = df.assign(reached_24=reached_24).groupby(\"segment\")[\"reached_24\"].mean() * 100\nprint(\"reached 24 months, all accounts (%)\")\nsurvival.round(2)",
+        "reads": "From signup, the picture is the opposite of the one that prompted the question."
+      },
+      {
+        "title": "State both truths",
+        "explain": "Both readings are true of different populations. Put them beside each other so the difference is unmissable.",
+        "code": "pd.DataFrame(\n    {\"active past renewal (%)\": rates, \"first-year churn (%)\": first_year_churn, \"reach 24m (%)\": survival}\n).round(2)",
+        "reads": "Enterprise survivors are sticky and the enterprise segment is risky. Betting the GTM on the first sentence ignores the second."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "Among accounts that reached their first renewal, enterprise are the stickiest — ~77.6% still active versus 72.5% mid and 65.6% SMB. Read directly, enterprise is the most loyal segment and shifting the GTM upmarket looks like the low-risk, high-retention play.",
     "theTrap": "The headline is computed only on accounts that survived to their first renewal — it silently drops every account that churned in year one. That conditioning hides exactly where enterprise is weakest. Enterprise deals are big, complex, and carry high expectations, so they have the HIGHEST first-year churn: 29.3% of enterprise accounts churn before month 12, versus 19.8% mid and 14.9% SMB. Those failures vanish from the survivor view, leaving behind the enterprise accounts that clearly succeeded — which are, genuinely, very sticky. So 'enterprise survivors rarely churn' is true and 'enterprise is the safest segment' is false, and the survivor filter turns the first into the second.",
@@ -61,10 +195,22 @@
       "Reconcile: enterprise survivors are stickiest AND enterprise has the worst early survival — the survivor filter shows only the first."
     ],
     "numbers": [
-      { "label": "Survivor view — active among reached-first-renewal", "value": "Ent 77.6% · Mid 72.5% · SMB 65.6%" },
-      { "label": "First-year churn (full cohort)", "value": "Ent 29.3% · Mid 19.8% · SMB 14.9%" },
-      { "label": "Survival to 24 months from signup", "value": "Ent 63.3% · Mid 71.5% · SMB 74.7%" },
-      { "label": "Verdict", "value": "Survivors sticky, segment riskiest early" }
+      {
+        "label": "Survivor view — active among reached-first-renewal",
+        "value": "Ent 77.6% · Mid 72.5% · SMB 65.6%"
+      },
+      {
+        "label": "First-year churn (full cohort)",
+        "value": "Ent 29.3% · Mid 19.8% · SMB 14.9%"
+      },
+      {
+        "label": "Survival to 24 months from signup",
+        "value": "Ent 63.3% · Mid 71.5% · SMB 74.7%"
+      },
+      {
+        "label": "Verdict",
+        "value": "Survivors sticky, segment riskiest early"
+      }
     ],
     "lesson": "When you measure a group only after filtering to the ones that lasted, you throw away the failures — and the failures are the whole point. Enterprise survivors look loyal because the enterprise accounts that didn't make it are already gone from the active book. Any metric computed on 'accounts we still have' or 'customers who reached X' is survivor-conditioned and will overstate durability, most for the segment that fails earliest. The fix is to reason from cohorts: start with everyone who signed up and follow them forward, churned accounts included. Do that and the 'safest segment' becomes the riskiest one to sign — with a clear action (fix year-one churn) that the survivor view completely hid."
   }

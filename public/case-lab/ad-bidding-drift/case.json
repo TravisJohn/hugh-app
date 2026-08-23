@@ -2,7 +2,12 @@
   "id": "ad-bidding-drift",
   "title": "The learned bidder beats the fixed rule by $2.93/auction — keep it live?",
   "trap": "Non-stationarity",
-  "facets": { "topic": "Marketing", "skill": ["Non-stationarity"] },
+  "facets": {
+    "topic": "Marketing",
+    "skill": [
+      "Non-stationarity"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the bidding-strategy analyst at Cobalt Ads",
@@ -15,22 +20,88 @@
     "file": "/case-lab/ad-bidding-drift/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "auction_id", "type": "int", "description": "Unique auction identifier" },
-      { "name": "period", "type": "string", "description": "pre or post — before or after a new competitor entered the auction pool partway through the test window" },
-      { "name": "arm", "type": "string", "description": "learned_bidder or fixed_rule — which bidding strategy this auction used, randomly split 50/50 within each period" },
-      { "name": "profit_per_auction", "type": "float", "description": "Profit earned on this auction in dollars — the reward" }
+      {
+        "name": "auction_id",
+        "type": "int",
+        "description": "Unique auction identifier"
+      },
+      {
+        "name": "period",
+        "type": "string",
+        "description": "pre or post — before or after a new competitor entered the auction pool partway through the test window"
+      },
+      {
+        "name": "arm",
+        "type": "string",
+        "description": "learned_bidder or fixed_rule — which bidding strategy this auction used, randomly split 50/50 within each period"
+      },
+      {
+        "name": "profit_per_auction",
+        "type": "float",
+        "description": "Profit earned on this auction in dollars — the reward"
+      }
     ],
     "sample": [
-      { "auction_id": 1, "period": "pre", "arm": "fixed_rule", "profit_per_auction": 5.85 },
-      { "auction_id": 2, "period": "post", "arm": "learned_bidder", "profit_per_auction": 9.89 },
-      { "auction_id": 3, "period": "pre", "arm": "learned_bidder", "profit_per_auction": 18.4 },
-      { "auction_id": 4, "period": "pre", "arm": "fixed_rule", "profit_per_auction": 9.37 },
-      { "auction_id": 5, "period": "pre", "arm": "fixed_rule", "profit_per_auction": 3.42 },
-      { "auction_id": 6, "period": "pre", "arm": "learned_bidder", "profit_per_auction": 5.0 },
-      { "auction_id": 7, "period": "pre", "arm": "fixed_rule", "profit_per_auction": 4.64 },
-      { "auction_id": 8, "period": "post", "arm": "learned_bidder", "profit_per_auction": 3.98 },
-      { "auction_id": 9, "period": "pre", "arm": "fixed_rule", "profit_per_auction": 11.6 },
-      { "auction_id": 10, "period": "post", "arm": "learned_bidder", "profit_per_auction": 0.36 }
+      {
+        "auction_id": 1,
+        "period": "pre",
+        "arm": "fixed_rule",
+        "profit_per_auction": 5.85
+      },
+      {
+        "auction_id": 2,
+        "period": "post",
+        "arm": "learned_bidder",
+        "profit_per_auction": 9.89
+      },
+      {
+        "auction_id": 3,
+        "period": "pre",
+        "arm": "learned_bidder",
+        "profit_per_auction": 18.4
+      },
+      {
+        "auction_id": 4,
+        "period": "pre",
+        "arm": "fixed_rule",
+        "profit_per_auction": 9.37
+      },
+      {
+        "auction_id": 5,
+        "period": "pre",
+        "arm": "fixed_rule",
+        "profit_per_auction": 3.42
+      },
+      {
+        "auction_id": 6,
+        "period": "pre",
+        "arm": "learned_bidder",
+        "profit_per_auction": 5.0
+      },
+      {
+        "auction_id": 7,
+        "period": "pre",
+        "arm": "fixed_rule",
+        "profit_per_auction": 4.64
+      },
+      {
+        "auction_id": 8,
+        "period": "post",
+        "arm": "learned_bidder",
+        "profit_per_auction": 3.98
+      },
+      {
+        "auction_id": 9,
+        "period": "pre",
+        "arm": "fixed_rule",
+        "profit_per_auction": 11.6
+      },
+      {
+        "auction_id": 10,
+        "period": "post",
+        "arm": "learned_bidder",
+        "profit_per_auction": 0.36
+      }
     ]
   },
   "guidingQuestions": [
@@ -47,6 +118,41 @@
     "Name the mechanism: the learned bidder was tuned on pre-competitor auction dynamics; once the competitor enters and win prices/margins shift, a model fit to the old regime doesn't automatically adapt.",
     "Recommend based on the post-period gap — the regime the bidder will actually operate in going forward — not the pooled average, which is mostly measuring a regime that no longer exists."
   ],
+  "notebook": {
+    "intro": "Five steps: reproduce the pooled win, split it by regime, and work out which regime the bidder will actually operate in.",
+    "cells": [
+      {
+        "title": "Reproduce the pooled gap",
+        "explain": "Mean profit per auction for the learned bidder against the fixed rule, across every row.",
+        "code": "means = df.groupby(\"arm\")[\"profit_per_auction\"].mean()\npooled_gap = means[\"learned_bidder\"] - means[\"fixed_rule\"]\nprint(f\"pooled gap: {pooled_gap:+.2f} per auction\")\nmeans.round(3)",
+        "reads": "Pooled, the learned bidder looks like a clear winner. The pool covers two different worlds."
+      },
+      {
+        "title": "Split by regime",
+        "explain": "Recompute the gap inside the pre-competitor period and inside the post-competitor period separately.",
+        "code": "by_period = df.groupby([\"period\", \"arm\"])[\"profit_per_auction\"].mean().unstack()\nby_period[\"gap\"] = by_period[\"learned_bidder\"] - by_period[\"fixed_rule\"]\nby_period.round(3)",
+        "reads": "The advantage lives in one period and has gone in the other. Compare the two gap values."
+      },
+      {
+        "title": "Check which regime dominates the pool",
+        "explain": "A pooled average is a weighted average. See what share of rows each period contributes.",
+        "code": "share = df[\"period\"].value_counts(normalize=True) * 100\nprint(\"share of auctions by period (%)\")\nshare.round(1)",
+        "reads": "The pre-competitor period is the majority of the data, so the pooled number is mostly describing a world that no longer exists."
+      },
+      {
+        "title": "Name the mechanism",
+        "explain": "The bidder was tuned on pre-competitor dynamics. Look at what the competitor did to the auction itself, not just to the gap.",
+        "code": "levels = df.groupby([\"period\", \"arm\"])[\"profit_per_auction\"].agg([\"mean\", \"std\", \"size\"])\nlevels.round(3)",
+        "reads": "Margins compress for both arms after entry. A model fitted to the old dynamics does not adapt on its own; the simpler rule has less to unlearn."
+      },
+      {
+        "title": "Decide on the regime that is coming",
+        "explain": "The bidder will operate in the post period. Put the pooled number beside the one that describes it.",
+        "code": "post_gap = by_period.loc[\"post\", \"gap\"]\npd.DataFrame(\n    {\"gap per auction\": [pooled_gap, post_gap]},\n    index=[\"pooled across both periods\", \"post-competitor only\"],\n).round(3)",
+        "reads": "Keeping the bidder on the strength of the pooled number buys an edge that has already expired."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "Averaged across the whole test window, the learned bidder earns $2.93 more profit per auction than the fixed rule. That reads as a clear, sustained edge — obviously make it the permanent default.",
     "theTrap": "The test window isn't one stable environment — a new competitor entered the auction partway through, changing win prices and margins for everyone. Split by period and the story flips: in the pre-competitor period, the learned bidder has a large genuine edge (+$4.99/auction). But in the post-competitor period — the regime the bidder will actually operate in going forward — that edge is gone; the fixed rule is actually slightly ahead (learned bidder -$0.62/auction relative to fixed). The learned bidder was tuned to auction dynamics that no longer exist. Because \"pre\" makes up 65% of the test window, the pooled average is dominated by a period that's now history, and it's masking the fact that the bidder's advantage has already evaporated.",
@@ -59,10 +165,22 @@
       "Recommend using the post-period (current-regime) gap for a go-forward decision, not the pooled average."
     ],
     "numbers": [
-      { "label": "Pooled reward gap (learned − fixed)", "value": "+$2.93/auction" },
-      { "label": "Pre-competitor period gap", "value": "+$4.99/auction (learned bidder ahead)" },
-      { "label": "Post-competitor period gap", "value": "-$0.62/auction (fixed rule slightly ahead)" },
-      { "label": "Share of test window that is pre-competitor", "value": "65%" }
+      {
+        "label": "Pooled reward gap (learned − fixed)",
+        "value": "+$2.93/auction"
+      },
+      {
+        "label": "Pre-competitor period gap",
+        "value": "+$4.99/auction (learned bidder ahead)"
+      },
+      {
+        "label": "Post-competitor period gap",
+        "value": "-$0.62/auction (fixed rule slightly ahead)"
+      },
+      {
+        "label": "Share of test window that is pre-competitor",
+        "value": "65%"
+      }
     ],
     "lesson": "A policy's average reward over a test window is only meaningful if the environment stayed the same throughout it — and in live systems (auctions, markets, user behavior), it frequently doesn't. Non-stationarity means a policy's advantage measured in one regime doesn't automatically carry into the next one, especially for models tuned tightly to the conditions they were trained or tested under. Whenever there's a known or suspected regime change in your test window, split the result by time period before trusting a pooled average — and weight your decision toward the regime you'll actually be operating in going forward, not the one that dominates the historical average."
   }

@@ -2,7 +2,12 @@
   "id": "creative-bandit-regret",
   "title": "The bandit's average conversion rate beats the old creative — was it worth running?",
   "trap": "Hidden exploration cost",
-  "facets": { "topic": "Marketing", "skill": ["Hidden exploration cost"] },
+  "facets": {
+    "topic": "Marketing",
+    "skill": [
+      "Hidden exploration cost"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the paid-social analyst at Brightloop",
@@ -15,22 +20,88 @@
     "file": "/case-lab/creative-bandit-regret/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "impression_id", "type": "int", "description": "Unique impression identifier" },
-      { "name": "day", "type": "int", "description": "Campaign day, 1-40" },
-      { "name": "policy", "type": "string", "description": "bandit (exploring multiple creatives, converging over time) or baseline (the old best-known creative, run unchanged the whole campaign)" },
-      { "name": "converted", "type": "int", "description": "1 if the impression converted — the reward" }
+      {
+        "name": "impression_id",
+        "type": "int",
+        "description": "Unique impression identifier"
+      },
+      {
+        "name": "day",
+        "type": "int",
+        "description": "Campaign day, 1-40"
+      },
+      {
+        "name": "policy",
+        "type": "string",
+        "description": "bandit (exploring multiple creatives, converging over time) or baseline (the old best-known creative, run unchanged the whole campaign)"
+      },
+      {
+        "name": "converted",
+        "type": "int",
+        "description": "1 if the impression converted — the reward"
+      }
     ],
     "sample": [
-      { "impression_id": 1, "day": 1, "policy": "bandit", "converted": 0 },
-      { "impression_id": 2, "day": 1, "policy": "bandit", "converted": 0 },
-      { "impression_id": 3, "day": 1, "policy": "bandit", "converted": 0 },
-      { "impression_id": 4, "day": 1, "policy": "bandit", "converted": 0 },
-      { "impression_id": 5, "day": 1, "policy": "bandit", "converted": 0 },
-      { "impression_id": 6, "day": 1, "policy": "bandit", "converted": 0 },
-      { "impression_id": 7, "day": 1, "policy": "bandit", "converted": 0 },
-      { "impression_id": 8, "day": 1, "policy": "bandit", "converted": 0 },
-      { "impression_id": 9, "day": 1, "policy": "bandit", "converted": 0 },
-      { "impression_id": 10, "day": 1, "policy": "bandit", "converted": 0 }
+      {
+        "impression_id": 1,
+        "day": 1,
+        "policy": "bandit",
+        "converted": 0
+      },
+      {
+        "impression_id": 2,
+        "day": 1,
+        "policy": "bandit",
+        "converted": 0
+      },
+      {
+        "impression_id": 3,
+        "day": 1,
+        "policy": "bandit",
+        "converted": 0
+      },
+      {
+        "impression_id": 4,
+        "day": 1,
+        "policy": "bandit",
+        "converted": 0
+      },
+      {
+        "impression_id": 5,
+        "day": 1,
+        "policy": "bandit",
+        "converted": 0
+      },
+      {
+        "impression_id": 6,
+        "day": 1,
+        "policy": "bandit",
+        "converted": 0
+      },
+      {
+        "impression_id": 7,
+        "day": 1,
+        "policy": "bandit",
+        "converted": 0
+      },
+      {
+        "impression_id": 8,
+        "day": 1,
+        "policy": "bandit",
+        "converted": 0
+      },
+      {
+        "impression_id": 9,
+        "day": 1,
+        "policy": "bandit",
+        "converted": 0
+      },
+      {
+        "impression_id": 10,
+        "day": 1,
+        "policy": "bandit",
+        "converted": 0
+      }
     ]
   },
   "guidingQuestions": [
@@ -47,6 +118,41 @@
     "Note the day (or week) the bandit's rate first overtakes the baseline's, and consider what a campaign of only that length would have shown.",
     "Estimate cumulative regret: for each day, how far below the bandit's eventual best rate was that day's actual rate, summed over the exploration period — that's forgone reward the pooled average doesn't show."
   ],
+  "notebook": {
+    "intro": "Five steps: reproduce the pooled win, watch the gap over time, and price the exploration the average hides.",
+    "cells": [
+      {
+        "title": "Reproduce the pooled gap",
+        "explain": "Conversion rate for the bandit against the baseline, across every impression.",
+        "code": "rates = df.groupby(\"policy\")[\"converted\"].mean() * 100\npooled_gap = rates[\"bandit\"] - rates[\"baseline\"]\nprint(f\"pooled gap: {pooled_gap:+.2f} pts\")\nrates.round(2)",
+        "reads": "Averaged over the whole run, the bandit wins. An average over time hides how it got there."
+      },
+      {
+        "title": "Watch the gap over time",
+        "explain": "Group by week to smooth the noise and tabulate each policy's rate week by week.",
+        "code": "df[\"week\"] = ((df[\"day\"] - 1) // 7) + 1\nweekly = df.groupby([\"week\", \"policy\"])[\"converted\"].mean().unstack() * 100\nweekly[\"gap\"] = weekly[\"bandit\"] - weekly[\"baseline\"]\nweekly.round(2)",
+        "reads": "The bandit starts behind and ends ahead. The pooled number is the average of those two very different stories."
+      },
+      {
+        "title": "Isolate the first two weeks",
+        "explain": "Compare the policies inside days 1-14 only — the window a short campaign would have covered.",
+        "code": "early = df[df[\"day\"] <= 14]\nearly_rates = early.groupby(\"policy\")[\"converted\"].mean() * 100\nearly_gap = early_rates[\"bandit\"] - early_rates[\"baseline\"]\nprint(f\"days 1-14 gap: {early_gap:+.2f} pts\")\nearly_rates.round(2)",
+        "reads": "In the first fortnight the bandit is behind. A two-week campaign would have concluded the opposite of the pooled number."
+      },
+      {
+        "title": "Find when it overtakes",
+        "explain": "Identify the first week the bandit's rate passes the baseline's, so the length of the learning period is explicit.",
+        "code": "ahead = weekly[weekly[\"gap\"] > 0]\ncrossover = int(ahead.index[0]) if len(ahead) else None\nprint(f\"bandit first leads in week: {crossover}\")\nweekly[[\"gap\"]].round(2)",
+        "reads": "That week is the cost of admission. Any campaign shorter than it pays the exploration and never collects the reward."
+      },
+      {
+        "title": "Price the exploration",
+        "explain": "For each day, measure how far below the bandit's eventual rate it was, and sum those forgone conversions.",
+        "code": "bandit = df[df[\"policy\"] == \"bandit\"]\ndaily = bandit.groupby(\"day\")[\"converted\"].agg([\"mean\", \"size\"])\nsettled_rate = daily[\"mean\"].tail(10).mean()\ndaily[\"forgone\"] = (settled_rate - daily[\"mean\"]).clip(lower=0) * daily[\"size\"]\ntotal_regret = daily[\"forgone\"].sum()\nprint(f\"settled conversion rate: {settled_rate * 100:.2f}%\")\nprint(f\"conversions forgone while learning: {total_regret:.0f}\")\ndaily.tail(8).round(3)",
+        "reads": "That total is real money the pooled average never shows. It is the price of learning, and it is only worth paying if the campaign runs long enough to earn it back."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "Pooled over the full 40-day campaign, the bandit's conversion rate beats the old creative. That reads as a clean, unambiguous win — good enough to make bandits the new default for every campaign.",
     "theTrap": "A pooled average blends the bandit's exploration phase (when it's testing several creatives, some worse than the baseline) with its exploitation phase (once it's converged on the best one). Split by week and the picture is very different: in the first two weeks, the bandit's conversion rate is meaningfully BELOW the baseline (4.9% vs. 8.6% — a real loss), because it's still testing weaker creatives. It only pulls decisively ahead from around week 3 onward, once it's converged. The pooled 40-day average is a genuine net win, but it completely hides that the campaign spent its first two weeks actively losing ground — a fact that matters enormously if a shorter campaign, a tighter budget, or an impatient stakeholder would have called it off before the bandit caught up.",
@@ -59,10 +165,22 @@
       "Conclude: the net win depended on the campaign running long enough to amortize the exploration cost; a shorter campaign would have shown a loss."
     ],
     "numbers": [
-      { "label": "Pooled 40-day conversion gap (bandit − baseline)", "value": "+1.5 points (a real, modest net win)" },
-      { "label": "First-2-weeks conversion gap", "value": "-3.7 points (bandit behind)" },
-      { "label": "Days the bandit trailed the baseline", "value": "15 of 40, concentrated early" },
-      { "label": "Forgone conversions during exploration (cumulative regret)", "value": "≈ 350" }
+      {
+        "label": "Pooled 40-day conversion gap (bandit − baseline)",
+        "value": "+1.5 points (a real, modest net win)"
+      },
+      {
+        "label": "First-2-weeks conversion gap",
+        "value": "-3.7 points (bandit behind)"
+      },
+      {
+        "label": "Days the bandit trailed the baseline",
+        "value": "15 of 40, concentrated early"
+      },
+      {
+        "label": "Forgone conversions during exploration (cumulative regret)",
+        "value": "≈ 350"
+      }
     ],
     "lesson": "A pooled average reward over a bandit's run blends its exploration cost and its exploitation payoff into one number, and a positive pooled result doesn't mean the policy was ahead the whole time — it can mean a real early loss was more than made up for later. Before generalizing a bandit's win to \"bandits always work here,\" check the reward trajectory over time and estimate cumulative regret against the eventual best arm: that's the exploration cost the pooled average is hiding. Whether that cost pays back depends on how long the policy gets to run — the same bandit that wins over 40 days would have shown a clear loss if judged at day 14."
   }

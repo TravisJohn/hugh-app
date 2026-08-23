@@ -2,7 +2,12 @@
   "id": "redesign-dau",
   "title": "Weekly sessions rose after the redesign — did engagement go up?",
   "trap": "Simpson's paradox",
-  "facets": { "topic": "Product", "skill": ["Simpson's paradox"] },
+  "facets": {
+    "topic": "Product",
+    "skill": [
+      "Simpson's paradox"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the product analyst at Fathom",
@@ -15,23 +20,103 @@
     "file": "/case-lab/redesign-dau/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "user_id", "type": "int", "description": "Unique user identifier" },
-      { "name": "user_segment", "type": "string", "description": "new (joined recently) or returning (re-engaged / long-standing) user" },
-      { "name": "platform", "type": "string", "description": "Device platform: ios, android, or web" },
-      { "name": "period", "type": "string", "description": "before or after the redesign launch" },
-      { "name": "sessions_7d", "type": "int", "description": "Sessions the user opened in the measured week — the engagement outcome" }
+      {
+        "name": "user_id",
+        "type": "int",
+        "description": "Unique user identifier"
+      },
+      {
+        "name": "user_segment",
+        "type": "string",
+        "description": "new (joined recently) or returning (re-engaged / long-standing) user"
+      },
+      {
+        "name": "platform",
+        "type": "string",
+        "description": "Device platform: ios, android, or web"
+      },
+      {
+        "name": "period",
+        "type": "string",
+        "description": "before or after the redesign launch"
+      },
+      {
+        "name": "sessions_7d",
+        "type": "int",
+        "description": "Sessions the user opened in the measured week — the engagement outcome"
+      }
     ],
     "sample": [
-      { "user_id": 1, "user_segment": "new", "platform": "ios", "period": "before", "sessions_7d": 3 },
-      { "user_id": 2, "user_segment": "new", "platform": "android", "period": "after", "sessions_7d": 1 },
-      { "user_id": 3, "user_segment": "new", "platform": "web", "period": "after", "sessions_7d": 2 },
-      { "user_id": 4, "user_segment": "new", "platform": "ios", "period": "before", "sessions_7d": 4 },
-      { "user_id": 5, "user_segment": "new", "platform": "web", "period": "before", "sessions_7d": 3 },
-      { "user_id": 6, "user_segment": "returning", "platform": "android", "period": "after", "sessions_7d": 8 },
-      { "user_id": 7, "user_segment": "new", "platform": "web", "period": "before", "sessions_7d": 6 },
-      { "user_id": 8, "user_segment": "returning", "platform": "ios", "period": "after", "sessions_7d": 3 },
-      { "user_id": 9, "user_segment": "new", "platform": "ios", "period": "before", "sessions_7d": 4 },
-      { "user_id": 10, "user_segment": "new", "platform": "ios", "period": "before", "sessions_7d": 1 }
+      {
+        "user_id": 1,
+        "user_segment": "new",
+        "platform": "ios",
+        "period": "before",
+        "sessions_7d": 3
+      },
+      {
+        "user_id": 2,
+        "user_segment": "new",
+        "platform": "android",
+        "period": "after",
+        "sessions_7d": 1
+      },
+      {
+        "user_id": 3,
+        "user_segment": "new",
+        "platform": "web",
+        "period": "after",
+        "sessions_7d": 2
+      },
+      {
+        "user_id": 4,
+        "user_segment": "new",
+        "platform": "ios",
+        "period": "before",
+        "sessions_7d": 4
+      },
+      {
+        "user_id": 5,
+        "user_segment": "new",
+        "platform": "web",
+        "period": "before",
+        "sessions_7d": 3
+      },
+      {
+        "user_id": 6,
+        "user_segment": "returning",
+        "platform": "android",
+        "period": "after",
+        "sessions_7d": 8
+      },
+      {
+        "user_id": 7,
+        "user_segment": "new",
+        "platform": "web",
+        "period": "before",
+        "sessions_7d": 6
+      },
+      {
+        "user_id": 8,
+        "user_segment": "returning",
+        "platform": "ios",
+        "period": "after",
+        "sessions_7d": 3
+      },
+      {
+        "user_id": 9,
+        "user_segment": "new",
+        "platform": "ios",
+        "period": "before",
+        "sessions_7d": 4
+      },
+      {
+        "user_id": 10,
+        "user_segment": "new",
+        "platform": "ios",
+        "period": "before",
+        "sessions_7d": 1
+      }
     ]
   },
   "guidingQuestions": [
@@ -48,6 +133,41 @@
     "Recognise the composition change (win-back pulling in high-activity returning users) as the driver of the aggregate, and hold the mix constant to see the real within-segment trend.",
     "Separate the two concurrent events — redesign and win-back campaign — and attribute the sessions change to the right one."
   ],
+  "notebook": {
+    "intro": "Five steps: reproduce the lift, split the audience, and work out whether engagement rose or the audience changed.",
+    "cells": [
+      {
+        "title": "Reproduce the aggregate",
+        "explain": "Mean sessions_7d before and after — the number the claim rests on.",
+        "code": "overall = df.groupby(\"period\")[\"sessions_7d\"].mean()\nraw_change = overall[\"after\"] - overall[\"before\"]\nprint(f\"change: {raw_change:+.3f} sessions/week\")\noverall.round(3)",
+        "reads": "The aggregate really did rise. Whether it rose because people used the product more is a different question."
+      },
+      {
+        "title": "Split the blended average",
+        "explain": "An average over a changing audience is not a measure of behaviour. Split by user_segment within each period.",
+        "code": "by_segment = df.groupby([\"user_segment\", \"period\"])[\"sessions_7d\"].mean().unstack()\nby_segment[\"change\"] = by_segment[\"after\"] - by_segment[\"before\"]\nby_segment.round(3)",
+        "reads": "Compare the direction of the change column with the aggregate change from cell 1."
+      },
+      {
+        "title": "Look at the mix",
+        "explain": "If the segments move against the aggregate, the composition is doing the work. Compute the audience share per period.",
+        "code": "share = pd.crosstab(df[\"period\"], df[\"user_segment\"], normalize=\"index\") * 100\nprint(\"audience composition per period (%)\")\nshare.round(1)",
+        "reads": "The audience is not the same population before and after — the returning share has moved substantially."
+      },
+      {
+        "title": "Hold the mix constant",
+        "explain": "Re-weight both periods to one common audience mix, so the composition change cannot move the number.",
+        "code": "within = df.groupby([\"user_segment\", \"period\"])[\"sessions_7d\"].mean().unstack()\nweights = df[\"user_segment\"].value_counts(normalize=True)\nadjusted = within.mul(weights, axis=0).sum()\nheld_change = adjusted[\"after\"] - adjusted[\"before\"]\nprint(f\"mix-adjusted change: {held_change:+.3f} sessions/week\")\nadjusted.round(3)",
+        "reads": "With the audience held constant, the aggregate lift does not hold up."
+      },
+      {
+        "title": "Attribute it to the right event",
+        "explain": "Two things happened at once. Separate the within-segment change, which the redesign could have caused, from the mix change, which the win-back campaign caused.",
+        "code": "pd.DataFrame(\n    {\"sessions/week\": [raw_change, held_change, raw_change - held_change]},\n    index=[\"aggregate change\", \"within-segment (redesign)\", \"from audience mix (win-back)\"],\n).round(3)",
+        "reads": "Almost all of the headline sits on the third row — who was measured, not how the product behaved."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "Average weekly sessions rose from 4.9 to 5.5 per user — about +12%. Taken directly, the redesign looks like a clear engagement win worth extending across the app.",
     "theTrap": "The aggregate rose on a mix shift — Simpson's paradox. The redesign launched alongside a win-back campaign that pulled back a wave of returning users, who are far more active than new users (~8 sessions/week vs ~3). Returning users went from 38% of the population before to 62% after. Because the audience tilted toward the high-activity segment, the blended average climbed even though WITHIN each segment sessions fell: new users dropped from 2.96 to 2.40 and returning users from 8.13 to 7.44. The redesign didn't lift engagement; it slightly hurt it in both segments, and the changed audience hid that.",
@@ -60,10 +180,22 @@
       "Attribute correctly: the win-back campaign moved the mix; the redesign is the small within-segment drop — not the headline gain."
     ],
     "numbers": [
-      { "label": "Overall sessions — before vs after", "value": "4.94 → 5.54 (+12%)" },
-      { "label": "Returning share — before vs after", "value": "38% → 62%" },
-      { "label": "New-user sessions — before vs after", "value": "2.96 → 2.40 (down)" },
-      { "label": "Returning-user sessions — before vs after", "value": "8.13 → 7.44 (down)" }
+      {
+        "label": "Overall sessions — before vs after",
+        "value": "4.94 → 5.54 (+12%)"
+      },
+      {
+        "label": "Returning share — before vs after",
+        "value": "38% → 62%"
+      },
+      {
+        "label": "New-user sessions — before vs after",
+        "value": "2.96 → 2.40 (down)"
+      },
+      {
+        "label": "Returning-user sessions — before vs after",
+        "value": "8.13 → 7.44 (down)"
+      }
     ],
     "lesson": "A blended average can rise while every group inside it falls — Simpson's paradox — whenever the mix of groups shifts toward the higher-scoring one. Here a win-back campaign reweighted the audience toward active returning users, lifting the overall average even as the redesign quietly cost both segments engagement. When two things change at once (a redesign and a campaign) and your metric spans a mix that moved, disaggregate before attributing anything: report within-segment rates or a fixed-mix average. The direction of the honest answer here is the opposite of the headline — which is exactly when this reflex matters most."
   }

@@ -2,7 +2,12 @@
   "id": "retry-success-rate",
   "title": "Auto-retries pushed task success to 94% — did retries fix reliability?",
   "trap": "Simpson's paradox",
-  "facets": { "topic": "Orchestration", "skill": ["Simpson's paradox"] },
+  "facets": {
+    "topic": "Orchestration",
+    "skill": [
+      "Simpson's paradox"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the data engineer on platform reliability at Orbit",
@@ -15,25 +20,133 @@
     "file": "/case-lab/retry-success-rate/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "run_id", "type": "int", "description": "Unique task-run identifier" },
-      { "name": "dag_id", "type": "string", "description": "Which DAG the task belongs to" },
-      { "name": "task_class", "type": "string", "description": "Kind of task: sensor (cheap polling), transform, load, or ml" },
-      { "name": "period", "type": "string", "description": "before or after the retry change" },
-      { "name": "max_retries", "type": "int", "description": "Configured retries for the run: 1 before, 3 after" },
-      { "name": "duration_sec", "type": "float", "description": "Task runtime in seconds" },
-      { "name": "succeeded", "type": "int", "description": "1 if the task ultimately succeeded, else 0 — the outcome" }
+      {
+        "name": "run_id",
+        "type": "int",
+        "description": "Unique task-run identifier"
+      },
+      {
+        "name": "dag_id",
+        "type": "string",
+        "description": "Which DAG the task belongs to"
+      },
+      {
+        "name": "task_class",
+        "type": "string",
+        "description": "Kind of task: sensor (cheap polling), transform, load, or ml"
+      },
+      {
+        "name": "period",
+        "type": "string",
+        "description": "before or after the retry change"
+      },
+      {
+        "name": "max_retries",
+        "type": "int",
+        "description": "Configured retries for the run: 1 before, 3 after"
+      },
+      {
+        "name": "duration_sec",
+        "type": "float",
+        "description": "Task runtime in seconds"
+      },
+      {
+        "name": "succeeded",
+        "type": "int",
+        "description": "1 if the task ultimately succeeded, else 0 — the outcome"
+      }
     ],
     "sample": [
-      { "run_id": 1, "dag_id": "dag_000", "task_class": "transform", "period": "before", "max_retries": 1, "duration_sec": 7.3, "succeeded": 1 },
-      { "run_id": 2, "dag_id": "dag_001", "task_class": "sensor", "period": "after", "max_retries": 3, "duration_sec": 16.2, "succeeded": 1 },
-      { "run_id": 3, "dag_id": "dag_002", "task_class": "sensor", "period": "after", "max_retries": 3, "duration_sec": 19.8, "succeeded": 1 },
-      { "run_id": 4, "dag_id": "dag_003", "task_class": "sensor", "period": "before", "max_retries": 1, "duration_sec": 7.8, "succeeded": 1 },
-      { "run_id": 5, "dag_id": "dag_004", "task_class": "transform", "period": "before", "max_retries": 1, "duration_sec": 42.1, "succeeded": 1 },
-      { "run_id": 6, "dag_id": "dag_005", "task_class": "load", "period": "after", "max_retries": 3, "duration_sec": 51.1, "succeeded": 0 },
-      { "run_id": 7, "dag_id": "dag_006", "task_class": "sensor", "period": "before", "max_retries": 1, "duration_sec": 18.3, "succeeded": 1 },
-      { "run_id": 8, "dag_id": "dag_007", "task_class": "sensor", "period": "after", "max_retries": 3, "duration_sec": 9.1, "succeeded": 1 },
-      { "run_id": 9, "dag_id": "dag_008", "task_class": "sensor", "period": "before", "max_retries": 1, "duration_sec": 2.9, "succeeded": 1 },
-      { "run_id": 10, "dag_id": "dag_009", "task_class": "transform", "period": "before", "max_retries": 1, "duration_sec": 129.6, "succeeded": 0 }
+      {
+        "run_id": 1,
+        "dag_id": "dag_000",
+        "task_class": "transform",
+        "period": "before",
+        "max_retries": 1,
+        "duration_sec": 7.3,
+        "succeeded": 1
+      },
+      {
+        "run_id": 2,
+        "dag_id": "dag_001",
+        "task_class": "sensor",
+        "period": "after",
+        "max_retries": 3,
+        "duration_sec": 16.2,
+        "succeeded": 1
+      },
+      {
+        "run_id": 3,
+        "dag_id": "dag_002",
+        "task_class": "sensor",
+        "period": "after",
+        "max_retries": 3,
+        "duration_sec": 19.8,
+        "succeeded": 1
+      },
+      {
+        "run_id": 4,
+        "dag_id": "dag_003",
+        "task_class": "sensor",
+        "period": "before",
+        "max_retries": 1,
+        "duration_sec": 7.8,
+        "succeeded": 1
+      },
+      {
+        "run_id": 5,
+        "dag_id": "dag_004",
+        "task_class": "transform",
+        "period": "before",
+        "max_retries": 1,
+        "duration_sec": 42.1,
+        "succeeded": 1
+      },
+      {
+        "run_id": 6,
+        "dag_id": "dag_005",
+        "task_class": "load",
+        "period": "after",
+        "max_retries": 3,
+        "duration_sec": 51.1,
+        "succeeded": 0
+      },
+      {
+        "run_id": 7,
+        "dag_id": "dag_006",
+        "task_class": "sensor",
+        "period": "before",
+        "max_retries": 1,
+        "duration_sec": 18.3,
+        "succeeded": 1
+      },
+      {
+        "run_id": 8,
+        "dag_id": "dag_007",
+        "task_class": "sensor",
+        "period": "after",
+        "max_retries": 3,
+        "duration_sec": 9.1,
+        "succeeded": 1
+      },
+      {
+        "run_id": 9,
+        "dag_id": "dag_008",
+        "task_class": "sensor",
+        "period": "before",
+        "max_retries": 1,
+        "duration_sec": 2.9,
+        "succeeded": 1
+      },
+      {
+        "run_id": 10,
+        "dag_id": "dag_009",
+        "task_class": "transform",
+        "period": "before",
+        "max_retries": 1,
+        "duration_sec": 129.6,
+        "succeeded": 0
+      }
     ]
   },
   "guidingQuestions": [
@@ -50,6 +163,41 @@
     "Decide which number answers the reliability question — the blended rate over a shifted mix, or the like-for-like within-class rates.",
     "Separate the two things that happened at once (retry bump + a monitoring-driven sensor flood) and say what each did, rather than crediting the retry change for a mix artifact."
   ],
+  "notebook": {
+    "intro": "Five steps: reproduce the reliability number, break it down by task class, and decide which number answers the question.",
+    "cells": [
+      {
+        "title": "Reproduce the aggregate",
+        "explain": "Overall success rate before and after — the number in the claim.",
+        "code": "overall = df.groupby(\"period\")[\"succeeded\"].mean() * 100\nraw_change = overall[\"after\"] - overall[\"before\"]\nprint(f\"change: {raw_change:+.2f} pts\")\noverall.round(2)",
+        "reads": "Success really is higher after. The question is whether the same work is being measured."
+      },
+      {
+        "title": "Break it down by task class",
+        "explain": "Never trust an aggregate across a changing mix. Compare success within each task_class in each period.",
+        "code": "by_class = df.groupby([\"task_class\", \"period\"])[\"succeeded\"].mean().unstack() * 100\nby_class[\"change\"] = by_class[\"after\"] - by_class[\"before\"]\nby_class.round(2)",
+        "reads": "Read the change column class by class and compare it with the aggregate change from cell 1."
+      },
+      {
+        "title": "Look at the mix",
+        "explain": "If the classes disagree with the aggregate, look at what share of tasks each class contributes per period.",
+        "code": "share = pd.crosstab(df[\"period\"], df[\"task_class\"], normalize=\"index\") * 100\nprint(\"share of tasks by class, per period (%)\")\nshare.round(1)",
+        "reads": "One class's share moves sharply between the periods — that is the monitoring rollout, not a reliability change."
+      },
+      {
+        "title": "Hold the task mix constant",
+        "explain": "Re-weight both periods to one common class mix so the composition cannot move the number.",
+        "code": "within = df.groupby([\"task_class\", \"period\"])[\"succeeded\"].mean().unstack()\nweights = df[\"task_class\"].value_counts(normalize=True)\nadjusted = within.mul(weights, axis=0).sum() * 100\nheld_change = adjusted[\"after\"] - adjusted[\"before\"]\nprint(f\"mix-adjusted change: {held_change:+.2f} pts\")\nadjusted.round(2)",
+        "reads": "Like-for-like, the improvement is a different size from the headline."
+      },
+      {
+        "title": "Separate the two events",
+        "explain": "The retry bump and the sensor flood landed together. Split the headline into the part retries could explain and the part the mix explains.",
+        "code": "pd.DataFrame(\n    {\"pts\": [raw_change, held_change, raw_change - held_change]},\n    index=[\"aggregate change\", \"within-class (retries)\", \"from task mix (sensors)\"],\n).round(2)",
+        "reads": "Crediting the retry change with the whole headline would credit it for a change in what was being run."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "Overall task success rose from 92.1% before to 94.0% after the retry bump — about +1.9 points. Taken at face value, moving to 3 retries improved reliability and should be the new standard.",
     "theTrap": "The aggregate reversed on a mix shift — Simpson's paradox. The retry rollout coincided with a monitoring push that flooded the schedulers with cheap sensor tasks (near-100% success): sensors went from 30% of all tasks before to 75% after. Because the mix tilted hard toward the highest-success class, the blended rate rose even though EVERY class got worse: sensor 99.3% → 96.9%, transform 90.2% → 85.9%, load 89.5% → 85.2%, ml 85.8% → 83.4%. A concurrent dependency upgrade quietly regressed real execution, and retries didn't fix it. The headline is measuring the task mix, not reliability.",
@@ -62,10 +210,22 @@
       "Attribute correctly: the retry bump and a sensor flood happened together; the aggregate rise is the mix, and the within-class fall is the real signal."
     ],
     "numbers": [
-      { "label": "Overall success — before vs after", "value": "92.1% → 94.0% (+1.9 pts)" },
-      { "label": "Sensor share of tasks — before vs after", "value": "30% → 75%" },
-      { "label": "Transform success — before vs after", "value": "90.2% → 85.9%" },
-      { "label": "Every class, within period", "value": "down 2-4 pts after" }
+      {
+        "label": "Overall success — before vs after",
+        "value": "92.1% → 94.0% (+1.9 pts)"
+      },
+      {
+        "label": "Sensor share of tasks — before vs after",
+        "value": "30% → 75%"
+      },
+      {
+        "label": "Transform success — before vs after",
+        "value": "90.2% → 85.9%"
+      },
+      {
+        "label": "Every class, within period",
+        "value": "down 2-4 pts after"
+      }
     ],
     "lesson": "An aggregate rate over a changing population can move opposite to every subgroup inside it — Simpson's paradox. Here a flood of easy sensor tasks lifted the blended success rate while the actual work regressed underneath it. Whenever a headline metric spans a mix that shifted, disaggregate before you attribute the change to anything: compute the rate within stable subgroups, and check whether the group shares moved. Two things happened at once (more retries, more sensors); the reflex is to separate them, not to credit the intervention you were hoping worked. Track reliability on a fixed or weighted task mix so composition changes can't fake a win."
   }

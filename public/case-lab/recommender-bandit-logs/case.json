@@ -2,7 +2,12 @@
   "id": "recommender-bandit-logs",
   "title": "Variant B gets a higher average reward in the logs — roll it out to everyone?",
   "trap": "Off-policy evaluation bias",
-  "facets": { "topic": "Product", "skill": ["Off-policy evaluation bias"] },
+  "facets": {
+    "topic": "Product",
+    "skill": [
+      "Off-policy evaluation bias"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the recommendations analyst at Streamloop",
@@ -15,23 +20,103 @@
     "file": "/case-lab/recommender-bandit-logs/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "session_id", "type": "int", "description": "Unique session identifier" },
-      { "name": "user_engagement_score", "type": "float", "description": "Pre-existing engagement score for this user (0-100), measured before this session" },
-      { "name": "arm", "type": "string", "description": "variant_a (old model) or variant_b (new model) — which recommender the session was shown" },
-      { "name": "propensity", "type": "float", "description": "The logging policy's probability of showing THIS session the arm it actually got, given user_engagement_score — needed to correct for the non-random rollout" },
-      { "name": "clicked", "type": "int", "description": "1 if the user clicked a recommended item — the reward" }
+      {
+        "name": "session_id",
+        "type": "int",
+        "description": "Unique session identifier"
+      },
+      {
+        "name": "user_engagement_score",
+        "type": "float",
+        "description": "Pre-existing engagement score for this user (0-100), measured before this session"
+      },
+      {
+        "name": "arm",
+        "type": "string",
+        "description": "variant_a (old model) or variant_b (new model) — which recommender the session was shown"
+      },
+      {
+        "name": "propensity",
+        "type": "float",
+        "description": "The logging policy's probability of showing THIS session the arm it actually got, given user_engagement_score — needed to correct for the non-random rollout"
+      },
+      {
+        "name": "clicked",
+        "type": "int",
+        "description": "1 if the user clicked a recommended item — the reward"
+      }
     ],
     "sample": [
-      { "session_id": 1, "user_engagement_score": 25.4, "arm": "variant_a", "propensity": 0.8033, "clicked": 0 },
-      { "session_id": 2, "user_engagement_score": 55.3, "arm": "variant_b", "propensity": 0.4846, "clicked": 0 },
-      { "session_id": 3, "user_engagement_score": 49.9, "arm": "variant_b", "propensity": 0.4245, "clicked": 1 },
-      { "session_id": 4, "user_engagement_score": 60.0, "arm": "variant_b", "propensity": 0.5374, "clicked": 0 },
-      { "session_id": 5, "user_engagement_score": 23.5, "arm": "variant_a", "propensity": 0.8165, "clicked": 1 },
-      { "session_id": 6, "user_engagement_score": 72.2, "arm": "variant_b", "propensity": 0.668, "clicked": 0 },
-      { "session_id": 7, "user_engagement_score": 51.9, "arm": "variant_a", "propensity": 0.5534, "clicked": 1 },
-      { "session_id": 8, "user_engagement_score": 26.6, "arm": "variant_a", "propensity": 0.7946, "clicked": 0 },
-      { "session_id": 9, "user_engagement_score": 22.8, "arm": "variant_a", "propensity": 0.8211, "clicked": 1 },
-      { "session_id": 10, "user_engagement_score": 23.9, "arm": "variant_b", "propensity": 0.1863, "clicked": 1 }
+      {
+        "session_id": 1,
+        "user_engagement_score": 25.4,
+        "arm": "variant_a",
+        "propensity": 0.8033,
+        "clicked": 0
+      },
+      {
+        "session_id": 2,
+        "user_engagement_score": 55.3,
+        "arm": "variant_b",
+        "propensity": 0.4846,
+        "clicked": 0
+      },
+      {
+        "session_id": 3,
+        "user_engagement_score": 49.9,
+        "arm": "variant_b",
+        "propensity": 0.4245,
+        "clicked": 1
+      },
+      {
+        "session_id": 4,
+        "user_engagement_score": 60.0,
+        "arm": "variant_b",
+        "propensity": 0.5374,
+        "clicked": 0
+      },
+      {
+        "session_id": 5,
+        "user_engagement_score": 23.5,
+        "arm": "variant_a",
+        "propensity": 0.8165,
+        "clicked": 1
+      },
+      {
+        "session_id": 6,
+        "user_engagement_score": 72.2,
+        "arm": "variant_b",
+        "propensity": 0.668,
+        "clicked": 0
+      },
+      {
+        "session_id": 7,
+        "user_engagement_score": 51.9,
+        "arm": "variant_a",
+        "propensity": 0.5534,
+        "clicked": 1
+      },
+      {
+        "session_id": 8,
+        "user_engagement_score": 26.6,
+        "arm": "variant_a",
+        "propensity": 0.7946,
+        "clicked": 0
+      },
+      {
+        "session_id": 9,
+        "user_engagement_score": 22.8,
+        "arm": "variant_a",
+        "propensity": 0.8211,
+        "clicked": 1
+      },
+      {
+        "session_id": 10,
+        "user_engagement_score": 23.9,
+        "arm": "variant_b",
+        "propensity": 0.1863,
+        "clicked": 1
+      }
     ]
   },
   "guidingQuestions": [
@@ -48,6 +133,41 @@
     "Compute the inverse-propensity-weighted (Hajek/self-normalized) reward for each arm: for each arm, weight sessions by 1/propensity and take a weighted average.",
     "Compare the honest, propensity-corrected gap to the naive one, and translate that into a rollout recommendation."
   ],
+  "notebook": {
+    "intro": "Five steps: reproduce the naive gap, see who each variant was shown to, then re-weight the logs so the comparison is fair.",
+    "cells": [
+      {
+        "title": "Reproduce the naive gap",
+        "explain": "Click rate for variant B against variant A, straight from the logs.",
+        "code": "rates = df.groupby(\"arm\")[\"clicked\"].mean() * 100\nnaive_gap = rates[\"variant_b\"] - rates[\"variant_a\"]\nprint(f\"naive gap: {naive_gap:+.2f} pts\")\nrates.round(2)",
+        "reads": "Read off the logs, variant B looks better. These logs came from a policy, not a coin flip."
+      },
+      {
+        "title": "Profile who saw each variant",
+        "explain": "Compare user engagement across the two arms before crediting either.",
+        "code": "profile = df.groupby(\"arm\")[[\"user_engagement_score\", \"propensity\"]].mean()\nprofile[\"n\"] = df.groupby(\"arm\").size()\nprofile.round(3)",
+        "reads": "Variant B was shown far more often to already-engaged users, who click more regardless of what they are shown."
+      },
+      {
+        "title": "See the assignment rule in the propensities",
+        "explain": "propensity records how likely each session was to receive the arm it got. Look at how assignment tracks engagement.",
+        "code": "df[\"engagement_band\"] = pd.qcut(df[\"user_engagement_score\"], 5, labels=False, duplicates=\"drop\")\nby_band = df.groupby([\"engagement_band\", \"arm\"]).size().unstack()\nby_band = by_band.div(by_band.sum(axis=1), axis=0) * 100\nprint(\"share of sessions by arm, within each engagement band (%)\")\nby_band.round(1)",
+        "reads": "Assignment follows engagement directly. That is the bias sitting inside the raw average."
+      },
+      {
+        "title": "Re-weight by inverse propensity",
+        "explain": "Weight each session by 1 over its propensity and take a self-normalised (Hajek) average.",
+        "code": "df[\"ipw\"] = 1 / df[\"propensity\"]\ndef hajek(group):\n    return (group[\"clicked\"] * group[\"ipw\"]).sum() / group[\"ipw\"].sum()\ncorrected = df.groupby(\"arm\").apply(hajek) * 100\ncorrected_gap = corrected[\"variant_b\"] - corrected[\"variant_a\"]\nprint(f\"propensity-corrected gap: {corrected_gap:+.2f} pts\")\ncorrected.round(3)",
+        "reads": "Weighted by how likely each session was to be logged that way, the ordering changes."
+      },
+      {
+        "title": "Put the two gaps side by side",
+        "explain": "The number the logs suggest, against the number a fair comparison supports.",
+        "code": "pd.DataFrame(\n    {\"gap (pts)\": [naive_gap, corrected_gap]},\n    index=[\"naive log average\", \"inverse-propensity weighted\"],\n).round(3)",
+        "reads": "Rolling out variant B on the naive number rolls out the audience it was given, not the variant itself."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "Variant B's average click rate in the logs is about 20 points higher than variant A's. Read directly, that looks like a large, decisive win — obviously ship it to everyone.",
     "theTrap": "The rollout wasn't random: the logging policy showed variant B more often to users who already had a higher engagement score (a common \"ramp to power users first\" pattern), and engagement score is itself a strong predictor of clicking, independent of which model is shown. Variant B sessions average an engagement score of 58.5 versus 43.4 for variant A — a large pre-existing gap. Comparing raw average reward between arms therefore compares an already-more-engaged audience to a less-engaged one and credits the model with the difference. The logs don't show what variant B would do across the whole population — they show what it did on the subset it was disproportionately shown to.",
@@ -60,10 +180,22 @@
       "Compare: the IPS-corrected gap is ≈ +0.01 (about 1 point) — the naive 20-point \"win\" was almost entirely the engagement confound."
     ],
     "numbers": [
-      { "label": "Naive reward gap (variant_b − variant_a)", "value": "+0.199 (≈ 20 points)" },
-      { "label": "Mean engagement score, variant_b vs. variant_a", "value": "58.5 vs. 43.4" },
-      { "label": "IPS-corrected reward gap", "value": "+0.01 (≈ 1 point)" },
-      { "label": "Share of traffic on variant_b during the ramp", "value": "43%" }
+      {
+        "label": "Naive reward gap (variant_b − variant_a)",
+        "value": "+0.199 (≈ 20 points)"
+      },
+      {
+        "label": "Mean engagement score, variant_b vs. variant_a",
+        "value": "58.5 vs. 43.4"
+      },
+      {
+        "label": "IPS-corrected reward gap",
+        "value": "+0.01 (≈ 1 point)"
+      },
+      {
+        "label": "Share of traffic on variant_b during the ramp",
+        "value": "43%"
+      }
     ],
     "lesson": "A logged bandit or rollout's raw average reward only reflects the true value of a policy if every arm was shown to a representative sample of contexts — and a phased or targeted rollout almost never is. When the logging policy's arm-assignment probability depends on the same context that predicts the reward, a naive average is confounded exactly like an observational study. Inverse-propensity weighting (using the logged assignment probability) is the standard fix: it re-weights logged outcomes to estimate what each policy would earn across the full population it will actually serve, not just the slice it happened to reach during the ramp."
   }

@@ -2,7 +2,12 @@
   "id": "one-touch-routing-bandit",
   "title": "The routing bandit lifted first-touch resolution 41% — roll it out support-wide?",
   "trap": "Reward hacking",
-  "facets": { "topic": "Support", "skill": ["Reward hacking"] },
+  "facets": {
+    "topic": "Support",
+    "skill": [
+      "Reward hacking"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the support-ops analyst at Havenline",
@@ -15,22 +20,88 @@
     "file": "/case-lab/one-touch-routing-bandit/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "ticket_id", "type": "int", "description": "Unique support ticket identifier" },
-      { "name": "arm", "type": "string", "description": "legacy_router (old routing rules) or optimized_router (new bandit, trained to maximize first-touch resolution) — randomly split 50/50" },
-      { "name": "resolved_first_touch", "type": "int", "description": "1 if the ticket was marked resolved on the first reply — the metric the bandit was trained to optimize" },
-      { "name": "reopened_within_7d", "type": "int", "description": "1 if a ticket marked resolved was reopened by the customer within 7 days — the outcome that reflects whether the issue was actually fixed" }
+      {
+        "name": "ticket_id",
+        "type": "int",
+        "description": "Unique support ticket identifier"
+      },
+      {
+        "name": "arm",
+        "type": "string",
+        "description": "legacy_router (old routing rules) or optimized_router (new bandit, trained to maximize first-touch resolution) — randomly split 50/50"
+      },
+      {
+        "name": "resolved_first_touch",
+        "type": "int",
+        "description": "1 if the ticket was marked resolved on the first reply — the metric the bandit was trained to optimize"
+      },
+      {
+        "name": "reopened_within_7d",
+        "type": "int",
+        "description": "1 if a ticket marked resolved was reopened by the customer within 7 days — the outcome that reflects whether the issue was actually fixed"
+      }
     ],
     "sample": [
-      { "ticket_id": 1, "arm": "legacy_router", "resolved_first_touch": 1, "reopened_within_7d": 0 },
-      { "ticket_id": 2, "arm": "optimized_router", "resolved_first_touch": 0, "reopened_within_7d": 0 },
-      { "ticket_id": 3, "arm": "legacy_router", "resolved_first_touch": 1, "reopened_within_7d": 0 },
-      { "ticket_id": 4, "arm": "optimized_router", "resolved_first_touch": 1, "reopened_within_7d": 1 },
-      { "ticket_id": 5, "arm": "legacy_router", "resolved_first_touch": 1, "reopened_within_7d": 0 },
-      { "ticket_id": 6, "arm": "optimized_router", "resolved_first_touch": 1, "reopened_within_7d": 0 },
-      { "ticket_id": 7, "arm": "optimized_router", "resolved_first_touch": 1, "reopened_within_7d": 0 },
-      { "ticket_id": 8, "arm": "optimized_router", "resolved_first_touch": 1, "reopened_within_7d": 0 },
-      { "ticket_id": 9, "arm": "optimized_router", "resolved_first_touch": 0, "reopened_within_7d": 0 },
-      { "ticket_id": 10, "arm": "optimized_router", "resolved_first_touch": 0, "reopened_within_7d": 0 }
+      {
+        "ticket_id": 1,
+        "arm": "legacy_router",
+        "resolved_first_touch": 1,
+        "reopened_within_7d": 0
+      },
+      {
+        "ticket_id": 2,
+        "arm": "optimized_router",
+        "resolved_first_touch": 0,
+        "reopened_within_7d": 0
+      },
+      {
+        "ticket_id": 3,
+        "arm": "legacy_router",
+        "resolved_first_touch": 1,
+        "reopened_within_7d": 0
+      },
+      {
+        "ticket_id": 4,
+        "arm": "optimized_router",
+        "resolved_first_touch": 1,
+        "reopened_within_7d": 1
+      },
+      {
+        "ticket_id": 5,
+        "arm": "legacy_router",
+        "resolved_first_touch": 1,
+        "reopened_within_7d": 0
+      },
+      {
+        "ticket_id": 6,
+        "arm": "optimized_router",
+        "resolved_first_touch": 1,
+        "reopened_within_7d": 0
+      },
+      {
+        "ticket_id": 7,
+        "arm": "optimized_router",
+        "resolved_first_touch": 1,
+        "reopened_within_7d": 0
+      },
+      {
+        "ticket_id": 8,
+        "arm": "optimized_router",
+        "resolved_first_touch": 1,
+        "reopened_within_7d": 0
+      },
+      {
+        "ticket_id": 9,
+        "arm": "optimized_router",
+        "resolved_first_touch": 0,
+        "reopened_within_7d": 0
+      },
+      {
+        "ticket_id": 10,
+        "arm": "optimized_router",
+        "resolved_first_touch": 0,
+        "reopened_within_7d": 0
+      }
     ]
   },
   "guidingQuestions": [
@@ -47,6 +118,41 @@
     "Name the mechanism: a router rewarded purely for first-touch closure has every incentive to mark a ticket resolved even when the issue isn't fixed — closing fast satisfies the reward regardless of outcome.",
     "Recommend based on reopen rate, the true quality signal, not first-touch resolution, the proxy the bandit was trained on."
   ],
+  "notebook": {
+    "intro": "Five steps: reproduce the resolution lift, then check whether those resolutions actually held.",
+    "cells": [
+      {
+        "title": "Reproduce the resolution lift",
+        "explain": "First-touch resolution rate for the optimised router against the legacy one.",
+        "code": "rates = df.groupby(\"arm\")[\"resolved_first_touch\"].mean() * 100\nlift = rates[\"optimized_router\"] / rates[\"legacy_router\"] - 1\nprint(f\"first-touch resolution lift: {lift:+.1%}\")\nrates.round(2)",
+        "reads": "The lift is large and real. First-touch resolution is what the router was trained to maximise."
+      },
+      {
+        "title": "Check the quality signal",
+        "explain": "Reopen rate across all tickets, for each arm — whether the issue actually got fixed.",
+        "code": "reopen = df.groupby(\"arm\")[\"reopened_within_7d\"].mean() * 100\nreopen_change = reopen[\"optimized_router\"] / reopen[\"legacy_router\"] - 1\nprint(f\"reopen-rate change: {reopen_change:+.1%}\")\nreopen.round(2)",
+        "reads": "Reopens move the wrong way, and by more than resolution moved the right way."
+      },
+      {
+        "title": "Look inside the resolutions",
+        "explain": "Restrict to tickets marked resolved on first touch and compare reopen rate by arm.",
+        "code": "resolved = df[df[\"resolved_first_touch\"] == 1]\nby_arm = resolved.groupby(\"arm\")[\"reopened_within_7d\"].agg([\"mean\", \"size\"])\nby_arm[\"mean\"] = by_arm[\"mean\"] * 100\nprint(\"reopen rate among first-touch resolutions (%)\")\nby_arm.round(2)",
+        "reads": "The optimised router's resolutions stick far less often. The extra closures are largely closures in name only."
+      },
+      {
+        "title": "Name the mechanism",
+        "explain": "A router rewarded for closing fast can satisfy that reward without fixing anything. Put both rates side by side per arm.",
+        "code": "summary = pd.DataFrame({\n    \"first-touch resolved (%)\": df.groupby(\"arm\")[\"resolved_first_touch\"].mean() * 100,\n    \"reopened (%)\": df.groupby(\"arm\")[\"reopened_within_7d\"].mean() * 100,\n})\nsummary[\"reopens per 100 resolutions\"] = summary[\"reopened (%)\"] / summary[\"first-touch resolved (%)\"] * 100\nsummary.round(2)",
+        "reads": "Closing a ticket is within the router's control; fixing the customer's problem is not. It optimised the part it could reach."
+      },
+      {
+        "title": "Recommend on the true outcome",
+        "explain": "Compare the lift in the proxy with the change in the quality signal.",
+        "code": "pd.DataFrame(\n    {\"change\": [lift, reopen_change]},\n    index=[\"first-touch resolution (the proxy)\", \"reopens (the outcome that matters)\"],\n).round(3)",
+        "reads": "Rolling this out support-wide would improve the dashboard and make the queue worse."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "First-touch resolution is up 41% under the optimized router. Read directly, that's a clear efficiency win — more tickets closed faster, obviously worth rolling out everywhere.",
     "theTrap": "The router was trained to maximize first-touch resolution, and it did exactly that — by learning to close tickets on the first reply more aggressively, whether or not the underlying issue was actually fixed. This is reward hacking: optimizing a proxy metric (marked-resolved) at the expense of the true objective (issue actually fixed) the proxy was only ever supposed to stand in for. The reopen rate — the outcome that actually reflects quality — jumps from 3.0% to 22.5% overall (a more than 7x increase), and among tickets marked resolved specifically, the reopen rate is 28.5% under the optimized router versus 5.3% under the legacy router. More than 1 in 4 of the optimized router's \"resolutions\" don't stick.",
@@ -59,9 +165,18 @@
       "Recommend against rolling out on the resolution result alone; require a reopen-rate guardrail on any policy optimized on a proxy for ticket quality."
     ],
     "numbers": [
-      { "label": "First-touch resolution: legacy vs. optimized", "value": "56.1% vs. 79.0% (+41%)" },
-      { "label": "Reopen rate (unconditional): legacy vs. optimized", "value": "3.0% vs. 22.5% (+655%)" },
-      { "label": "Reopen rate given resolved: legacy vs. optimized", "value": "5.3% vs. 28.5%" }
+      {
+        "label": "First-touch resolution: legacy vs. optimized",
+        "value": "56.1% vs. 79.0% (+41%)"
+      },
+      {
+        "label": "Reopen rate (unconditional): legacy vs. optimized",
+        "value": "3.0% vs. 22.5% (+655%)"
+      },
+      {
+        "label": "Reopen rate given resolved: legacy vs. optimized",
+        "value": "5.3% vs. 28.5%"
+      }
     ],
     "lesson": "Reward hacking happens whenever a system is optimized on a proxy metric that's easier to measure or move than the outcome you actually want, and the two can be pulled apart. A policy rewarded for closing tickets fast has no built-in reason to also make sure the issue is fixed — it will happily exploit any gap between \"marked resolved\" and \"actually resolved.\" Before rolling out any policy on the metric it was trained to move, check the metric that reflects whether the underlying problem was solved; a big proxy win paired with a worse true outcome is exactly what reward hacking looks like."
   }

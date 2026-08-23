@@ -2,7 +2,12 @@
   "id": "sitespeed-deploy",
   "title": "Conversion rose after the December site-speed deploy — did the deploy do it?",
   "trap": "Seasonality confound",
-  "facets": { "topic": "Product", "skill": ["Seasonality"] },
+  "facets": {
+    "topic": "Product",
+    "skill": [
+      "Seasonality"
+    ]
+  },
   "estMinutes": 30,
   "scenario": {
     "role": "You're the analyst embedded with the web team at Verve",
@@ -15,21 +20,89 @@
     "file": "/case-lab/sitespeed-deploy/data.csv",
     "rows": 40000,
     "columns": [
-      { "name": "session_id", "type": "int", "description": "Unique session identifier (rows are in natural export order, not sorted by date)" },
-      { "name": "session_date", "type": "date", "description": "Date of the session (YYYY-MM-DD), spanning 2024-01 through 2025-12" },
-      { "name": "device", "type": "string", "description": "Device: desktop, mobile, or tablet" },
-      { "name": "traffic_source", "type": "string", "description": "How the session arrived: organic, paid, email, or social" },
-      { "name": "converted", "type": "int", "description": "1 if the session ended in a purchase, else 0" }
+      {
+        "name": "session_id",
+        "type": "int",
+        "description": "Unique session identifier (rows are in natural export order, not sorted by date)"
+      },
+      {
+        "name": "session_date",
+        "type": "date",
+        "description": "Date of the session (YYYY-MM-DD), spanning 2024-01 through 2025-12"
+      },
+      {
+        "name": "device",
+        "type": "string",
+        "description": "Device: desktop, mobile, or tablet"
+      },
+      {
+        "name": "traffic_source",
+        "type": "string",
+        "description": "How the session arrived: organic, paid, email, or social"
+      },
+      {
+        "name": "converted",
+        "type": "int",
+        "description": "1 if the session ended in a purchase, else 0"
+      }
     ],
     "sample": [
-      { "session_id": 1, "session_date": "2025-05-17", "device": "desktop", "traffic_source": "email", "converted": 0 },
-      { "session_id": 2, "session_date": "2024-11-10", "device": "desktop", "traffic_source": "email", "converted": 0 },
-      { "session_id": 3, "session_date": "2025-01-19", "device": "desktop", "traffic_source": "paid", "converted": 0 },
-      { "session_id": 4, "session_date": "2025-12-18", "device": "mobile", "traffic_source": "organic", "converted": 0 },
-      { "session_id": 5, "session_date": "2024-05-16", "device": "mobile", "traffic_source": "paid", "converted": 0 },
-      { "session_id": 6, "session_date": "2025-07-27", "device": "desktop", "traffic_source": "social", "converted": 1 },
-      { "session_id": 7, "session_date": "2024-01-10", "device": "mobile", "traffic_source": "organic", "converted": 0 },
-      { "session_id": 8, "session_date": "2024-02-12", "device": "mobile", "traffic_source": "paid", "converted": 0 }
+      {
+        "session_id": 1,
+        "session_date": "2025-05-17",
+        "device": "desktop",
+        "traffic_source": "email",
+        "converted": 0
+      },
+      {
+        "session_id": 2,
+        "session_date": "2024-11-10",
+        "device": "desktop",
+        "traffic_source": "email",
+        "converted": 0
+      },
+      {
+        "session_id": 3,
+        "session_date": "2025-01-19",
+        "device": "desktop",
+        "traffic_source": "paid",
+        "converted": 0
+      },
+      {
+        "session_id": 4,
+        "session_date": "2025-12-18",
+        "device": "mobile",
+        "traffic_source": "organic",
+        "converted": 0
+      },
+      {
+        "session_id": 5,
+        "session_date": "2024-05-16",
+        "device": "mobile",
+        "traffic_source": "paid",
+        "converted": 0
+      },
+      {
+        "session_id": 6,
+        "session_date": "2025-07-27",
+        "device": "desktop",
+        "traffic_source": "social",
+        "converted": 1
+      },
+      {
+        "session_id": 7,
+        "session_date": "2024-01-10",
+        "device": "mobile",
+        "traffic_source": "organic",
+        "converted": 0
+      },
+      {
+        "session_id": 8,
+        "session_date": "2024-02-12",
+        "device": "mobile",
+        "traffic_source": "paid",
+        "converted": 0
+      }
     ]
   },
   "guidingQuestions": [
@@ -46,6 +119,41 @@
     "Read the residual as the deploy's candidate effect — and treat a single-month, single-year comparison as noisy evidence, not proof.",
     "Recommend the only clean way to measure a deploy: a randomised holdout / A-B, not a before-vs-after across a seasonal boundary."
   ],
+  "notebook": {
+    "intro": "Five steps: reproduce the conversion jump, use both years of history, then compare December with December.",
+    "cells": [
+      {
+        "title": "Reproduce the headline",
+        "explain": "Conversion in November against December of the deploy year.",
+        "code": "df[\"session_date\"] = pd.to_datetime(df[\"session_date\"])\ndf[\"month\"] = df[\"session_date\"].dt.to_period(\"M\").astype(str)\nnov = df[df[\"month\"] == \"2025-11\"][\"converted\"].mean() * 100\ndec = df[df[\"month\"] == \"2025-12\"][\"converted\"].mean() * 100\nprint(f\"Nov to Dec 2025 change: {dec - nov:+.2f} pts\")\npd.Series({\"2025-11\": nov, \"2025-12\": dec}).round(2)",
+        "reads": "Conversion rose after the deploy. December is also the strongest month of the retail year."
+      },
+      {
+        "title": "Look at the full history",
+        "explain": "Chart monthly conversion across both years and check whether December always climbs.",
+        "code": "by_month = df.groupby(\"month\")[\"converted\"].mean() * 100\nprint(\"monthly conversion, all 24 months (%)\")\nby_month.round(2)",
+        "reads": "December 2024 climbs too, a full year before the deploy."
+      },
+      {
+        "title": "Compare December with December",
+        "explain": "Hold the month constant so the seasonal peak sits on both sides of the comparison.",
+        "code": "dec_2024 = df[df[\"month\"] == \"2024-12\"][\"converted\"].mean() * 100\ndec_2025 = df[df[\"month\"] == \"2025-12\"][\"converted\"].mean() * 100\nyoy = dec_2025 - dec_2024\nprint(f\"Dec 2025 vs Dec 2024: {yoy:+.2f} pts\")\npd.Series({\"2024-12\": dec_2024, \"2025-12\": dec_2025}).round(2)",
+        "reads": "Year on year, with the season held constant, the change is a fraction of the headline."
+      },
+      {
+        "title": "Size the seasonal share",
+        "explain": "Split the headline into the part December explains and the part left over.",
+        "code": "seasonal = (dec - nov) - yoy\npd.DataFrame(\n    {\"pts\": [dec - nov, yoy, seasonal]},\n    index=[\"Nov to Dec jump\", \"same month, year over year\", \"explained by season\"],\n).round(2)",
+        "reads": "Most of the jump is the calendar. The residual is the deploy's candidate effect, and it is small."
+      },
+      {
+        "title": "Judge the evidence",
+        "explain": "One month, one year, and a modest residual. Put a rough noise band around it before treating it as proof.",
+        "code": "n = len(df[df[\"month\"] == \"2025-12\"])\np = dec_2025 / 100\nse = (p * (1 - p) / n) ** 0.5 * 100\nprint(f\"December 2025 sessions: {n}\")\nprint(f\"approx standard error on that month: {se:.2f} pts\")\nprint(f\"residual attributed to the deploy: {yoy:+.2f} pts\")",
+        "reads": "A single-month, single-year residual of this size is noisy evidence, not proof. Only a randomised holdout settles a deploy."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "December converted at 18.8% versus 11.0% in November — a 7.7-point jump the month the speed improvement shipped. It looks like the deploy delivered a large, immediate conversion win.",
     "theTrap": "December converts far better than November every single year — holiday shoppers arrive with high purchase intent regardless of site speed. The deploy shipped on December 1st, straight into that seasonal peak, so the Nov→Dec jump credits the deploy with the holiday. The comparison confounds the deploy with the single biggest seasonal swing of the year.",
@@ -58,10 +166,22 @@
       "Conclude the conversion win is seasonal, and that a deploy's true effect can only be measured with a randomised holdout."
     ],
     "numbers": [
-      { "label": "November 2025 conversion", "value": "11.0%" },
-      { "label": "December 2025 conversion", "value": "18.8%" },
-      { "label": "Naive Nov → Dec jump", "value": "+7.7 pts" },
-      { "label": "Like-for-like Dec 2024 → Dec 2025", "value": "≈ −0.2 pts (no lift)" }
+      {
+        "label": "November 2025 conversion",
+        "value": "11.0%"
+      },
+      {
+        "label": "December 2025 conversion",
+        "value": "18.8%"
+      },
+      {
+        "label": "Naive Nov → Dec jump",
+        "value": "+7.7 pts"
+      },
+      {
+        "label": "Like-for-like Dec 2024 → Dec 2025",
+        "value": "≈ −0.2 pts (no lift)"
+      }
     ],
     "lesson": "A before-and-after comparison across a seasonal boundary measures the season, not your change — and December is the most seductive boundary there is. Compare the same period across years so the seasonal pattern appears on both sides and cancels. Better still, measure a deploy the only way that's truly clean: ship it to a random half of traffic and compare against the held-out half. A before/after on a launch that lands on the holiday will make almost anything look like a winner."
   }

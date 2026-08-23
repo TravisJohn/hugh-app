@@ -2,7 +2,13 @@
   "id": "referral-ltv",
   "title": "Customers who refer a friend are worth ~1.8x — should we push referrals to grow LTV?",
   "trap": "Survivorship / self-selection",
-  "facets": { "topic": "Marketing", "skill": ["Survivorship bias", "Self-selection"] },
+  "facets": {
+    "topic": "Marketing",
+    "skill": [
+      "Survivorship bias",
+      "Self-selection"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the growth analyst at Tally",
@@ -15,23 +21,115 @@
     "file": "/case-lab/referral-ltv/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "customer_id", "type": "int", "description": "Unique customer identifier" },
-      { "name": "segment", "type": "string", "description": "Customer segment: consumer, prosumer, or smb" },
-      { "name": "signup_channel", "type": "string", "description": "How the customer signed up: organic, paid, or partner" },
-      { "name": "engagement_score", "type": "float", "description": "Engagement (0-100) from early product behaviour" },
-      { "name": "tenure_months", "type": "int", "description": "Months since the customer signed up" },
-      { "name": "referred_friend", "type": "int", "description": "1 if the customer has referred at least one friend, else 0" },
-      { "name": "ltv_usd", "type": "float", "description": "Customer lifetime value to date, in dollars" }
+      {
+        "name": "customer_id",
+        "type": "int",
+        "description": "Unique customer identifier"
+      },
+      {
+        "name": "segment",
+        "type": "string",
+        "description": "Customer segment: consumer, prosumer, or smb"
+      },
+      {
+        "name": "signup_channel",
+        "type": "string",
+        "description": "How the customer signed up: organic, paid, or partner"
+      },
+      {
+        "name": "engagement_score",
+        "type": "float",
+        "description": "Engagement (0-100) from early product behaviour"
+      },
+      {
+        "name": "tenure_months",
+        "type": "int",
+        "description": "Months since the customer signed up"
+      },
+      {
+        "name": "referred_friend",
+        "type": "int",
+        "description": "1 if the customer has referred at least one friend, else 0"
+      },
+      {
+        "name": "ltv_usd",
+        "type": "float",
+        "description": "Customer lifetime value to date, in dollars"
+      }
     ],
     "sample": [
-      { "customer_id": 1, "segment": "smb", "signup_channel": "organic", "engagement_score": 50.4, "tenure_months": 14, "referred_friend": 0, "ltv_usd": 747.34 },
-      { "customer_id": 2, "segment": "smb", "signup_channel": "paid", "engagement_score": 50.4, "tenure_months": 12, "referred_friend": 0, "ltv_usd": 534.09 },
-      { "customer_id": 3, "segment": "consumer", "signup_channel": "partner", "engagement_score": 27.4, "tenure_months": 9, "referred_friend": 0, "ltv_usd": 287.09 },
-      { "customer_id": 4, "segment": "consumer", "signup_channel": "organic", "engagement_score": 35.7, "tenure_months": 13, "referred_friend": 0, "ltv_usd": 411.98 },
-      { "customer_id": 5, "segment": "consumer", "signup_channel": "organic", "engagement_score": 53.1, "tenure_months": 14, "referred_friend": 0, "ltv_usd": 701.73 },
-      { "customer_id": 6, "segment": "consumer", "signup_channel": "organic", "engagement_score": 47.8, "tenure_months": 14, "referred_friend": 0, "ltv_usd": 665.37 },
-      { "customer_id": 7, "segment": "prosumer", "signup_channel": "partner", "engagement_score": 40.3, "tenure_months": 13, "referred_friend": 0, "ltv_usd": 507.54 },
-      { "customer_id": 8, "segment": "consumer", "signup_channel": "organic", "engagement_score": 36.9, "tenure_months": 7, "referred_friend": 0, "ltv_usd": 243.75 }
+      {
+        "customer_id": 1,
+        "segment": "smb",
+        "signup_channel": "organic",
+        "engagement_score": 50.4,
+        "tenure_months": 14,
+        "referred_friend": 0,
+        "ltv_usd": 747.34
+      },
+      {
+        "customer_id": 2,
+        "segment": "smb",
+        "signup_channel": "paid",
+        "engagement_score": 50.4,
+        "tenure_months": 12,
+        "referred_friend": 0,
+        "ltv_usd": 534.09
+      },
+      {
+        "customer_id": 3,
+        "segment": "consumer",
+        "signup_channel": "partner",
+        "engagement_score": 27.4,
+        "tenure_months": 9,
+        "referred_friend": 0,
+        "ltv_usd": 287.09
+      },
+      {
+        "customer_id": 4,
+        "segment": "consumer",
+        "signup_channel": "organic",
+        "engagement_score": 35.7,
+        "tenure_months": 13,
+        "referred_friend": 0,
+        "ltv_usd": 411.98
+      },
+      {
+        "customer_id": 5,
+        "segment": "consumer",
+        "signup_channel": "organic",
+        "engagement_score": 53.1,
+        "tenure_months": 14,
+        "referred_friend": 0,
+        "ltv_usd": 701.73
+      },
+      {
+        "customer_id": 6,
+        "segment": "consumer",
+        "signup_channel": "organic",
+        "engagement_score": 47.8,
+        "tenure_months": 14,
+        "referred_friend": 0,
+        "ltv_usd": 665.37
+      },
+      {
+        "customer_id": 7,
+        "segment": "prosumer",
+        "signup_channel": "partner",
+        "engagement_score": 40.3,
+        "tenure_months": 13,
+        "referred_friend": 0,
+        "ltv_usd": 507.54
+      },
+      {
+        "customer_id": 8,
+        "segment": "consumer",
+        "signup_channel": "organic",
+        "engagement_score": 36.9,
+        "tenure_months": 7,
+        "referred_friend": 0,
+        "ltv_usd": 243.75
+      }
     ]
   },
   "guidingQuestions": [
@@ -48,6 +146,41 @@
     "Build a fair comparison — referrers vs non-referrers matched on engagement and tenure — so the referral act is the only thing that differs.",
     "Report the matched gap as the real effect, and note that incentivised referrals from new/less-engaged users won't carry the loyalty that produced the headline."
   ],
+  "notebook": {
+    "intro": "Five steps: reproduce the 1.8x, profile who gets the chance to refer, then compare referrers with comparable non-referrers.",
+    "cells": [
+      {
+        "title": "Reproduce the headline",
+        "explain": "Mean LTV for referrers against non-referrers.",
+        "code": "means = df.groupby(\"referred_friend\")[\"ltv_usd\"].mean()\nheadline_ratio = means[1] / means[0]\nprint(f\"referrers are worth {headline_ratio:.2f}x non-referrers\")\nmeans.round(2)",
+        "reads": "The ratio is real. Whether referring caused it is the open question."
+      },
+      {
+        "title": "Profile who refers",
+        "explain": "Compare referrers and non-referrers on the things that were true before any referral happened.",
+        "code": "profile = df.groupby(\"referred_friend\")[[\"tenure_months\", \"engagement_score\"]].mean()\nprofile[\"n\"] = df.groupby(\"referred_friend\").size()\nprofile.round(2)",
+        "reads": "Referrers are longer-tenured and more engaged. They were a different population before they referred anyone."
+      },
+      {
+        "title": "Referral is a late-lifecycle act",
+        "explain": "Only customers who stayed and were happy get the chance to refer. Check how referral rate moves with tenure.",
+        "code": "df[\"tenure_band\"] = pd.qcut(df[\"tenure_months\"], 5, labels=False, duplicates=\"drop\")\nby_band = df.groupby(\"tenure_band\")[\"referred_friend\"].mean() * 100\nprint(\"share who have referred, by tenure band (%)\")\nby_band.round(1)",
+        "reads": "Referral rate climbs steeply with tenure — the referred group is a set of self-selected survivors."
+      },
+      {
+        "title": "Match on tenure and engagement",
+        "explain": "Compare referrers with non-referrers who look the same on both, so the referral act is the only difference left.",
+        "code": "df[\"engagement_band\"] = pd.qcut(df[\"engagement_score\"], 5, labels=False, duplicates=\"drop\")\nwithin = df.groupby([\"tenure_band\", \"engagement_band\", \"referred_friend\"])[\"ltv_usd\"].mean().unstack()\ncell_weights = df.groupby([\"tenure_band\", \"engagement_band\"]).size()\ncell_weights = cell_weights / cell_weights.sum()\nadjusted = within.mul(cell_weights, axis=0).sum()\nadj_ratio = adjusted[1] / adjusted[0]\nprint(f\"matched, referrers are worth {adj_ratio:.2f}x non-referrers\")\nadjusted.round(2)",
+        "reads": "Comparing like with like, most of the 1.8x is who refers rather than what referring does."
+      },
+      {
+        "title": "Put the two ratios side by side",
+        "explain": "What the headline promises against what survives matching.",
+        "code": "pd.DataFrame(\n    {\"LTV ratio\": [headline_ratio, adj_ratio]},\n    index=[\"raw comparison\", \"matched on tenure and engagement\"],\n).round(3)",
+        "reads": "Incentivising referrals from new or less-engaged customers cannot buy the loyalty that produced the headline, because that loyalty came first."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "Referrers are worth about $1,210 in LTV versus $683 for non-referrers — roughly 1.8x, a $527 gap. It reads as a clear mandate: drive referrals and lifetime value follows.",
     "theTrap": "Referring a friend is something happy, engaged, long-tenured customers do — late in their lifecycle, after they've already decided they love the product. Referrers here average 18 months of tenure and an engagement score of 65, versus 14 months and 46 for non-referrers. Lifetime value is driven by that engagement and tenure; the referral is a downstream marker of an already-loyal customer, not a cause of their value. A brand-new or lukewarm customer can't refer in the first place, so the 'referred' group is self-selected to be your best customers. You're reading the LTV of your most loyal customers back as if the referral created it.",
@@ -60,10 +193,22 @@
       "Conclude the referral act adds little to LTV; the headline reflects self-selection. Confirm any causal claim with a randomised referral-incentive test."
     ],
     "numbers": [
-      { "label": "Mean LTV — referrers vs not", "value": "$1,210 vs $683 (1.8x)" },
-      { "label": "Mean tenure — referrers vs not", "value": "18.4 vs 13.5 months" },
-      { "label": "Mean engagement — referrers vs not", "value": "65 vs 46" },
-      { "label": "LTV gap for comparable customers", "value": "≈ $43" }
+      {
+        "label": "Mean LTV — referrers vs not",
+        "value": "$1,210 vs $683 (1.8x)"
+      },
+      {
+        "label": "Mean tenure — referrers vs not",
+        "value": "18.4 vs 13.5 months"
+      },
+      {
+        "label": "Mean engagement — referrers vs not",
+        "value": "65 vs 46"
+      },
+      {
+        "label": "LTV gap for comparable customers",
+        "value": "≈ $43"
+      }
     ],
     "lesson": "When a behaviour can only happen to people who are already succeeding — referring a friend, reaching a loyalty tier, hitting a lifetime milestone — the group that does it is self-selected to be your best customers, and their outcomes will look spectacular. That's survivorship and self-selection, not causation. Before treating the behaviour as a lever, compare people who are otherwise alike and ask what the behaviour itself adds. Usually far less than the headline — and you can only really know by running an experiment."
   }

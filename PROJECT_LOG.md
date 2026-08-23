@@ -4807,3 +4807,75 @@ restart down with it.
 
 This is the first defect in this feature found by something other than a person
 looking at it.
+
+---
+
+## Case Lab — a worked notebook on every case
+
+**Date:** 2026-08-23
+
+### What shipped
+
+All 38 Case Lab cases now carry a runnable notebook, up from one. 190 cells,
+each authored against that case's own `suggestedApproach` and its own columns.
+
+### Why authored, not generic
+
+The earlier plan was a generic starter notebook — `df.head()`, `df.dtypes`, a
+groupby stub — on the grounds that per-case authoring meant 38 rounds of content
+work. That reasoning assumed the cases had nothing to author from. They do: every
+case ships exactly five `suggestedApproach` steps that name real columns and
+prescribe real operations ("stratify on health deciles", "cross-tab
+flagged_anomalous against confirmed_compromised", "compute precision and
+recall"). A generic notebook would have thrown that away.
+
+Each case's `dgp.py` docstring also states its archetype and the effect it
+plants, so cells could be written against ground truth rather than guesswork.
+
+### The 14 archetypes
+
+The 38 cases are not 38 unrelated jobs. They are 14 patterns, mostly in pairs:
+Simpson / stratify (5), confounding and selection bias (6), survivorship and
+reverse causality (3), seasonality (2), regression to the mean (3),
+non-stationarity (2), hidden exploration cost (2), reward hacking (2),
+off-policy propensity (2), redundant clustering (2), feature-scaling dominance
+(2), cluster instability (2), PCA explained-variance (2), anomaly precision (2).
+
+Authoring by archetype is what made this tractable. It is also why the shape had
+to be checked per case rather than copied: `checkout-bandit-simpson` and the
+pilot share a schema almost exactly and run in opposite directions.
+
+### Verification
+
+Two layers, because they answer different questions.
+
+`python scripts/verify-notebook-cells.py` runs every case's cells against its
+real CSV using the same exec-then-eval semantics as the worker. It answers "does
+this run and render" in seconds, which is what makes iterating over 190 cells
+possible at all. `npm run qa:notebooks` then drives a real browser and is the
+honest end-to-end check.
+
+Running is not the bar, though. Every case was also checked against the number
+its DGP plants — the notebooks have to surface the trap, not merely execute.
+Each one does: `checkout-bandit-simpson` +1.14 to -1.18 pts, `sales-team-winrate`
++7.09 to -5.71, `support-churn` +28.36 to -5.11 (flipping protective),
+`discount-basket` 3.14x to 1.01x, `loyalty-launch` +73.4% to +7.7% like-for-like,
+`pricing-bandit-logs` +14.35 to -1.79 per session, `warehouse-migration` 63.2%
+faster to 23.4%.
+
+### One metric replaced after it under-sold the point
+
+The two feature-scaling cases first measured "naive clusters are N% recoverable
+from spend/seat quantile bands", which returned about 50% — weak, and weak for a
+bad reason: unequal clusters do not line up with equal-sized quantile bands.
+Replaced with variance explained (eta-squared) per feature, which measures the
+actual claim: the naive clustering explains 92.5% of `seat_count` variance and
+0.4% of the usage columns, while the scaled clustering explains 75.5% of usage.
+
+### Constraints held
+
+Still zero runtime AI and zero server cost — static CSVs, Pyodide in the browser,
+nothing leaves the page. Two authoring rules worth keeping: cells come from
+`suggestedApproach` and never from `teachingNote.howToGetThere`, and no f-string
+may contain a quote character, because Pyodide's Python rejects nested same-type
+quotes inside f-strings.

@@ -2,7 +2,12 @@
   "id": "seat-count-clusters",
   "title": "Usage clustering found 5 personas — target onboarding by persona?",
   "trap": "Feature scaling in clustering",
-  "facets": { "topic": "Product", "skill": ["Feature scaling in clustering"] },
+  "facets": {
+    "topic": "Product",
+    "skill": [
+      "Feature scaling in clustering"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the product analyst at Ledgerline",
@@ -15,25 +20,133 @@
     "file": "/case-lab/seat-count-clusters/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "account_id", "type": "int", "description": "Unique account identifier" },
-      { "name": "plan", "type": "string", "description": "starter, team, or business — pricing tier (not used in clustering, for context)" },
-      { "name": "active_days_per_week", "type": "float", "description": "Average number of days per week someone on the account is active (0-7)" },
-      { "name": "features_used", "type": "float", "description": "Count of distinct product features touched in the last 30 days (0-20)" },
-      { "name": "seat_count", "type": "float", "description": "Number of seats on the account" },
-      { "name": "naive_cluster", "type": "int", "description": "Dev's cluster label (0-4) — k-means(k=5) run directly on the raw active_days_per_week/features_used/seat_count columns, no scaling" },
-      { "name": "honest_cluster", "type": "int", "description": "K-means run on the same 3 features after standardizing each to mean 0 / unit variance, with k chosen by silhouette score" }
+      {
+        "name": "account_id",
+        "type": "int",
+        "description": "Unique account identifier"
+      },
+      {
+        "name": "plan",
+        "type": "string",
+        "description": "starter, team, or business — pricing tier (not used in clustering, for context)"
+      },
+      {
+        "name": "active_days_per_week",
+        "type": "float",
+        "description": "Average number of days per week someone on the account is active (0-7)"
+      },
+      {
+        "name": "features_used",
+        "type": "float",
+        "description": "Count of distinct product features touched in the last 30 days (0-20)"
+      },
+      {
+        "name": "seat_count",
+        "type": "float",
+        "description": "Number of seats on the account"
+      },
+      {
+        "name": "naive_cluster",
+        "type": "int",
+        "description": "Dev's cluster label (0-4) — k-means(k=5) run directly on the raw active_days_per_week/features_used/seat_count columns, no scaling"
+      },
+      {
+        "name": "honest_cluster",
+        "type": "int",
+        "description": "K-means run on the same 3 features after standardizing each to mean 0 / unit variance, with k chosen by silhouette score"
+      }
     ],
     "sample": [
-      { "account_id": 1, "plan": "starter", "active_days_per_week": 5.8, "features_used": 12.0, "seat_count": 20.0, "naive_cluster": 3, "honest_cluster": 1 },
-      { "account_id": 2, "plan": "team", "active_days_per_week": 4.9, "features_used": 14.0, "seat_count": 108.0, "naive_cluster": 2, "honest_cluster": 1 },
-      { "account_id": 3, "plan": "team", "active_days_per_week": 7.0, "features_used": 11.0, "seat_count": 84.0, "naive_cluster": 0, "honest_cluster": 1 },
-      { "account_id": 4, "plan": "starter", "active_days_per_week": 1.2, "features_used": 0.0, "seat_count": 16.0, "naive_cluster": 3, "honest_cluster": 0 },
-      { "account_id": 5, "plan": "starter", "active_days_per_week": 2.1, "features_used": 1.0, "seat_count": 51.0, "naive_cluster": 0, "honest_cluster": 0 },
-      { "account_id": 6, "plan": "starter", "active_days_per_week": 5.6, "features_used": 5.0, "seat_count": 86.0, "naive_cluster": 0, "honest_cluster": 1 },
-      { "account_id": 7, "plan": "starter", "active_days_per_week": 1.2, "features_used": 3.0, "seat_count": 12.0, "naive_cluster": 3, "honest_cluster": 0 },
-      { "account_id": 8, "plan": "starter", "active_days_per_week": 6.1, "features_used": 14.0, "seat_count": 14.0, "naive_cluster": 3, "honest_cluster": 1 },
-      { "account_id": 9, "plan": "business", "active_days_per_week": 5.1, "features_used": 7.0, "seat_count": 29.0, "naive_cluster": 3, "honest_cluster": 1 },
-      { "account_id": 10, "plan": "team", "active_days_per_week": 1.1, "features_used": 5.0, "seat_count": 34.0, "naive_cluster": 3, "honest_cluster": 0 }
+      {
+        "account_id": 1,
+        "plan": "starter",
+        "active_days_per_week": 5.8,
+        "features_used": 12.0,
+        "seat_count": 20.0,
+        "naive_cluster": 3,
+        "honest_cluster": 1
+      },
+      {
+        "account_id": 2,
+        "plan": "team",
+        "active_days_per_week": 4.9,
+        "features_used": 14.0,
+        "seat_count": 108.0,
+        "naive_cluster": 2,
+        "honest_cluster": 1
+      },
+      {
+        "account_id": 3,
+        "plan": "team",
+        "active_days_per_week": 7.0,
+        "features_used": 11.0,
+        "seat_count": 84.0,
+        "naive_cluster": 0,
+        "honest_cluster": 1
+      },
+      {
+        "account_id": 4,
+        "plan": "starter",
+        "active_days_per_week": 1.2,
+        "features_used": 0.0,
+        "seat_count": 16.0,
+        "naive_cluster": 3,
+        "honest_cluster": 0
+      },
+      {
+        "account_id": 5,
+        "plan": "starter",
+        "active_days_per_week": 2.1,
+        "features_used": 1.0,
+        "seat_count": 51.0,
+        "naive_cluster": 0,
+        "honest_cluster": 0
+      },
+      {
+        "account_id": 6,
+        "plan": "starter",
+        "active_days_per_week": 5.6,
+        "features_used": 5.0,
+        "seat_count": 86.0,
+        "naive_cluster": 0,
+        "honest_cluster": 1
+      },
+      {
+        "account_id": 7,
+        "plan": "starter",
+        "active_days_per_week": 1.2,
+        "features_used": 3.0,
+        "seat_count": 12.0,
+        "naive_cluster": 3,
+        "honest_cluster": 0
+      },
+      {
+        "account_id": 8,
+        "plan": "starter",
+        "active_days_per_week": 6.1,
+        "features_used": 14.0,
+        "seat_count": 14.0,
+        "naive_cluster": 3,
+        "honest_cluster": 1
+      },
+      {
+        "account_id": 9,
+        "plan": "business",
+        "active_days_per_week": 5.1,
+        "features_used": 7.0,
+        "seat_count": 29.0,
+        "naive_cluster": 3,
+        "honest_cluster": 1
+      },
+      {
+        "account_id": 10,
+        "plan": "team",
+        "active_days_per_week": 1.1,
+        "features_used": 5.0,
+        "seat_count": 34.0,
+        "naive_cluster": 3,
+        "honest_cluster": 0
+      }
     ]
   },
   "guidingQuestions": [
@@ -50,6 +163,41 @@
     "Re-profile using honest_cluster (standardized features, k chosen by silhouette); check whether active_days_per_week and features_used now separate meaningfully.",
     "Contrast the two: naive clusters mostly recover seat_count tiers; honest clusters recover a real behavioral split (frequent multi-feature users vs. rarely-active ones) largely independent of account size."
   ],
+  "notebook": {
+    "intro": "Five steps: profile the personas, find which feature actually made them, then compare with a clustering that was scaled properly.",
+    "cells": [
+      {
+        "title": "Profile the personas",
+        "explain": "Group by naive_cluster and look at the mean of each feature that went into it.",
+        "code": "profile = df.groupby(\"naive_cluster\")[[\"active_days_per_week\", \"features_used\", \"seat_count\"]].mean()\nprofile[\"accounts\"] = df.groupby(\"naive_cluster\").size()\nprofile.round(2)",
+        "reads": "Read down the columns. One of them changes enormously across the personas and the others barely move."
+      },
+      {
+        "title": "Compare the raw ranges",
+        "explain": "Look at the spread of each feature across cluster means, in the units k-means actually saw.",
+        "code": "spread = profile[[\"active_days_per_week\", \"features_used\", \"seat_count\"]].agg([\"min\", \"max\"]).T\nspread[\"range\"] = spread[\"max\"] - spread[\"min\"]\nspread[\"std in data\"] = df[[\"active_days_per_week\", \"features_used\", \"seat_count\"]].std()\nspread.round(2)",
+        "reads": "seat_count spans hundreds; active_days_per_week spans a fraction of a day. They were never competing on equal terms."
+      },
+      {
+        "title": "Name the mechanism",
+        "explain": "Unscaled k-means minimises Euclidean distance, so the largest-magnitude feature dominates. Measure how much of each feature's variance each clustering actually accounts for.",
+        "code": "def variance_explained(col, labels):\n    grand = df[col].mean()\n    groups = df.groupby(labels)[col]\n    between = (groups.count() * (groups.mean() - grand) ** 2).sum()\n    total = ((df[col] - grand) ** 2).sum()\n    return between / total\n\nfeats = [\"active_days_per_week\", \"features_used\", \"seat_count\"]\nshares = pd.DataFrame({\n    \"naive_cluster explains\": [variance_explained(c, df[\"naive_cluster\"]) for c in feats],\n    \"honest_cluster explains\": [variance_explained(c, df[\"honest_cluster\"]) for c in feats],\n}, index=feats)\nshares.round(3)",
+        "reads": "The naive clustering explains almost all of seat_count and almost none of the usage columns. It is an account-size split wearing persona labels."
+      },
+      {
+        "title": "Re-profile with the scaled clustering",
+        "explain": "honest_cluster was built on standardised features. Check whether behaviour separates now.",
+        "code": "honest = df.groupby(\"honest_cluster\")[[\"active_days_per_week\", \"features_used\", \"seat_count\"]].mean()\nhonest[\"accounts\"] = df.groupby(\"honest_cluster\").size()\nhonest.round(2)",
+        "reads": "Now the usage columns move across clusters, and seat_count is no longer the thing doing the sorting."
+      },
+      {
+        "title": "Contrast the two clusterings",
+        "explain": "Measure how much each clustering separates behaviour versus account size.",
+        "code": "def spread_of(frame, col):\n    return frame[col].max() - frame[col].min()\n\npd.DataFrame(\n    {\n        \"active_days spread\": [spread_of(profile, \"active_days_per_week\"), spread_of(honest, \"active_days_per_week\")],\n        \"features_used spread\": [spread_of(profile, \"features_used\"), spread_of(honest, \"features_used\")],\n    },\n    index=[\"naive (unscaled)\", \"honest (standardised)\"],\n).round(2)",
+        "reads": "The naive clusters recover a size ranking you already had. The scaled ones recover a behavioural split you did not."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "Five clusters, cleanly separated by k-means. Dev reads them as five different ways teams use the product, and briefs onboarding to build a track for each.",
     "theTrap": "seat_count ranges from a handful of seats to several hundred; active_days_per_week only ranges 0-7 and features_used only 0-20. On raw, unscaled features, Euclidean distance is dominated by whichever column has the biggest numbers — here, seat_count almost entirely decides who lands in which cluster. Profile the 5 naive clusters and active_days_per_week barely moves (3.3 to 3.8 across every cluster) while seat_count ranges from ~18 to ~617 — a more than 30x spread. The clustering isn't finding 5 usage personas; it's finding 5 account-size tiers, which sales already has in the CRM as company size.",
@@ -62,11 +210,26 @@
       "Re-profile the honest clusters: active_days_per_week (1.6 vs 5.2) and features_used (3.0 vs 11.0) now clearly separate — a real usage split, largely independent of seat count."
     ],
     "numbers": [
-      { "label": "active_days_per_week range across the 5 naive clusters", "value": "3.3 – 3.8 (flat)" },
-      { "label": "seat_count range across the 5 naive clusters", "value": "18 – 617 (34x)" },
-      { "label": "Agreement: naive cluster vs. true usage segment (ARI)", "value": "0.003 — essentially none" },
-      { "label": "Agreement: honest cluster vs. true usage segment (ARI)", "value": "0.93 — strong recovery" },
-      { "label": "Agreement: honest cluster vs. seat-count quartile (ARI)", "value": "0.01 — essentially independent" }
+      {
+        "label": "active_days_per_week range across the 5 naive clusters",
+        "value": "3.3 – 3.8 (flat)"
+      },
+      {
+        "label": "seat_count range across the 5 naive clusters",
+        "value": "18 – 617 (34x)"
+      },
+      {
+        "label": "Agreement: naive cluster vs. true usage segment (ARI)",
+        "value": "0.003 — essentially none"
+      },
+      {
+        "label": "Agreement: honest cluster vs. true usage segment (ARI)",
+        "value": "0.93 — strong recovery"
+      },
+      {
+        "label": "Agreement: honest cluster vs. seat-count quartile (ARI)",
+        "value": "0.01 — essentially independent"
+      }
     ],
     "lesson": "Distance-based clustering has no concept of which of your columns is \"important\" — it just minimizes distance in whatever units you hand it, and the biggest-magnitude column wins by default. A feature measured in the hundreds will silently steamroll features measured in single digits, no matter how behaviorally meaningful those smaller features are. Standardize before you cluster, and always profile the resulting clusters against your raw inputs before naming or acting on them — if one unscaled column alone orders your clusters top to bottom, you've re-discovered that column, not found a new segment."
   }

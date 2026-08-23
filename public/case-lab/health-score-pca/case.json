@@ -2,7 +2,12 @@
   "id": "health-score-pca",
   "title": "PC1 explains 99.9% of the variance — build the health score on it?",
   "trap": "Explained variance ≠ relevance",
-  "facets": { "topic": "Product", "skill": ["Explained variance ≠ relevance"] },
+  "facets": {
+    "topic": "Product",
+    "skill": [
+      "Explained variance ≠ relevance"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the customer-success analyst at Anchorage",
@@ -15,25 +20,133 @@
     "file": "/case-lab/health-score-pca/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "account_id", "type": "int", "description": "Unique account identifier" },
-      { "name": "tenure_months", "type": "int", "description": "Months since the account signed up (1-60)" },
-      { "name": "session_count", "type": "float", "description": "Total product sessions in the last 90 days" },
-      { "name": "feature_adoption_count", "type": "int", "description": "Count of distinct core features the account has used (0-10)" },
-      { "name": "support_tickets", "type": "int", "description": "Support tickets opened in the last 90 days" },
-      { "name": "churned", "type": "int", "description": "1 if the account churned this quarter — the outcome a health score should predict" },
-      { "name": "pc1_score", "type": "float", "description": "The account's score on the first principal component, computed from PCA fit on the four raw (unscaled) metrics above" }
+      {
+        "name": "account_id",
+        "type": "int",
+        "description": "Unique account identifier"
+      },
+      {
+        "name": "tenure_months",
+        "type": "int",
+        "description": "Months since the account signed up (1-60)"
+      },
+      {
+        "name": "session_count",
+        "type": "float",
+        "description": "Total product sessions in the last 90 days"
+      },
+      {
+        "name": "feature_adoption_count",
+        "type": "int",
+        "description": "Count of distinct core features the account has used (0-10)"
+      },
+      {
+        "name": "support_tickets",
+        "type": "int",
+        "description": "Support tickets opened in the last 90 days"
+      },
+      {
+        "name": "churned",
+        "type": "int",
+        "description": "1 if the account churned this quarter — the outcome a health score should predict"
+      },
+      {
+        "name": "pc1_score",
+        "type": "float",
+        "description": "The account's score on the first principal component, computed from PCA fit on the four raw (unscaled) metrics above"
+      }
     ],
     "sample": [
-      { "account_id": 1, "tenure_months": 45, "session_count": 126.0, "feature_adoption_count": 2, "support_tickets": 2, "churned": 1, "pc1_score": -511.06 },
-      { "account_id": 2, "tenure_months": 51, "session_count": 111.0, "feature_adoption_count": 5, "support_tickets": 1, "churned": 0, "pc1_score": -526.06 },
-      { "account_id": 3, "tenure_months": 7, "session_count": 148.0, "feature_adoption_count": 1, "support_tickets": 1, "churned": 0, "pc1_score": -489.07 },
-      { "account_id": 4, "tenure_months": 10, "session_count": 729.0, "feature_adoption_count": 2, "support_tickets": 1, "churned": 0, "pc1_score": 91.93 },
-      { "account_id": 5, "tenure_months": 28, "session_count": 264.0, "feature_adoption_count": 2, "support_tickets": 1, "churned": 1, "pc1_score": -373.06 },
-      { "account_id": 6, "tenure_months": 34, "session_count": 179.0, "feature_adoption_count": 4, "support_tickets": 0, "churned": 1, "pc1_score": -458.06 },
-      { "account_id": 7, "tenure_months": 46, "session_count": 1065.0, "feature_adoption_count": 6, "support_tickets": 2, "churned": 0, "pc1_score": 427.94 },
-      { "account_id": 8, "tenure_months": 23, "session_count": 116.0, "feature_adoption_count": 6, "support_tickets": 0, "churned": 0, "pc1_score": -521.06 },
-      { "account_id": 9, "tenure_months": 3, "session_count": 682.0, "feature_adoption_count": 4, "support_tickets": 2, "churned": 0, "pc1_score": 44.93 },
-      { "account_id": 10, "tenure_months": 13, "session_count": 350.0, "feature_adoption_count": 6, "support_tickets": 3, "churned": 1, "pc1_score": -287.07 }
+      {
+        "account_id": 1,
+        "tenure_months": 45,
+        "session_count": 126.0,
+        "feature_adoption_count": 2,
+        "support_tickets": 2,
+        "churned": 1,
+        "pc1_score": -511.06
+      },
+      {
+        "account_id": 2,
+        "tenure_months": 51,
+        "session_count": 111.0,
+        "feature_adoption_count": 5,
+        "support_tickets": 1,
+        "churned": 0,
+        "pc1_score": -526.06
+      },
+      {
+        "account_id": 3,
+        "tenure_months": 7,
+        "session_count": 148.0,
+        "feature_adoption_count": 1,
+        "support_tickets": 1,
+        "churned": 0,
+        "pc1_score": -489.07
+      },
+      {
+        "account_id": 4,
+        "tenure_months": 10,
+        "session_count": 729.0,
+        "feature_adoption_count": 2,
+        "support_tickets": 1,
+        "churned": 0,
+        "pc1_score": 91.93
+      },
+      {
+        "account_id": 5,
+        "tenure_months": 28,
+        "session_count": 264.0,
+        "feature_adoption_count": 2,
+        "support_tickets": 1,
+        "churned": 1,
+        "pc1_score": -373.06
+      },
+      {
+        "account_id": 6,
+        "tenure_months": 34,
+        "session_count": 179.0,
+        "feature_adoption_count": 4,
+        "support_tickets": 0,
+        "churned": 1,
+        "pc1_score": -458.06
+      },
+      {
+        "account_id": 7,
+        "tenure_months": 46,
+        "session_count": 1065.0,
+        "feature_adoption_count": 6,
+        "support_tickets": 2,
+        "churned": 0,
+        "pc1_score": 427.94
+      },
+      {
+        "account_id": 8,
+        "tenure_months": 23,
+        "session_count": 116.0,
+        "feature_adoption_count": 6,
+        "support_tickets": 0,
+        "churned": 0,
+        "pc1_score": -521.06
+      },
+      {
+        "account_id": 9,
+        "tenure_months": 3,
+        "session_count": 682.0,
+        "feature_adoption_count": 4,
+        "support_tickets": 2,
+        "churned": 0,
+        "pc1_score": 44.93
+      },
+      {
+        "account_id": 10,
+        "tenure_months": 13,
+        "session_count": 350.0,
+        "feature_adoption_count": 6,
+        "support_tickets": 3,
+        "churned": 1,
+        "pc1_score": -287.07
+      }
     ]
   },
   "guidingQuestions": [
@@ -50,6 +163,41 @@
     "Check the scale of each input column — session_count's range should dwarf the other three, explaining why PCA (which is scale-sensitive, just like clustering) loaded almost entirely onto it.",
     "Conclude which metric(s) should actually drive the health score, and why 'explains the most variance' isn't the same question as 'predicts the outcome we care about.'"
   ],
+  "notebook": {
+    "intro": "Five steps: find out what PC1 is really summarising, then check whether it predicts churn at all.",
+    "cells": [
+      {
+        "title": "Find out what PC1 is made of",
+        "explain": "Correlate pc1_score against each raw input to see which one it is really tracking.",
+        "code": "inputs = [\"tenure_months\", \"session_count\", \"feature_adoption_count\", \"support_tickets\"]\nloadings = df[inputs].corrwith(df[\"pc1_score\"]).sort_values(ascending=False)\nprint(\"correlation of PC1 with each input:\")\nloadings.round(3)",
+        "reads": "PC1 is essentially one input wearing a new name, not a summary of account health."
+      },
+      {
+        "title": "Check PC1 against churn",
+        "explain": "For a health score, the number that matters is how well it predicts churn.",
+        "code": "pc1_corr = df[\"pc1_score\"].corr(df[\"churned\"])\nprint(f\"correlation of PC1 with churned: {pc1_corr:.3f}\")\ndf.groupby(pd.qcut(df[\"pc1_score\"], 5, labels=False, duplicates=\"drop\"))[\"churned\"].mean().round(3) * 100",
+        "reads": "Churn barely moves across PC1's range, despite its enormous explained-variance share."
+      },
+      {
+        "title": "Check each raw metric against churn",
+        "explain": "Correlate every input with churn separately and compare them to PC1.",
+        "code": "raw_corr = df[inputs].corrwith(df[\"churned\"]).sort_values(key=abs, ascending=False)\nprint(\"correlation with churned:\")\nraw_corr.round(3)",
+        "reads": "One of the discarded metrics predicts churn far better than the component built to summarise them all."
+      },
+      {
+        "title": "Check the scales",
+        "explain": "PCA is scale-sensitive, exactly like k-means. Look at the spread of each input in raw units.",
+        "code": "scales = df[inputs].agg([\"mean\", \"std\", \"min\", \"max\"]).T\nscales.round(2)",
+        "reads": "session_count's scale dwarfs the others, so the first component had nowhere else to go."
+      },
+      {
+        "title": "Explained variance is not relevance",
+        "explain": "Put PC1's correlation with churn beside the best raw metric's.",
+        "code": "best = raw_corr.abs().idxmax()\npd.DataFrame(\n    {\"correlation with churn\": [pc1_corr, df[best].corr(df[\"churned\"])]},\n    index=[\"PC1 (99.9% of variance)\", best + \" (predicts churn)\"],\n).round(3)",
+        "reads": "A health score should be built on what predicts the outcome, not on what happens to have the largest numbers."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "PC1 explains 99.9% of the variance across the four metrics. That sounds like PC1 has captured nearly everything worth knowing about an account in one number — an obvious candidate for a single health score.",
     "theTrap": "PCA finds the direction of maximum *variance* in the data, with no idea which of your columns matters for the outcome you actually care about. session_count ranges up into the thousands while feature_adoption_count tops out at 10 and support_tickets at 20 — session_count's raw variance is so much larger than the other three combined that PC1 loads almost entirely onto it (loading ≈ 1.0 on session_count, ≈ 0 on everything else). PC1 isn't a composite health score; it's session_count wearing a disguise. And session_count barely relates to churn at all (correlation ≈ 0.00) — churn is actually driven by feature_adoption_count (correlation ≈ -0.39, the strongest single signal) and, to a lesser extent, support_tickets (≈ +0.19). The metric that 'explains the most variance' turns out to be nearly useless for the thing the dashboard is supposed to predict.",
@@ -62,11 +210,26 @@
       "Compare column scales: session_count ranges into the thousands vs. single digits/tens for the others — explaining why unscaled PCA collapsed onto it."
     ],
     "numbers": [
-      { "label": "PC1 explained variance", "value": "99.9%" },
-      { "label": "PC1's loading on session_count", "value": "≈ 1.00 (all other loadings ≈ 0)" },
-      { "label": "Correlation: PC1 vs. churn", "value": "≈ 0.00" },
-      { "label": "Correlation: feature_adoption_count vs. churn", "value": "≈ -0.39 (strongest predictor)" },
-      { "label": "Correlation: support_tickets vs. churn", "value": "≈ +0.19" }
+      {
+        "label": "PC1 explained variance",
+        "value": "99.9%"
+      },
+      {
+        "label": "PC1's loading on session_count",
+        "value": "≈ 1.00 (all other loadings ≈ 0)"
+      },
+      {
+        "label": "Correlation: PC1 vs. churn",
+        "value": "≈ 0.00"
+      },
+      {
+        "label": "Correlation: feature_adoption_count vs. churn",
+        "value": "≈ -0.39 (strongest predictor)"
+      },
+      {
+        "label": "Correlation: support_tickets vs. churn",
+        "value": "≈ +0.19"
+      }
     ],
     "lesson": "Explained variance tells you how much a component captures about the *spread* of your inputs — it says nothing about whether that component relates to the outcome you actually care about. PCA is also scale-sensitive: an unscaled feature with a much bigger numeric range will dominate the first component regardless of its real-world importance, exactly like unscaled clustering. Before turning a component into a metric people act on, correlate it against the actual outcome, and check whether one raw input's scale is doing all the work. A number that summarizes 99.9% of the data's variance can still summarize 0% of what you need to know."
   }

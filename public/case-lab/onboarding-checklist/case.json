@@ -2,7 +2,12 @@
   "id": "onboarding-checklist",
   "title": "Checklist-completers retain at nearly double — make it mandatory?",
   "trap": "Self-selection",
-  "facets": { "topic": "Product", "skill": ["Self-selection"] },
+  "facets": {
+    "topic": "Product",
+    "skill": [
+      "Self-selection"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the product analyst at Plotline",
@@ -15,24 +20,118 @@
     "file": "/case-lab/onboarding-checklist/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "user_id", "type": "int", "description": "Unique user identifier" },
-      { "name": "signup_source", "type": "string", "description": "How the user arrived: organic, paid, or referral" },
-      { "name": "plan", "type": "string", "description": "Account plan: free or pro" },
-      { "name": "setup_actions_first_hour", "type": "int", "description": "Number of setup actions the user took in their first hour — BEFORE the checklist — a signal of how motivated they arrived" },
-      { "name": "completed_checklist", "type": "int", "description": "1 if the user finished the onboarding checklist, else 0" },
-      { "name": "retained_30d", "type": "int", "description": "1 if the user was still active 30 days later, else 0 — the outcome" }
+      {
+        "name": "user_id",
+        "type": "int",
+        "description": "Unique user identifier"
+      },
+      {
+        "name": "signup_source",
+        "type": "string",
+        "description": "How the user arrived: organic, paid, or referral"
+      },
+      {
+        "name": "plan",
+        "type": "string",
+        "description": "Account plan: free or pro"
+      },
+      {
+        "name": "setup_actions_first_hour",
+        "type": "int",
+        "description": "Number of setup actions the user took in their first hour — BEFORE the checklist — a signal of how motivated they arrived"
+      },
+      {
+        "name": "completed_checklist",
+        "type": "int",
+        "description": "1 if the user finished the onboarding checklist, else 0"
+      },
+      {
+        "name": "retained_30d",
+        "type": "int",
+        "description": "1 if the user was still active 30 days later, else 0 — the outcome"
+      }
     ],
     "sample": [
-      { "user_id": 1, "signup_source": "paid", "plan": "free", "setup_actions_first_hour": 7, "completed_checklist": 0, "retained_30d": 1 },
-      { "user_id": 2, "signup_source": "organic", "plan": "free", "setup_actions_first_hour": 3, "completed_checklist": 0, "retained_30d": 0 },
-      { "user_id": 3, "signup_source": "referral", "plan": "free", "setup_actions_first_hour": 9, "completed_checklist": 1, "retained_30d": 0 },
-      { "user_id": 4, "signup_source": "paid", "plan": "pro", "setup_actions_first_hour": 6, "completed_checklist": 1, "retained_30d": 1 },
-      { "user_id": 5, "signup_source": "organic", "plan": "free", "setup_actions_first_hour": 8, "completed_checklist": 1, "retained_30d": 1 },
-      { "user_id": 6, "signup_source": "referral", "plan": "free", "setup_actions_first_hour": 7, "completed_checklist": 1, "retained_30d": 1 },
-      { "user_id": 7, "signup_source": "paid", "plan": "free", "setup_actions_first_hour": 7, "completed_checklist": 1, "retained_30d": 0 },
-      { "user_id": 8, "signup_source": "paid", "plan": "pro", "setup_actions_first_hour": 5, "completed_checklist": 0, "retained_30d": 1 },
-      { "user_id": 9, "signup_source": "organic", "plan": "free", "setup_actions_first_hour": 5, "completed_checklist": 0, "retained_30d": 1 },
-      { "user_id": 10, "signup_source": "paid", "plan": "free", "setup_actions_first_hour": 4, "completed_checklist": 1, "retained_30d": 0 }
+      {
+        "user_id": 1,
+        "signup_source": "paid",
+        "plan": "free",
+        "setup_actions_first_hour": 7,
+        "completed_checklist": 0,
+        "retained_30d": 1
+      },
+      {
+        "user_id": 2,
+        "signup_source": "organic",
+        "plan": "free",
+        "setup_actions_first_hour": 3,
+        "completed_checklist": 0,
+        "retained_30d": 0
+      },
+      {
+        "user_id": 3,
+        "signup_source": "referral",
+        "plan": "free",
+        "setup_actions_first_hour": 9,
+        "completed_checklist": 1,
+        "retained_30d": 0
+      },
+      {
+        "user_id": 4,
+        "signup_source": "paid",
+        "plan": "pro",
+        "setup_actions_first_hour": 6,
+        "completed_checklist": 1,
+        "retained_30d": 1
+      },
+      {
+        "user_id": 5,
+        "signup_source": "organic",
+        "plan": "free",
+        "setup_actions_first_hour": 8,
+        "completed_checklist": 1,
+        "retained_30d": 1
+      },
+      {
+        "user_id": 6,
+        "signup_source": "referral",
+        "plan": "free",
+        "setup_actions_first_hour": 7,
+        "completed_checklist": 1,
+        "retained_30d": 1
+      },
+      {
+        "user_id": 7,
+        "signup_source": "paid",
+        "plan": "free",
+        "setup_actions_first_hour": 7,
+        "completed_checklist": 1,
+        "retained_30d": 0
+      },
+      {
+        "user_id": 8,
+        "signup_source": "paid",
+        "plan": "pro",
+        "setup_actions_first_hour": 5,
+        "completed_checklist": 0,
+        "retained_30d": 1
+      },
+      {
+        "user_id": 9,
+        "signup_source": "organic",
+        "plan": "free",
+        "setup_actions_first_hour": 5,
+        "completed_checklist": 0,
+        "retained_30d": 1
+      },
+      {
+        "user_id": 10,
+        "signup_source": "paid",
+        "plan": "free",
+        "setup_actions_first_hour": 4,
+        "completed_checklist": 1,
+        "retained_30d": 0
+      }
     ]
   },
   "guidingQuestions": [
@@ -49,6 +148,41 @@
     "Adjust for intent (stratify on setup_actions or model it) and see how much of the gap survives.",
     "Reason about the intervention: mandatory completion changes who completes, not who's motivated — forecast against the adjusted effect, and note that a randomised forced-vs-optional test would settle it."
   ],
+  "notebook": {
+    "intro": "Five steps: reproduce the retention gap, look at who chooses to finish, then see how much of the gap survives adjusting for intent.",
+    "cells": [
+      {
+        "title": "Reproduce the headline",
+        "explain": "Retention for checklist completers against non-completers — the exact claim.",
+        "code": "rates = df.groupby(\"completed_checklist\")[\"retained_30d\"].mean() * 100\nheadline = rates[1] - rates[0]\nprint(f\"headline gap (completed - not): {headline:+.2f} pts\")\nrates.round(2)",
+        "reads": "A very large gap. The question is whether the checklist made it or merely marks it."
+      },
+      {
+        "title": "Describe who finishes it",
+        "explain": "setup_actions_first_hour is measured BEFORE the checklist, so it is a clean read on intent. Compare it across the two groups.",
+        "code": "profile = df.groupby(\"completed_checklist\")[\"setup_actions_first_hour\"].agg([\"mean\", \"median\", \"count\"])\nprint(\"intent signal, measured before the checklist:\")\nprofile.round(2)",
+        "reads": "Completers were already doing far more in their first hour. Finishing is voluntary, and the motivated self-select into it."
+      },
+      {
+        "title": "Check intent drives retention",
+        "explain": "If the opt-in signal predicts retention on its own, it confounds the raw comparison. Bin it and look.",
+        "code": "df[\"intent_band\"] = pd.qcut(df[\"setup_actions_first_hour\"], 5, labels=False, duplicates=\"drop\")\nby_band = df.groupby(\"intent_band\")[\"retained_30d\"].mean() * 100\nprint(\"retention by first-hour activity band (%)\")\nby_band.round(1)",
+        "reads": "Intent predicts retention by itself, before the checklist enters the picture at all."
+      },
+      {
+        "title": "Hold intent constant",
+        "explain": "Compare completers with non-completers at the same level of first-hour activity, then re-weight to one common mix.",
+        "code": "within = df.groupby([\"intent_band\", \"completed_checklist\"])[\"retained_30d\"].mean().unstack()\nweights = df[\"intent_band\"].value_counts(normalize=True)\nadjusted = within.mul(weights, axis=0).sum() * 100\nadj_effect = adjusted[1] - adjusted[0]\nprint(f\"adjusted effect: {adj_effect:+.2f} pts\")\nwithin.round(3)",
+        "reads": "Among equally motivated users the checklist is worth far less than the headline suggests."
+      },
+      {
+        "title": "What making it mandatory would do",
+        "explain": "Mandatory completion changes who completes, not who is motivated. Forecast against the adjusted effect, not the raw one.",
+        "code": "pd.DataFrame(\n    {\"effect (pts)\": [headline, adj_effect]},\n    index=[\"raw comparison\", \"same intent level\"],\n).round(2)",
+        "reads": "Forcing low-intent users through the checklist hands them the steps, not the motivation the headline was actually measuring."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "Checklist-completers retain at 60.5% versus 33.5% for non-completers — a +27 point gap, nearly 1.8x. Read directly, the checklist looks like the strongest retention lever Plotline has, and forcing it looks like a free way to lift the non-completers to ~60%.",
     "theTrap": "Completing the checklist is voluntary, so completers self-selected. The users who bother to finish it arrived more motivated: they took 7.4 setup actions in their first hour on average, versus 4.9 for non-completers. That early intent is what drives retention — the same motivation that makes someone finish the checklist also makes them stick around. The checklist is a marker of intent, not mainly a cause of retention. Comparing completers to non-completers compares motivated users to unmotivated ones and blames the difference on the checklist.",
@@ -61,10 +195,22 @@
       "Reason about the policy: forcing completion moves the click, not the motivation — the honest effect, not the gap, is what a mandate would buy."
     ],
     "numbers": [
-      { "label": "Naive retention gap (completers − not)", "value": "60.5% vs 33.5% (+27 pts)" },
-      { "label": "Mean first-hour setup actions", "value": "7.4 vs 4.9" },
-      { "label": "Intent-adjusted checklist effect", "value": "≈ +4.6 pts" },
-      { "label": "Share who complete the checklist", "value": "46%" }
+      {
+        "label": "Naive retention gap (completers − not)",
+        "value": "60.5% vs 33.5% (+27 pts)"
+      },
+      {
+        "label": "Mean first-hour setup actions",
+        "value": "7.4 vs 4.9"
+      },
+      {
+        "label": "Intent-adjusted checklist effect",
+        "value": "≈ +4.6 pts"
+      },
+      {
+        "label": "Share who complete the checklist",
+        "value": "46%"
+      }
     ],
     "lesson": "When users opt into a behaviour, comparing the opt-ins to everyone else measures who they already were, not what the behaviour did. Motivated users complete onboarding AND retain; the checklist rides along as a marker. Before turning a voluntary behaviour into a mandate, ask whether the people doing it were different to begin with — and adjust for that difference. Here a nearly-2x story becomes a few-points one. A mandate changes who completes without changing who's motivated, so it can't reproduce the self-selected gap. The only clean read is to randomise the requirement and compare."
   }

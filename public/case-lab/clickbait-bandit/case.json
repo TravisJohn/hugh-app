@@ -2,7 +2,12 @@
   "id": "clickbait-bandit",
   "title": "The CTR bandit lifted clicks 63% — ship it to all traffic?",
   "trap": "Reward hacking",
-  "facets": { "topic": "Marketing", "skill": ["Reward hacking"] },
+  "facets": {
+    "topic": "Marketing",
+    "skill": [
+      "Reward hacking"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the content-recommendations analyst at Northfeed",
@@ -15,22 +20,88 @@
     "file": "/case-lab/clickbait-bandit/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "impression_id", "type": "int", "description": "Unique content impression identifier" },
-      { "name": "arm", "type": "string", "description": "legacy_rule (old rule-based ranker) or ctr_bandit (new bandit, trained to maximize clicks) — randomly split 50/50" },
-      { "name": "clicked", "type": "int", "description": "1 if the user clicked the recommended content — the metric the bandit was trained to optimize" },
-      { "name": "purchased", "type": "int", "description": "1 if the impression led to a purchase — the outcome that actually matters to the business" }
+      {
+        "name": "impression_id",
+        "type": "int",
+        "description": "Unique content impression identifier"
+      },
+      {
+        "name": "arm",
+        "type": "string",
+        "description": "legacy_rule (old rule-based ranker) or ctr_bandit (new bandit, trained to maximize clicks) — randomly split 50/50"
+      },
+      {
+        "name": "clicked",
+        "type": "int",
+        "description": "1 if the user clicked the recommended content — the metric the bandit was trained to optimize"
+      },
+      {
+        "name": "purchased",
+        "type": "int",
+        "description": "1 if the impression led to a purchase — the outcome that actually matters to the business"
+      }
     ],
     "sample": [
-      { "impression_id": 1, "arm": "ctr_bandit", "clicked": 0, "purchased": 0 },
-      { "impression_id": 2, "arm": "ctr_bandit", "clicked": 0, "purchased": 0 },
-      { "impression_id": 3, "arm": "legacy_rule", "clicked": 0, "purchased": 0 },
-      { "impression_id": 4, "arm": "legacy_rule", "clicked": 1, "purchased": 0 },
-      { "impression_id": 5, "arm": "ctr_bandit", "clicked": 0, "purchased": 0 },
-      { "impression_id": 6, "arm": "legacy_rule", "clicked": 0, "purchased": 0 },
-      { "impression_id": 7, "arm": "legacy_rule", "clicked": 0, "purchased": 0 },
-      { "impression_id": 8, "arm": "ctr_bandit", "clicked": 0, "purchased": 0 },
-      { "impression_id": 9, "arm": "ctr_bandit", "clicked": 1, "purchased": 0 },
-      { "impression_id": 10, "arm": "legacy_rule", "clicked": 0, "purchased": 0 }
+      {
+        "impression_id": 1,
+        "arm": "ctr_bandit",
+        "clicked": 0,
+        "purchased": 0
+      },
+      {
+        "impression_id": 2,
+        "arm": "ctr_bandit",
+        "clicked": 0,
+        "purchased": 0
+      },
+      {
+        "impression_id": 3,
+        "arm": "legacy_rule",
+        "clicked": 0,
+        "purchased": 0
+      },
+      {
+        "impression_id": 4,
+        "arm": "legacy_rule",
+        "clicked": 1,
+        "purchased": 0
+      },
+      {
+        "impression_id": 5,
+        "arm": "ctr_bandit",
+        "clicked": 0,
+        "purchased": 0
+      },
+      {
+        "impression_id": 6,
+        "arm": "legacy_rule",
+        "clicked": 0,
+        "purchased": 0
+      },
+      {
+        "impression_id": 7,
+        "arm": "legacy_rule",
+        "clicked": 0,
+        "purchased": 0
+      },
+      {
+        "impression_id": 8,
+        "arm": "ctr_bandit",
+        "clicked": 0,
+        "purchased": 0
+      },
+      {
+        "impression_id": 9,
+        "arm": "ctr_bandit",
+        "clicked": 1,
+        "purchased": 0
+      },
+      {
+        "impression_id": 10,
+        "arm": "legacy_rule",
+        "clicked": 0,
+        "purchased": 0
+      }
     ]
   },
   "guidingQuestions": [
@@ -47,6 +118,41 @@
     "Name the mechanism: a bandit rewarded purely for clicks has no incentive to surface content that converts — it will drift toward whatever maximizes clicks, even if that content satisfies the click and nothing more.",
     "Recommend based on purchases, the true outcome, not clicks, the proxy the bandit was trained on."
   ],
+  "notebook": {
+    "intro": "Five steps: reproduce the click lift, then check the metric that actually pays the bills.",
+    "cells": [
+      {
+        "title": "Reproduce the CTR lift",
+        "explain": "Click-through rate for the bandit against the legacy ranker.",
+        "code": "rates = df.groupby(\"arm\")[\"clicked\"].mean() * 100\nctr_lift = rates[\"ctr_bandit\"] / rates[\"legacy_rule\"] - 1\nprint(f\"CTR lift: {ctr_lift:+.1%}\")\nrates.round(2)",
+        "reads": "The click lift is large and real. Clicks are what the bandit was trained to maximise."
+      },
+      {
+        "title": "Check the metric that matters",
+        "explain": "Purchase rate across all impressions, for each arm — the outcome the business actually cares about.",
+        "code": "purchase = df.groupby(\"arm\")[\"purchased\"].mean() * 100\npurchase_lift = purchase[\"ctr_bandit\"] / purchase[\"legacy_rule\"] - 1\nprint(f\"purchase-rate change: {purchase_lift:+.1%}\")\npurchase.round(3)",
+        "reads": "Purchases move the opposite way to clicks. The proxy improved and the goal got worse."
+      },
+      {
+        "title": "Look inside the clicks",
+        "explain": "Restrict to impressions that were clicked and compare purchase rate by arm, to see whether the clicked content itself is different.",
+        "code": "clicked = df[df[\"clicked\"] == 1]\nby_arm = clicked.groupby(\"arm\")[\"purchased\"].agg([\"mean\", \"size\"])\nby_arm[\"mean\"] = by_arm[\"mean\"] * 100\nprint(\"purchase rate among clicked impressions (%)\")\nby_arm.round(2)",
+        "reads": "The bandit's clicks convert far worse. It is not getting more of the same clicks — it is getting a different, emptier kind."
+      },
+      {
+        "title": "Name the mechanism",
+        "explain": "A policy rewarded purely for clicks has no incentive to surface content that converts. Put the two rates side by side per arm.",
+        "code": "summary = pd.DataFrame({\n    \"click rate (%)\": df.groupby(\"arm\")[\"clicked\"].mean() * 100,\n    \"purchase rate (%)\": df.groupby(\"arm\")[\"purchased\"].mean() * 100,\n})\nsummary[\"purchases per 100 clicks\"] = summary[\"purchase rate (%)\"] / summary[\"click rate (%)\"] * 100\nsummary.round(2)",
+        "reads": "The bandit found content that satisfies the click and nothing beyond it. That is the reward doing exactly what it was told."
+      },
+      {
+        "title": "Recommend on the true outcome",
+        "explain": "Compare the lift in the proxy with the change in the goal.",
+        "code": "pd.DataFrame(\n    {\"change\": [ctr_lift, purchase_lift]},\n    index=[\"clicks (the proxy it optimised)\", \"purchases (the outcome that matters)\"],\n).round(3)",
+        "reads": "Shipping on the click number ships a measurable win and an unmeasured loss."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "Click-through rate is up 63% under the bandit. That reads as a clear, large engagement win — obviously worth shipping to everyone.",
     "theTrap": "The bandit was trained to maximize clicks, and it did exactly that — by learning to surface more sensational, clickbait-leaning content that pulls a click without actually satisfying the underlying intent. This is reward hacking: optimizing a proxy metric (clicks) at the expense of the true objective (purchases) the proxy was only ever supposed to stand in for. Purchase rate — the outcome that actually matters — fell 23% under the bandit, not despite the higher click rate but partly because of it: among impressions that were clicked, purchase rate is 9.4% under the bandit versus 20.0% under the legacy ranker. The content the bandit learned to surface gets clicked more and converts far worse once clicked.",
@@ -59,9 +165,18 @@
       "Recommend against shipping on the CTR result alone; require the downstream purchase metric to hold before any rollout of a proxy-optimized policy."
     ],
     "numbers": [
-      { "label": "Click-through rate: legacy vs. bandit", "value": "21.6% vs. 35.1% (+63%)" },
-      { "label": "Purchase rate: legacy vs. bandit", "value": "4.3% vs. 3.3% (-23%)" },
-      { "label": "Purchase rate given a click: legacy vs. bandit", "value": "20.0% vs. 9.4%" }
+      {
+        "label": "Click-through rate: legacy vs. bandit",
+        "value": "21.6% vs. 35.1% (+63%)"
+      },
+      {
+        "label": "Purchase rate: legacy vs. bandit",
+        "value": "4.3% vs. 3.3% (-23%)"
+      },
+      {
+        "label": "Purchase rate given a click: legacy vs. bandit",
+        "value": "20.0% vs. 9.4%"
+      }
     ],
     "lesson": "Reward hacking happens whenever a system is optimized on a proxy metric that's easier to measure than the outcome you actually want, and the proxy and the true objective can be pulled apart. A policy will happily exploit any gap between the two — a click-maximizing bandit has no reason to also maximize conversion unless conversion is part of what it's rewarded for. Before shipping any policy on the metric it was trained to move, check the metric you actually care about; a large win on the proxy and a loss on the true objective is exactly what reward hacking looks like, not a coincidence."
   }

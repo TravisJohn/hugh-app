@@ -2,7 +2,12 @@
   "id": "sales-coaching",
   "title": "We coached our worst reps and they improved — does coaching work?",
   "trap": "Regression to the mean",
-  "facets": { "topic": "Sales", "skill": ["Regression to the mean"] },
+  "facets": {
+    "topic": "Sales",
+    "skill": [
+      "Regression to the mean"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the sales-ops analyst at Ridgeline",
@@ -15,22 +20,102 @@
     "file": "/case-lab/sales-coaching/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "rep_id", "type": "int", "description": "Unique sales-rep identifier" },
-      { "name": "region", "type": "string", "description": "Rep's sales region" },
-      { "name": "tenure_months", "type": "int", "description": "Months the rep has been in seat" },
-      { "name": "q1_sales_k", "type": "float", "description": "Q1 bookings in thousands of dollars (before coaching)" },
-      { "name": "coached", "type": "int", "description": "1 if the rep went through the coaching program, else 0" },
-      { "name": "q2_sales_k", "type": "float", "description": "Q2 bookings in thousands of dollars (after coaching)" }
+      {
+        "name": "rep_id",
+        "type": "int",
+        "description": "Unique sales-rep identifier"
+      },
+      {
+        "name": "region",
+        "type": "string",
+        "description": "Rep's sales region"
+      },
+      {
+        "name": "tenure_months",
+        "type": "int",
+        "description": "Months the rep has been in seat"
+      },
+      {
+        "name": "q1_sales_k",
+        "type": "float",
+        "description": "Q1 bookings in thousands of dollars (before coaching)"
+      },
+      {
+        "name": "coached",
+        "type": "int",
+        "description": "1 if the rep went through the coaching program, else 0"
+      },
+      {
+        "name": "q2_sales_k",
+        "type": "float",
+        "description": "Q2 bookings in thousands of dollars (after coaching)"
+      }
     ],
     "sample": [
-      { "rep_id": 1, "region": "APAC", "tenure_months": 25, "q1_sales_k": 41.9, "coached": 0, "q2_sales_k": 41.6 },
-      { "rep_id": 2, "region": "APAC", "tenure_months": 30, "q1_sales_k": 56.3, "coached": 0, "q2_sales_k": 64.8 },
-      { "rep_id": 3, "region": "NA", "tenure_months": 30, "q1_sales_k": 46.8, "coached": 0, "q2_sales_k": 63.9 },
-      { "rep_id": 4, "region": "EMEA", "tenure_months": 35, "q1_sales_k": 48.5, "coached": 0, "q2_sales_k": 35.0 },
-      { "rep_id": 5, "region": "NA", "tenure_months": 4, "q1_sales_k": 60.9, "coached": 0, "q2_sales_k": 43.2 },
-      { "rep_id": 6, "region": "LATAM", "tenure_months": 28, "q1_sales_k": 65.5, "coached": 0, "q2_sales_k": 42.1 },
-      { "rep_id": 7, "region": "EMEA", "tenure_months": 29, "q1_sales_k": 48.8, "coached": 0, "q2_sales_k": 70.9 },
-      { "rep_id": 8, "region": "APAC", "tenure_months": 40, "q1_sales_k": 52.6, "coached": 1, "q2_sales_k": 52.9 }
+      {
+        "rep_id": 1,
+        "region": "APAC",
+        "tenure_months": 25,
+        "q1_sales_k": 41.9,
+        "coached": 0,
+        "q2_sales_k": 41.6
+      },
+      {
+        "rep_id": 2,
+        "region": "APAC",
+        "tenure_months": 30,
+        "q1_sales_k": 56.3,
+        "coached": 0,
+        "q2_sales_k": 64.8
+      },
+      {
+        "rep_id": 3,
+        "region": "NA",
+        "tenure_months": 30,
+        "q1_sales_k": 46.8,
+        "coached": 0,
+        "q2_sales_k": 63.9
+      },
+      {
+        "rep_id": 4,
+        "region": "EMEA",
+        "tenure_months": 35,
+        "q1_sales_k": 48.5,
+        "coached": 0,
+        "q2_sales_k": 35.0
+      },
+      {
+        "rep_id": 5,
+        "region": "NA",
+        "tenure_months": 4,
+        "q1_sales_k": 60.9,
+        "coached": 0,
+        "q2_sales_k": 43.2
+      },
+      {
+        "rep_id": 6,
+        "region": "LATAM",
+        "tenure_months": 28,
+        "q1_sales_k": 65.5,
+        "coached": 0,
+        "q2_sales_k": 42.1
+      },
+      {
+        "rep_id": 7,
+        "region": "EMEA",
+        "tenure_months": 29,
+        "q1_sales_k": 48.8,
+        "coached": 0,
+        "q2_sales_k": 70.9
+      },
+      {
+        "rep_id": 8,
+        "region": "APAC",
+        "tenure_months": 40,
+        "q1_sales_k": 52.6,
+        "coached": 1,
+        "q2_sales_k": 52.9
+      }
     ]
   },
   "guidingQuestions": [
@@ -47,6 +132,41 @@
     "Build a fair comparison: coached vs uncoached reps at the SAME starting level (match or bin on q1_sales_k). The gap between them is the real coaching effect.",
     "Report that effect — and note that a clean estimate needs randomised assignment, not coaching-the-bottom."
   ],
+  "notebook": {
+    "intro": "Five steps: reproduce both changes, notice who was picked, then compare coached and uncoached reps who started level.",
+    "cells": [
+      {
+        "title": "Reproduce both headline numbers",
+        "explain": "The change from Q1 to Q2 for coached reps and for uncoached reps.",
+        "code": "df[\"change\"] = df[\"q2_sales_k\"] - df[\"q1_sales_k\"]\nchanges = df.groupby(\"coached\")[\"change\"].mean()\nprint(f\"coached improved by {changes[1]:+.2f}k, uncoached by {changes[0]:+.2f}k\")\nchanges.round(2)",
+        "reads": "The coached reps did improve. Whether coaching did it is the question."
+      },
+      {
+        "title": "Check who was picked",
+        "explain": "The program targeted the worst Q1 reps. Compare the starting point of each group.",
+        "code": "starts = df.groupby(\"coached\")[\"q1_sales_k\"].agg([\"mean\", \"median\", \"count\"])\nprint(\"Q1 starting point by group:\")\nstarts.round(2)",
+        "reads": "The two groups start from very different places, which breaks any simple before/after or group-versus-group read."
+      },
+      {
+        "title": "Ask how much of a quarter is noise",
+        "explain": "If quarters are not perfectly stable, a group picked for being at the bottom drifts upward on its own. Look at uncoached reps only, by starting level.",
+        "code": "uncoached = df[df[\"coached\"] == 0].copy()\nuncoached[\"q1_band\"] = pd.qcut(uncoached[\"q1_sales_k\"], 5, labels=False, duplicates=\"drop\")\ndrift = uncoached.groupby(\"q1_band\")[\"change\"].mean()\nprint(\"Q1 to Q2 change among UNCOACHED reps, by Q1 band:\")\ndrift.round(2)",
+        "reads": "Untouched reps who had a bad Q1 climb anyway, and strong ones fall back. That is mean reversion, with no coaching involved."
+      },
+      {
+        "title": "Compare reps who started level",
+        "explain": "Match on the starting quarter, then take the difference between coached and uncoached inside each band.",
+        "code": "df[\"q1_band\"] = pd.qcut(df[\"q1_sales_k\"], 10, labels=False, duplicates=\"drop\")\nwithin = df.groupby([\"q1_band\", \"coached\"])[\"change\"].mean().unstack().dropna()\ntreated_weights = df[df[\"coached\"] == 1][\"q1_band\"].value_counts(normalize=True)\ntreated_weights = treated_weights.reindex(within.index).fillna(0)\ntreated_weights = treated_weights / treated_weights.sum()\neffect = ((within[1] - within[0]) * treated_weights).sum()\nprint(f\"coaching effect, reps matched on Q1: {effect:+.2f}k\")\nwithin.round(2)",
+        "reads": "Against reps who started at the same level, the coaching effect is far smaller than the raw improvement."
+      },
+      {
+        "title": "Put the two numbers side by side",
+        "explain": "The improvement that would be reported, against the part coaching can claim.",
+        "code": "pd.DataFrame(\n    {\"Q1 to Q2 change (k)\": [changes[1], effect]},\n    index=[\"coached group improvement\", \"vs uncoached reps who started level\"],\n).round(2)",
+        "reads": "Most of the improvement was reversion. A clean estimate needs randomised assignment, not coaching the bottom."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "The coached reps (last quarter's worst) rose +6.2k, while the uncoached reps fell -2.9k — a swing of roughly nine points in coaching's favour. It looks like a slam-dunk case for scaling the program.",
     "theTrap": "A rep's quarter is stable skill plus luck (q1 and q2 correlate about 0.6, so ~40% of any quarter is transient). The reps who looked worst in Q1 were disproportionately unlucky — and luck doesn't repeat, so they climb back toward their true level in Q2 no matter what. That's regression to the mean. Coaching was aimed exactly at this bounce-back group, so it inherits their rebound. Worse, the uncoached comparison group skews toward last quarter's LUCKY high performers, who regress DOWN — which is why they 'slipped' and why the naive nine-point swing is doubly misleading.",
@@ -59,10 +179,22 @@
       "Conclude the coaching effect ≈ 0 within noise; a trustworthy estimate requires randomising who gets coached."
     ],
     "numbers": [
-      { "label": "Coached reps' Q1→Q2 change", "value": "+6.2k" },
-      { "label": "Uncoached reps' change", "value": "−2.9k" },
-      { "label": "Same low-Q1 reps: coached vs uncoached", "value": "+9.3k vs +7.3k" },
-      { "label": "True coaching effect", "value": "≈ 0 (within noise)" }
+      {
+        "label": "Coached reps' Q1→Q2 change",
+        "value": "+6.2k"
+      },
+      {
+        "label": "Uncoached reps' change",
+        "value": "−2.9k"
+      },
+      {
+        "label": "Same low-Q1 reps: coached vs uncoached",
+        "value": "+9.3k vs +7.3k"
+      },
+      {
+        "label": "True coaching effect",
+        "value": "≈ 0 (within noise)"
+      }
     ],
     "lesson": "Any time you select a group because it's at an extreme and then measure it again, it will drift toward the average on its own — regression to the mean — and that drift will masquerade as the effect of whatever you did in between. Comparing the bottom group's rebound to the top group's decline makes it look even stronger. To measure a real effect you need an equivalent comparison group at the same starting point, ideally assigned at random. Otherwise you're just paying to watch luck even out."
   }

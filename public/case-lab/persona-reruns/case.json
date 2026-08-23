@@ -2,7 +2,12 @@
   "id": "persona-reruns",
   "title": "We found 4 stable customer personas — commit next quarter's budget by persona?",
   "trap": "Cluster instability",
-  "facets": { "topic": "Marketing", "skill": ["Cluster instability"] },
+  "facets": {
+    "topic": "Marketing",
+    "skill": [
+      "Cluster instability"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the marketing analyst at Millbrook",
@@ -15,23 +20,103 @@
     "file": "/case-lab/persona-reruns/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "customer_id", "type": "int", "description": "Unique customer identifier" },
-      { "name": "engagement_score", "type": "float", "description": "Composite engagement score, 0-100" },
-      { "name": "value_score", "type": "float", "description": "Composite value score, roughly $10-3,000" },
-      { "name": "cluster_run1", "type": "int", "description": "K-means(k=4) cluster label from the first run, fit on engagement_score/value_score (standardized)" },
-      { "name": "cluster_run2", "type": "int", "description": "K-means(k=4) cluster label from a second run — same data, same k, only the random initialization differs (like re-running the job on a different day without a pinned seed). Labels are pre-matched to run1's numbering for comparison." }
+      {
+        "name": "customer_id",
+        "type": "int",
+        "description": "Unique customer identifier"
+      },
+      {
+        "name": "engagement_score",
+        "type": "float",
+        "description": "Composite engagement score, 0-100"
+      },
+      {
+        "name": "value_score",
+        "type": "float",
+        "description": "Composite value score, roughly $10-3,000"
+      },
+      {
+        "name": "cluster_run1",
+        "type": "int",
+        "description": "K-means(k=4) cluster label from the first run, fit on engagement_score/value_score (standardized)"
+      },
+      {
+        "name": "cluster_run2",
+        "type": "int",
+        "description": "K-means(k=4) cluster label from a second run — same data, same k, only the random initialization differs (like re-running the job on a different day without a pinned seed). Labels are pre-matched to run1's numbering for comparison."
+      }
     ],
     "sample": [
-      { "customer_id": 1, "engagement_score": 33.5, "value_score": 303.29, "cluster_run1": 0, "cluster_run2": 2 },
-      { "customer_id": 2, "engagement_score": 77.5, "value_score": 666.17, "cluster_run1": 3, "cluster_run2": 3 },
-      { "customer_id": 3, "engagement_score": 41.9, "value_score": 113.59, "cluster_run1": 0, "cluster_run2": 0 },
-      { "customer_id": 4, "engagement_score": 79.9, "value_score": 720.4, "cluster_run1": 3, "cluster_run2": 3 },
-      { "customer_id": 5, "engagement_score": 28.9, "value_score": 279.19, "cluster_run1": 0, "cluster_run2": 2 },
-      { "customer_id": 6, "engagement_score": 45.9, "value_score": 237.44, "cluster_run1": 0, "cluster_run2": 0 },
-      { "customer_id": 7, "engagement_score": 100.0, "value_score": 562.01, "cluster_run1": 1, "cluster_run2": 3 },
-      { "customer_id": 8, "engagement_score": 26.9, "value_score": 74.22, "cluster_run1": 0, "cluster_run2": 0 },
-      { "customer_id": 9, "engagement_score": 65.3, "value_score": 451.12, "cluster_run1": 1, "cluster_run2": 1 },
-      { "customer_id": 10, "engagement_score": 100.0, "value_score": 521.14, "cluster_run1": 1, "cluster_run2": 1 }
+      {
+        "customer_id": 1,
+        "engagement_score": 33.5,
+        "value_score": 303.29,
+        "cluster_run1": 0,
+        "cluster_run2": 2
+      },
+      {
+        "customer_id": 2,
+        "engagement_score": 77.5,
+        "value_score": 666.17,
+        "cluster_run1": 3,
+        "cluster_run2": 3
+      },
+      {
+        "customer_id": 3,
+        "engagement_score": 41.9,
+        "value_score": 113.59,
+        "cluster_run1": 0,
+        "cluster_run2": 0
+      },
+      {
+        "customer_id": 4,
+        "engagement_score": 79.9,
+        "value_score": 720.4,
+        "cluster_run1": 3,
+        "cluster_run2": 3
+      },
+      {
+        "customer_id": 5,
+        "engagement_score": 28.9,
+        "value_score": 279.19,
+        "cluster_run1": 0,
+        "cluster_run2": 2
+      },
+      {
+        "customer_id": 6,
+        "engagement_score": 45.9,
+        "value_score": 237.44,
+        "cluster_run1": 0,
+        "cluster_run2": 0
+      },
+      {
+        "customer_id": 7,
+        "engagement_score": 100.0,
+        "value_score": 562.01,
+        "cluster_run1": 1,
+        "cluster_run2": 3
+      },
+      {
+        "customer_id": 8,
+        "engagement_score": 26.9,
+        "value_score": 74.22,
+        "cluster_run1": 0,
+        "cluster_run2": 0
+      },
+      {
+        "customer_id": 9,
+        "engagement_score": 65.3,
+        "value_score": 451.12,
+        "cluster_run1": 1,
+        "cluster_run2": 1
+      },
+      {
+        "customer_id": 10,
+        "engagement_score": 100.0,
+        "value_score": 521.14,
+        "cluster_run1": 1,
+        "cluster_run2": 1
+      }
     ]
   },
   "guidingQuestions": [
@@ -48,6 +133,41 @@
     "Consider what k actually fits: does the data support a cleaner, smaller number of groups than 4?",
     "State the real risk in business terms: an ad-budget split locked to cluster sizes that reshuffle ~15% of customers on a re-run with the exact same underlying population."
   ],
+  "notebook": {
+    "intro": "Five steps: measure how reproducible the personas are, see who moves, and price the risk of budgeting by them.",
+    "cells": [
+      {
+        "title": "Measure reproducibility",
+        "explain": "Two runs on refreshed samples of the same population. Count how often a customer lands in the same cluster.",
+        "code": "same = (df[\"cluster_run1\"] == df[\"cluster_run2\"]).mean()\nprint(f\"customers landing in the same cluster on both runs: {same:.1%}\")\nprint(f\"customers reshuffled: {1 - same:.1%}\")\npd.crosstab(df[\"cluster_run1\"], df[\"cluster_run2\"])",
+        "reads": "A meaningful share of customers change persona between runs, with nothing about them having changed."
+      },
+      {
+        "title": "See who moves",
+        "explain": "For each customer, measure how much closer they sit to their own cluster centre than to the next nearest. Small margins mean a coin flip.",
+        "code": "feats = [\"engagement_score\", \"value_score\"]\nz = (df[feats] - df[feats].mean()) / df[feats].std()\ncentres = z.groupby(df[\"cluster_run1\"]).mean()\nd = np.sqrt(((z.values[:, None, :] - centres.values[None, :, :]) ** 2).sum(axis=2))\nd.sort(axis=1)\ndf[\"margin\"] = d[:, 1] - d[:, 0]\ndf[\"switched\"] = (df[\"cluster_run1\"] != df[\"cluster_run2\"]).astype(int)\ndf.groupby(\"switched\")[\"margin\"].agg([\"mean\", \"median\", \"size\"]).round(3)",
+        "reads": "The customers who switch sit close to a boundary. They were never firmly in a persona to begin with."
+      },
+      {
+        "title": "Look for the blobs",
+        "explain": "Bucket the two scores against each other. Four real personas would show as four separated concentrations.",
+        "code": "grid = pd.crosstab(\n    pd.qcut(df[\"engagement_score\"], 6, labels=False, duplicates=\"drop\"),\n    pd.qcut(df[\"value_score\"], 6, labels=False, duplicates=\"drop\"),\n)\ngrid.index.name = \"engagement band\"\ngrid.columns.name = \"value band\"\ngrid",
+        "reads": "The customers fill the space fairly evenly. This is one continuous cloud, not four islands."
+      },
+      {
+        "title": "Ask what k the data supports",
+        "explain": "Count how many customers sit near a boundary at all. If most do, the number of groups is being imposed rather than found.",
+        "code": "threshold = df[\"margin\"].median()\nnear = (df[\"margin\"] < threshold).mean()\nprint(f\"median separation margin: {threshold:.3f}\")\nprint(f\"customers within that margin of another cluster: {near:.1%}\")\ndf[\"margin\"].describe().round(3)",
+        "reads": "With margins this small across the board, four groups is a choice made by the algorithm's input, not a structure in the customers."
+      },
+      {
+        "title": "Price the budget risk",
+        "explain": "Cluster sizes decide the split. Compare what each run would have allocated.",
+        "code": "run1 = df[\"cluster_run1\"].value_counts(normalize=True).sort_index() * 100\nrun2 = df[\"cluster_run2\"].value_counts(normalize=True).sort_index() * 100\nbudget = pd.DataFrame({\"run 1 (%)\": run1, \"run 2 (%)\": run2})\nbudget[\"shift (pts)\"] = budget[\"run 2 (%)\"] - budget[\"run 1 (%)\"]\nbudget.round(2)",
+        "reads": "Locking next quarter's ad budget to these shares locks it to a split that moves when you re-run the same analysis on the same population."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "K-means ran, 4 clusters came out, they got named, and the sizes look final enough to lock next quarter's budget split against.",
     "theTrap": "K-means is a local-search algorithm: it starts from a random set of initial cluster centers and converges to whichever partition is nearest that starting point, not necessarily the one globally best partition. When the underlying data doesn't have 4 cleanly separated groups — here, it's really closer to 2 broad, overlapping groups, and k=4 was chosen from an elbow-plot ritual rather than genuine structure — the two \"extra\" clusters get carved out of that continuous cloud roughly wherever the random initialization happens to land. Re-run the exact same clustering on the exact same data, with only the random seed different, and 15% of customers land in a different cluster than before. The clusters aren't measuring something real and stable about each customer; a meaningful chunk of the \"persona\" label is just which random start the algorithm happened to get.",
@@ -60,10 +180,22 @@
       "Conclude: k=4 doesn't reflect genuine structure in this data; treat cluster identity here as unstable rather than a fixed customer trait."
     ],
     "numbers": [
-      { "label": "Customers with the same cluster across two re-runs", "value": "≈ 85%" },
-      { "label": "Customers reassigned to a different cluster", "value": "≈ 15% (~1,800 of 12,000)" },
-      { "label": "Adjusted Rand index between the two runs", "value": "≈ 0.68 (well below 1.0)" },
-      { "label": "Genuinely separated groups visible in the data", "value": "≈ 2, not 4" }
+      {
+        "label": "Customers with the same cluster across two re-runs",
+        "value": "≈ 85%"
+      },
+      {
+        "label": "Customers reassigned to a different cluster",
+        "value": "≈ 15% (~1,800 of 12,000)"
+      },
+      {
+        "label": "Adjusted Rand index between the two runs",
+        "value": "≈ 0.68 (well below 1.0)"
+      },
+      {
+        "label": "Genuinely separated groups visible in the data",
+        "value": "≈ 2, not 4"
+      }
     ],
     "lesson": "K-means always returns an answer, even when the data doesn't have the number of clean, separated groups you asked for — and that answer can depend heavily on the random starting point rather than on real structure. Before treating a clustering result as a stable customer attribute (worth budget, campaigns, or roadmap decisions), re-run it and measure agreement. If the same data produces meaningfully different clusters from run to run, the instability is telling you something important: either stabilize the method (more restarts, consensus clustering) or reduce k to the number of groups the data actually supports."
   }

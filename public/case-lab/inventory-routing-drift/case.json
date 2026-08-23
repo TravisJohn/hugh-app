@@ -2,7 +2,12 @@
   "id": "inventory-routing-drift",
   "title": "The RL router beats the heuristic by 5.5 points of on-time rate — make it permanent?",
   "trap": "Non-stationarity",
-  "facets": { "topic": "Orchestration", "skill": ["Non-stationarity"] },
+  "facets": {
+    "topic": "Orchestration",
+    "skill": [
+      "Non-stationarity"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the fulfillment-ops analyst at Palletworks",
@@ -15,22 +20,88 @@
     "file": "/case-lab/inventory-routing-drift/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "order_id", "type": "int", "description": "Unique order identifier" },
-      { "name": "period", "type": "string", "description": "normal or holiday_surge — normal volume versus the holiday-surge window within the quarter" },
-      { "name": "arm", "type": "string", "description": "rl_router or heuristic_router — which routing policy handled this order, randomly split 50/50 within each period" },
-      { "name": "on_time_in_full", "type": "int", "description": "1 if the order was delivered on-time and in full (OTIF) — the reward" }
+      {
+        "name": "order_id",
+        "type": "int",
+        "description": "Unique order identifier"
+      },
+      {
+        "name": "period",
+        "type": "string",
+        "description": "normal or holiday_surge — normal volume versus the holiday-surge window within the quarter"
+      },
+      {
+        "name": "arm",
+        "type": "string",
+        "description": "rl_router or heuristic_router — which routing policy handled this order, randomly split 50/50 within each period"
+      },
+      {
+        "name": "on_time_in_full",
+        "type": "int",
+        "description": "1 if the order was delivered on-time and in full (OTIF) — the reward"
+      }
     ],
     "sample": [
-      { "order_id": 1, "period": "normal", "arm": "heuristic_router", "on_time_in_full": 1 },
-      { "order_id": 2, "period": "holiday_surge", "arm": "heuristic_router", "on_time_in_full": 1 },
-      { "order_id": 3, "period": "normal", "arm": "heuristic_router", "on_time_in_full": 1 },
-      { "order_id": 4, "period": "holiday_surge", "arm": "rl_router", "on_time_in_full": 1 },
-      { "order_id": 5, "period": "normal", "arm": "rl_router", "on_time_in_full": 1 },
-      { "order_id": 6, "period": "holiday_surge", "arm": "heuristic_router", "on_time_in_full": 1 },
-      { "order_id": 7, "period": "holiday_surge", "arm": "heuristic_router", "on_time_in_full": 1 },
-      { "order_id": 8, "period": "holiday_surge", "arm": "heuristic_router", "on_time_in_full": 1 },
-      { "order_id": 9, "period": "normal", "arm": "rl_router", "on_time_in_full": 1 },
-      { "order_id": 10, "period": "normal", "arm": "heuristic_router", "on_time_in_full": 0 }
+      {
+        "order_id": 1,
+        "period": "normal",
+        "arm": "heuristic_router",
+        "on_time_in_full": 1
+      },
+      {
+        "order_id": 2,
+        "period": "holiday_surge",
+        "arm": "heuristic_router",
+        "on_time_in_full": 1
+      },
+      {
+        "order_id": 3,
+        "period": "normal",
+        "arm": "heuristic_router",
+        "on_time_in_full": 1
+      },
+      {
+        "order_id": 4,
+        "period": "holiday_surge",
+        "arm": "rl_router",
+        "on_time_in_full": 1
+      },
+      {
+        "order_id": 5,
+        "period": "normal",
+        "arm": "rl_router",
+        "on_time_in_full": 1
+      },
+      {
+        "order_id": 6,
+        "period": "holiday_surge",
+        "arm": "heuristic_router",
+        "on_time_in_full": 1
+      },
+      {
+        "order_id": 7,
+        "period": "holiday_surge",
+        "arm": "heuristic_router",
+        "on_time_in_full": 1
+      },
+      {
+        "order_id": 8,
+        "period": "holiday_surge",
+        "arm": "heuristic_router",
+        "on_time_in_full": 1
+      },
+      {
+        "order_id": 9,
+        "period": "normal",
+        "arm": "rl_router",
+        "on_time_in_full": 1
+      },
+      {
+        "order_id": 10,
+        "period": "normal",
+        "arm": "heuristic_router",
+        "on_time_in_full": 0
+      }
     ]
   },
   "guidingQuestions": [
@@ -47,6 +118,41 @@
     "Name the mechanism: the RL policy was trained/tuned mostly on normal-volume conditions; holiday-surge volume creates capacity binds and routing tradeoffs it rarely encountered, while the heuristic's explicit capacity rules degrade more gracefully.",
     "Recommend based on the holiday_surge gap — the regime where routing quality matters most and where the policy will actually be tested — not the pooled average."
   ],
+  "notebook": {
+    "intro": "Five steps: reproduce the pooled win, split it by regime, and judge the router on the conditions that matter most.",
+    "cells": [
+      {
+        "title": "Reproduce the pooled gap",
+        "explain": "On-time-in-full rate for the RL router against the heuristic, across every order.",
+        "code": "means = df.groupby(\"arm\")[\"on_time_in_full\"].mean() * 100\npooled_gap = means[\"rl_router\"] - means[\"heuristic_router\"]\nprint(f\"pooled gap: {pooled_gap:+.2f} pts\")\nmeans.round(2)",
+        "reads": "Pooled, the RL router looks decisively better. The pool mixes two very different operating conditions."
+      },
+      {
+        "title": "Split by regime",
+        "explain": "Recompute the gap inside normal volume and inside the holiday surge separately.",
+        "code": "by_period = df.groupby([\"period\", \"arm\"])[\"on_time_in_full\"].mean().unstack() * 100\nby_period[\"gap\"] = by_period[\"rl_router\"] - by_period[\"heuristic_router\"]\nby_period.round(2)",
+        "reads": "The advantage is large in one regime and gone in the other. Note which regime is which."
+      },
+      {
+        "title": "Check which regime dominates the pool",
+        "explain": "See what share of orders each period contributes to the pooled average.",
+        "code": "share = df[\"period\"].value_counts(normalize=True) * 100\nprint(\"share of orders by period (%)\")\nshare.round(1)",
+        "reads": "Normal volume dominates the data, so the pooled number is mostly a statement about quiet weeks."
+      },
+      {
+        "title": "Name the mechanism",
+        "explain": "The RL policy was tuned mostly on normal conditions. Look at how each router holds up as constraints bind.",
+        "code": "levels = df.groupby([\"period\", \"arm\"])[\"on_time_in_full\"].agg([\"mean\", \"size\"])\nlevels[\"mean\"] = levels[\"mean\"] * 100\nlevels.round(2)",
+        "reads": "Both degrade under surge, but the heuristic's explicit capacity rules degrade more gracefully than a policy that rarely met these binds in training."
+      },
+      {
+        "title": "Decide on the regime that matters",
+        "explain": "Routing quality matters most under surge. Put the pooled number beside the surge number.",
+        "code": "surge_gap = by_period.loc[\"holiday_surge\", \"gap\"]\npd.DataFrame(\n    {\"gap (pts)\": [pooled_gap, surge_gap]},\n    index=[\"pooled across both periods\", \"holiday surge only\"],\n).round(2)",
+        "reads": "Making the RL router permanent on the pooled number bets on an edge that disappears exactly when the business needs it."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "Pooled across the full quarter, the RL router beats the heuristic by 5.5 points of OTIF. That reads as a clear, durable improvement — obviously make it the permanent router.",
     "theTrap": "The quarter isn't one stable operating regime — holiday-surge volume creates warehouse capacity binds that don't show up during normal volume. Split by period and the story reverses: during normal volume, the RL router has a large genuine edge (+9.5 points). But during the holiday surge — the period where routing quality actually matters most, and precisely when the business needs reliable OTIF — the RL router is worse than the heuristic (-3.9 points). The RL policy was tuned on conditions where capacity rarely binds; once it does, the heuristic's explicit capacity-aware rules handle the tradeoffs better than a policy that never learned to operate under that constraint. Because normal-volume orders make up 70% of the quarter, the pooled average is dominated by the easier regime and hides the surge-period reversal.",
@@ -59,10 +165,22 @@
       "Recommend a regime-aware decision — use the surge-period gap for surge-window routing, not the pooled average."
     ],
     "numbers": [
-      { "label": "Pooled OTIF gap (RL − heuristic)", "value": "+5.5 points" },
-      { "label": "Normal-volume period gap", "value": "+9.5 points (RL router ahead)" },
-      { "label": "Holiday-surge period gap", "value": "-3.9 points (heuristic ahead)" },
-      { "label": "Share of the quarter that is holiday surge", "value": "30%" }
+      {
+        "label": "Pooled OTIF gap (RL − heuristic)",
+        "value": "+5.5 points"
+      },
+      {
+        "label": "Normal-volume period gap",
+        "value": "+9.5 points (RL router ahead)"
+      },
+      {
+        "label": "Holiday-surge period gap",
+        "value": "-3.9 points (heuristic ahead)"
+      },
+      {
+        "label": "Share of the quarter that is holiday surge",
+        "value": "30%"
+      }
     ],
     "lesson": "A policy's pooled performance over a test window only means what you think it means if the operating environment stayed constant throughout — and physical operations (warehouse capacity, seasonal volume) are exactly where it often doesn't. A policy's advantage measured under normal conditions doesn't automatically carry into a capacity-constrained surge, especially when the policy was tuned on data that rarely included that constraint. Whenever a known regime shift falls inside your test window, split the result by regime before trusting a pooled average — and weight the decision toward the regime you actually care about most, not the one with the most rows."
   }

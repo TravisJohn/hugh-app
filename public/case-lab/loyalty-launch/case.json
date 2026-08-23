@@ -2,7 +2,12 @@
   "id": "loyalty-launch",
   "title": "Revenue jumped 64% after we launched the loyalty program — did it work?",
   "trap": "Seasonality confound",
-  "facets": { "topic": "Marketing", "skill": ["Seasonality"] },
+  "facets": {
+    "topic": "Marketing",
+    "skill": [
+      "Seasonality"
+    ]
+  },
   "estMinutes": 30,
   "scenario": {
     "role": "You're the analyst on the marketing team at Harbor",
@@ -15,21 +20,89 @@
     "file": "/case-lab/loyalty-launch/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "order_id", "type": "int", "description": "Unique order identifier (rows are in natural export order, not sorted by date)" },
-      { "name": "order_date", "type": "date", "description": "Date the order was placed (YYYY-MM-DD), spanning 2024-01 through 2025-12" },
-      { "name": "customer_segment", "type": "string", "description": "Customer type: new, returning, or vip" },
-      { "name": "channel", "type": "string", "description": "Order channel: web, app, or marketplace" },
-      { "name": "order_value", "type": "float", "description": "Order value in dollars" }
+      {
+        "name": "order_id",
+        "type": "int",
+        "description": "Unique order identifier (rows are in natural export order, not sorted by date)"
+      },
+      {
+        "name": "order_date",
+        "type": "date",
+        "description": "Date the order was placed (YYYY-MM-DD), spanning 2024-01 through 2025-12"
+      },
+      {
+        "name": "customer_segment",
+        "type": "string",
+        "description": "Customer type: new, returning, or vip"
+      },
+      {
+        "name": "channel",
+        "type": "string",
+        "description": "Order channel: web, app, or marketplace"
+      },
+      {
+        "name": "order_value",
+        "type": "float",
+        "description": "Order value in dollars"
+      }
     ],
     "sample": [
-      { "order_id": 1, "order_date": "2024-09-11", "customer_segment": "returning", "channel": "app", "order_value": 60.49 },
-      { "order_id": 2, "order_date": "2024-02-04", "customer_segment": "returning", "channel": "app", "order_value": 28.91 },
-      { "order_id": 3, "order_date": "2025-05-06", "customer_segment": "returning", "channel": "marketplace", "order_value": 100.2 },
-      { "order_id": 4, "order_date": "2024-09-20", "customer_segment": "vip", "channel": "marketplace", "order_value": 127.69 },
-      { "order_id": 5, "order_date": "2024-10-12", "customer_segment": "vip", "channel": "web", "order_value": 42.9 },
-      { "order_id": 6, "order_date": "2024-08-22", "customer_segment": "returning", "channel": "marketplace", "order_value": 48.74 },
-      { "order_id": 7, "order_date": "2025-11-29", "customer_segment": "new", "channel": "app", "order_value": 63.57 },
-      { "order_id": 8, "order_date": "2024-11-06", "customer_segment": "vip", "channel": "web", "order_value": 33.09 }
+      {
+        "order_id": 1,
+        "order_date": "2024-09-11",
+        "customer_segment": "returning",
+        "channel": "app",
+        "order_value": 60.49
+      },
+      {
+        "order_id": 2,
+        "order_date": "2024-02-04",
+        "customer_segment": "returning",
+        "channel": "app",
+        "order_value": 28.91
+      },
+      {
+        "order_id": 3,
+        "order_date": "2025-05-06",
+        "customer_segment": "returning",
+        "channel": "marketplace",
+        "order_value": 100.2
+      },
+      {
+        "order_id": 4,
+        "order_date": "2024-09-20",
+        "customer_segment": "vip",
+        "channel": "marketplace",
+        "order_value": 127.69
+      },
+      {
+        "order_id": 5,
+        "order_date": "2024-10-12",
+        "customer_segment": "vip",
+        "channel": "web",
+        "order_value": 42.9
+      },
+      {
+        "order_id": 6,
+        "order_date": "2024-08-22",
+        "customer_segment": "returning",
+        "channel": "marketplace",
+        "order_value": 48.74
+      },
+      {
+        "order_id": 7,
+        "order_date": "2025-11-29",
+        "customer_segment": "new",
+        "channel": "app",
+        "order_value": 63.57
+      },
+      {
+        "order_id": 8,
+        "order_date": "2024-11-06",
+        "customer_segment": "vip",
+        "channel": "web",
+        "order_value": 33.09
+      }
     ]
   },
   "guidingQuestions": [
@@ -46,6 +119,41 @@
     "Separate the program from ordinary growth: compare like-for-like order value year over year, and note the underlying volume trend.",
     "Attribute only the residual, seasonally- and trend-adjusted lift to the program — and recommend a holdout to confirm it."
   ],
+  "notebook": {
+    "intro": "Five steps: reproduce the revenue jump, look at two years of history, then compare the same season across years.",
+    "cells": [
+      {
+        "title": "Reproduce the headline",
+        "explain": "Monthly revenue before and after the November 2025 launch.",
+        "code": "df[\"order_date\"] = pd.to_datetime(df[\"order_date\"])\ndf[\"month\"] = df[\"order_date\"].dt.to_period(\"M\").astype(str)\ndf[\"launched\"] = (df[\"month\"] >= \"2025-11\").astype(int)\nmonthly = df.groupby([\"launched\", \"month\"])[\"order_value\"].sum().groupby(level=0).mean()\nheadline_lift = monthly[1] / monthly[0] - 1\nprint(f\"post-launch months run {headline_lift:.1%} above pre-launch months\")\nmonthly.round(0)",
+        "reads": "Revenue really did jump. The launch month is also the start of the holiday peak."
+      },
+      {
+        "title": "Look at the full history",
+        "explain": "Two years of data are available. Chart monthly revenue and see whether November and December spike every year.",
+        "code": "by_month = df.groupby(\"month\")[\"order_value\"].sum()\nprint(\"monthly revenue, all 24 months\")\nby_month.round(0)",
+        "reads": "November and December spike in 2024 too — a year before the loyalty program existed."
+      },
+      {
+        "title": "Compare the same season across years",
+        "explain": "Hold the season constant: the same two months, one year apart, one with the program and one without.",
+        "code": "season = df[df[\"month\"].isin([\"2024-11\", \"2024-12\", \"2025-11\", \"2025-12\"])]\nseason_year = season[\"order_date\"].dt.year\nby_year = season.groupby(season_year)[\"order_value\"].agg([\"sum\", \"mean\", \"size\"])\nby_year.columns = [\"revenue\", \"mean order value\", \"orders\"]\nby_year.round(2)",
+        "reads": "Same season, one year apart. This comparison has the holiday removed from both sides."
+      },
+      {
+        "title": "Separate the program from ordinary growth",
+        "explain": "Volume grows year over year regardless. Compare like-for-like order value, and note the order count separately.",
+        "code": "value_yoy = by_year[\"mean order value\"][2025] / by_year[\"mean order value\"][2024] - 1\nvolume_yoy = by_year[\"orders\"][2025] / by_year[\"orders\"][2024] - 1\nprint(f\"order value YoY, same season: {value_yoy:+.1%}\")\nprint(f\"order volume YoY, same season: {volume_yoy:+.1%}\")",
+        "reads": "The order-value change is the part a loyalty program could plausibly own. The volume change is ordinary growth."
+      },
+      {
+        "title": "Attribute only the residual",
+        "explain": "Set the headline against the seasonally-matched, like-for-like number.",
+        "code": "pd.DataFrame(\n    {\"lift\": [headline_lift, value_yoy]},\n    index=[\"pre vs post launch\", \"same season, year over year\"],\n).round(3)",
+        "reads": "Almost all of the headline was the holidays. Only the residual belongs to the program — and a holdout would be needed to trust even that."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "Revenue in the two months after launch (Nov–Dec) ran ~64% above the two months before (Sep–Oct). Read straight, the loyalty program looks like it added nearly two-thirds to revenue overnight.",
     "theTrap": "The program launched in November — straight into the biggest seasonal peak of the year. In this data, and in almost every consumer business, November and December revenue towers over the autumn shoulder months every single year, loyalty program or not. Comparing pre-launch autumn to post-launch holiday confounds the program with the holiday. The 64% is what you'd have seen with no program at all: it's the season, not the loyalty scheme.",
@@ -58,10 +166,22 @@
       "Attribute only the residual (~single-digit %) to the program, and recommend a randomised holdout to pin it down."
     ],
     "numbers": [
-      { "label": "Naive pre-launch → post-launch revenue", "value": "+64%" },
-      { "label": "Year-over-year Nov–Dec revenue", "value": "+17.5%" },
-      { "label": "Like-for-like order value (isolates program)", "value": "≈ +8%" },
-      { "label": "Underlying annual volume growth", "value": "≈ +8%" }
+      {
+        "label": "Naive pre-launch → post-launch revenue",
+        "value": "+64%"
+      },
+      {
+        "label": "Year-over-year Nov–Dec revenue",
+        "value": "+17.5%"
+      },
+      {
+        "label": "Like-for-like order value (isolates program)",
+        "value": "≈ +8%"
+      },
+      {
+        "label": "Underlying annual volume growth",
+        "value": "≈ +8%"
+      }
     ],
     "lesson": "Never compare a period after a launch to the period just before it when a season sits in between — the season will masquerade as your intervention. Compare like-for-like windows across years so the seasonal pattern appears on both sides and cancels out, then strip any underlying growth trend before crediting the rest to what you did. Here a holiday launch made an ~8% program look like a 64% miracle. When you can, launch with a randomised holdout so the comparison is clean by design."
   }

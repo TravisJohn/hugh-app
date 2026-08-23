@@ -2,7 +2,12 @@
   "id": "pricing-bandit-logs",
   "title": "The discount-price arm shows higher revenue per session in the logs — roll it out everywhere?",
   "trap": "Off-policy evaluation bias",
-  "facets": { "topic": "Retail", "skill": ["Off-policy evaluation bias"] },
+  "facets": {
+    "topic": "Retail",
+    "skill": [
+      "Off-policy evaluation bias"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the pricing analyst at Redbrick Market",
@@ -15,23 +20,103 @@
     "file": "/case-lab/pricing-bandit-logs/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "session_id", "type": "int", "description": "Unique session identifier" },
-      { "name": "customer_ltv_score", "type": "float", "description": "Pre-existing predicted lifetime-value score for this customer (0-100), computed before this session" },
-      { "name": "arm", "type": "string", "description": "aggressive_discount or standard_price — which pricing this session was shown" },
-      { "name": "propensity", "type": "float", "description": "The logging policy's probability of showing THIS session the arm it actually got, given customer_ltv_score" },
-      { "name": "revenue_per_session", "type": "float", "description": "Revenue generated in this session, in dollars — the reward" }
+      {
+        "name": "session_id",
+        "type": "int",
+        "description": "Unique session identifier"
+      },
+      {
+        "name": "customer_ltv_score",
+        "type": "float",
+        "description": "Pre-existing predicted lifetime-value score for this customer (0-100), computed before this session"
+      },
+      {
+        "name": "arm",
+        "type": "string",
+        "description": "aggressive_discount or standard_price — which pricing this session was shown"
+      },
+      {
+        "name": "propensity",
+        "type": "float",
+        "description": "The logging policy's probability of showing THIS session the arm it actually got, given customer_ltv_score"
+      },
+      {
+        "name": "revenue_per_session",
+        "type": "float",
+        "description": "Revenue generated in this session, in dollars — the reward"
+      }
     ],
     "sample": [
-      { "session_id": 1, "customer_ltv_score": 54.9, "arm": "standard_price", "propensity": 0.5199, "revenue_per_session": 34.66 },
-      { "session_id": 2, "customer_ltv_score": 63.6, "arm": "aggressive_discount", "propensity": 0.5774, "revenue_per_session": 36.99 },
-      { "session_id": 3, "customer_ltv_score": 38.3, "arm": "aggressive_discount", "propensity": 0.3044, "revenue_per_session": 30.76 },
-      { "session_id": 4, "customer_ltv_score": 31.8, "arm": "standard_price", "propensity": 0.7538, "revenue_per_session": 11.05 },
-      { "session_id": 5, "customer_ltv_score": 10.2, "arm": "standard_price", "propensity": 0.89, "revenue_per_session": 0.0 },
-      { "session_id": 6, "customer_ltv_score": 69.4, "arm": "standard_price", "propensity": 0.3605, "revenue_per_session": 65.41 },
-      { "session_id": 7, "customer_ltv_score": 50.3, "arm": "aggressive_discount", "propensity": 0.4289, "revenue_per_session": 29.04 },
-      { "session_id": 8, "customer_ltv_score": 54.1, "arm": "aggressive_discount", "propensity": 0.4712, "revenue_per_session": 41.22 },
-      { "session_id": 9, "customer_ltv_score": 34.3, "arm": "standard_price", "propensity": 0.7323, "revenue_per_session": 19.8 },
-      { "session_id": 10, "customer_ltv_score": 74.5, "arm": "aggressive_discount", "propensity": 0.6905, "revenue_per_session": 65.06 }
+      {
+        "session_id": 1,
+        "customer_ltv_score": 54.9,
+        "arm": "standard_price",
+        "propensity": 0.5199,
+        "revenue_per_session": 34.66
+      },
+      {
+        "session_id": 2,
+        "customer_ltv_score": 63.6,
+        "arm": "aggressive_discount",
+        "propensity": 0.5774,
+        "revenue_per_session": 36.99
+      },
+      {
+        "session_id": 3,
+        "customer_ltv_score": 38.3,
+        "arm": "aggressive_discount",
+        "propensity": 0.3044,
+        "revenue_per_session": 30.76
+      },
+      {
+        "session_id": 4,
+        "customer_ltv_score": 31.8,
+        "arm": "standard_price",
+        "propensity": 0.7538,
+        "revenue_per_session": 11.05
+      },
+      {
+        "session_id": 5,
+        "customer_ltv_score": 10.2,
+        "arm": "standard_price",
+        "propensity": 0.89,
+        "revenue_per_session": 0.0
+      },
+      {
+        "session_id": 6,
+        "customer_ltv_score": 69.4,
+        "arm": "standard_price",
+        "propensity": 0.3605,
+        "revenue_per_session": 65.41
+      },
+      {
+        "session_id": 7,
+        "customer_ltv_score": 50.3,
+        "arm": "aggressive_discount",
+        "propensity": 0.4289,
+        "revenue_per_session": 29.04
+      },
+      {
+        "session_id": 8,
+        "customer_ltv_score": 54.1,
+        "arm": "aggressive_discount",
+        "propensity": 0.4712,
+        "revenue_per_session": 41.22
+      },
+      {
+        "session_id": 9,
+        "customer_ltv_score": 34.3,
+        "arm": "standard_price",
+        "propensity": 0.7323,
+        "revenue_per_session": 19.8
+      },
+      {
+        "session_id": 10,
+        "customer_ltv_score": 74.5,
+        "arm": "aggressive_discount",
+        "propensity": 0.6905,
+        "revenue_per_session": 65.06
+      }
     ]
   },
   "guidingQuestions": [
@@ -48,6 +133,41 @@
     "Compute the inverse-propensity-weighted (Hajek/self-normalized) revenue for each arm: weight each arm's sessions by 1/propensity and take a weighted average.",
     "Compare the honest, propensity-corrected gap to the naive one — check the sign, not just the size — and translate that into a rollout recommendation."
   ],
+  "notebook": {
+    "intro": "Five steps: reproduce the naive gap, see who each arm was shown to, then re-weight the logs so the comparison is fair.",
+    "cells": [
+      {
+        "title": "Reproduce the naive gap",
+        "explain": "Mean revenue per session for the discount arm against standard pricing, straight from the logs.",
+        "code": "means = df.groupby(\"arm\")[\"revenue_per_session\"].mean()\nnaive_gap = means[\"aggressive_discount\"] - means[\"standard_price\"]\nprint(f\"naive gap: {naive_gap:+.2f} per session\")\nmeans.round(3)",
+        "reads": "Read off the logs, the discount arm looks clearly better. These logs were not a randomised test."
+      },
+      {
+        "title": "Profile who saw each arm",
+        "explain": "The logging policy chose which sessions saw which price. Compare customer value across the arms.",
+        "code": "profile = df.groupby(\"arm\")[[\"customer_ltv_score\", \"propensity\"]].mean()\nprofile[\"n\"] = df.groupby(\"arm\").size()\nprofile.round(3)",
+        "reads": "The discount arm was shown far more often to high-LTV customers, who spend more whatever price they see."
+      },
+      {
+        "title": "See the assignment rule in the propensities",
+        "explain": "propensity records how likely each session was to get the arm it got. Look at how it moves with customer value.",
+        "code": "df[\"ltv_band\"] = pd.qcut(df[\"customer_ltv_score\"], 5, labels=False, duplicates=\"drop\")\nby_band = df.groupby([\"ltv_band\", \"arm\"]).size().unstack()\nby_band = by_band.div(by_band.sum(axis=1), axis=0) * 100\nprint(\"share of sessions by arm, within each LTV band (%)\")\nby_band.round(1)",
+        "reads": "Arm assignment tracks customer value directly. That is the bias the raw average is absorbing."
+      },
+      {
+        "title": "Re-weight by inverse propensity",
+        "explain": "Weight each session by 1 over its propensity and take a self-normalised (Hajek) average, so over-represented sessions stop dominating.",
+        "code": "df[\"ipw\"] = 1 / df[\"propensity\"]\ndef hajek(group):\n    return (group[\"revenue_per_session\"] * group[\"ipw\"]).sum() / group[\"ipw\"].sum()\ncorrected = df.groupby(\"arm\").apply(hajek)\ncorrected_gap = corrected[\"aggressive_discount\"] - corrected[\"standard_price\"]\nprint(f\"propensity-corrected gap: {corrected_gap:+.2f} per session\")\ncorrected.round(3)",
+        "reads": "Once each session is weighted by how likely it was to be there, the arms look very different."
+      },
+      {
+        "title": "Put the two gaps side by side",
+        "explain": "The number the logs suggest, against the number a fair comparison supports. Watch the sign.",
+        "code": "pd.DataFrame(\n    {\"gap per session\": [naive_gap, corrected_gap]},\n    index=[\"naive log average\", \"inverse-propensity weighted\"],\n).round(3)",
+        "reads": "Rolling out the discount on the naive number would roll out a price cut whose apparent gain belonged to the customers, not the price."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "The discount arm earns about $14 more revenue per session than standard pricing in the raw logs. Read directly, that's a strong, obvious case to roll the discount out to everyone.",
     "theTrap": "The bandit's logging policy wasn't neutral: it leaned toward showing the discount arm to customers with a high predicted LTV score (a \"protect our best customers\" heuristic added mid-flight), and LTV score is a strong predictor of revenue per session on its own, regardless of pricing. Discount-arm sessions average an LTV score of 58.6 versus 42.9 for standard pricing — a large pre-existing gap. Comparing raw average revenue between arms therefore compares an already-higher-spending customer base to a lower-spending one and credits the discount with the difference — while the discount is actually quietly giving away margin.",
@@ -60,10 +180,22 @@
       "Compare: the IPS-corrected gap is ≈ -$1.79 — the naive +$14 'win' was entirely the LTV-targeting confound, and the true effect is a small revenue loss."
     ],
     "numbers": [
-      { "label": "Naive revenue gap (discount − standard)", "value": "+$14.35 per session" },
-      { "label": "Mean LTV score, discount arm vs. standard", "value": "58.6 vs. 42.9" },
-      { "label": "IPS-corrected revenue gap", "value": "-$1.79 per session" },
-      { "label": "Share of traffic on the discount arm", "value": "44%" }
+      {
+        "label": "Naive revenue gap (discount − standard)",
+        "value": "+$14.35 per session"
+      },
+      {
+        "label": "Mean LTV score, discount arm vs. standard",
+        "value": "58.6 vs. 42.9"
+      },
+      {
+        "label": "IPS-corrected revenue gap",
+        "value": "-$1.79 per session"
+      },
+      {
+        "label": "Share of traffic on the discount arm",
+        "value": "44%"
+      }
     ],
     "lesson": "A pricing bandit's raw average reward by arm only reflects the arm's true value if every arm was shown to a representative mix of customers — and a targeting heuristic layered onto a bandit (even a well-intentioned one, like protecting high-value customers) breaks that. When the assignment probability depends on the same variable that predicts the reward, a naive comparison is confounded exactly like an observational study, and the confound can be large enough to flip the sign of the conclusion, not just its size. Inverse-propensity weighting with the logged propensity is the standard correction — always check it before reading a bandit's raw arm averages as causal."
   }

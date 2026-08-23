@@ -2,7 +2,12 @@
   "id": "checkout-bandit-simpson",
   "title": "The new checkout UI converts better overall — make it the default?",
   "trap": "Bandit traffic-allocation paradox",
-  "facets": { "topic": "Product", "skill": ["Bandit traffic-allocation paradox"] },
+  "facets": {
+    "topic": "Product",
+    "skill": [
+      "Bandit traffic-allocation paradox"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the checkout-experience analyst at Coastline Goods",
@@ -15,22 +20,88 @@
     "file": "/case-lab/checkout-bandit-simpson/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "session_id", "type": "int", "description": "Unique checkout session identifier" },
-      { "name": "device", "type": "string", "description": "mobile or desktop" },
-      { "name": "arm", "type": "string", "description": "new_ui or old_ui — which checkout UI this session was shown (allocated unevenly by device — mobile got new_ui far more often than desktop did)" },
-      { "name": "converted", "type": "int", "description": "1 if the session completed checkout — the reward" }
+      {
+        "name": "session_id",
+        "type": "int",
+        "description": "Unique checkout session identifier"
+      },
+      {
+        "name": "device",
+        "type": "string",
+        "description": "mobile or desktop"
+      },
+      {
+        "name": "arm",
+        "type": "string",
+        "description": "new_ui or old_ui — which checkout UI this session was shown (allocated unevenly by device — mobile got new_ui far more often than desktop did)"
+      },
+      {
+        "name": "converted",
+        "type": "int",
+        "description": "1 if the session completed checkout — the reward"
+      }
     ],
     "sample": [
-      { "session_id": 1, "device": "mobile", "arm": "new_ui", "converted": 0 },
-      { "session_id": 2, "device": "mobile", "arm": "new_ui", "converted": 0 },
-      { "session_id": 3, "device": "mobile", "arm": "new_ui", "converted": 0 },
-      { "session_id": 4, "device": "desktop", "arm": "old_ui", "converted": 0 },
-      { "session_id": 5, "device": "mobile", "arm": "new_ui", "converted": 0 },
-      { "session_id": 6, "device": "mobile", "arm": "new_ui", "converted": 0 },
-      { "session_id": 7, "device": "desktop", "arm": "new_ui", "converted": 0 },
-      { "session_id": 8, "device": "mobile", "arm": "new_ui", "converted": 0 },
-      { "session_id": 9, "device": "desktop", "arm": "new_ui", "converted": 0 },
-      { "session_id": 10, "device": "desktop", "arm": "old_ui", "converted": 0 }
+      {
+        "session_id": 1,
+        "device": "mobile",
+        "arm": "new_ui",
+        "converted": 0
+      },
+      {
+        "session_id": 2,
+        "device": "mobile",
+        "arm": "new_ui",
+        "converted": 0
+      },
+      {
+        "session_id": 3,
+        "device": "mobile",
+        "arm": "new_ui",
+        "converted": 0
+      },
+      {
+        "session_id": 4,
+        "device": "desktop",
+        "arm": "old_ui",
+        "converted": 0
+      },
+      {
+        "session_id": 5,
+        "device": "mobile",
+        "arm": "new_ui",
+        "converted": 0
+      },
+      {
+        "session_id": 6,
+        "device": "mobile",
+        "arm": "new_ui",
+        "converted": 0
+      },
+      {
+        "session_id": 7,
+        "device": "desktop",
+        "arm": "new_ui",
+        "converted": 0
+      },
+      {
+        "session_id": 8,
+        "device": "mobile",
+        "arm": "new_ui",
+        "converted": 0
+      },
+      {
+        "session_id": 9,
+        "device": "desktop",
+        "arm": "new_ui",
+        "converted": 0
+      },
+      {
+        "session_id": 10,
+        "device": "desktop",
+        "arm": "old_ui",
+        "converted": 0
+      }
     ]
   },
   "guidingQuestions": [
@@ -47,6 +118,41 @@
     "Compare baseline conversion rates by device to see whether one device converts substantially higher than the other regardless of UI.",
     "Explain how an uneven traffic split across a higher- and lower-converting segment can flip the pooled sign relative to every individual segment — classic Simpson's paradox."
   ],
+  "notebook": {
+    "intro": "Five steps: reproduce the pooled win, check how the traffic was split, then compare the arms on equal ground.",
+    "cells": [
+      {
+        "title": "Reproduce the pooled gap",
+        "explain": "Start with the exact claim on the table — new_ui's conversion minus old_ui's, across every session.",
+        "code": "rates = df.groupby(\"arm\")[\"converted\"].mean() * 100\npooled_gap = rates[\"new_ui\"] - rates[\"old_ui\"]\nprint(f\"pooled gap (new_ui - old_ui): {pooled_gap:+.2f} pts\")\nrates.round(2)",
+        "reads": "The pooled number really does favour new_ui. Everything that follows is about whether the comparison behind it is fair."
+      },
+      {
+        "title": "Check how the traffic was split",
+        "explain": "A bandit allocates traffic; it does not run a coin flip. Look at what share of each device's sessions went to each arm.",
+        "code": "mix = pd.crosstab(df[\"device\"], df[\"arm\"], normalize=\"index\") * 100\nprint(\"share of each arm within each device (%)\")\nmix.round(1)",
+        "reads": "The split leans opposite ways on the two devices. That alone makes the pooled comparison a comparison of device mixes, not of interfaces."
+      },
+      {
+        "title": "Compare the arms within each device",
+        "explain": "Hold the device constant and the allocation stops mattering. This is the like-for-like comparison.",
+        "code": "by_device = df.groupby([\"device\", \"arm\"])[\"converted\"].mean().unstack() * 100\nby_device[\"gap\"] = by_device[\"new_ui\"] - by_device[\"old_ui\"]\nby_device.round(2)",
+        "reads": "Look at the sign of the gap column on both rows, then compare it with the pooled gap from cell 1."
+      },
+      {
+        "title": "See which device converts better anyway",
+        "explain": "For a mix to flip a result, the segments have to differ in the outcome as well as in allocation. Check that here.",
+        "code": "baseline = df.groupby(\"device\")[\"converted\"].mean() * 100\nprint(\"conversion by device, ignoring the arm (%)\")\nbaseline.round(2)",
+        "reads": "One device converts far better regardless of interface — and it is the device new_ui was given most of."
+      },
+      {
+        "title": "Put the two numbers side by side",
+        "explain": "Re-weight both arms to one common device mix, so neither is flattered by where its traffic came from.",
+        "code": "within = df.groupby([\"device\", \"arm\"])[\"converted\"].mean().unstack()\nweights = df[\"device\"].value_counts(normalize=True)\nadjusted = within.mul(weights, axis=0).sum() * 100\nadj_gap = adjusted[\"new_ui\"] - adjusted[\"old_ui\"]\nprint(f\"mix-adjusted gap: {adj_gap:+.2f} pts\")\npd.DataFrame({\"effect (pts)\": [pooled_gap, adj_gap]}, index=[\"pooled\", \"mix-adjusted\"]).round(2)",
+        "reads": "The sign flips once both arms face the same device mix. The pooled number was measuring the allocation, not the interface."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "Pooled across all sessions, the new checkout UI converts better than the old one. That reads as a clear win — obviously make it the default everywhere.",
     "theTrap": "The rollout policy didn't allocate the new UI evenly: mobile sessions got new_ui 76% of the time, while desktop sessions got it only 25% of the time (a mobile-first ramp). Mobile also converts substantially higher than desktop regardless of which UI is shown. Split the comparison by device and the new UI actually LOSES in both: -0.7 points on mobile and -1.9 points on desktop. But because the new UI's traffic is disproportionately mobile (the higher-converting segment) and the old UI's traffic is disproportionately desktop (the lower-converting segment), the pooled comparison mixes a favorable segment for the new UI with an unfavorable one for the old UI — and the pooled number flips positive even though the new UI never actually wins anywhere. This is Simpson's paradox, driven here by unequal bandit/rollout traffic allocation rather than a random split.",
@@ -59,10 +165,22 @@
       "Conclude: the pooled 'win' is a mix-shift artifact of unequal traffic allocation, not a real effect of the new UI — Simpson's paradox."
     ],
     "numbers": [
-      { "label": "Pooled conversion gap (new_ui − old_ui)", "value": "+1.1 points" },
-      { "label": "new_ui share of traffic: mobile vs. desktop", "value": "76% vs. 25%" },
-      { "label": "Conversion gap within mobile", "value": "-0.7 points (old_ui wins)" },
-      { "label": "Conversion gap within desktop", "value": "-1.9 points (old_ui wins)" }
+      {
+        "label": "Pooled conversion gap (new_ui − old_ui)",
+        "value": "+1.1 points"
+      },
+      {
+        "label": "new_ui share of traffic: mobile vs. desktop",
+        "value": "76% vs. 25%"
+      },
+      {
+        "label": "Conversion gap within mobile",
+        "value": "-0.7 points (old_ui wins)"
+      },
+      {
+        "label": "Conversion gap within desktop",
+        "value": "-1.9 points (old_ui wins)"
+      }
     ],
     "lesson": "A bandit or phased rollout that allocates traffic unevenly across segments — even for good operational reasons, like ramping mobile first — can produce a pooled result that reverses what's true in every individual segment, the same Simpson's paradox mechanism as any confounded observational comparison. Whenever an arm's traffic share differs across a variable that also affects the outcome, split the comparison by that variable before trusting the pooled number. A policy that loses in every segment cannot be a real winner overall — the pooled 'win' is measuring the traffic mix, not the policy."
   }

@@ -2,7 +2,13 @@
   "id": "support-churn",
   "title": "Do support tickets cause churn — should we cut the support team?",
   "trap": "Confounding / reverse causality",
-  "facets": { "topic": "Support", "skill": ["Confounding", "Reverse causality"] },
+  "facets": {
+    "topic": "Support",
+    "skill": [
+      "Confounding",
+      "Reverse causality"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the analyst at Meridian",
@@ -15,23 +21,115 @@
     "file": "/case-lab/support-churn/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "account_id", "type": "int", "description": "Unique account identifier" },
-      { "name": "industry", "type": "string", "description": "Account's industry vertical" },
-      { "name": "seats", "type": "int", "description": "Number of paid seats on the account" },
-      { "name": "tenure_months", "type": "int", "description": "Months the account has been a customer" },
-      { "name": "health_score", "type": "float", "description": "Account health (0-100) at the START of the quarter, before any support contact — product usage, adoption, and engagement rolled up" },
-      { "name": "contacted_support", "type": "int", "description": "1 if the account opened a support ticket during the quarter, else 0" },
-      { "name": "churned", "type": "int", "description": "1 if the account cancelled by the end of the quarter, else 0" }
+      {
+        "name": "account_id",
+        "type": "int",
+        "description": "Unique account identifier"
+      },
+      {
+        "name": "industry",
+        "type": "string",
+        "description": "Account's industry vertical"
+      },
+      {
+        "name": "seats",
+        "type": "int",
+        "description": "Number of paid seats on the account"
+      },
+      {
+        "name": "tenure_months",
+        "type": "int",
+        "description": "Months the account has been a customer"
+      },
+      {
+        "name": "health_score",
+        "type": "float",
+        "description": "Account health (0-100) at the START of the quarter, before any support contact — product usage, adoption, and engagement rolled up"
+      },
+      {
+        "name": "contacted_support",
+        "type": "int",
+        "description": "1 if the account opened a support ticket during the quarter, else 0"
+      },
+      {
+        "name": "churned",
+        "type": "int",
+        "description": "1 if the account cancelled by the end of the quarter, else 0"
+      }
     ],
     "sample": [
-      { "account_id": 1, "industry": "Health", "seats": 55, "tenure_months": 25, "health_score": 58.8, "contacted_support": 0, "churned": 0 },
-      { "account_id": 2, "industry": "SaaS", "seats": 8, "tenure_months": 47, "health_score": 44.5, "contacted_support": 0, "churned": 1 },
-      { "account_id": 3, "industry": "Media", "seats": 151, "tenure_months": 16, "health_score": 36.7, "contacted_support": 1, "churned": 1 },
-      { "account_id": 4, "industry": "SaaS", "seats": 169, "tenure_months": 3, "health_score": 56.0, "contacted_support": 1, "churned": 1 },
-      { "account_id": 5, "industry": "Retail", "seats": 47, "tenure_months": 41, "health_score": 70.1, "contacted_support": 0, "churned": 1 },
-      { "account_id": 6, "industry": "Health", "seats": 336, "tenure_months": 4, "health_score": 27.3, "contacted_support": 1, "churned": 0 },
-      { "account_id": 7, "industry": "Retail", "seats": 388, "tenure_months": 1, "health_score": 82.0, "contacted_support": 0, "churned": 0 },
-      { "account_id": 8, "industry": "Retail", "seats": 389, "tenure_months": 41, "health_score": 71.2, "contacted_support": 0, "churned": 0 }
+      {
+        "account_id": 1,
+        "industry": "Health",
+        "seats": 55,
+        "tenure_months": 25,
+        "health_score": 58.8,
+        "contacted_support": 0,
+        "churned": 0
+      },
+      {
+        "account_id": 2,
+        "industry": "SaaS",
+        "seats": 8,
+        "tenure_months": 47,
+        "health_score": 44.5,
+        "contacted_support": 0,
+        "churned": 1
+      },
+      {
+        "account_id": 3,
+        "industry": "Media",
+        "seats": 151,
+        "tenure_months": 16,
+        "health_score": 36.7,
+        "contacted_support": 1,
+        "churned": 1
+      },
+      {
+        "account_id": 4,
+        "industry": "SaaS",
+        "seats": 169,
+        "tenure_months": 3,
+        "health_score": 56.0,
+        "contacted_support": 1,
+        "churned": 1
+      },
+      {
+        "account_id": 5,
+        "industry": "Retail",
+        "seats": 47,
+        "tenure_months": 41,
+        "health_score": 70.1,
+        "contacted_support": 0,
+        "churned": 1
+      },
+      {
+        "account_id": 6,
+        "industry": "Health",
+        "seats": 336,
+        "tenure_months": 4,
+        "health_score": 27.3,
+        "contacted_support": 1,
+        "churned": 0
+      },
+      {
+        "account_id": 7,
+        "industry": "Retail",
+        "seats": 388,
+        "tenure_months": 1,
+        "health_score": 82.0,
+        "contacted_support": 0,
+        "churned": 0
+      },
+      {
+        "account_id": 8,
+        "industry": "Retail",
+        "seats": 389,
+        "tenure_months": 41,
+        "health_score": 71.2,
+        "contacted_support": 0,
+        "churned": 0
+      }
     ]
   },
   "guidingQuestions": [
@@ -48,6 +146,41 @@
     "Re-estimate support's effect within similar-health accounts (stratify on health deciles, or add health to a model). Note the sign carefully.",
     "Translate into a recommendation — and if the effect flips protective, say plainly what cutting support would do."
   ],
+  "notebook": {
+    "intro": "Five steps: reproduce the COO's number, work out which way the arrow points, and re-estimate support's effect among similar accounts.",
+    "cells": [
+      {
+        "title": "Reproduce the COO's number",
+        "explain": "Churn rate for accounts that contacted support against those that did not.",
+        "code": "rates = df.groupby(\"contacted_support\")[\"churned\"].mean() * 100\nheadline = rates[1] - rates[0]\nprint(f\"headline gap (contacted - not): {headline:+.2f} pts\")\nrates.round(2)",
+        "reads": "Accounts that contact support do churn more. That is the claim; it is not yet a cause."
+      },
+      {
+        "title": "Ask which way the arrow runs",
+        "explain": "Do tickets cause churn, or do struggling accounts raise tickets? health_score describes the account before the ticket, so compare it across the groups.",
+        "code": "profile = df.groupby(\"contacted_support\")[\"health_score\"].agg([\"mean\", \"median\", \"count\"])\nprint(\"account health by whether they contacted support:\")\nprofile.round(2)",
+        "reads": "The accounts contacting support were already in much worse health. The ticket looks more like a symptom than a cause."
+      },
+      {
+        "title": "Check health drives churn",
+        "explain": "For health to confound the comparison it must also predict churn. Bin it into deciles and look.",
+        "code": "df[\"health_band\"] = pd.qcut(df[\"health_score\"], 10, labels=False, duplicates=\"drop\")\nby_band = df.groupby(\"health_band\")[\"churned\"].mean() * 100\nprint(\"churn by health decile (%)\")\nby_band.round(1)",
+        "reads": "Health predicts churn powerfully on its own, and it is distributed very unevenly across the two groups."
+      },
+      {
+        "title": "Compare within similar-health accounts",
+        "explain": "Hold health constant and re-estimate support's effect. Watch the sign, not just the size.",
+        "code": "within = df.groupby([\"health_band\", \"contacted_support\"])[\"churned\"].mean().unstack()\nweights = df[\"health_band\"].value_counts(normalize=True)\nadjusted = within.mul(weights, axis=0).sum() * 100\nadj_effect = adjusted[1] - adjusted[0]\nprint(f\"adjusted effect: {adj_effect:+.2f} pts\")\nwithin.round(3)",
+        "reads": "Among accounts in comparable health, contacting support looks very different from the raw comparison. Read the sign carefully."
+      },
+      {
+        "title": "Say what cutting support would do",
+        "explain": "Put the two estimates together and state the consequence plainly.",
+        "code": "pd.DataFrame(\n    {\"effect on churn (pts)\": [headline, adj_effect]},\n    index=[\"raw comparison\", \"same health level\"],\n).round(2)",
+        "reads": "If the adjusted effect is protective, cutting the support team removes something that was helping the accounts most at risk."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "Accounts that contacted support churned at ~59% versus ~31% for those that didn't — a +28.4 point gap. Read naively, support looks actively harmful, and cutting the team looks like a two-for-one win: lower cost and lower churn.",
     "theTrap": "The arrow runs the other way. Accounts contact support because they're already in trouble: the contacted group averages a health_score of 41, versus 65 for accounts that never reached out. Low health is what actually drives churn — and it's also what makes an account raise a ticket. So support contact is a symptom of an at-risk account, not a cause of its departure. The naive gap is almost entirely the pre-existing health difference between who does and doesn't contact support.",
@@ -60,10 +193,22 @@
       "Sanity-check the sign flip: it's stable across deciles and methods, which is the tell that the raw comparison was confounded."
     ],
     "numbers": [
-      { "label": "Naive churn gap (contacted − not)", "value": "+28.4 pts" },
-      { "label": "Mean health — contacted vs not", "value": "40.8 vs 64.9" },
-      { "label": "Health-adjusted effect of support", "value": "≈ −5.1 pts (protective)" },
-      { "label": "Overall quarterly churn", "value": "44.4%" }
+      {
+        "label": "Naive churn gap (contacted − not)",
+        "value": "+28.4 pts"
+      },
+      {
+        "label": "Mean health — contacted vs not",
+        "value": "40.8 vs 64.9"
+      },
+      {
+        "label": "Health-adjusted effect of support",
+        "value": "≈ −5.1 pts (protective)"
+      },
+      {
+        "label": "Overall quarterly churn",
+        "value": "44.4%"
+      }
     ],
     "lesson": "A raw association can point the exact opposite way to the causal effect. Before acting on 'X is associated with more of the bad outcome,' ask what leads people to X in the first place — here, accounts contact support because they're already struggling, and struggling is what causes churn. Condition on that pre-existing state and support turns out mildly protective. Cutting it to 'reduce churn' would strip help from the most at-risk accounts. When a marker of trouble correlates with a bad outcome, don't mistake the smoke alarm for the fire."
   }

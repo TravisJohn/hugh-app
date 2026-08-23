@@ -2,7 +2,13 @@
   "id": "airflow-migration-sla",
   "title": "SLA breaches jumped after the Airflow 2 migration — roll it back?",
   "trap": "Confounding / selection bias",
-  "facets": { "topic": "Orchestration", "skill": ["Selection bias", "Confounding"] },
+  "facets": {
+    "topic": "Orchestration",
+    "skill": [
+      "Selection bias",
+      "Confounding"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the platform engineer at Switchyard",
@@ -15,26 +21,148 @@
     "file": "/case-lab/airflow-migration-sla/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "run_id", "type": "int", "description": "Unique DAG-run identifier" },
-      { "name": "dag_id", "type": "string", "description": "Which DAG this run belongs to (~240 distinct DAGs)" },
-      { "name": "task_count", "type": "int", "description": "Number of tasks in the DAG — a measure of its complexity" },
-      { "name": "upstream_deps", "type": "int", "description": "Count of upstream dependencies feeding the DAG" },
-      { "name": "data_volume_gb", "type": "float", "description": "Data processed by the run, in GB" },
-      { "name": "scheduled_hour", "type": "int", "description": "Hour of day the run was scheduled (0-23); 1-5 is the nightly batch crunch" },
-      { "name": "migrated", "type": "int", "description": "1 if the run executed on Airflow 2, else 0 (old scheduler)" },
-      { "name": "sla_breached", "type": "int", "description": "1 if the run missed its SLA, else 0 — the outcome" }
+      {
+        "name": "run_id",
+        "type": "int",
+        "description": "Unique DAG-run identifier"
+      },
+      {
+        "name": "dag_id",
+        "type": "string",
+        "description": "Which DAG this run belongs to (~240 distinct DAGs)"
+      },
+      {
+        "name": "task_count",
+        "type": "int",
+        "description": "Number of tasks in the DAG — a measure of its complexity"
+      },
+      {
+        "name": "upstream_deps",
+        "type": "int",
+        "description": "Count of upstream dependencies feeding the DAG"
+      },
+      {
+        "name": "data_volume_gb",
+        "type": "float",
+        "description": "Data processed by the run, in GB"
+      },
+      {
+        "name": "scheduled_hour",
+        "type": "int",
+        "description": "Hour of day the run was scheduled (0-23); 1-5 is the nightly batch crunch"
+      },
+      {
+        "name": "migrated",
+        "type": "int",
+        "description": "1 if the run executed on Airflow 2, else 0 (old scheduler)"
+      },
+      {
+        "name": "sla_breached",
+        "type": "int",
+        "description": "1 if the run missed its SLA, else 0 — the outcome"
+      }
     ],
     "sample": [
-      { "run_id": 1, "dag_id": "dag_000", "task_count": 14, "upstream_deps": 3, "data_volume_gb": 6.64, "scheduled_hour": 21, "migrated": 1, "sla_breached": 0 },
-      { "run_id": 2, "dag_id": "dag_001", "task_count": 5, "upstream_deps": 2, "data_volume_gb": 6.52, "scheduled_hour": 13, "migrated": 0, "sla_breached": 0 },
-      { "run_id": 3, "dag_id": "dag_002", "task_count": 19, "upstream_deps": 3, "data_volume_gb": 2.01, "scheduled_hour": 13, "migrated": 1, "sla_breached": 0 },
-      { "run_id": 4, "dag_id": "dag_003", "task_count": 21, "upstream_deps": 7, "data_volume_gb": 7.07, "scheduled_hour": 16, "migrated": 1, "sla_breached": 0 },
-      { "run_id": 5, "dag_id": "dag_004", "task_count": 3, "upstream_deps": 1, "data_volume_gb": 1.92, "scheduled_hour": 6, "migrated": 0, "sla_breached": 0 },
-      { "run_id": 6, "dag_id": "dag_005", "task_count": 4, "upstream_deps": 2, "data_volume_gb": 3.47, "scheduled_hour": 12, "migrated": 0, "sla_breached": 0 },
-      { "run_id": 7, "dag_id": "dag_006", "task_count": 12, "upstream_deps": 3, "data_volume_gb": 3.32, "scheduled_hour": 21, "migrated": 1, "sla_breached": 0 },
-      { "run_id": 8, "dag_id": "dag_007", "task_count": 9, "upstream_deps": 3, "data_volume_gb": 1.15, "scheduled_hour": 14, "migrated": 0, "sla_breached": 0 },
-      { "run_id": 9, "dag_id": "dag_008", "task_count": 11, "upstream_deps": 4, "data_volume_gb": 1.29, "scheduled_hour": 20, "migrated": 1, "sla_breached": 0 },
-      { "run_id": 10, "dag_id": "dag_009", "task_count": 6, "upstream_deps": 1, "data_volume_gb": 25.38, "scheduled_hour": 0, "migrated": 1, "sla_breached": 0 }
+      {
+        "run_id": 1,
+        "dag_id": "dag_000",
+        "task_count": 14,
+        "upstream_deps": 3,
+        "data_volume_gb": 6.64,
+        "scheduled_hour": 21,
+        "migrated": 1,
+        "sla_breached": 0
+      },
+      {
+        "run_id": 2,
+        "dag_id": "dag_001",
+        "task_count": 5,
+        "upstream_deps": 2,
+        "data_volume_gb": 6.52,
+        "scheduled_hour": 13,
+        "migrated": 0,
+        "sla_breached": 0
+      },
+      {
+        "run_id": 3,
+        "dag_id": "dag_002",
+        "task_count": 19,
+        "upstream_deps": 3,
+        "data_volume_gb": 2.01,
+        "scheduled_hour": 13,
+        "migrated": 1,
+        "sla_breached": 0
+      },
+      {
+        "run_id": 4,
+        "dag_id": "dag_003",
+        "task_count": 21,
+        "upstream_deps": 7,
+        "data_volume_gb": 7.07,
+        "scheduled_hour": 16,
+        "migrated": 1,
+        "sla_breached": 0
+      },
+      {
+        "run_id": 5,
+        "dag_id": "dag_004",
+        "task_count": 3,
+        "upstream_deps": 1,
+        "data_volume_gb": 1.92,
+        "scheduled_hour": 6,
+        "migrated": 0,
+        "sla_breached": 0
+      },
+      {
+        "run_id": 6,
+        "dag_id": "dag_005",
+        "task_count": 4,
+        "upstream_deps": 2,
+        "data_volume_gb": 3.47,
+        "scheduled_hour": 12,
+        "migrated": 0,
+        "sla_breached": 0
+      },
+      {
+        "run_id": 7,
+        "dag_id": "dag_006",
+        "task_count": 12,
+        "upstream_deps": 3,
+        "data_volume_gb": 3.32,
+        "scheduled_hour": 21,
+        "migrated": 1,
+        "sla_breached": 0
+      },
+      {
+        "run_id": 8,
+        "dag_id": "dag_007",
+        "task_count": 9,
+        "upstream_deps": 3,
+        "data_volume_gb": 1.15,
+        "scheduled_hour": 14,
+        "migrated": 0,
+        "sla_breached": 0
+      },
+      {
+        "run_id": 9,
+        "dag_id": "dag_008",
+        "task_count": 11,
+        "upstream_deps": 4,
+        "data_volume_gb": 1.29,
+        "scheduled_hour": 20,
+        "migrated": 1,
+        "sla_breached": 0
+      },
+      {
+        "run_id": 10,
+        "dag_id": "dag_009",
+        "task_count": 6,
+        "upstream_deps": 1,
+        "data_volume_gb": 25.38,
+        "scheduled_hour": 0,
+        "migrated": 1,
+        "sla_breached": 0
+      }
     ]
   },
   "guidingQuestions": [
@@ -51,6 +179,41 @@
     "Re-estimate the migrated effect within complexity buckets and check it's stable and near zero.",
     "Turn it into a recommendation: would a rollback move the fragile DAGs back to an equally-loaded old scheduler, and what would a fair test (same DAGs, both schedulers) look like?"
   ],
+  "notebook": {
+    "intro": "Five steps: reproduce the breach rates, profile what was actually migrated, then compare schedulers at equal DAG complexity.",
+    "cells": [
+      {
+        "title": "Reproduce the headline",
+        "explain": "SLA breach rate by migrated — the number behind the rollback proposal.",
+        "code": "rates = df.groupby(\"migrated\")[\"sla_breached\"].mean() * 100\nheadline = rates[1] - rates[0]\nprint(f\"headline gap (migrated - not): {headline:+.2f} pts\")\nrates.round(2)",
+        "reads": "Migrated DAGs really do breach more. Whether the scheduler is the reason is the open question."
+      },
+      {
+        "title": "Profile what was migrated",
+        "explain": "Migration order was a choice. Compare complexity across the two groups before blaming the engine.",
+        "code": "profile = df.groupby(\"migrated\")[[\"task_count\", \"upstream_deps\", \"data_volume_gb\"]].mean()\nprofile[\"n\"] = df.groupby(\"migrated\").size()\nprint(\"what each scheduler is actually running:\")\nprofile.round(2)",
+        "reads": "Airflow 2 is holding the heavy, dependency-laden DAGs. The raw comparison is not a comparison of schedulers."
+      },
+      {
+        "title": "Check complexity drives breaches",
+        "explain": "Complexity has to predict breaches for it to confound the comparison. Bin task_count and look.",
+        "code": "df[\"complexity_band\"] = pd.qcut(df[\"task_count\"], 5, labels=False, duplicates=\"drop\")\nby_band = df.groupby(\"complexity_band\")[\"sla_breached\"].mean() * 100\nprint(\"breach rate by DAG complexity band (%)\")\nby_band.round(1)",
+        "reads": "Breach rate climbs steeply with complexity — and complexity is exactly what drove migration order."
+      },
+      {
+        "title": "Compare within complexity bands",
+        "explain": "Hold complexity constant and re-estimate the migration effect, then re-weight to one common mix.",
+        "code": "within = df.groupby([\"complexity_band\", \"migrated\"])[\"sla_breached\"].mean().unstack()\nweights = df[\"complexity_band\"].value_counts(normalize=True)\nadjusted = within.mul(weights, axis=0).sum() * 100\nadj_effect = adjusted[1] - adjusted[0]\nprint(f\"adjusted effect: {adj_effect:+.2f} pts\")\nwithin.round(3)",
+        "reads": "At equal complexity the scheduler effect is close to nothing."
+      },
+      {
+        "title": "What a rollback would actually do",
+        "explain": "Set the two estimates beside each other and reason about the proposed action.",
+        "code": "pd.DataFrame(\n    {\"effect on breaches (pts)\": [headline, adj_effect]},\n    index=[\"raw comparison\", \"same DAG complexity\"],\n).round(2)",
+        "reads": "A rollback would move the fragile DAGs onto an equally loaded old scheduler and change very little. A fair test runs the same DAGs on both."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "Airflow 2 runs breach SLA 21.0% of the time versus 13.2% on the old scheduler — a +7.8 point gap, about 1.6x. Read directly, the new scheduler looks materially less reliable and a rollback looks prudent.",
     "theTrap": "DAGs weren't migrated at random. The heaviest, most dependency-laden DAGs went first — migrated runs average 19.2 tasks versus 10.6 for the ones still on the old scheduler, nearly double. Task count, dependencies, data volume and nightly scheduling are what actually cause SLA breaches, and Airflow 2 was handed a disproportionate share of the fragile, breach-prone DAGs. So the migrated group breached more before the new scheduler could help or hurt. The comparison measures which DAGs were moved, not the scheduler they were moved to.",
@@ -63,10 +226,22 @@
       "Sanity-check: within a fixed complexity bucket, migrated and non-migrated runs breach at nearly the same rate — the scheduler isn't the driver."
     ],
     "numbers": [
-      { "label": "Naive breach gap (Airflow 2 − old)", "value": "21.0% vs 13.2% (+7.8 pts)" },
-      { "label": "Mean task_count — migrated vs not", "value": "19.2 vs 10.6" },
-      { "label": "Complexity-adjusted scheduler effect", "value": "≈ −0.7 pts (neutral)" },
-      { "label": "Share of runs migrated", "value": "40%" }
+      {
+        "label": "Naive breach gap (Airflow 2 − old)",
+        "value": "21.0% vs 13.2% (+7.8 pts)"
+      },
+      {
+        "label": "Mean task_count — migrated vs not",
+        "value": "19.2 vs 10.6"
+      },
+      {
+        "label": "Complexity-adjusted scheduler effect",
+        "value": "≈ −0.7 pts (neutral)"
+      },
+      {
+        "label": "Share of runs migrated",
+        "value": "40%"
+      }
     ],
     "lesson": "When a change is rolled out to the hardest cases first, the treated group looks worse for reasons that have nothing to do with the change. Airflow 2 inherited the heavy, breach-prone DAGs, so it took the blame for their breaches. Before attributing a reliability shift to a new system, ask what was moved onto it — and compare like-for-like DAGs. Adjust for the real driver (complexity) and the scheduler is neutral. A rollback wouldn't fix anything, because the SLA misses live in the DAGs, not the scheduler. The clean test is to run the same DAGs on both schedulers; short of that, stratify before you conclude."
   }

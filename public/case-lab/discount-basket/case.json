@@ -2,7 +2,12 @@
   "id": "discount-basket",
   "title": "Discount-code orders are 3x bigger — blast more codes to grow baskets?",
   "trap": "Reverse causality",
-  "facets": { "topic": "Finance", "skill": ["Reverse causality"] },
+  "facets": {
+    "topic": "Finance",
+    "skill": [
+      "Reverse causality"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the commercial analyst at Cartwheel",
@@ -15,25 +20,133 @@
     "file": "/case-lab/discount-basket/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "order_id", "type": "int", "description": "Unique order identifier" },
-      { "name": "category", "type": "string", "description": "everyday or big_ticket — the kind of purchase" },
-      { "name": "customer_type", "type": "string", "description": "new or repeat customer" },
-      { "name": "items_in_cart", "type": "int", "description": "Number of items in the cart — a proxy for how big a purchase the shopper intended" },
-      { "name": "used_code", "type": "int", "description": "1 if a promo code was applied to the order, else 0" },
-      { "name": "discount_pct", "type": "float", "description": "Fraction discounted when a code was used (0 if no code)" },
-      { "name": "order_value", "type": "float", "description": "Gross basket value before discount, in dollars — the outcome Owen is comparing" }
+      {
+        "name": "order_id",
+        "type": "int",
+        "description": "Unique order identifier"
+      },
+      {
+        "name": "category",
+        "type": "string",
+        "description": "everyday or big_ticket — the kind of purchase"
+      },
+      {
+        "name": "customer_type",
+        "type": "string",
+        "description": "new or repeat customer"
+      },
+      {
+        "name": "items_in_cart",
+        "type": "int",
+        "description": "Number of items in the cart — a proxy for how big a purchase the shopper intended"
+      },
+      {
+        "name": "used_code",
+        "type": "int",
+        "description": "1 if a promo code was applied to the order, else 0"
+      },
+      {
+        "name": "discount_pct",
+        "type": "float",
+        "description": "Fraction discounted when a code was used (0 if no code)"
+      },
+      {
+        "name": "order_value",
+        "type": "float",
+        "description": "Gross basket value before discount, in dollars — the outcome Owen is comparing"
+      }
     ],
     "sample": [
-      { "order_id": 1, "category": "big_ticket", "customer_type": "repeat", "items_in_cart": 5, "used_code": 0, "discount_pct": 0.0, "order_value": 771.29 },
-      { "order_id": 2, "category": "everyday", "customer_type": "new", "items_in_cart": 2, "used_code": 0, "discount_pct": 0.0, "order_value": 37.72 },
-      { "order_id": 3, "category": "big_ticket", "customer_type": "new", "items_in_cart": 10, "used_code": 1, "discount_pct": 0.177, "order_value": 1004.83 },
-      { "order_id": 4, "category": "everyday", "customer_type": "repeat", "items_in_cart": 2, "used_code": 0, "discount_pct": 0.0, "order_value": 14.69 },
-      { "order_id": 5, "category": "everyday", "customer_type": "new", "items_in_cart": 3, "used_code": 0, "discount_pct": 0.0, "order_value": 62.03 },
-      { "order_id": 6, "category": "big_ticket", "customer_type": "new", "items_in_cart": 6, "used_code": 1, "discount_pct": 0.19, "order_value": 353.52 },
-      { "order_id": 7, "category": "big_ticket", "customer_type": "new", "items_in_cart": 7, "used_code": 0, "discount_pct": 0.0, "order_value": 848.43 },
-      { "order_id": 8, "category": "big_ticket", "customer_type": "repeat", "items_in_cart": 2, "used_code": 1, "discount_pct": 0.155, "order_value": 280.18 },
-      { "order_id": 9, "category": "everyday", "customer_type": "repeat", "items_in_cart": 4, "used_code": 0, "discount_pct": 0.0, "order_value": 105.22 },
-      { "order_id": 10, "category": "everyday", "customer_type": "repeat", "items_in_cart": 3, "used_code": 1, "discount_pct": 0.108, "order_value": 31.79 }
+      {
+        "order_id": 1,
+        "category": "big_ticket",
+        "customer_type": "repeat",
+        "items_in_cart": 5,
+        "used_code": 0,
+        "discount_pct": 0.0,
+        "order_value": 771.29
+      },
+      {
+        "order_id": 2,
+        "category": "everyday",
+        "customer_type": "new",
+        "items_in_cart": 2,
+        "used_code": 0,
+        "discount_pct": 0.0,
+        "order_value": 37.72
+      },
+      {
+        "order_id": 3,
+        "category": "big_ticket",
+        "customer_type": "new",
+        "items_in_cart": 10,
+        "used_code": 1,
+        "discount_pct": 0.177,
+        "order_value": 1004.83
+      },
+      {
+        "order_id": 4,
+        "category": "everyday",
+        "customer_type": "repeat",
+        "items_in_cart": 2,
+        "used_code": 0,
+        "discount_pct": 0.0,
+        "order_value": 14.69
+      },
+      {
+        "order_id": 5,
+        "category": "everyday",
+        "customer_type": "new",
+        "items_in_cart": 3,
+        "used_code": 0,
+        "discount_pct": 0.0,
+        "order_value": 62.03
+      },
+      {
+        "order_id": 6,
+        "category": "big_ticket",
+        "customer_type": "new",
+        "items_in_cart": 6,
+        "used_code": 1,
+        "discount_pct": 0.19,
+        "order_value": 353.52
+      },
+      {
+        "order_id": 7,
+        "category": "big_ticket",
+        "customer_type": "new",
+        "items_in_cart": 7,
+        "used_code": 0,
+        "discount_pct": 0.0,
+        "order_value": 848.43
+      },
+      {
+        "order_id": 8,
+        "category": "big_ticket",
+        "customer_type": "repeat",
+        "items_in_cart": 2,
+        "used_code": 1,
+        "discount_pct": 0.155,
+        "order_value": 280.18
+      },
+      {
+        "order_id": 9,
+        "category": "everyday",
+        "customer_type": "repeat",
+        "items_in_cart": 4,
+        "used_code": 0,
+        "discount_pct": 0.0,
+        "order_value": 105.22
+      },
+      {
+        "order_id": 10,
+        "category": "everyday",
+        "customer_type": "repeat",
+        "items_in_cart": 3,
+        "used_code": 1,
+        "discount_pct": 0.108,
+        "order_value": 31.79
+      }
     ]
   },
   "guidingQuestions": [
@@ -50,6 +163,41 @@
     "Adjust for intent (stratify on items_in_cart within category) and see how much of the gap survives.",
     "Quantify the margin cost: discount given per coded order vs the adjusted basket lift, and extrapolate to a blast-to-everyone policy."
   ],
+  "notebook": {
+    "intro": "Five steps: reproduce the basket gap, work out who reaches for a code, and price what blasting codes would really cost.",
+    "cells": [
+      {
+        "title": "Reproduce the headline",
+        "explain": "Mean order value for coded and non-coded orders — the claim behind the blast.",
+        "code": "means = df.groupby(\"used_code\")[\"order_value\"].mean()\nheadline_ratio = means[1] / means[0]\nprint(f\"coded orders are {headline_ratio:.2f}x bigger on the raw comparison\")\nmeans.round(2)",
+        "reads": "Coded orders really are much bigger. Whether the code made them bigger is a different claim."
+      },
+      {
+        "title": "Profile who uses codes",
+        "explain": "Compare basket intent and category across coded and non-coded orders.",
+        "code": "profile = df.groupby(\"used_code\")[\"items_in_cart\"].agg([\"mean\", \"median\", \"count\"])\nprint(\"basket size by code use:\")\nprint(profile.round(2))\npd.crosstab(df[\"used_code\"], df[\"category\"], normalize=\"index\").round(3) * 100",
+        "reads": "Code users were already buying more items, and skew towards the big-ticket category."
+      },
+      {
+        "title": "Name the causal direction",
+        "explain": "A large intended basket sends someone hunting for a code. Check whether code use rises with basket size.",
+        "code": "df[\"basket_band\"] = pd.qcut(df[\"items_in_cart\"], 5, labels=False, duplicates=\"drop\")\nby_band = df.groupby(\"basket_band\")[\"used_code\"].mean() * 100\nprint(\"share of orders using a code, by basket size band (%)\")\nby_band.round(1)",
+        "reads": "Code use climbs with basket size. The code marks a big basket rather than creating one — the arrow runs the other way."
+      },
+      {
+        "title": "Hold basket intent and category constant",
+        "explain": "Compare coded against non-coded orders at the same basket size within the same category.",
+        "code": "within = df.groupby([\"category\", \"basket_band\", \"used_code\"])[\"order_value\"].mean().unstack()\ncell_weights = df.groupby([\"category\", \"basket_band\"]).size()\ncell_weights = cell_weights / cell_weights.sum()\nadjusted = within.mul(cell_weights, axis=0).sum()\nadj_ratio = adjusted[1] / adjusted[0]\nprint(f\"like-for-like, coded orders are {adj_ratio:.2f}x non-coded\")\nwithin.round(2)",
+        "reads": "Comparing like with like, almost all of the 3x disappears."
+      },
+      {
+        "title": "Price the blast",
+        "explain": "Set the surviving lift against the discount actually given away per coded order.",
+        "code": "coded = df[df[\"used_code\"] == 1]\ndiscount_cost = (coded[\"order_value\"] * coded[\"discount_pct\"]).mean()\nlift_value = adjusted[1] - adjusted[0]\npd.DataFrame(\n    {\"per coded order\": [lift_value, -discount_cost, lift_value - discount_cost]},\n    index=[\"adjusted basket lift\", \"discount given away\", \"net\"],\n).round(2)",
+        "reads": "Once the lift is measured like-for-like, the discount can cost more than the extra basket it buys."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "Coded orders average $374 versus $119 for non-coded — a $255 gap, more than 3x. Read directly, codes look like a powerful basket-builder and mailing them to everyone looks like an easy way to lift AOV.",
     "theTrap": "The arrow points the other way. Shoppers planning a big, considered purchase are the ones who pause to search for a promo code before checking out — so a large intended basket causes code use, not the reverse. Code users were already buying more: they average 5 items per cart versus 3 for non-code orders, and skew toward big-ticket categories. The code is a marker of a big planned purchase, not its cause. Comparing coded to non-coded orders compares big-basket shoppers to small-basket shoppers and credits the code with the difference.",
@@ -62,10 +210,22 @@
       "Cost it: average discount given per coded order ≈ $56 against a ~$2 lift → the policy is margin-negative on purchases that would have happened anyway."
     ],
     "numbers": [
-      { "label": "Naive basket gap (coded − not)", "value": "$374 vs $119 (+$255)" },
-      { "label": "Mean items in cart — coded vs not", "value": "5 vs 3" },
-      { "label": "Intent-adjusted code effect on basket", "value": "≈ +$2" },
-      { "label": "Discount given per coded order", "value": "≈ $56" }
+      {
+        "label": "Naive basket gap (coded − not)",
+        "value": "$374 vs $119 (+$255)"
+      },
+      {
+        "label": "Mean items in cart — coded vs not",
+        "value": "5 vs 3"
+      },
+      {
+        "label": "Intent-adjusted code effect on basket",
+        "value": "≈ +$2"
+      },
+      {
+        "label": "Discount given per coded order",
+        "value": "≈ $56"
+      }
     ],
     "lesson": "Correlation with an outcome doesn't tell you which way the causation runs. Here the tempting story — codes cause big baskets — is backwards: big baskets cause code use, because people hunt for a code before a considered purchase. Whenever a behaviour and an outcome move together, ask whether the outcome could be driving the behaviour, and find a pre-treatment measure of intent to adjust for. Do that and a 3x story becomes a rounding error — plus a margin leak. The clean way to learn a code's real effect is to randomise who receives it and read net revenue, not to compare the people who already chose to redeem one."
   }

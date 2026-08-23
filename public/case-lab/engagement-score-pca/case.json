@@ -2,7 +2,12 @@
   "id": "engagement-score-pca",
   "title": "PC1 explains 99% of the engagement variance — score users on it?",
   "trap": "Explained variance ≠ relevance",
-  "facets": { "topic": "Marketing", "skill": ["Explained variance ≠ relevance"] },
+  "facets": {
+    "topic": "Marketing",
+    "skill": [
+      "Explained variance ≠ relevance"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the lifecycle/growth analyst at Fernglow",
@@ -15,25 +20,133 @@
     "file": "/case-lab/engagement-score-pca/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "user_id", "type": "int", "description": "Unique user identifier" },
-      { "name": "days_since_signup", "type": "int", "description": "Days since the user signed up (1-365)" },
-      { "name": "page_views", "type": "float", "description": "Total page views in the last 90 days" },
-      { "name": "purchase_count", "type": "int", "description": "Purchases/subscriptions completed in the last 90 days (0-10)" },
-      { "name": "email_opens", "type": "int", "description": "Marketing emails opened in the last 90 days (0-20)" },
-      { "name": "retained_90d", "type": "int", "description": "1 if the user was still active 90 days later — the outcome a win-back campaign should be targeting" },
-      { "name": "pc1_score", "type": "float", "description": "The user's score on the first principal component, computed from PCA fit on the four raw (unscaled) metrics above" }
+      {
+        "name": "user_id",
+        "type": "int",
+        "description": "Unique user identifier"
+      },
+      {
+        "name": "days_since_signup",
+        "type": "int",
+        "description": "Days since the user signed up (1-365)"
+      },
+      {
+        "name": "page_views",
+        "type": "float",
+        "description": "Total page views in the last 90 days"
+      },
+      {
+        "name": "purchase_count",
+        "type": "int",
+        "description": "Purchases/subscriptions completed in the last 90 days (0-10)"
+      },
+      {
+        "name": "email_opens",
+        "type": "int",
+        "description": "Marketing emails opened in the last 90 days (0-20)"
+      },
+      {
+        "name": "retained_90d",
+        "type": "int",
+        "description": "1 if the user was still active 90 days later — the outcome a win-back campaign should be targeting"
+      },
+      {
+        "name": "pc1_score",
+        "type": "float",
+        "description": "The user's score on the first principal component, computed from PCA fit on the four raw (unscaled) metrics above"
+      }
     ],
     "sample": [
-      { "user_id": 1, "days_since_signup": 215, "page_views": 50.0, "purchase_count": 0, "email_opens": 5, "retained_90d": 0, "pc1_score": -823.54 },
-      { "user_id": 2, "days_since_signup": 154, "page_views": 394.0, "purchase_count": 5, "email_opens": 2, "retained_90d": 1, "pc1_score": -479.6 },
-      { "user_id": 3, "days_since_signup": 131, "page_views": 251.0, "purchase_count": 1, "email_opens": 9, "retained_90d": 0, "pc1_score": -622.62 },
-      { "user_id": 4, "days_since_signup": 338, "page_views": 299.0, "purchase_count": 1, "email_opens": 9, "retained_90d": 1, "pc1_score": -574.42 },
-      { "user_id": 5, "days_since_signup": 139, "page_views": 150.0, "purchase_count": 2, "email_opens": 3, "retained_90d": 1, "pc1_score": -723.61 },
-      { "user_id": 6, "days_since_signup": 100, "page_views": 764.0, "purchase_count": 3, "email_opens": 5, "retained_90d": 1, "pc1_score": -109.65 },
-      { "user_id": 7, "days_since_signup": 320, "page_views": 57.0, "purchase_count": 1, "email_opens": 5, "retained_90d": 0, "pc1_score": -816.44 },
-      { "user_id": 8, "days_since_signup": 22, "page_views": 481.0, "purchase_count": 3, "email_opens": 2, "retained_90d": 0, "pc1_score": -392.72 },
-      { "user_id": 9, "days_since_signup": 162, "page_views": 248.0, "purchase_count": 2, "email_opens": 3, "retained_90d": 1, "pc1_score": -625.59 },
-      { "user_id": 10, "days_since_signup": 114, "page_views": 181.0, "purchase_count": 3, "email_opens": 9, "retained_90d": 1, "pc1_score": -692.63 }
+      {
+        "user_id": 1,
+        "days_since_signup": 215,
+        "page_views": 50.0,
+        "purchase_count": 0,
+        "email_opens": 5,
+        "retained_90d": 0,
+        "pc1_score": -823.54
+      },
+      {
+        "user_id": 2,
+        "days_since_signup": 154,
+        "page_views": 394.0,
+        "purchase_count": 5,
+        "email_opens": 2,
+        "retained_90d": 1,
+        "pc1_score": -479.6
+      },
+      {
+        "user_id": 3,
+        "days_since_signup": 131,
+        "page_views": 251.0,
+        "purchase_count": 1,
+        "email_opens": 9,
+        "retained_90d": 0,
+        "pc1_score": -622.62
+      },
+      {
+        "user_id": 4,
+        "days_since_signup": 338,
+        "page_views": 299.0,
+        "purchase_count": 1,
+        "email_opens": 9,
+        "retained_90d": 1,
+        "pc1_score": -574.42
+      },
+      {
+        "user_id": 5,
+        "days_since_signup": 139,
+        "page_views": 150.0,
+        "purchase_count": 2,
+        "email_opens": 3,
+        "retained_90d": 1,
+        "pc1_score": -723.61
+      },
+      {
+        "user_id": 6,
+        "days_since_signup": 100,
+        "page_views": 764.0,
+        "purchase_count": 3,
+        "email_opens": 5,
+        "retained_90d": 1,
+        "pc1_score": -109.65
+      },
+      {
+        "user_id": 7,
+        "days_since_signup": 320,
+        "page_views": 57.0,
+        "purchase_count": 1,
+        "email_opens": 5,
+        "retained_90d": 0,
+        "pc1_score": -816.44
+      },
+      {
+        "user_id": 8,
+        "days_since_signup": 22,
+        "page_views": 481.0,
+        "purchase_count": 3,
+        "email_opens": 2,
+        "retained_90d": 0,
+        "pc1_score": -392.72
+      },
+      {
+        "user_id": 9,
+        "days_since_signup": 162,
+        "page_views": 248.0,
+        "purchase_count": 2,
+        "email_opens": 3,
+        "retained_90d": 1,
+        "pc1_score": -625.59
+      },
+      {
+        "user_id": 10,
+        "days_since_signup": 114,
+        "page_views": 181.0,
+        "purchase_count": 3,
+        "email_opens": 9,
+        "retained_90d": 1,
+        "pc1_score": -692.63
+      }
     ]
   },
   "guidingQuestions": [
@@ -50,6 +163,41 @@
     "Check the scale of each input column — page_views should dwarf the other three, explaining why PCA loaded almost entirely onto it.",
     "Conclude which metric should actually drive the win-back targeting, and why 'explains the most variance' isn't the same question as 'predicts who comes back.'"
   ],
+  "notebook": {
+    "intro": "Five steps: find out what PC1 is really summarising, then check whether it predicts the thing you care about.",
+    "cells": [
+      {
+        "title": "Find out what PC1 is made of",
+        "explain": "Correlate pc1_score against each raw input to see which one it is really tracking.",
+        "code": "inputs = [\"days_since_signup\", \"page_views\", \"purchase_count\", \"email_opens\"]\nloadings = df[inputs].corrwith(df[\"pc1_score\"]).sort_values(ascending=False)\nprint(\"correlation of PC1 with each input:\")\nloadings.round(3)",
+        "reads": "PC1 is almost entirely one input. It is not a blend of engagement; it is a rename."
+      },
+      {
+        "title": "Check PC1 against the outcome",
+        "explain": "The number that matters for targeting is how well PC1 predicts retention, not how much variance it explains.",
+        "code": "pc1_corr = df[\"pc1_score\"].corr(df[\"retained_90d\"])\nprint(f\"correlation of PC1 with retained_90d: {pc1_corr:.3f}\")\ndf.groupby(pd.qcut(df[\"pc1_score\"], 5, labels=False, duplicates=\"drop\"))[\"retained_90d\"].mean().round(3) * 100",
+        "reads": "For all its explained variance, PC1 barely moves retention across its range."
+      },
+      {
+        "title": "Check each raw metric against the outcome",
+        "explain": "Correlate every input with retention separately and compare them to PC1.",
+        "code": "raw_corr = df[inputs].corrwith(df[\"retained_90d\"]).sort_values(key=abs, ascending=False)\nprint(\"correlation with retained_90d:\")\nraw_corr.round(3)",
+        "reads": "At least one raw metric predicts retention far better than PC1 does."
+      },
+      {
+        "title": "Check the scales",
+        "explain": "PCA is scale-sensitive. Look at the spread of each input in raw units.",
+        "code": "scales = df[inputs].agg([\"mean\", \"std\", \"min\", \"max\"]).T\nscales.round(2)",
+        "reads": "One column's scale dwarfs the others, which is exactly why PCA loaded onto it and ignored the rest."
+      },
+      {
+        "title": "Explained variance is not relevance",
+        "explain": "Put PC1's correlation with the outcome beside the best raw metric's.",
+        "code": "best = raw_corr.abs().idxmax()\npd.DataFrame(\n    {\"correlation with retention\": [pc1_corr, df[best].corr(df[\"retained_90d\"])]},\n    index=[\"PC1 (explains the most variance)\", best + \" (predicts the outcome)\"],\n).round(3)",
+        "reads": "Explaining the most variance answers a question nobody asked. Targeting should follow the metric that predicts who comes back."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "PC1 explains 99% of the variance across the four engagement metrics. That reads like PC1 has distilled almost everything worth knowing about a user into one number — ready to rank and target on.",
     "theTrap": "PCA finds the direction of maximum *variance*, with no idea which column predicts the outcome you actually care about. page_views ranges into the thousands while purchase_count tops out at 10 and email_opens at 20 — page_views' raw variance is so much larger that PC1 loads almost entirely onto it (loading ≈ 1.00 on page_views, ≈ 0 on everything else). PC1 isn't an engagement score; it's page_views wearing a disguise. And page_views barely relates to 90-day retention (correlation ≈ -0.01) — retention is actually driven by purchase_count (correlation ≈ 0.38, by far the strongest signal), with email_opens a weak secondary factor (≈ 0.06). The metric that 'explains the most variance' is nearly useless for predicting who comes back.",
@@ -62,11 +210,26 @@
       "Compare column scales: page_views ranges into the thousands vs. single digits/tens for the others — explaining why unscaled PCA collapsed onto it."
     ],
     "numbers": [
-      { "label": "PC1 explained variance", "value": "99%" },
-      { "label": "PC1's loading on page_views", "value": "≈ 1.00 (all other loadings ≈ 0)" },
-      { "label": "Correlation: PC1 vs. 90-day retention", "value": "≈ -0.01" },
-      { "label": "Correlation: purchase_count vs. 90-day retention", "value": "≈ 0.38 (strongest predictor)" },
-      { "label": "Correlation: email_opens vs. 90-day retention", "value": "≈ 0.06" }
+      {
+        "label": "PC1 explained variance",
+        "value": "99%"
+      },
+      {
+        "label": "PC1's loading on page_views",
+        "value": "≈ 1.00 (all other loadings ≈ 0)"
+      },
+      {
+        "label": "Correlation: PC1 vs. 90-day retention",
+        "value": "≈ -0.01"
+      },
+      {
+        "label": "Correlation: purchase_count vs. 90-day retention",
+        "value": "≈ 0.38 (strongest predictor)"
+      },
+      {
+        "label": "Correlation: email_opens vs. 90-day retention",
+        "value": "≈ 0.06"
+      }
     ],
     "lesson": "Explained variance measures how much a component captures about the *spread* of your inputs, not whether it relates to the outcome you actually care about — and PCA is scale-sensitive, so an unscaled feature with a big numeric range will dominate the first component regardless of its real-world importance. Before ranking or targeting users on a component, correlate it against the actual outcome, and check whether one raw input's scale is doing all the work. A score that summarizes 99% of the data's variance can still summarize none of what you need to know."
   }

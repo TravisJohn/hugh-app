@@ -2,7 +2,12 @@
   "id": "schema-validation",
   "title": "Incidents fell on the tables we validated — did validation work?",
   "trap": "Regression to the mean",
-  "facets": { "topic": "Data Engineering", "skill": ["Regression to the mean"] },
+  "facets": {
+    "topic": "Data Engineering",
+    "skill": [
+      "Regression to the mean"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the data engineer at Corva",
@@ -15,24 +20,118 @@
     "file": "/case-lab/schema-validation/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "table_id", "type": "int", "description": "Unique table identifier" },
-      { "name": "domain", "type": "string", "description": "Business domain the table serves: finance, marketing, product, ops, or growth" },
-      { "name": "owner_team", "type": "string", "description": "Team that owns the table: ingest, core-model, activation, or reporting" },
-      { "name": "incidents_h1", "type": "int", "description": "Data-quality incidents logged against the table in the first half (H1), BEFORE validation" },
-      { "name": "got_validation", "type": "int", "description": "1 if schema/contract validation was added to the table for H2, else 0" },
-      { "name": "incidents_h2", "type": "int", "description": "Data-quality incidents logged in the second half (H2) — the outcome" }
+      {
+        "name": "table_id",
+        "type": "int",
+        "description": "Unique table identifier"
+      },
+      {
+        "name": "domain",
+        "type": "string",
+        "description": "Business domain the table serves: finance, marketing, product, ops, or growth"
+      },
+      {
+        "name": "owner_team",
+        "type": "string",
+        "description": "Team that owns the table: ingest, core-model, activation, or reporting"
+      },
+      {
+        "name": "incidents_h1",
+        "type": "int",
+        "description": "Data-quality incidents logged against the table in the first half (H1), BEFORE validation"
+      },
+      {
+        "name": "got_validation",
+        "type": "int",
+        "description": "1 if schema/contract validation was added to the table for H2, else 0"
+      },
+      {
+        "name": "incidents_h2",
+        "type": "int",
+        "description": "Data-quality incidents logged in the second half (H2) — the outcome"
+      }
     ],
     "sample": [
-      { "table_id": 1, "domain": "ops", "owner_team": "core-model", "incidents_h1": 1, "got_validation": 0, "incidents_h2": 2 },
-      { "table_id": 2, "domain": "marketing", "owner_team": "core-model", "incidents_h1": 1, "got_validation": 0, "incidents_h2": 1 },
-      { "table_id": 3, "domain": "growth", "owner_team": "ingest", "incidents_h1": 7, "got_validation": 0, "incidents_h2": 4 },
-      { "table_id": 4, "domain": "product", "owner_team": "reporting", "incidents_h1": 2, "got_validation": 0, "incidents_h2": 0 },
-      { "table_id": 5, "domain": "finance", "owner_team": "ingest", "incidents_h1": 4, "got_validation": 0, "incidents_h2": 2 },
-      { "table_id": 6, "domain": "growth", "owner_team": "ingest", "incidents_h1": 12, "got_validation": 1, "incidents_h2": 9 },
-      { "table_id": 7, "domain": "ops", "owner_team": "ingest", "incidents_h1": 0, "got_validation": 0, "incidents_h2": 2 },
-      { "table_id": 8, "domain": "ops", "owner_team": "reporting", "incidents_h1": 2, "got_validation": 0, "incidents_h2": 7 },
-      { "table_id": 9, "domain": "finance", "owner_team": "activation", "incidents_h1": 1, "got_validation": 0, "incidents_h2": 3 },
-      { "table_id": 10, "domain": "product", "owner_team": "core-model", "incidents_h1": 3, "got_validation": 0, "incidents_h2": 1 }
+      {
+        "table_id": 1,
+        "domain": "ops",
+        "owner_team": "core-model",
+        "incidents_h1": 1,
+        "got_validation": 0,
+        "incidents_h2": 2
+      },
+      {
+        "table_id": 2,
+        "domain": "marketing",
+        "owner_team": "core-model",
+        "incidents_h1": 1,
+        "got_validation": 0,
+        "incidents_h2": 1
+      },
+      {
+        "table_id": 3,
+        "domain": "growth",
+        "owner_team": "ingest",
+        "incidents_h1": 7,
+        "got_validation": 0,
+        "incidents_h2": 4
+      },
+      {
+        "table_id": 4,
+        "domain": "product",
+        "owner_team": "reporting",
+        "incidents_h1": 2,
+        "got_validation": 0,
+        "incidents_h2": 0
+      },
+      {
+        "table_id": 5,
+        "domain": "finance",
+        "owner_team": "ingest",
+        "incidents_h1": 4,
+        "got_validation": 0,
+        "incidents_h2": 2
+      },
+      {
+        "table_id": 6,
+        "domain": "growth",
+        "owner_team": "ingest",
+        "incidents_h1": 12,
+        "got_validation": 1,
+        "incidents_h2": 9
+      },
+      {
+        "table_id": 7,
+        "domain": "ops",
+        "owner_team": "ingest",
+        "incidents_h1": 0,
+        "got_validation": 0,
+        "incidents_h2": 2
+      },
+      {
+        "table_id": 8,
+        "domain": "ops",
+        "owner_team": "reporting",
+        "incidents_h1": 2,
+        "got_validation": 0,
+        "incidents_h2": 7
+      },
+      {
+        "table_id": 9,
+        "domain": "finance",
+        "owner_team": "activation",
+        "incidents_h1": 1,
+        "got_validation": 0,
+        "incidents_h2": 3
+      },
+      {
+        "table_id": 10,
+        "domain": "product",
+        "owner_team": "core-model",
+        "incidents_h1": 3,
+        "got_validation": 0,
+        "incidents_h2": 1
+      }
     ]
   },
   "guidingQuestions": [
@@ -49,6 +148,41 @@
     "Difference the two: within each H1 count, take (treated H1→H2 change) minus (control H1→H2 change). That nets out the reversion both groups share.",
     "State the honest effect and what a warehouse-wide rollout — applied to average tables, not just the worst — should be expected to deliver."
   ],
+  "notebook": {
+    "intro": "Five steps: reproduce the incident drop, notice which tables were chosen, then difference against untreated tables that were equally bad.",
+    "cells": [
+      {
+        "title": "Reproduce the headline",
+        "explain": "The change in incidents among validated tables, in absolute terms and as a share of their H1 level.",
+        "code": "df[\"change\"] = df[\"incidents_h2\"] - df[\"incidents_h1\"]\ntreated = df[df[\"got_validation\"] == 1]\ndrop = treated[\"change\"].mean()\npct = drop / treated[\"incidents_h1\"].mean()\nprint(f\"validated tables fell by {drop:.2f} incidents, {pct:.1%} of their H1 average\")\ntreated[[\"incidents_h1\", \"incidents_h2\"]].mean().round(2)",
+        "reads": "The drop is large. Whether validation caused it depends on which tables were chosen."
+      },
+      {
+        "title": "Describe the selection",
+        "explain": "Validated tables were not a random sample — they were picked for being the worst in H1. Confirm that.",
+        "code": "starts = df.groupby(\"got_validation\")[\"incidents_h1\"].agg([\"mean\", \"median\", \"count\"])\nprint(\"H1 incidents by group:\")\nstarts.round(2)",
+        "reads": "The treated group starts far worse. Any group selected on an extreme has somewhere to fall back to."
+      },
+      {
+        "title": "Build the counterfactual",
+        "explain": "Look at untreated tables that were equally bad in H1. If they fall too, part of the treated drop is reversion.",
+        "code": "control = df[df[\"got_validation\"] == 0]\nby_h1 = control.groupby(\"incidents_h1\")[\"change\"].mean()\nprint(\"H1 to H2 change among UNTREATED tables, by H1 incident count:\")\nby_h1.round(2)",
+        "reads": "Untreated tables that were bad in H1 improve on their own. Nothing was done to them."
+      },
+      {
+        "title": "Difference the two",
+        "explain": "Within each H1 count, take the treated change minus the control change. That nets out the reversion both share.",
+        "code": "within = df.groupby([\"incidents_h1\", \"got_validation\"])[\"change\"].mean().unstack().dropna()\ntreated_weights = treated[\"incidents_h1\"].value_counts(normalize=True)\ntreated_weights = treated_weights.reindex(within.index).fillna(0)\ntreated_weights = treated_weights / treated_weights.sum()\neffect = ((within[1] - within[0]) * treated_weights).sum()\nprint(f\"validation effect, net of reversion: {effect:+.2f} incidents\")\nwithin.round(2)",
+        "reads": "Against equally-bad untreated tables, validation is worth much less than the raw drop."
+      },
+      {
+        "title": "Forecast a warehouse-wide rollout",
+        "explain": "A rollout applies validation to average tables, not just the worst ones.",
+        "code": "pd.DataFrame(\n    {\"incidents\": [drop, effect]},\n    index=[\"raw drop among validated\", \"net of reversion\"],\n).round(2)",
+        "reads": "Rolling out on the strength of the raw drop promises a fall that mostly came from picking the worst tables."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "Validated tables averaged ~7.2 incidents in H1 and fell ~1.5 in H2 — about a 21% drop. Read directly, validation looks like it removed a fifth of incidents, and applying it everywhere looks like a fifth off the whole warehouse.",
     "theTrap": "Validation was applied to the tables with the worst H1 incident counts — not a random sample, the extreme tail. Each table has a fairly stable underlying quality; a single half-year's incident count is a noisy draw around it. The tables that looked worst in H1 were partly just unlucky that half, and an unlucky draw is followed by a more typical one — they fall back toward their own average in H2 whether or not anyone touches them. This is regression to the mean, and it's the entire shape of the naive result. The tell is in the untreated tables that were equally bad in H1: with no validation at all, they fell by the SAME ~1.5 incidents.",
@@ -61,10 +195,22 @@
       "Sanity-check: the honest effect is far smaller than the naive one, and the near-identical drop in the untreated-high group confirms mean-reversion is doing the work."
     ],
     "numbers": [
-      { "label": "Naive drop on validated tables", "value": "−1.5 incidents (~21%)" },
-      { "label": "Mean H1 incidents — validated vs not", "value": "7.2 vs 2.4" },
-      { "label": "Untreated-but-equally-bad tables' drop", "value": "−1.5 incidents (no validation)" },
-      { "label": "Diff-in-diff validation effect", "value": "≈ −0.45 incidents (~6-7%)" }
+      {
+        "label": "Naive drop on validated tables",
+        "value": "−1.5 incidents (~21%)"
+      },
+      {
+        "label": "Mean H1 incidents — validated vs not",
+        "value": "7.2 vs 2.4"
+      },
+      {
+        "label": "Untreated-but-equally-bad tables' drop",
+        "value": "−1.5 incidents (no validation)"
+      },
+      {
+        "label": "Diff-in-diff validation effect",
+        "value": "≈ −0.45 incidents (~6-7%)"
+      }
     ],
     "lesson": "When you act on the worst performers and measure them again, they improve — even if you did nothing. Extreme values are extreme partly by luck, and luck doesn't repeat, so the tail reverts toward the mean on its own. Selecting on H1 and then celebrating the H2 drop bakes that reversion into your estimate. The fix is a control group that was equally extreme but untreated: the difference between their change and the treated group's change is the real effect. Here that turns a 21% story into a ~6% one. Any 'we fixed the worst X and they got better' claim deserves this same reflex — build the counterfactual before you scale the intervention."
   }

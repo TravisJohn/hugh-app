@@ -2,7 +2,12 @@
   "id": "push-notification-bandit-simpson",
   "title": "The new notification timing gets a higher open rate overall — switch everyone to it?",
   "trap": "Bandit traffic-allocation paradox",
-  "facets": { "topic": "Marketing", "skill": ["Bandit traffic-allocation paradox"] },
+  "facets": {
+    "topic": "Marketing",
+    "skill": [
+      "Bandit traffic-allocation paradox"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the lifecycle-marketing analyst at Dayspring",
@@ -15,22 +20,88 @@
     "file": "/case-lab/push-notification-bandit-simpson/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "notification_id", "type": "int", "description": "Unique push notification send identifier" },
-      { "name": "user_cohort", "type": "string", "description": "weekday_active or weekend_only — the user's usage pattern" },
-      { "name": "arm", "type": "string", "description": "new_timing or old_timing — which send time this notification used (allocated unevenly by cohort — weekday_active got new_timing far more often than weekend_only did)" },
-      { "name": "opened", "type": "int", "description": "1 if the notification was opened — the reward" }
+      {
+        "name": "notification_id",
+        "type": "int",
+        "description": "Unique push notification send identifier"
+      },
+      {
+        "name": "user_cohort",
+        "type": "string",
+        "description": "weekday_active or weekend_only — the user's usage pattern"
+      },
+      {
+        "name": "arm",
+        "type": "string",
+        "description": "new_timing or old_timing — which send time this notification used (allocated unevenly by cohort — weekday_active got new_timing far more often than weekend_only did)"
+      },
+      {
+        "name": "opened",
+        "type": "int",
+        "description": "1 if the notification was opened — the reward"
+      }
     ],
     "sample": [
-      { "notification_id": 1, "user_cohort": "weekend_only", "arm": "old_timing", "opened": 0 },
-      { "notification_id": 2, "user_cohort": "weekday_active", "arm": "new_timing", "opened": 0 },
-      { "notification_id": 3, "user_cohort": "weekend_only", "arm": "old_timing", "opened": 1 },
-      { "notification_id": 4, "user_cohort": "weekday_active", "arm": "new_timing", "opened": 1 },
-      { "notification_id": 5, "user_cohort": "weekday_active", "arm": "new_timing", "opened": 1 },
-      { "notification_id": 6, "user_cohort": "weekday_active", "arm": "old_timing", "opened": 1 },
-      { "notification_id": 7, "user_cohort": "weekday_active", "arm": "old_timing", "opened": 0 },
-      { "notification_id": 8, "user_cohort": "weekday_active", "arm": "new_timing", "opened": 0 },
-      { "notification_id": 9, "user_cohort": "weekday_active", "arm": "new_timing", "opened": 1 },
-      { "notification_id": 10, "user_cohort": "weekday_active", "arm": "new_timing", "opened": 1 }
+      {
+        "notification_id": 1,
+        "user_cohort": "weekend_only",
+        "arm": "old_timing",
+        "opened": 0
+      },
+      {
+        "notification_id": 2,
+        "user_cohort": "weekday_active",
+        "arm": "new_timing",
+        "opened": 0
+      },
+      {
+        "notification_id": 3,
+        "user_cohort": "weekend_only",
+        "arm": "old_timing",
+        "opened": 1
+      },
+      {
+        "notification_id": 4,
+        "user_cohort": "weekday_active",
+        "arm": "new_timing",
+        "opened": 1
+      },
+      {
+        "notification_id": 5,
+        "user_cohort": "weekday_active",
+        "arm": "new_timing",
+        "opened": 1
+      },
+      {
+        "notification_id": 6,
+        "user_cohort": "weekday_active",
+        "arm": "old_timing",
+        "opened": 1
+      },
+      {
+        "notification_id": 7,
+        "user_cohort": "weekday_active",
+        "arm": "old_timing",
+        "opened": 0
+      },
+      {
+        "notification_id": 8,
+        "user_cohort": "weekday_active",
+        "arm": "new_timing",
+        "opened": 0
+      },
+      {
+        "notification_id": 9,
+        "user_cohort": "weekday_active",
+        "arm": "new_timing",
+        "opened": 1
+      },
+      {
+        "notification_id": 10,
+        "user_cohort": "weekday_active",
+        "arm": "new_timing",
+        "opened": 1
+      }
     ]
   },
   "guidingQuestions": [
@@ -47,6 +118,41 @@
     "Compare baseline open rates by cohort to see whether one cohort opens substantially more than the other regardless of timing.",
     "Explain how an uneven traffic split across a higher- and lower-opening cohort can flip the pooled sign relative to every individual cohort — classic Simpson's paradox."
   ],
+  "notebook": {
+    "intro": "Five steps: reproduce the pooled win, check how the sends were allocated, then compare the timings on equal ground.",
+    "cells": [
+      {
+        "title": "Reproduce the pooled gap",
+        "explain": "Start with the claim itself — new_timing's open rate minus old_timing's, across every notification.",
+        "code": "rates = df.groupby(\"arm\")[\"opened\"].mean() * 100\npooled_gap = rates[\"new_timing\"] - rates[\"old_timing\"]\nprint(f\"pooled gap (new_timing - old_timing): {pooled_gap:+.2f} pts\")\nrates.round(2)",
+        "reads": "The pooled number favours the new timing. The question is whether the two arms were sent to comparable people."
+      },
+      {
+        "title": "Check how the sends were allocated",
+        "explain": "Look at what share of each cohort's notifications went to each arm. An even split would make the pooled number trustworthy.",
+        "code": "mix = pd.crosstab(df[\"user_cohort\"], df[\"arm\"], normalize=\"index\") * 100\nprint(\"share of each arm within each cohort (%)\")\nmix.round(1)",
+        "reads": "The allocation leans opposite ways in the two cohorts, so the arms are not facing the same audience."
+      },
+      {
+        "title": "Compare the timings within each cohort",
+        "explain": "Hold the cohort constant so the allocation cannot do any of the work.",
+        "code": "by_cohort = df.groupby([\"user_cohort\", \"arm\"])[\"opened\"].mean().unstack() * 100\nby_cohort[\"gap\"] = by_cohort[\"new_timing\"] - by_cohort[\"old_timing\"]\nby_cohort.round(2)",
+        "reads": "Check the sign of the gap in each cohort against the pooled gap from cell 1."
+      },
+      {
+        "title": "See which cohort opens more anyway",
+        "explain": "A mix can only flip a result if the segments differ in the outcome too. Check that here.",
+        "code": "baseline = df.groupby(\"user_cohort\")[\"opened\"].mean() * 100\nprint(\"open rate by cohort, ignoring the arm (%)\")\nbaseline.round(2)",
+        "reads": "One cohort opens far more regardless of timing — and it is the cohort the new timing was given most of."
+      },
+      {
+        "title": "Put the two numbers side by side",
+        "explain": "Re-weight both arms to one common cohort mix and compare again.",
+        "code": "within = df.groupby([\"user_cohort\", \"arm\"])[\"opened\"].mean().unstack()\nweights = df[\"user_cohort\"].value_counts(normalize=True)\nadjusted = within.mul(weights, axis=0).sum() * 100\nadj_gap = adjusted[\"new_timing\"] - adjusted[\"old_timing\"]\nprint(f\"mix-adjusted gap: {adj_gap:+.2f} pts\")\npd.DataFrame({\"effect (pts)\": [pooled_gap, adj_gap]}, index=[\"pooled\", \"mix-adjusted\"]).round(2)",
+        "reads": "Once both arms face the same cohort mix the pooled advantage does not survive. The allocation was the story."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "Pooled across all notifications, the new send timing gets a higher open rate than the old one. That reads as a clear win — obviously switch everyone to it.",
     "theTrap": "The rollout policy didn't allocate the new timing evenly: weekday-active users got new_timing 72% of the time, while weekend-only users got it only 28% of the time (a weekday-first ramp). Weekday-active users also open notifications far more than weekend-only users regardless of timing. Split the comparison by cohort and the new timing actually LOSES in both: -1.7 points for weekday-active and -4.0 points for weekend-only. But because the new timing's traffic is disproportionately weekday-active (the higher-opening cohort) and the old timing's traffic is disproportionately weekend-only (the lower-opening cohort), the pooled comparison mixes a favorable cohort for the new timing with an unfavorable one for the old timing — and the pooled number flips positive even though the new timing never actually wins anywhere. This is Simpson's paradox, driven here by unequal bandit/rollout allocation rather than a random split.",
@@ -59,10 +165,22 @@
       "Conclude: the pooled 'win' is a mix-shift artifact of unequal traffic allocation, not a real effect of the new timing — Simpson's paradox."
     ],
     "numbers": [
-      { "label": "Pooled open-rate gap (new_timing − old_timing)", "value": "+3.8 points" },
-      { "label": "new_timing share of traffic: weekday_active vs. weekend_only", "value": "72% vs. 28%" },
-      { "label": "Open-rate gap within weekday_active", "value": "-1.7 points (old_timing wins)" },
-      { "label": "Open-rate gap within weekend_only", "value": "-4.0 points (old_timing wins)" }
+      {
+        "label": "Pooled open-rate gap (new_timing − old_timing)",
+        "value": "+3.8 points"
+      },
+      {
+        "label": "new_timing share of traffic: weekday_active vs. weekend_only",
+        "value": "72% vs. 28%"
+      },
+      {
+        "label": "Open-rate gap within weekday_active",
+        "value": "-1.7 points (old_timing wins)"
+      },
+      {
+        "label": "Open-rate gap within weekend_only",
+        "value": "-4.0 points (old_timing wins)"
+      }
     ],
     "lesson": "A bandit or phased rollout that allocates traffic unevenly across segments — even for reasonable operational reasons, like ramping the most active users first — can produce a pooled result that reverses what's true in every individual segment, the same Simpson's paradox mechanism as any confounded observational comparison. Whenever an arm's traffic share differs across a variable that also affects the outcome, split the comparison by that variable before trusting the pooled number. A policy that loses in every segment cannot be a real winner overall — the pooled 'win' is measuring the traffic mix, not the policy."
   }

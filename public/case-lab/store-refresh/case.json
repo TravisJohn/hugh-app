@@ -2,7 +2,12 @@
   "id": "store-refresh",
   "title": "We remodeled our worst-rated stores and ratings rebounded — did it work?",
   "trap": "Regression to the mean",
-  "facets": { "topic": "Retail", "skill": ["Regression to the mean"] },
+  "facets": {
+    "topic": "Retail",
+    "skill": [
+      "Regression to the mean"
+    ]
+  },
   "estMinutes": 25,
   "scenario": {
     "role": "You're the analyst on the retail-ops team at Foundry Goods",
@@ -15,22 +20,102 @@
     "file": "/case-lab/store-refresh/data.csv",
     "rows": 12000,
     "columns": [
-      { "name": "store_id", "type": "int", "description": "Unique store identifier" },
-      { "name": "region", "type": "string", "description": "Store region" },
-      { "name": "footprint_sqft", "type": "int", "description": "Store floor area in square feet" },
-      { "name": "rating_before", "type": "float", "description": "Customer-satisfaction rating (0-100) in the year BEFORE the remodel decision" },
-      { "name": "remodeled", "type": "int", "description": "1 if the store was remodeled, else 0" },
-      { "name": "rating_after", "type": "float", "description": "Customer-satisfaction rating (0-100) in the year AFTER" }
+      {
+        "name": "store_id",
+        "type": "int",
+        "description": "Unique store identifier"
+      },
+      {
+        "name": "region",
+        "type": "string",
+        "description": "Store region"
+      },
+      {
+        "name": "footprint_sqft",
+        "type": "int",
+        "description": "Store floor area in square feet"
+      },
+      {
+        "name": "rating_before",
+        "type": "float",
+        "description": "Customer-satisfaction rating (0-100) in the year BEFORE the remodel decision"
+      },
+      {
+        "name": "remodeled",
+        "type": "int",
+        "description": "1 if the store was remodeled, else 0"
+      },
+      {
+        "name": "rating_after",
+        "type": "float",
+        "description": "Customer-satisfaction rating (0-100) in the year AFTER"
+      }
     ],
     "sample": [
-      { "store_id": 1, "region": "South", "footprint_sqft": 5532, "rating_before": 73.8, "remodeled": 0, "rating_after": 67.9 },
-      { "store_id": 2, "region": "Northeast", "footprint_sqft": 8590, "rating_before": 76.3, "remodeled": 0, "rating_after": 74.1 },
-      { "store_id": 3, "region": "Northeast", "footprint_sqft": 3307, "rating_before": 70.4, "remodeled": 0, "rating_after": 68.1 },
-      { "store_id": 4, "region": "Midwest", "footprint_sqft": 6002, "rating_before": 62.0, "remodeled": 1, "rating_after": 61.4 },
-      { "store_id": 5, "region": "Northeast", "footprint_sqft": 7793, "rating_before": 47.4, "remodeled": 1, "rating_after": 52.5 },
-      { "store_id": 6, "region": "Northeast", "footprint_sqft": 8173, "rating_before": 89.3, "remodeled": 0, "rating_after": 84.8 },
-      { "store_id": 7, "region": "Midwest", "footprint_sqft": 5161, "rating_before": 62.3, "remodeled": 0, "rating_after": 69.9 },
-      { "store_id": 8, "region": "Northeast", "footprint_sqft": 7174, "rating_before": 75.7, "remodeled": 0, "rating_after": 69.4 }
+      {
+        "store_id": 1,
+        "region": "South",
+        "footprint_sqft": 5532,
+        "rating_before": 73.8,
+        "remodeled": 0,
+        "rating_after": 67.9
+      },
+      {
+        "store_id": 2,
+        "region": "Northeast",
+        "footprint_sqft": 8590,
+        "rating_before": 76.3,
+        "remodeled": 0,
+        "rating_after": 74.1
+      },
+      {
+        "store_id": 3,
+        "region": "Northeast",
+        "footprint_sqft": 3307,
+        "rating_before": 70.4,
+        "remodeled": 0,
+        "rating_after": 68.1
+      },
+      {
+        "store_id": 4,
+        "region": "Midwest",
+        "footprint_sqft": 6002,
+        "rating_before": 62.0,
+        "remodeled": 1,
+        "rating_after": 61.4
+      },
+      {
+        "store_id": 5,
+        "region": "Northeast",
+        "footprint_sqft": 7793,
+        "rating_before": 47.4,
+        "remodeled": 1,
+        "rating_after": 52.5
+      },
+      {
+        "store_id": 6,
+        "region": "Northeast",
+        "footprint_sqft": 8173,
+        "rating_before": 89.3,
+        "remodeled": 0,
+        "rating_after": 84.8
+      },
+      {
+        "store_id": 7,
+        "region": "Midwest",
+        "footprint_sqft": 5161,
+        "rating_before": 62.3,
+        "remodeled": 0,
+        "rating_after": 69.9
+      },
+      {
+        "store_id": 8,
+        "region": "Northeast",
+        "footprint_sqft": 7174,
+        "rating_before": 75.7,
+        "remodeled": 0,
+        "rating_after": 69.4
+      }
     ]
   },
   "guidingQuestions": [
@@ -47,6 +132,41 @@
     "Compare like with like: remodeled vs non-remodeled stores at the same low starting rating. That gap is the real remodel effect.",
     "Report that effect, and note that a clean read needs a randomised or matched-control rollout, not remodeling-the-bottom."
   ],
+  "notebook": {
+    "intro": "Five steps: reproduce both changes, notice which stores were chosen, then compare remodels against equally low-rated stores.",
+    "cells": [
+      {
+        "title": "Reproduce both change numbers",
+        "explain": "Rating change for remodeled and non-remodeled stores.",
+        "code": "df[\"change\"] = df[\"rating_after\"] - df[\"rating_before\"]\nchanges = df.groupby(\"remodeled\")[\"change\"].mean()\nprint(f\"remodeled moved {changes[1]:+.2f}, non-remodeled {changes[0]:+.2f}\")\nchanges.round(2)",
+        "reads": "Remodeled stores did rebound. Whether the remodel did it is the question."
+      },
+      {
+        "title": "Check the selection",
+        "explain": "The program targeted the lowest-rated stores. Compare where each group started.",
+        "code": "starts = df.groupby(\"remodeled\")[\"rating_before\"].agg([\"mean\", \"median\", \"count\"])\nprint(\"starting rating by group:\")\nstarts.round(2)",
+        "reads": "The two groups do not start from the same place, so the raw comparison is not a comparison of remodels."
+      },
+      {
+        "title": "Ask how noisy one year is",
+        "explain": "If ratings wobble year to year, stores picked at the bottom climb back on their own. Look at non-remodeled stores by starting rating.",
+        "code": "control = df[df[\"remodeled\"] == 0].copy()\ncontrol[\"start_band\"] = pd.qcut(control[\"rating_before\"], 5, labels=False, duplicates=\"drop\")\ndrift = control.groupby(\"start_band\")[\"change\"].mean()\nprint(\"rating change among NON-REMODELED stores, by starting band:\")\ndrift.round(2)",
+        "reads": "Low-rated stores that were left alone climb anyway, and high-rated ones slip back. That is the wobble, not a remodel."
+      },
+      {
+        "title": "Compare stores that started level",
+        "explain": "Match on the starting rating, then difference remodeled against non-remodeled inside each band.",
+        "code": "df[\"start_band\"] = pd.qcut(df[\"rating_before\"], 10, labels=False, duplicates=\"drop\")\nwithin = df.groupby([\"start_band\", \"remodeled\"])[\"change\"].mean().unstack().dropna()\ntreated_weights = df[df[\"remodeled\"] == 1][\"start_band\"].value_counts(normalize=True)\ntreated_weights = treated_weights.reindex(within.index).fillna(0)\ntreated_weights = treated_weights / treated_weights.sum()\neffect = ((within[1] - within[0]) * treated_weights).sum()\nprint(f\"remodel effect, stores matched on starting rating: {effect:+.2f} rating points\")\nwithin.round(2)",
+        "reads": "Against stores that started equally low, the remodel is worth much less than the rebound suggested."
+      },
+      {
+        "title": "Put the two numbers side by side",
+        "explain": "The rebound that would be reported, against the part the remodel can claim.",
+        "code": "pd.DataFrame(\n    {\"rating change\": [changes[1], effect]},\n    index=[\"remodeled group rebound\", \"vs stores that started level\"],\n).round(2)",
+        "reads": "Most of the rebound was reversion. A clean read needs a matched or randomised control, not remodeling the bottom."
+      }
+    ]
+  },
   "teachingNote": {
     "naiveRead": "The remodeled stores (last year's worst-rated) gained about +5.3 points while the untouched stores were flat-to-down. It reads as clear proof the remodel lifts satisfaction, and the VP wants to scale it.",
     "theTrap": "A store's rating in any given year is its stable quality plus a good-or-bad stretch of noise. The lowest-rated stores were partly just having a bad year, and a bad year doesn't repeat — so their ratings climb back toward their true level the next year whether or not anyone touches them. That's regression to the mean. Because the remodel was aimed squarely at these bottom stores, it gets credit for a rebound that was going to happen anyway.",
@@ -59,10 +179,22 @@
       "Conclude the remodel effect ≈ 0 within noise; a real estimate needs a matched or randomised control group of low-rated stores."
     ],
     "numbers": [
-      { "label": "Remodeled stores' change", "value": "+5.3 pts" },
-      { "label": "Non-remodeled stores' change", "value": "−2.2 pts" },
-      { "label": "Same low-rated stores: remodeled vs not", "value": "+7.5 vs +5.7 pts" },
-      { "label": "True remodel effect", "value": "≈ 0 (within noise)" }
+      {
+        "label": "Remodeled stores' change",
+        "value": "+5.3 pts"
+      },
+      {
+        "label": "Non-remodeled stores' change",
+        "value": "−2.2 pts"
+      },
+      {
+        "label": "Same low-rated stores: remodeled vs not",
+        "value": "+7.5 vs +5.7 pts"
+      },
+      {
+        "label": "True remodel effect",
+        "value": "≈ 0 (within noise)"
+      }
     ],
     "lesson": "Selecting on an extreme and then re-measuring guarantees a move toward the average — regression to the mean — which any intervention applied in between will appear to cause. It's the same trap as coaching the worst reps or treating the sickest patients: the bottom bounces back on its own. To know whether the remodel did anything, hold a matched set of equally-low stores as a control (ideally randomised) and compare. Judge the program against that control, never against the selected stores' own past."
   }
