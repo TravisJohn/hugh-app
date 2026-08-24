@@ -7,10 +7,11 @@ through them — asking questions, keeping a learning diary, proving mastery out
 loud, drilling code, and working business cases. Named after the first person who
 interviewed the founder.
 
-It began as a mock-interview trainer. That flow still exists and still works
-(`/interview`), but it is now one surface among several rather than the product.
-**Treat the learning loop as the product; treat the interview loop as a live
-legacy surface.**
+It began as a mock-interview trainer. That loop was deleted on 2026-08-24
+along with the standalone `/tracker` board — both were legacy, and the second
+had become the unhardened path into track generation. **The learning loop is
+the product.** Its voice (`/api/tts`, `lib/personas.ts`, `useAudioPlayer`,
+`useSpeechRecognition`) was never interview-only and survives in `/mastery`.
 
 ### The surfaces
 | Route | What it is |
@@ -25,7 +26,6 @@ legacy surface.**
 | `/cloud` | Cloud-services reference — assistant, margin notes, and a review list |
 | `/notes` | Screenshot + reasoning workspace with per-image Coach threads |
 | `/monitor` | Monitor — hand-kept tracking: Skills · Job Applications (résumés/cover letters + applications) · Your Usage |
-| `/interview/[room]` | Legacy mock-interview loop (not linked from `/home`) |
 | `/admin` | Admin console — users, approvals, usage and cost |
 
 The public landing page (`/`) presents three pillars — **Learn**, **Apply**
@@ -55,8 +55,8 @@ bulk of Claude spend, so cheap routes should use the cheap model:
 
 - **`claude-sonnet-4-6`** ($3/$15 per MTok) — reasoning-heavy generation where
   quality matters: track generation, backlog priority, quiz generation, diary
-  fact-check, learn/summarize, mastery **evaluate** (scoring), interview
-  feedback, document topic extraction.
+  fact-check, learn/summarize, mastery **evaluate** (scoring), document topic
+  extraction.
 - **`claude-haiku-4-5`** ($1/$5 per MTok — 5× cheaper input) — classification and
   short, low-stakes generation: similarity checks, hints, 5-whys refinement
   questions, mastery **open**/**respond** (in-character conversational lines),
@@ -138,12 +138,12 @@ SUPABASE_ACCESS_TOKEN           # optional — only for scripts/run-migration.ts
 ```
 app/                        # Pages and API routes only — no business logic here
   api/                      # admin · architecture · auth · cases · cloud · code
-                            # dashboard · interview · learn · notes · tracker
+                            # dashboard · learn · notes · tracker · tts
   (auth)/                   # login, signup
   home/                     # activity grid + /home/learn topic picker
   study/[goalId]/           # track board, ask page
   review/ · mastery/        # milestone review quiz, prove-mastery
-  code/ · cases/ · cloud/ · notes/ · interview/ · tracker/ · admin/
+  code/ · cases/ · cloud/ · notes/ · admin/
   monitor/                  # Monitor — Skills · Applications · Usage (tabs, ?view=)
 components/                 # one folder per surface, plus ui/ primitives
 lib/
@@ -171,22 +171,25 @@ Anthropic, OpenAI, and ElevenLabs are server-side only. All calls go through
 
 ### 2. One source of truth for session state
 A screen's hook owns its state; components receive state and handlers via props
-and do not fetch independently. `useInterview` owns the interview session;
-`useNotes` / `useNotesLayout` own the Notes workspace.
+and do not fetch independently. `useNotes` / `useNotesLayout` own the Notes
+workspace; `useTrackStatusWatch` owns "is this track built yet".
 
-### 3. Strict interview state machine (`/interview` only)
-The legacy interview loop follows this exact sequence. Do not skip or shortcut
-states:
+### 3. One track-build state machine
+A track is built in exactly one shape, whatever started it:
 ```
-IDLE → PLAYING_QUESTION → READY → RECORDING → REVIEWING → SUBMITTING → FEEDBACK → NEXT | BREAK
+pending → after() runs generateTrack → ready | failed
 ```
-- `PLAYING_QUESTION`: ElevenLabs audio is playing, waveform animates
-- `READY`: Audio finished, "Show Best Answer" and "I'm Ready" buttons are visible
-- `RECORDING`: Web Speech API is active, live transcript shown
-- `REVIEWING`: Recording stopped, transcript in editable textarea
-- `SUBMITTING`: Similarity check + feedback generation in progress
-- `FEEDBACK`: Feedback audio plays, text shown, waveform animates
-- `NEXT | BREAK`: User chooses next question or ends session
+Watched by `useTrackStatusWatch` (Realtime + 3s poll + hard timeout). Three
+routes drive it — `dashboard/goals`, `goals/document/approve`, and
+`goals/[id]/retry` — and each must set `maxDuration`, gate usage, and settle
+the status in both the success and failure branch. Do not add a fourth path
+that generates a track synchronously; that was `/api/tracker/generate`, and it
+was deleted for having no `maxDuration`, no usage gate and no domain gate.
+
+Whether a build is *still running* or *dead* is decided in one place:
+`lib/tracker/buildState.ts` (pure, unit-tested). The card, the track page and
+the retry route all read it, so the Rebuild button appears exactly where the
+server would accept it. Never re-derive that rule inline.
 
 ### 4. No scroll on any screen
 Every screen must fit within the viewport height. Use `h-screen`, flex column
@@ -214,10 +217,13 @@ own widths.
 The public landing page (`/`) is marketing, not an app screen, and scrolls
 normally.
 
-### 5. Buttons appear only after audio finishes
-On the interview question screen, "Show Best Answer" and "I'm Ready" only render
-when state is `READY` (audio playback complete). Enforced in `useAudioPlayer` via
-an `onEnded` callback that transitions state.
+### 5. A failure must be distinguishable from a wait
+No surface may show one message for "still working" and "broken". If a state
+can end in failure, the failure needs its own copy and its own way out — a
+retry that reuses the existing machine, not advice to refresh or to delete and
+start over. Reads that fail are the same rule: never render a dropped query
+error as empty data, because "you have nothing" and "we could not load it" are
+different sentences to the person reading them.
 
 ### 6. TypeScript strict mode — no `any`
 All components, hooks, API handlers, and utility functions are fully typed. The
@@ -241,10 +247,10 @@ component or a route that imports `server-only`. See `lib/notes/layout.ts`,
 - Row Level Security must be enabled on all tables
 
 ## Persona Configuration
-Personas are a static config (not in DB), used by the legacy interview loop.
-Three personas in `lib/personas.ts`, each with `id`, `name`, `role`, `company`,
-`voiceId` (maps to `ELEVENLABS_VOICE_ID_1/2/3`), `avatar`. Randomly assigned per
-session and stored in `session.persona_id` for consistency within a session.
+Personas are a static config (not in DB), now used by scripted mastery for its
+TTS voice. Three personas in `lib/personas.ts`, each with `id`, `name`, `role`,
+`company`, `voiceId` (maps to `ELEVENLABS_VOICE_ID_1/2/3`), `avatar`. One is
+picked at random per mastery session.
 
 ## Key Design Decisions
 | Decision | Choice | Reason |
@@ -266,8 +272,10 @@ session and stored in `session.persona_id` for consistency within a session.
 ## DO NOT Do (ever)
 - Call Anthropic, OpenAI, or ElevenLabs from client components
 - Use the `any` TypeScript type
-- Add scrollable containers to an interview screen
+- Add scrollable containers to a teaching screen (see Rule 4 for the two
+  records-tool exceptions)
 - Hardcode API keys, or a model string in more than one place per route
 - Spend tokens without calling `logUsage` with the model
-- Skip the state machine transitions in `useInterview`
+- Swallow a Supabase `error` — an unchecked write is how a "ready" track shipped
+  with an empty board
 - Add a `middleware.ts` — this project uses `proxy.ts` (Next 16)
