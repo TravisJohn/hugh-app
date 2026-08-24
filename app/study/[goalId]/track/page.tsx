@@ -6,6 +6,8 @@ import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import SignOutButton from "@/components/landing/SignOutButton";
 import HeaderUsage from "@/components/usage/HeaderUsage";
 import KanbanBoard from "@/components/tracker/KanbanBoard";
+import TrackBuildPanel from "@/components/tracker/TrackBuildPanel";
+import { buildState, trackViewState } from "@/lib/tracker/buildState";
 import { type LearningGoal, type Track, type Milestone } from "@/types";
 import RecordActivity from "@/components/monitor/RecordActivity";
 
@@ -58,6 +60,16 @@ export default async function StudyTrackPage({ params, searchParams }: Props) {
       .order("position", { ascending: true });
     milestones = (ms ?? []) as Milestone[];
   }
+
+  // What the learner is actually looking at. The goal row already carried
+  // track_status; the page used to ignore it and show one "may still be
+  // generating" message for every non-board case, including 'failed' — where
+  // the refresh it suggested could never work.
+  const build = buildState(g.track_status, g.track_started_at ?? g.created_at, Date.now());
+  const view  = trackViewState(build, Boolean(t), milestones.length);
+  // A 'ready' goal reaching the panel means the board is missing or empty,
+  // which is a failure however the row is labelled.
+  const panelState = build === "ready" ? "failed" : build;
 
   // Days-remaining reminder — nudges amber ≤7 days out, rose once due/overdue.
   const days      = daysUntil(g.end_date);
@@ -115,35 +127,17 @@ export default async function StudyTrackPage({ params, searchParams }: Props) {
           </span>
         </div>
 
-        {t ? (
-          <>
-            {/* Kanban board */}
-            <div className="flex-1 overflow-hidden px-6 py-5">
-              <KanbanBoard initialMilestones={milestones} topicContext={g.topic} goalId={goalId} trackId={t.id} focusMilestoneId={t.focus_milestone_id} backlogPriorityMode={t.backlog_priority_mode} pulseId={pulseId} validatedId={validatedId} masteredId={masteredId} isPremium={isPremium} isAdmin={isAdmin} />
-            </div>
-          </>
-        ) : (
-          /* No linked track — shouldn't happen for new goals, graceful fallback for old ones */
-          <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center px-6">
-            <p className="text-base font-semibold text-slate-300">Track not ready yet</p>
-            <p className="text-sm text-slate-500 max-w-xs leading-relaxed">
-              Your learning plan may still be generating. Refresh in a moment, or create one manually from the tracker.
-            </p>
-            <div className="flex gap-3">
-              <Link
-                href={`/study/${goalId}/track`}
-                className="rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors"
-              >
-                Refresh
-              </Link>
-              <Link
-                href="/tracker"
-                className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500 transition-colors"
-              >
-                Go to Tracker
-              </Link>
-            </div>
+        {view === "board" && t ? (
+          /* Kanban board */
+          <div className="flex-1 overflow-hidden px-6 py-5">
+            <KanbanBoard initialMilestones={milestones} topicContext={g.topic} goalId={goalId} trackId={t.id} focusMilestoneId={t.focus_milestone_id} backlogPriorityMode={t.backlog_priority_mode} pulseId={pulseId} validatedId={validatedId} masteredId={masteredId} isPremium={isPremium} isAdmin={isAdmin} />
           </div>
+        ) : (
+          <TrackBuildPanel
+            goalId={goalId}
+            initialState={view === "building" ? "building" : panelState}
+            emptyBoard={Boolean(t) && milestones.length === 0}
+          />
         )}
 
       </div>

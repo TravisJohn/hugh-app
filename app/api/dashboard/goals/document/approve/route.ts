@@ -43,14 +43,19 @@ export async function POST(request: NextRequest) {
   // Re-gate: the learner may have edited the topic since extraction. A human
   // editing a field doesn't get to skip the same check a machine-derived
   // topic goes through — this closes the edit-bypass gap (PRD §6/§7.1).
-  const verdict = await judgeTopicDomain(topic);
+  const verdict = await judgeTopicDomain(topic, userId);
   if (!verdict.inDomain) {
     return NextResponse.json(verdict);
   }
 
+  // track_started_at is stamped here, not at insert time: a document goal sits
+  // at 'awaiting_approval' until the learner approves it, which may be much
+  // later. Stall detection has to measure from when the build actually began.
+  const startedAt = new Date().toISOString();
+
   const { error: updateError } = await supabase
     .from("learning_goals")
-    .update({ topic, track_status: "pending" })
+    .update({ topic, track_status: "pending", track_started_at: startedAt })
     .eq("id", goalId);
 
   if (updateError) {
@@ -82,5 +87,5 @@ export async function POST(request: NextRequest) {
     }
   });
 
-  return NextResponse.json({ goal: { ...goal, topic, track_status: "pending" } });
+  return NextResponse.json({ goal: { ...goal, topic, track_status: "pending", track_started_at: startedAt } });
 }

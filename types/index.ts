@@ -105,6 +105,9 @@ export interface LearningGoal {
   track_status: TrackStatus;
   source_kind:  SourceKind;
   created_at:   string;
+  // When the current track build started. Null on rows written before
+  // migration 046 — read it as `track_started_at ?? created_at`.
+  track_started_at: string | null;
 }
 
 // ── Progress Tracker ──────────────────────────────────────────────────────

@@ -19,6 +19,6 @@ export async function POST(request: NextRequest) {
   const topic = body.topic?.trim();
   if (!topic) return NextResponse.json({ error: "topic is required" }, { status: 400 });
 
-  const verdict = await judgeTopicDomain(topic);
+  const verdict = await judgeTopicDomain(topic, userId);
   return NextResponse.json(verdict);
 }

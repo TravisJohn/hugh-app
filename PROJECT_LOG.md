@@ -4932,3 +4932,53 @@ with a literal hex compiles the value into the utility, so it could not have
 driven a runtime theme swap anyway. And two different page backgrounds are both
 in service as the full-screen ground, `#0F172A` and `#0A0F1E`; that needs
 deciding before tokenising, or one role gets two tokens permanently.
+
+## Fortifying the Learn loop: the failure paths (2026-08-24)
+
+A review of the Learn card found the happy path well built and every real
+defect on a failure path. Nobody had walked one end to end.
+
+**The silent one.** `generateTrack` awaited the milestone insert and never
+checked its error. A failed insert still returned a track id, the goal flipped
+to `track_status: 'ready'`, and the learner opened an empty Kanban board with
+no error on any surface — after paying for the Sonnet call. The insert is now
+checked, the returned rows are counted (a partial insert is a failure: two
+thirds of a curriculum is not a curriculum), and the track row is deleted
+rather than left orphaned. `TrackGenerationError` distinguishes "the database
+refused" from "the model misbehaved". Twelve tests cover these paths; there
+were none before, on the most failure-prone module in the loop.
+
+The same class of bug on `/home/learn`: a dropped error on the goals query
+rendered as "you have no goals", which is indistinguishable from having lost
+them. It now says what happened.
+
+**Pending meant two things.** The track page selected the goal with `*` — so
+`track_status` was in hand — and then ignored it, showing one "may still be
+generating, refresh in a moment" message for every non-board state including
+`failed`, where refreshing could never work. `lib/tracker/buildState.ts` is now
+the single rule: `pending` resolves to `building` or `stalled` by age, a
+`ready` goal with no board is `broken`, and `retryVerdict` decides where a
+rebuild is offered. Pure and unit-tested, and shared by the card, the page and
+the route, so the button appears exactly where the server would accept it.
+
+**There is a retry now.** `POST /api/dashboard/goals/[id]/retry` reuses the
+existing machine — flip to `pending`, generate in `after()`, settle to
+`ready`/`failed`, watched by `useTrackStatusWatch`. One state machine, not
+two. The previous remedy was "remove and re-add", which threw the goal away and
+re-ran the whole Q&A refinement: a second Sonnet call for answers already
+given. The document path's "open it to retry generating the track" message was
+promising a thing that did not exist; it is now true.
+
+Migration 046 adds `learning_goals.track_started_at`. Stall detection measured
+from `created_at`, which is only right for a first build — a retry keeps its
+original `created_at`, so every rebuild would have read as stalled the instant
+it started.
+
+**Gates moved server-side.** The domain gate ran only in the browser before
+`POST /api/dashboard/goals`, which is reachable directly. It now re-judges the
+*refined* topic server-side, since refinement is what becomes the curriculum —
+the same rule the document path already enforced on approve. Separately,
+`judgeTopicDomain` spent Haiku tokens at three call sites and logged none of
+them; it now bills its own spend, accumulating across retries, and `userId` is
+required rather than optional because an optional parameter is how the next
+caller forgets.

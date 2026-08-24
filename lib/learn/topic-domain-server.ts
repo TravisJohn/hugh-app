@@ -2,8 +2,13 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { topicDomainJudgePrompt, parseClaudeJson } from "@/lib/claude/prompts";
 import { type TopicDomainVerdict } from "@/lib/learn/topic-domain";
+import { logUsage } from "@/lib/usage";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// Model for the domain gate — see CLAUDE.md "Model Selection". Declared once
+// so the API call and the usage log cannot disagree about what was billed.
+const MODEL = "claude-haiku-4-5";
 
 function openVerdict(): TopicDomainVerdict {
   return { inDomain: true, reason: "classifier-unavailable", message: "", suggestions: [] };
@@ -20,18 +25,35 @@ function openVerdict(): TopicDomainVerdict {
  *
  * Fails OPEN on any network/parse error so a transient classifier failure
  * never blocks a legitimate learner.
+ *
+ * `userId` is required, not optional: this call spends tokens at every call
+ * site, and an optional parameter is how a future caller forgets to bill them.
  */
-export async function judgeTopicDomain(topic: string): Promise<TopicDomainVerdict> {
+export async function judgeTopicDomain(
+  topic:  string,
+  userId: string,
+): Promise<TopicDomainVerdict> {
   const prompt = topicDomainJudgePrompt(topic);
 
   let lastErr: unknown = null;
+  // Accumulated across attempts: a discarded first attempt still costs money.
+  let tokensIn  = 0;
+  let tokensOut = 0;
+
+  const bill = () => {
+    if (tokensIn === 0 && tokensOut === 0) return;
+    void logUsage({ userId, model: MODEL, feature: "learn/topic-domain", tokensIn, tokensOut });
+  };
+
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const msg = await anthropic.messages.create({
-        model:      "claude-haiku-4-5",
+        model:      MODEL,
         max_tokens: 250,
         messages:   [{ role: "user", content: prompt }],
       });
+      tokensIn  += msg.usage.input_tokens;
+      tokensOut += msg.usage.output_tokens;
       const text   = msg.content[0]?.type === "text" ? msg.content[0].text : "";
       const result = parseClaudeJson<Partial<TopicDomainVerdict>>(text);
       const verdict: TopicDomainVerdict = {
@@ -46,6 +68,7 @@ export async function judgeTopicDomain(topic: string): Promise<TopicDomainVerdic
         verdict.message = "";
         verdict.suggestions = [];
       }
+      bill();
       return verdict;
     } catch (err) {
       lastErr = err;
@@ -53,5 +76,6 @@ export async function judgeTopicDomain(topic: string): Promise<TopicDomainVerdic
   }
 
   console.error("[topic-domain-server] judge failed:", lastErr);
+  bill();
   return openVerdict();
 }

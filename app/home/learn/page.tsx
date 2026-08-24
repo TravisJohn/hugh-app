@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, AlertTriangle } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import SignOutButton from "@/components/landing/SignOutButton";
@@ -24,7 +24,7 @@ export default async function LearnDashboardPage({ searchParams }: Props) {
   const sp          = searchParams ? await searchParams : {};
   const showNotice  = sp.notice === "min5";
 
-  const [{ data: goals }, quota] = await Promise.all([
+  const [{ data: goals, error: goalsError }, quota] = await Promise.all([
     supabase
       .from("learning_goals")
       .select("*")
@@ -32,6 +32,12 @@ export default async function LearnDashboardPage({ searchParams }: Props) {
       .order("created_at", { ascending: false }),
     checkSessionQuota(supabase, user.id),
   ]);
+
+  // A dropped error here renders as "you have no goals", which is
+  // indistinguishable from having lost them. Say what actually happened.
+  if (goalsError) {
+    console.error("[home/learn] could not load goals:", goalsError.message);
+  }
 
   const firstName = (user.email ?? "").split("@")[0] ?? "there";
   const initial   = firstName[0]?.toUpperCase() ?? "?";
@@ -150,7 +156,22 @@ export default async function LearnDashboardPage({ searchParams }: Props) {
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto">
-          <DashboardPanel initialGoals={(goals ?? []) as LearningGoal[]} />
+          {goalsError ? (
+            <div className="mx-8 mt-6 flex items-start gap-3 rounded-2xl border border-red-500/30 bg-red-500/5 px-5 py-4">
+              <AlertTriangle size={18} className="mt-0.5 shrink-0 text-red-400" />
+              <div>
+                <p className="text-sm font-semibold text-slate-200">
+                  Your goals could not be loaded
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-400">
+                  Nothing has been lost — the list just could not be read this
+                  time. Reload the page to try again.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <DashboardPanel initialGoals={(goals ?? []) as LearningGoal[]} />
+          )}
         </div>
       </div>
     </div>

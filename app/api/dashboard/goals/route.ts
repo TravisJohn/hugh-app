@@ -5,6 +5,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { enforceUsageGate, logUsage } from "@/lib/usage";
 import { refineTopicPrompt, parseClaudeJson } from "@/lib/claude/prompts";
+import { judgeTopicDomain } from "@/lib/learn/topic-domain-server";
 import { generateTrack } from "@/lib/tracker/generate";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -71,6 +72,16 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       console.error("[dashboard/goals] refinement error:", err);
     }
+  }
+
+  // Step 1b: re-gate server-side. The client calls classify-topic before it
+  // gets here, but a check that only runs in the browser is not a gate — this
+  // endpoint is reachable directly. It also re-judges the *refined* topic
+  // rather than the typed one, because refinement is what actually becomes the
+  // curriculum. Same rule the document path already enforces in approve.
+  const verdict = await judgeTopicDomain(finalTopic, userId);
+  if (!verdict.inDomain) {
+    return NextResponse.json(verdict, { status: 422 });
   }
 
   // Step 2: create the learning goal with track_status = 'pending'.

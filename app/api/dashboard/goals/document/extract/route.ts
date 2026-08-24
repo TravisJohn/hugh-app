@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
   // topic path calls, just with no HTTP round-trip since we're already
   // server-side. Rejected verdicts return the same shape classify-topic
   // does, so any future client code can share one verdict-handling path.
-  const verdict = await judgeTopicDomain(candidate.candidateTopic);
+  const verdict = await judgeTopicDomain(candidate.candidateTopic, userId);
   if (!verdict.inDomain) {
     return NextResponse.json(verdict);
   }

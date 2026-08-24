@@ -2,15 +2,16 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Sparkles, Trash2, Loader2, AlertTriangle, Pencil } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useTrackStatusWatch } from "@/hooks/useTrackStatusWatch";
+import { Sparkles, Trash2, Loader2, AlertTriangle, Pencil, RotateCcw } from "lucide-react";
 import { type LearningGoal } from "@/types";
+import { canRetry, STALL_MS, type BuildState } from "@/lib/tracker/buildState";
 
-// A goal still 'pending' past this age means its background build never
-// finished (function killed / tab closed before the watchdog wrote a status).
-// The server caps track-gen at maxDuration=120s, so anything pending this long
-// is definitively stalled, not slow. Surfaced as a recoverable dead-end rather
-// than an endless "Building…" spinner.
-const STALL_MS = 5 * 60 * 1000;
+// The stall rule and the pending/stalled split now live in
+// lib/tracker/buildState.ts, shared with the track page and enforced by the
+// retry route — so the button appears exactly where the server would accept
+// it, and one change moves all three.
 
 function fmt(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-GB", {
@@ -24,21 +25,61 @@ interface Props {
 }
 
 export default function GoalCard({ goal, onDelete }: Props) {
+  const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting]     = useState(false);
+  const [retrying, setRetrying]     = useState(false);
+  const [retryError, setRetryError] = useState<string | null>(null);
+  // Optimistic: a retry flips the card back to building without waiting for a
+  // round trip through the parent's goal list.
+  const [rebuilt, setRebuilt]       = useState(false);
   // Computed client-side after mount to avoid an SSR/CSR hydration mismatch
   // (Date.now() differs between render passes).
   const [stalled, setStalled]       = useState(false);
 
+  // Measured from when the build started, not when the goal was created — a
+  // retried goal keeps its original created_at, so reading that would mark
+  // every rebuild as stalled the instant it began.
+  const startedAt = goal.track_started_at ?? goal.created_at;
+
   useEffect(() => {
     if (goal.track_status !== "pending") return;
-    const age = Date.now() - new Date(goal.created_at).getTime();
+    const age = Date.now() - new Date(startedAt).getTime();
     // Fires immediately if already past the threshold (delay clamped to 0), or
     // live when the user is watching a goal cross it. setState stays in the
     // callback, never synchronous in the effect body.
     const t = setTimeout(() => setStalled(true), Math.max(0, STALL_MS - age));
     return () => clearTimeout(t);
-  }, [goal.track_status, goal.created_at]);
+  }, [goal.track_status, startedAt]);
+
+  // Once a rebuild is in flight the card follows it with the same watcher the
+  // first build uses — realtime, a poll, and a hard timeout — rather than
+  // sitting on an optimistic spinner until the learner reloads.
+  useTrackStatusWatch({
+    goalId:   goal.id,
+    active:   rebuilt,
+    onReady:  () => router.refresh(),
+    onFailed: () => setRebuilt(false),
+  });
+
+  async function handleRetry() {
+    setRetrying(true);
+    setRetryError(null);
+    try {
+      const res  = await fetch(`/api/dashboard/goals/${goal.id}/retry`, { method: "POST" });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setRetryError(data.error ?? "Could not start the rebuild.");
+        return;
+      }
+      setRebuilt(true);
+      setStalled(false);
+    } catch {
+      setRetryError("Could not reach the server.");
+    } finally {
+      setRetrying(false);
+    }
+  }
 
   async function handleDeleteClick() {
     if (!confirming) {
@@ -50,14 +91,21 @@ export default function GoalCard({ goal, onDelete }: Props) {
     onDelete?.(goal.id);
   }
 
-  const status: "pending" | "ready" | "failed" | "stalled" | "awaiting_approval" =
-    stalled ? "stalled" : goal.track_status;
+  // Deliberately free of Date.now(): the stall crossing arrives via the effect
+  // above, so the first client render matches the server's exactly.
+  const status: BuildState = rebuilt
+    ? "building"
+    : stalled
+    ? "stalled"
+    : goal.track_status === "pending"
+    ? "building"
+    : goal.track_status;
 
   return (
     <div className="flex items-center gap-4 rounded-2xl border border-slate-700 bg-slate-800/60 px-5 py-4 transition-colors hover:border-slate-600 hover:bg-slate-800">
       {/* Status icon */}
       <div className="shrink-0">
-        {status === "pending" ? (
+        {status === "building" ? (
           <Loader2 size={20} className="text-amber-400 animate-spin" />
         ) : status === "failed" || status === "stalled" ? (
           <AlertTriangle size={20} className="text-red-400" />
@@ -71,15 +119,15 @@ export default function GoalCard({ goal, onDelete }: Props) {
       {/* Info */}
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-slate-100 leading-snug">{goal.topic}</p>
-        {status === "pending" ? (
+        {status === "building" ? (
           <p className="mt-0.5 text-xs text-amber-400/80">Building your track…</p>
         ) : status === "stalled" ? (
           <p className="mt-0.5 text-xs text-red-400/90">
-            Track build stalled — remove and re-add to try again.
+            Track build stopped partway — rebuild to try again.
           </p>
         ) : status === "failed" ? (
           <p className="mt-0.5 text-xs text-red-400/90">
-            Track build failed — remove and re-add to try again.
+            {retryError ?? "Track build failed — rebuild to try again."}
           </p>
         ) : status === "awaiting_approval" ? (
           <p className="mt-0.5 text-xs text-sky-400/90">
@@ -122,6 +170,20 @@ export default function GoalCard({ goal, onDelete }: Props) {
           </button>
         )}
 
+        {canRetry(status) && (
+          <button
+            onClick={handleRetry}
+            disabled={retrying}
+            title="Rebuild this track"
+            className="flex items-center gap-1.5 rounded-xl border border-slate-600 px-3 py-2 text-xs font-semibold text-slate-300 transition-colors hover:border-sky-500 hover:text-sky-300 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {retrying
+              ? <Loader2 size={13} className="animate-spin" />
+              : <RotateCcw size={13} />}
+            {retrying ? "Starting…" : "Rebuild"}
+          </button>
+        )}
+
         {status === "ready" ? (
           <Link
             href={`/study/${goal.id}/track`}
@@ -133,10 +195,10 @@ export default function GoalCard({ goal, onDelete }: Props) {
           <span
             className="cursor-not-allowed rounded-xl bg-slate-700 px-4 py-2 text-sm font-bold text-slate-500"
             title={
-              status === "pending"
+              status === "building"
                 ? "Track is still being built"
                 : status === "stalled"
-                ? "Track build stalled — remove and re-add"
+                ? "Track build stopped partway — rebuild it"
                 : status === "awaiting_approval"
                 ? "Review the extracted topic to build this track"
                 : "Track build failed"
