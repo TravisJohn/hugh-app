@@ -136,12 +136,22 @@ export function silentFailures(stats: readonly OperationStats[]): OperationStats
   return stats.filter(s => s.failureIsSilent && s.failed > 0);
 }
 
+/**
+ * 'no-telemetry' is not a healthy state and not a broken one — it is the
+ * absence of evidence. Before the first event is ever written there is no
+ * baseline to compare goals against, and every goal that predates
+ * instrumentation would otherwise read as a ghost. A dashboard that opens on a
+ * red alarm the day it ships teaches the operator to distrust it immediately.
+ */
+export type CoverageState = "no-telemetry" | "complete" | "gap";
+
 export interface BuildCoverage {
   goalsCreated:   number;
   recordedBuilds: number;
-  /** Goals with no recorded build. Should be zero. */
+  /** Goals with no recorded build. Zero when there is no telemetry to compare. */
   unrecorded:     number;
   complete:       boolean;
+  state:          CoverageState;
 }
 
 /**
@@ -156,13 +166,31 @@ export interface BuildCoverage {
  * A negative shortfall is not an error. It means goals were deleted after
  * their builds were recorded, and `complete` stays true.
  */
-export function buildCoverage(goalsCreated: number, recordedBuilds: number): BuildCoverage {
+export function buildCoverage(
+  goalsCreated:   number,
+  recordedBuilds: number,
+  /** False before the first event exists, when nothing can be compared. */
+  hasTelemetry    = true,
+): BuildCoverage {
+  if (!hasTelemetry) {
+    return {
+      goalsCreated,
+      recordedBuilds,
+      // Not "zero ghosts" — unknowable. The state carries that distinction so
+      // the panel says "waiting for data" rather than claiming health.
+      unrecorded: 0,
+      complete:   true,
+      state:      "no-telemetry",
+    };
+  }
+
   const unrecorded = goalsCreated - recordedBuilds;
   return {
     goalsCreated,
     recordedBuilds,
     unrecorded,
     complete: unrecorded <= 0,
+    state:    unrecorded <= 0 ? "complete" : "gap",
   };
 }
 
@@ -184,4 +212,40 @@ export function totals(stats: readonly OperationStats[]): {
   // a mean of rates weights a two-attempt operation the same as a
   // thousand-attempt one.
   return { attempts, ok, failed, refused, failureRate: decisive === 0 ? null : failed / decisive };
+}
+
+// ── The chat spotlight ──────────────────────────────────────────────────────
+
+/** Above this, ask.chat's failure rate stops being background noise. */
+export const CHAT_ANOMALY_THRESHOLD = 0.01;
+
+/**
+ * Below this many decisive attempts, a rate is not a rate.
+ *
+ * One failure out of three requests is 33%, which would light the panel red on
+ * a quiet afternoon and teach the operator to ignore it. A threshold indicator
+ * that cries wolf in its first week is worse than no indicator, because it
+ * trains the habit of not looking.
+ */
+export const CHAT_MIN_SAMPLE = 50;
+
+export type ChatHealth = "no-data" | "too-few" | "normal" | "anomaly";
+
+/**
+ * Whether ask.chat's error rate deserves attention.
+ *
+ * Deliberately the only thing computed for this operation. It outnumbers
+ * everything else by orders of magnitude, so a list of its rows would bury the
+ * five operations worth reading and cost a large query to do it.
+ */
+export function chatHealth(stats: OperationStats | undefined): ChatHealth {
+  if (!stats || stats.attempts === 0) return "no-data";
+
+  const decisive = stats.ok + stats.failed;
+  if (decisive === 0) return "no-data";
+  if (decisive < CHAT_MIN_SAMPLE) return "too-few";
+
+  // Strictly greater: exactly at the threshold is still normal, so a rate that
+  // lands precisely on 1% does not flip the panel on a rounding artefact.
+  return (stats.failureRate ?? 0) > CHAT_ANOMALY_THRESHOLD ? "anomaly" : "normal";
 }

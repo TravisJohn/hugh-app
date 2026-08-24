@@ -174,6 +174,10 @@ export default async function AdminPage() {
           <Link href="/admin/architecture" className="text-sm text-slate-500 hover:text-slate-300 transition-colors">
             Architecture
           </Link>
+          <span className="text-slate-700">|</span>
+          <Link href="/admin/observability" className="text-sm text-slate-500 hover:text-slate-300 transition-colors">
+            Observability
+          </Link>
         </div>
         <span className="text-xs text-slate-600">{new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" })}</span>
       </header>

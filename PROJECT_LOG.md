@@ -5123,3 +5123,50 @@ pass by finding nothing.
 
 Not built yet: the admin panel. `rollup.ts` is tested but unconsumed until
 Stage 3 reads it. Migration 047 needs manual apply.
+
+## Observability Stage 3: the admin dashboard (2026-08-24)
+
+`/admin/observability`, behind `requireAdminPage()` like the rest of the
+console, linked from the admin header. All arithmetic stays in `rollup.ts`;
+the page queries and formats.
+
+**The ghost-build check needed three exclusions to tell the truth.** Comparing
+goals created against builds recorded sounds like one subtraction, and each of
+these would have produced a permanent false alarm:
+
+1. Goals that predate migration 047 could never have a build on record, so the
+   comparison starts at the first event ever written, not at the window edge.
+2. `awaiting_approval` goals exist from topic extraction but attempt no build
+   until a person approves them — counted, they would report a ghost for every
+   goal simply waiting on someone.
+3. A `refused` build was turned away by the usage gate *before* any goal was
+   inserted, so counting it as a recorded build would mask a real ghost with a
+   phantom success.
+
+**A smoke test against the real database caught the fourth.** With zero events
+recorded, there is no first event, so the window fell back to 30 days and the
+page greeted the operator with a red "5 ghost builds" alarm — the precise
+failure the widget exists to prevent. `buildCoverage` now takes `hasTelemetry`
+and returns a `no-telemetry` state: not healthy, not broken, the absence of
+evidence. A dashboard that opens on a red alarm the day it ships teaches the
+operator to distrust it immediately.
+
+That bug was invisible to the unit tests, which had never been asked what
+happens when the table is empty, and invisible to the page's HTTP smoke test,
+which redirects at the auth gate before any query runs. It took running the
+page's exact queries against the real database to see it.
+
+**The chat spotlight has four states, not two.** `chatHealth` refuses to judge
+below 50 decisive attempts: one failure in three is 33%, which would light the
+panel red on a quiet afternoon. Exactly 1% reads as normal — strictly greater
+is an anomaly — so a rate landing on a round number cannot make the panel
+oscillate. Refusals are excluded there too, so a wave of gate blocks neither
+raises the alarm nor inflates the denominator to hide a real one.
+
+The table shows the five non-chat operations, with `topic.gate` carrying a
+"silent" badge, and a separate amber panel appears whenever a fail-open
+operation has failures — those are the ones nobody will ever report.
+
+Verified: compile, route registration, the auth gate (307 to /login), and all
+three queries against the live database. Visual confirmation needs an admin
+session and is Travis's to do.

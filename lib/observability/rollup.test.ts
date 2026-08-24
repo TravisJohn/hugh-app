@@ -5,6 +5,9 @@ import {
   silentFailures,
   buildCoverage,
   totals,
+  chatHealth,
+  CHAT_ANOMALY_THRESHOLD,
+  CHAT_MIN_SAMPLE,
   type OperationEventRow,
 } from "./rollup";
 import { OPERATIONS } from "./operations";
@@ -226,7 +229,7 @@ describe("silentFailures - the ones nobody complained about", () => {
 describe("buildCoverage - attempts nobody heard about", () => {
   it("is complete when every goal produced a recorded build", () => {
     expect(buildCoverage(10, 10)).toEqual({
-      goalsCreated: 10, recordedBuilds: 10, unrecorded: 0, complete: true,
+      goalsCreated: 10, recordedBuilds: 10, unrecorded: 0, complete: true, state: "complete",
     });
   });
 
@@ -276,5 +279,103 @@ describe("totals", () => {
 
   it("returns a null rate when nothing decisive happened", () => {
     expect(totals(rollupOperations([])).failureRate).toBeNull();
+  });
+});
+
+// ── chatHealth ──────────────────────────────────────────────────────────────
+
+describe("chatHealth - one number for the noisiest operation", () => {
+  const chat = (ok: number, failed: number) =>
+    rollupOperations([
+      ...Array.from({ length: ok },     () => row({ operation: "ask.chat", outcome: "ok" })),
+      ...Array.from({ length: failed }, () => row({ operation: "ask.chat", outcome: "failed" })),
+    ]).find(s => s.id === "ask.chat")!;
+
+  it("says no-data before anything has happened", () => {
+    expect(chatHealth(chat(0, 0))).toBe("no-data");
+  });
+
+  it("says no-data when the stats are missing entirely", () => {
+    expect(chatHealth(undefined)).toBe("no-data");
+  });
+
+  it("refuses to judge a sample too small to mean anything", () => {
+    // 1 failure in 3 is 33%, which would light the panel red on a quiet
+    // afternoon and teach the operator to stop looking at it.
+    expect(chatHealth(chat(2, 1))).toBe("too-few");
+  });
+
+  it("starts judging once the sample is large enough", () => {
+    expect(chatHealth(chat(CHAT_MIN_SAMPLE, 0))).toBe("normal");
+  });
+
+  it("reads a healthy rate as normal", () => {
+    // 1 failure in 200 = 0.5%.
+    expect(chatHealth(chat(199, 1))).toBe("normal");
+  });
+
+  it("treats exactly the threshold as normal, not an anomaly", () => {
+    // 1 in 100 is exactly 1%. Flipping here would make the panel oscillate on
+    // a single request either side of a round number.
+    const stats = chat(99, 1);
+    expect(stats.failureRate).toBe(CHAT_ANOMALY_THRESHOLD);
+    expect(chatHealth(stats)).toBe("normal");
+  });
+
+  it("flags a rate above the threshold as an anomaly", () => {
+    // 2 in 100 = 2%.
+    expect(chatHealth(chat(98, 2))).toBe("anomaly");
+  });
+
+  it("ignores refusals when deciding, like every other rate here", () => {
+    const stats = rollupOperations([
+      ...Array.from({ length: 100 }, () => row({ operation: "ask.chat", outcome: "ok" })),
+      ...Array.from({ length: 900 }, () => row({ operation: "ask.chat", outcome: "refused" })),
+    ]).find(s => s.id === "ask.chat")!;
+
+    // 1000 attempts, but only 100 decisive - and none of them failed.
+    expect(chatHealth(stats)).toBe("normal");
+  });
+
+  it("says too-few when refusals inflate the volume but the sample is thin", () => {
+    const stats = rollupOperations([
+      ...Array.from({ length: 5 },   () => row({ operation: "ask.chat", outcome: "ok" })),
+      ...Array.from({ length: 500 }, () => row({ operation: "ask.chat", outcome: "refused" })),
+    ]).find(s => s.id === "ask.chat")!;
+
+    expect(stats.attempts).toBe(505);
+    expect(chatHealth(stats)).toBe("too-few");
+  });
+});
+
+describe("buildCoverage - no telemetry is not the same as no problem", () => {
+  it("reports no-telemetry before the first event exists", () => {
+    // Every goal predates instrumentation, so none of them could have a build
+    // on record. Calling that 5 ghost builds would open the dashboard on a red
+    // alarm the day it ships and teach the operator to ignore it.
+    const coverage = buildCoverage(5, 0, false);
+
+    expect(coverage.state).toBe("no-telemetry");
+    expect(coverage.unrecorded).toBe(0);
+    expect(coverage.complete).toBe(true);
+  });
+
+  it("still reports the raw counts while in no-telemetry", () => {
+    // The operator should be able to see why nothing is being compared.
+    const coverage = buildCoverage(5, 0, false);
+    expect(coverage.goalsCreated).toBe(5);
+    expect(coverage.recordedBuilds).toBe(0);
+  });
+
+  it("labels a clean comparison complete", () => {
+    expect(buildCoverage(10, 10, true).state).toBe("complete");
+  });
+
+  it("labels a shortfall as a gap", () => {
+    expect(buildCoverage(10, 7, true).state).toBe("gap");
+  });
+
+  it("defaults to having telemetry, so existing callers are unchanged", () => {
+    expect(buildCoverage(10, 7).state).toBe("gap");
   });
 });
