@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import {
   OPERATIONS,
   OPERATION_IDS,
@@ -165,9 +167,69 @@ describe("isOperationId / isOperationOutcome / operationById", () => {
   });
 });
 
-// ── Stage 2 seam ────────────────────────────────────────────────────────────
-// lib/monitor/features.test.ts scans the app directory to prove the registry
-// and the instrumentation agree. The counterpart cannot exist yet: Stage 1 is
-// the foundation only, and nothing calls recordOperation. That scan belongs
-// with the instrumentation in Stage 2, and its absence here is deliberate
-// rather than an oversight.
+// ── The registry and the code must agree ────────────────────────────────────
+//
+// The Stage 1 seam, now closed. This is the test that stops the two drifting,
+// and it mirrors the registry-to-pages scan in lib/monitor/features.test.ts.
+//
+// An operation recorded but not registered writes rows the panel never renders
+// — spend on a blind spot. An operation registered but never recorded shows a
+// permanently empty row that reads as "never happened" when the truth is
+// "never measured", which is the more dangerous of the two: it is a claim of
+// health backed by no evidence.
+
+/** Every `recordOperation({ … operation: "…" })` literal in the source tree. */
+function instrumentedOperations(dirs: readonly string[]): Set<string> {
+  const found = new Set<string>();
+
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir)) {
+      const path = join(dir, entry);
+
+      if (statSync(path).isDirectory()) {
+        // Skip this module's own directory: record.ts defines the function and
+        // the tests quote ids, neither of which is instrumentation.
+        if (entry === "observability") continue;
+        walk(path);
+        continue;
+      }
+      if (!entry.endsWith(".ts") && !entry.endsWith(".tsx")) continue;
+
+      const source = readFileSync(path, "utf8");
+      let from = source.indexOf("recordOperation(");
+
+      while (from !== -1) {
+        const next   = source.indexOf("recordOperation(", from + 1);
+        // Read only as far as the next call, so one call site cannot claim the
+        // id belonging to the one after it.
+        const window = source.slice(from, next === -1 ? from + 400 : Math.min(next, from + 400));
+        const match  = /operation:\s*["']([^"']+)["']/.exec(window);
+        if (match) found.add(match[1]);
+        from = next;
+      }
+    }
+  };
+
+  for (const dir of dirs) walk(dir);
+  return found;
+}
+
+describe("registry ↔ code", () => {
+  const instrumented = instrumentedOperations(["app", "lib"]);
+
+  it("instruments every operation the registry promises", () => {
+    const missing = OPERATION_IDS.filter(id => !instrumented.has(id));
+    expect(missing, `registered but never recorded: ${missing.join(", ")}`).toEqual([]);
+  });
+
+  it("registers every operation the code records", () => {
+    const unknown = [...instrumented].filter(id => !(OPERATION_IDS as readonly string[]).includes(id));
+    expect(unknown, `recorded but not in the registry: ${unknown.join(", ")}`).toEqual([]);
+  });
+
+  it("actually found call sites, so a broken scan cannot pass by finding nothing", () => {
+    // Without this, deleting every recordOperation call in the app would make
+    // the two tests above pass perfectly against an empty set.
+    expect(instrumented.size).toBe(OPERATION_IDS.length);
+  });
+});

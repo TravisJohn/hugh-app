@@ -1,5 +1,6 @@
 import "server-only";
 import { type NextRequest, NextResponse } from "next/server";
+import { recordOperation } from "@/lib/observability/record";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
@@ -16,6 +17,8 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = "claude-sonnet-4-6";
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now();
+
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -24,6 +27,10 @@ export async function POST(request: NextRequest) {
     const msg = reason === "limit_reached"
       ? "Monthly usage limit reached. Please contact Travis to reset or upgrade."
       : "Your access has been restricted. Please contact support.";
+    void recordOperation({
+      userId, operation: "quiz.generate", outcome: "refused",
+      detail: { reason: reason ?? "usage-gate" },
+    });
     return NextResponse.json({ error: msg }, { status: reason === "limit_reached" ? 429 : 403 });
   }
 
@@ -123,6 +130,14 @@ Return ONLY a valid JSON array — no markdown, no commentary:
     // Better to say the notes are too thin than to quiz someone on material
     // they never covered — that was the original complaint.
     if (kept.length < MIN_QUESTIONS) {
+      // 'refused', not 'failed'. Declining to quiz someone on material they
+      // never covered is the feature working as designed - that refusal was
+      // the whole point of grounding quizzes in the diary.
+      void recordOperation({
+        userId, operation: "quiz.generate", outcome: "refused",
+        durationMs: Date.now() - startedAt,
+        detail: { reason: "insufficient_material", kept: kept.length },
+      });
       return NextResponse.json(
         {
           error:
@@ -134,9 +149,17 @@ Return ONLY a valid JSON array — no markdown, no commentary:
       );
     }
 
+    void recordOperation({
+      userId, operation: "quiz.generate", outcome: "ok",
+      durationMs: Date.now() - startedAt, detail: { questions: kept.length },
+    });
     return NextResponse.json({ questions: kept });
   } catch (err) {
     console.error("[review/quiz] Generation failed:", err);
+    void recordOperation({
+      userId, operation: "quiz.generate", outcome: "failed",
+      durationMs: Date.now() - startedAt, error: err,
+    });
     return NextResponse.json({ error: "Failed to generate quiz. Please try again." }, { status: 500 });
   }
 }

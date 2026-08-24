@@ -3,6 +3,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { topicDomainJudgePrompt, parseClaudeJson } from "@/lib/claude/prompts";
 import { type TopicDomainVerdict } from "@/lib/learn/topic-domain";
 import { logUsage } from "@/lib/usage";
+import { recordOperation } from "@/lib/observability/record";
+import { messageOf } from "@/lib/observability/sanitize";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -34,6 +36,8 @@ export async function judgeTopicDomain(
   userId: string,
 ): Promise<TopicDomainVerdict> {
   const prompt = topicDomainJudgePrompt(topic);
+
+  const startedAt = Date.now();
 
   let lastErr: unknown = null;
   // Accumulated across attempts: a discarded first attempt still costs money.
@@ -69,6 +73,16 @@ export async function judgeTopicDomain(
         verdict.suggestions = [];
       }
       bill();
+      // 'refused' for an off-domain topic: the gate turning someone away is
+      // the gate working, and counting it as a failure would make a week of
+      // off-topic requests read as an outage.
+      await recordOperation({
+        userId,
+        operation:  "topic.gate",
+        outcome:    verdict.inDomain ? "ok" : "refused",
+        durationMs: Date.now() - startedAt,
+        detail:     { attempts: attempt + 1 },
+      });
       return verdict;
     } catch (err) {
       lastErr = err;
@@ -77,5 +91,28 @@ export async function judgeTopicDomain(
 
   console.error("[topic-domain-server] judge failed:", lastErr);
   bill();
+
+  // THE SILENT FAILURE. Both attempts are gone and this returns "in domain",
+  // so the learner sees nothing wrong and their topic goes straight through —
+  // the gate has stopped gating and nobody would ever report it. Recorded as
+  // 'failed' even though the request succeeds, which is the entire reason
+  // operations are tracked separately from spend and engagement.
+  //
+  // Wrapped in a named error so error_class groups on the operational meaning
+  // ("the classifier is unavailable") rather than on whichever network error
+  // happened to surface, while the original message survives in the note.
+  const unavailable  = new Error(`classifier unavailable: ${messageOf(lastErr)}`);
+  unavailable.name   = "ClassifierUnavailable";
+
+  await recordOperation({
+    userId,
+    operation:  "topic.gate",
+    outcome:    "failed",
+    durationMs: Date.now() - startedAt,
+    error:      unavailable,
+    redact:     [topic],
+    detail:     { failedOpen: true, attempts: 2 },
+  });
+
   return openVerdict();
 }

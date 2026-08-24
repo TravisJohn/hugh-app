@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { recordOperation } from "@/lib/observability/record";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
@@ -46,6 +47,8 @@ function sanitizeTranscript(input: unknown): MasteryTranscriptTurn[] {
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now();
+
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -128,14 +131,29 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     console.error("[mastery/evaluate] Anthropic error:", err);
+    void recordOperation({
+      userId, operation: "mastery.evaluate", outcome: "failed",
+      durationMs: Date.now() - startedAt, error: err, detail: { stage: "model" },
+    });
     return NextResponse.json({ error: "Failed to evaluate the session." }, { status: 502 });
   }
 
   const result = parseMasteryResult(raw);
   if (!result) {
     console.error("[mastery/evaluate] malformed model output:", raw.slice(0, 500));
+    // A failure, not a refusal: the learner did their part and got nothing.
+    void recordOperation({
+      userId, operation: "mastery.evaluate", outcome: "failed",
+      durationMs: Date.now() - startedAt,
+      error: Object.assign(new Error("model output failed schema validation"), { name: "MalformedEvaluation" }),
+      detail: { stage: "parse" },
+    });
     return NextResponse.json({ error: "Could not produce a valid evaluation." }, { status: 502 });
   }
 
+  void recordOperation({
+    userId, operation: "mastery.evaluate", outcome: "ok",
+    durationMs: Date.now() - startedAt,
+  });
   return NextResponse.json({ result });
 }

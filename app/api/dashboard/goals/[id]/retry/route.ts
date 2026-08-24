@@ -5,6 +5,7 @@ import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { enforceUsageGate } from "@/lib/usage";
 import { generateTrack } from "@/lib/tracker/generate";
 import { buildState, retryVerdict } from "@/lib/tracker/buildState";
+import { recordOperation } from "@/lib/observability/record";
 import { type LearningGoal } from "@/types";
 
 // Rebuild the track for a goal whose build failed or died mid-flight.
@@ -30,7 +31,13 @@ export async function POST(
   // A retry spends a full track-generation call, so it is gated like any
   // other spend. Without this, a failing build would be an unmetered loop.
   const usageGate = await enforceUsageGate(userId);
-  if (usageGate) return usageGate;
+  if (usageGate) {
+    void recordOperation({
+      userId, operation: "track.retry", outcome: "refused",
+      detail: { reason: "usage-gate" },
+    });
+    return usageGate;
+  }
 
   const { id: goalId } = await params;
   const supabase = await createClient();
@@ -74,6 +81,15 @@ export async function POST(
   const verdict = retryVerdict(state, Boolean(track) && milestoneCount > 0);
 
   if (verdict !== "allow") {
+    // Each of the three 409s is the server declining correctly - a stale tab
+    // trying to restart a live build, a goal that needs approving, a track
+    // that is already fine. The verdict rides along so the panel can show
+    // which refusal dominates without a second query.
+    void recordOperation({
+      userId, operation: "track.retry", outcome: "refused",
+      detail: { verdict, state },
+    });
+
     const reason =
       verdict === "still-building"  ? "This track is still building - give it a moment." :
       verdict === "needs-approval"  ? "This goal is waiting for you to approve its topic." :
@@ -95,7 +111,8 @@ export async function POST(
   }
 
   after(async () => {
-    const service = createServiceClient();
+    const service   = createServiceClient();
+    const rebuiltAt = Date.now();
     try {
       // A previous attempt can leave a track row behind — generateTrack only
       // cleans up its own partial write, and an earlier build may have
@@ -113,9 +130,18 @@ export async function POST(
 
       await generateTrack(service, userId, g.topic, goalId);
       await service.from("learning_goals").update({ track_status: "ready" }).eq("id", goalId);
+      await recordOperation({
+        userId, operation: "track.retry", outcome: "ok",
+        durationMs: Date.now() - rebuiltAt, detail: { previousState: state },
+      });
     } catch (err) {
       console.error("[goals/retry] background track rebuild failed:", err);
       await service.from("learning_goals").update({ track_status: "failed" }).eq("id", goalId);
+      await recordOperation({
+        userId, operation: "track.retry", outcome: "failed",
+        durationMs: Date.now() - rebuiltAt, error: err, redact: [g.topic],
+        detail: { previousState: state },
+      });
     }
   });
 

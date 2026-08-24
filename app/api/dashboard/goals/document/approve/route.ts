@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { judgeTopicDomain } from "@/lib/learn/topic-domain-server";
 import { generateTrack } from "@/lib/tracker/generate";
+import { recordOperation } from "@/lib/observability/record";
 
 // Second half of the document-upload path (PRD-course-from-document.md §7.1).
 // The learner has reviewed — and possibly edited — the candidate topic from
@@ -67,7 +68,8 @@ export async function POST(request: NextRequest) {
   // client is used because the cookie-bound request client isn't guaranteed
   // usable once the response lifecycle has ended.
   after(async () => {
-    const service = createServiceClient();
+    const service   = createServiceClient();
+    const startedAt = Date.now();
     try {
       const { data: pending } = await service
         .from("pending_document_extractions")
@@ -77,9 +79,18 @@ export async function POST(request: NextRequest) {
 
       await generateTrack(service, userId, topic, goalId, pending?.extracted_text as string | undefined);
       await service.from("learning_goals").update({ track_status: "ready" }).eq("id", goalId);
+      await recordOperation({
+        userId, operation: "track.build", outcome: "ok",
+        durationMs: Date.now() - startedAt, detail: { source: "document" },
+      });
     } catch (err) {
       console.error("[goals/document/approve] background track generation failed:", err);
       await service.from("learning_goals").update({ track_status: "failed" }).eq("id", goalId);
+      await recordOperation({
+        userId, operation: "track.build", outcome: "failed",
+        durationMs: Date.now() - startedAt, error: err, redact: [topic],
+        detail: { source: "document" },
+      });
     } finally {
       // The extracted document text's job is done once generateTrack has
       // read it — it doesn't linger in the database after the track exists.

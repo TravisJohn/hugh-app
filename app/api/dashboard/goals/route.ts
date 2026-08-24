@@ -7,6 +7,7 @@ import { enforceUsageGate, logUsage } from "@/lib/usage";
 import { refineTopicPrompt, parseClaudeJson } from "@/lib/claude/prompts";
 import { judgeTopicDomain } from "@/lib/learn/topic-domain-server";
 import { generateTrack } from "@/lib/tracker/generate";
+import { recordOperation } from "@/lib/observability/record";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -28,7 +29,16 @@ export async function POST(request: NextRequest) {
   }
 
   const usageGate = await enforceUsageGate(userId);
-  if (usageGate) return usageGate;
+  if (usageGate) {
+    // 'refused', not 'failed'. The budget gate doing its job is the system
+    // working, and folding it into the failure rate would make a month of
+    // heavy use look like an outage.
+    void recordOperation({
+      userId, operation: "track.build", outcome: "refused",
+      detail: { source: "qa", reason: "usage-gate" },
+    });
+    return usageGate;
+  }
 
   const body = (await request.json()) as {
     topic:    string;
@@ -104,19 +114,31 @@ export async function POST(request: NextRequest) {
   // A service-role client is used because the cookie-bound request client is
   // not guaranteed to be usable once the response lifecycle has ended.
   after(async () => {
-    const service = createServiceClient();
+    const service   = createServiceClient();
+    const startedAt = Date.now();
     try {
       await generateTrack(service, userId, finalTopic, goalId);
       await service
         .from("learning_goals")
         .update({ track_status: "ready" })
         .eq("id", goalId);
+      // Awaited, not voided: a floating promise inside after() can be cut off
+      // when the invocation ends, losing exactly the rows that matter most.
+      await recordOperation({
+        userId, operation: "track.build", outcome: "ok",
+        durationMs: Date.now() - startedAt, detail: { source: "qa" },
+      });
     } catch (err) {
       console.error("[dashboard/goals] background track generation failed:", err);
       await service
         .from("learning_goals")
         .update({ track_status: "failed" })
         .eq("id", goalId);
+      await recordOperation({
+        userId, operation: "track.build", outcome: "failed",
+        durationMs: Date.now() - startedAt, error: err, redact: [finalTopic, topic],
+        detail: { source: "qa" },
+      });
     }
   });
 

@@ -4,6 +4,7 @@ import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { focusedLearningSystemPrompt } from "@/lib/claude/prompts";
 import { parseChatResponse } from "@/lib/askcode/parse";
 import { checkUsageAllowed, logUsage } from "@/lib/usage";
+import { recordOperation } from "@/lib/observability/record";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -21,6 +22,8 @@ interface ChatMessage {
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now();
+
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -98,6 +101,13 @@ export async function POST(request: NextRequest) {
     // are intentionally excluded so a warm cache eases the learner's quota.
     const tokensIn = res.usage.input_tokens + (res.usage.cache_creation_input_tokens ?? 0);
     void logUsage({ userId, model: MODEL, feature: "learn/chat", tokensIn, tokensOut: res.usage.output_tokens });
+    // Voided, not awaited: this is the highest-volume route in the product and
+    // the learner is waiting on the response. A lost row here costs one data
+    // point; an added round trip costs every learner on every message.
+    void recordOperation({
+      userId, operation: "ask.chat", outcome: "ok",
+      durationMs: Date.now() - startedAt, detail: { offTopic: isOffTopic },
+    });
     return NextResponse.json({
       reply: reply || "I couldn't generate a response. Please try again.",
       isOffTopic,
@@ -106,6 +116,10 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     console.error("[learn/chat] Claude error:", err);
+    void recordOperation({
+      userId, operation: "ask.chat", outcome: "failed",
+      durationMs: Date.now() - startedAt, error: err,
+    });
     return NextResponse.json({ error: "Failed to generate response" }, { status: 502 });
   }
 }

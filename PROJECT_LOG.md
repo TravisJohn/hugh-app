@@ -5069,3 +5069,57 @@ ceiling to 400 and swapping the redact/truncate order each turned a test red.
 The first pass exposed a self-fulfilling test — it measured the ceiling against
 the constant that defines it, so raising the constant kept it green. It now
 asserts the literal 40.
+
+## Observability Stage 2: database, writer, instrumentation (2026-08-24)
+
+Migration 047 creates `operation_events` — one row per attempt. `outcome` is
+the one column with a CHECK constraint: the operation vocabulary is meant to
+grow and lives in TypeScript, but 'ok' | 'failed' | 'refused' is not meant to.
+RLS is enabled with **no policy at all**, which denies everyone; this is
+operator data, and both the writes and the /admin reads go through the service
+role.
+
+**`recordOperation` swallows everything.** Insert error, thrown exception,
+missing service key — all logged to console, none rethrown. That is the exact
+inversion of the rule f540684 enforced across the Learn loop, and this is the
+one place it is right: a telemetry write must not fail a learner's track build.
+Written at the top of the file so nobody later "fixes" it.
+
+The await/void distinction is deliberate and load-bearing. Inside `after()` the
+call is **awaited**, because a floating promise there can be cut off when the
+invocation ends — losing exactly the rows that matter most. In a request path
+it is **voided**, so telemetry adds no latency to the learner's response.
+`ask.chat` is the clearest case: highest volume in the product, learner waiting.
+
+**Instrumented all six operations, not the three originally scoped.** The
+invariant test asserts registry ↔ code in both directions, so three wired
+operations and six registered ones would fail by construction. The alternatives
+were instrumenting the rest or shrinking an approved registry; the other three
+were small wraps around existing try/catch blocks.
+
+`topic.gate` is the reason the system exists. Off-domain is `refused` — the
+gate turning someone away is the gate working. A classifier outage is `failed`
+*even though the request succeeds*, wrapped in a named `ClassifierUnavailable`
+error so it groups on the operational meaning rather than on whichever network
+error surfaced. Nobody will ever report that failure, because nobody sees it.
+
+`rollup.ts` computes failure rate as failed / (ok + failed) — **refusals are
+excluded from the denominator**. Otherwise a wave of off-domain topics reads as
+a reliability collapse, and heavy refusals could equally mask a real failure
+rate by inflating the denominator. `buildCoverage` subtracts recorded builds
+from goals created: when both the server row and the beacon miss, that
+subtraction is the only evidence the attempt ever happened.
+
+The beacon accepts no free text whatsoever. Outcome and error class are
+hardcoded, the operation is checked against the registry's `clientReportable`
+allowlist, goal ownership is verified, and the single caller-supplied value is
+a clamped number. It fires only on the watchdog timeout path — a status of
+'failed' arriving normally is already recorded server-side.
+
+The registry-to-code scan was mutation-tested: renaming one call site's id to
+`ask.chatt` turned two tests red. It also asserts the scan found as many call
+sites as there are operations, so deleting every call in the app cannot make it
+pass by finding nothing.
+
+Not built yet: the admin panel. `rollup.ts` is tested but unconsumed until
+Stage 3 reads it. Migration 047 needs manual apply.

@@ -86,6 +86,26 @@ export function useTrackStatusWatch({ goalId, active, onReady, onFailed, timeout
       if (!settledRef.current) {
         settledRef.current = true;
         cleanup();
+
+        // The beacon fires on THIS path only. Reaching the timeout means the
+        // build wrote no status at all — the after() invocation was killed and
+        // cannot report its own death, so the browser is the only witness. A
+        // status of 'failed' arriving through settle() is already recorded
+        // server-side; beaconing that too would double-count it.
+        //
+        // keepalive so the report survives the learner closing the tab, and
+        // deliberately unawaited: telling the user comes first.
+        void fetch("/api/observability/beacon", {
+          method:    "POST",
+          headers:   { "Content-Type": "application/json" },
+          body:      JSON.stringify({ operation: "track.build", goalId, waitedMs: timeoutMs }),
+          keepalive: true,
+        }).catch(() => {
+          // Observability must never break what it observes — least of all in
+          // the browser, where a failed report would otherwise surface as an
+          // unhandled rejection on top of the failure the learner already has.
+        });
+
         onFailed();
       }
     }, timeoutMs);
