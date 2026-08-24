@@ -5023,3 +5023,49 @@ move onto something the learner still does, which is a product decision, not a
 cleanup. The `Room`/`CoachingMode` types and the interview prompt builders in
 `lib/claude/prompts.ts` are now dead but were left alone: that file is shared
 with the learn loop and untangling it is not part of this change.
+
+## Observability Stage 1: the foundation, no wiring (2026-08-24)
+
+"Operations" is a third telemetry concept, deliberately separate from the two
+that exist. `usage_logs` records spend and prices it per row; `activity_events`
+records engagement, deduped to one row per learner per surface per day. Neither
+can carry an outcome — the first because non-spend rows corrupt the cost maths,
+the second because its unique constraint makes per-attempt anything impossible.
+Operations records one row per attempt: did it work, how long, and why not.
+
+Stage 1 is the pure modules only. No migration, no instrumented endpoint. The
+full design is in PRD-observability.md.
+
+**Three outcomes, not two.** `refused` is the load-bearing value. A usage-gate
+block, an off-domain topic, a 409 "still building" — these are the system
+working correctly, and folding them into `failed` would make a healthy product
+look broken.
+
+**`failureIsSilent` is the field the whole idea turns on.** `topic.gate` fails
+OPEN by design: a classifier outage returns "in domain" and the request
+proceeds. Nobody sees a failure, so a gate that has stopped gating is
+indistinguishable from one that works. Marking that on the record is how the
+panel will know to rank it first, rather than leaving it as tribal knowledge.
+
+**Exhaustiveness is enforced twice.** A `Record<OperationId, true>` in the test
+makes TypeScript refuse to compile if the union and the registry disagree; a
+runtime comparison catches the rest. Mirrors `lib/monitor/features.test.ts`,
+whose filesystem scan has no counterpart yet — that belongs with the
+instrumentation in Stage 2, and its absence is marked in the test file so it
+reads as deferred rather than forgotten.
+
+**Privacy is two mechanisms, not one.** Redaction is explicit: the caller passes
+the learner strings to remove, because the caller is the only thing that
+reliably knows which they are. Pattern-matching for "things that look private"
+would be a guess. Redaction runs BEFORE truncation — truncating first can cut a
+secret in half and leave the front of it standing. The 40-character ceiling on
+every `detail` string is the backstop for when a caller forgets to pass a
+secret at all: nothing long enough to be free text survives. Detail keys must
+look like identifiers, non-primitive values are dropped rather than coerced,
+and the key count is capped.
+
+Both guarantees were mutation-tested rather than assumed: raising the detail
+ceiling to 400 and swapping the redact/truncate order each turned a test red.
+The first pass exposed a self-fulfilling test — it measured the ceiling against
+the constant that defines it, so raising the constant kept it green. It now
+asserts the literal 40.
