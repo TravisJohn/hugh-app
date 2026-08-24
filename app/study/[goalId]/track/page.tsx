@@ -65,6 +65,10 @@ export default async function StudyTrackPage({ params, searchParams }: Props) {
   // track_status; the page used to ignore it and show one "may still be
   // generating" message for every non-board case, including 'failed' — where
   // the refresh it suggested could never work.
+  // This is a Server Component: it renders once per request, so "now" is a
+  // request timestamp rather than a value that could shift between client
+  // re-renders. The purity rule cannot tell the two apart.
+  // eslint-disable-next-line react-hooks/purity
   const build = buildState(g.track_status, g.track_started_at ?? g.created_at, Date.now());
   const view  = trackViewState(build, Boolean(t), milestones.length);
   // A 'ready' goal reaching the panel means the board is missing or empty,

@@ -5,24 +5,17 @@ import { createClient } from "@/lib/supabase/server";
 import { verifyUserAccess } from "@/lib/supabase/verify-access";
 import SignOutButton from "@/components/landing/SignOutButton";
 import HeaderUsage from "@/components/usage/HeaderUsage";
-import LandingNotice from "@/components/landing/LandingNotice";
 import DashboardPanel from "@/components/dashboard/DashboardPanel";
 import { type LearningGoal } from "@/types";
 import { checkSessionQuota, FREE_SESSION_LIMIT } from "@/lib/quota";
 
-interface Props {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-}
-
 // "What do you want to learn?" — the learning dashboard. Reached by picking
 // "Learn" on the top-level activity picker (/home). Opening a goal here jumps
 // straight to that goal's Track board.
-export default async function LearnDashboardPage({ searchParams }: Props) {
+export default async function LearnDashboardPage() {
   const supabase = await createClient();
   const { user } = await verifyUserAccess(supabase);
 
-  const sp          = searchParams ? await searchParams : {};
-  const showNotice  = sp.notice === "min5";
 
   const [{ data: goals, error: goalsError }, quota] = await Promise.all([
     supabase
@@ -102,12 +95,6 @@ export default async function LearnDashboardPage({ searchParams }: Props) {
           </div>
         </header>
 
-        {/* Notice (shows after a short interview session break) */}
-        {showNotice && (
-          <div className="px-8 pt-5">
-            <LandingNotice />
-          </div>
-        )}
 
         {/* Usage bar — only shown to free users */}
         {quota.plan === "free" && (

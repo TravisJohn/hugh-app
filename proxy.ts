@@ -28,17 +28,13 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  // IMPORTANT: always call getUser() to refresh the session token.
-  // Never use getSession() here — it reads from the cookie without server-side verification.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (request.nextUrl.pathname.startsWith("/interview") && !user) {
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    return NextResponse.redirect(loginUrl);
-  }
+  // IMPORTANT: always call getUser() to refresh the session token — the
+  // return value is deliberately unused. Route gating lives in the pages
+  // themselves (verifyUserAccess); this proxy exists only so Server
+  // Components see a refreshed session, since they cannot set cookies.
+  // Never use getSession() here — it reads from the cookie without
+  // server-side verification.
+  await supabase.auth.getUser();
 
   return supabaseResponse;
 }

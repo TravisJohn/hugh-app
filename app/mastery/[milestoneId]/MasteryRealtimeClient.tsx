@@ -15,8 +15,9 @@ type Phase = "intro" | "live" | "recapping" | "recap";
 interface Props {
   milestoneId:     string;
   milestoneTitle:  string;
-  trackId:         string;
   returnUrl?:      string;
+  /** The goal board to use when no returnUrl was supplied. */
+  fallbackUrl:     string;
   alreadyMastered: boolean;
   classicUrl:      string;   // intentional escape hatch to the scripted flow
   summaryDoc:      string | null;
@@ -35,12 +36,13 @@ const STATUS_LABEL: Record<MasteryRealtimeStatus, string> = {
 };
 
 export default function MasteryRealtimeClient({
-  milestoneId, milestoneTitle, trackId, returnUrl, alreadyMastered, classicUrl,
+  milestoneId, milestoneTitle, returnUrl,
+  fallbackUrl, alreadyMastered, classicUrl,
   summaryDoc, summaryDocAt,
 }: Props) {
   const router = useRouter();
 
-  const boardUrl = returnUrl && returnUrl !== "/tracker" ? returnUrl : `/tracker/${trackId}`;
+  const boardUrl = returnUrl ?? fallbackUrl;
 
   const [phase,       setPhase]       = useState<Phase>("intro");
   const [recap,       setRecap]       = useState<string | null>(null);

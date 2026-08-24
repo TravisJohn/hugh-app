@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
 
   const elevenlabs = ttsClient();
   if (!elevenlabs) {
-    console.error("[interview/tts] ELEVENLABS_API_KEY is not set");
+    console.error("[tts] ELEVENLABS_API_KEY is not set");
     return NextResponse.json(
       { error: "Voice playback is unavailable right now." },
       { status: 503 }

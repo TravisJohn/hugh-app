@@ -93,22 +93,22 @@ interface Props {
   milestoneId:     string;
   milestoneTitle:  string;
   personaId:       string;
-  trackId:         string;
   returnUrl?:      string;
+  /** The goal board to use when no returnUrl was supplied. */
+  fallbackUrl:     string;
   alreadyMastered: boolean;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
 
-export default function MasteryClient({ milestoneId, milestoneTitle, personaId, trackId, returnUrl, alreadyMastered }: Props) {
+export default function MasteryClient({ milestoneId, milestoneTitle, personaId, returnUrl,
+  fallbackUrl, alreadyMastered }: Props) {
   const router = useRouter();
 
-  // The specific board is the guaranteed destination. returnUrl adds study-context
-  // if the user came from /study/[goalId]/track, otherwise we fall back to the
-  // standalone board so we never land on the generic /tracker list page.
-  const boardUrl = returnUrl && returnUrl !== "/tracker"
-    ? returnUrl
-    : `/tracker/${trackId}`;
+  // returnUrl carries study-context when the learner came from
+  // /study/[goalId]/track. fallbackUrl is that same board, resolved
+  // server-side from the track's goal, for anyone arriving here directly.
+  const boardUrl = returnUrl ?? fallbackUrl;
 
   const [phase,      setPhase]      = useState<Phase>("setup");
   const [scenario,   setScenario]   = useState<ScenarioKey>(randomScenario);

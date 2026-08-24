@@ -4982,3 +4982,44 @@ the same rule the document path already enforced on approve. Separately,
 them; it now bills its own spend, accumulating across retries, and `userId` is
 required rather than optional because an optional parameter is how the next
 caller forgets.
+
+## Deleting the legacy surfaces: interview and tracker (2026-08-24)
+
+Both were called legacy and removed. Neither was a clean delete — the
+dependency map is the reason this is worth writing down.
+
+**/mastery was standing on interview's foundations.** `MasteryClient` imports
+`useAudioPlayer` and `useSpeechRecognition`, `useAudioPlayer` fetched
+`/api/interview/tts`, and `mastery/page.tsx` imports `getRandomPersona`.
+Deleting `app/api/interview/` wholesale would have broken the voice on a live
+Learn surface. The TTS route moved to `/api/tts` — it was never interview-only,
+it is the app's voice — and `lib/personas.ts`, `useAudioPlayer` and
+`useSpeechRecognition` all stay.
+
+**Mastery also fell back to /tracker in six places.** Those fallbacks fire when
+someone reaches `/mastery/[id]` without a returnUrl. Rather than point them at
+a generic list that no longer exists, the page now resolves the track's
+`goal_id` and falls back to that goal's board, with `/home/learn` behind it for
+a legacy track that has no goal.
+
+**proxy.ts had exactly one route gate, and it was /interview.** Removing it
+leaves the proxy doing only session refresh — which is all its own comment ever
+claimed it was for. Every other route gates in-page via `verifyUserAccess`. The
+`getUser()` call stays; only the unused binding went.
+
+Deleted: `app/interview/**`, `components/interview/**`, `useInterview`, five
+`/api/interview/*` generation routes, `app/actions/session.ts`,
+`SessionSetupForm`, `CoachingToggle`, `LandingNotice`, `app/tracker/**`,
+`CreateTrackModal`, `TrackerDashboard`, and `/api/tracker/generate` — the
+second, unhardened entry point to `generateTrack` that had no `maxDuration`, no
+usage gate and no domain gate, and which the old failed-track fallback pointed
+learners at.
+
+**Not deleted, deliberately.** The `sessions` and `questions` tables stay:
+migrations here are forward-only and dropping a table is not reversible.
+`checkSessionQuota` still counts `sessions`, so the free-plan bar on
+`/home/learn` is now frozen at whatever it last read — the quota model needs to
+move onto something the learner still does, which is a product decision, not a
+cleanup. The `Room`/`CoachingMode` types and the interview prompt builders in
+`lib/claude/prompts.ts` are now dead but were left alone: that file is shared
+with the learn loop and untangling it is not part of this change.

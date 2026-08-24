@@ -65,7 +65,7 @@ export function useAudioPlayer({ onEnded }: UseAudioPlayerOptions): UseAudioPlay
 
     const playId = (playIdRef.current += 1);
 
-    const res = await fetch('/api/interview/tts', {
+    const res = await fetch('/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, personaId }),
