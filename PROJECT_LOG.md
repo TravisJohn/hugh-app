@@ -5230,5 +5230,27 @@ direct `db.<ref>` host is IPv6-only and hangs a runner rather than failing).
 `BACKUP_PASSPHRASE` was generated and handed to Travis; if it is lost, every DB
 artifact is unrecoverable.
 
-**Not yet done:** a test restore into a scratch project. An untested backup is
-not a backup.
+**The DB snapshot went green the same day.** `SUPABASE_DB_URL` needed its
+password percent-encoded — Hugh's contains an `@`, which unencoded splits the
+authority in the wrong place and surfaces as a host error rather than an auth
+one. First run: 28 tables, 32 non-empty, 616 KB encrypted.
+
+**The artifact was then verified against the live database, not just extracted.**
+It downloads, decrypts, and unpacks; `scripts/verify-backup.py` compared it row
+for row and all 25 non-empty `public` tables match exactly, alongside 12
+`auth.users` and 853 `storage.objects` — the same 853 the mirror holds, so the
+rows and the files agree.
+
+Two things that check corrected. The README claimed passwords were not
+captured; `auth.users` in fact carries `encrypted_password`, so restored
+accounts keep their passwords and the artifact holds bcrypt hashes — which is
+why it is encrypted and the repo is private. And the first pass of the verifier
+reported `note_messages` 54 rows short, which was the verifier, not the backup:
+it split statements on `;
+`, and that table holds AI chat about code, where a
+semicolon at end-of-line truncates the INSERT. A dump is only checkable with a
+parser that tracks quote and paren state.
+
+**Not yet done:** the replay. Nothing has loaded `schema.sql` and `data.sql`
+into a fresh Postgres, so ordering, FK constraints, extensions and role grants
+remain unproven. Knowing every row is present is not knowing it loads back.
