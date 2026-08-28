@@ -5170,3 +5170,65 @@ operation has failures — those are the ones nobody will ever report.
 Verified: compile, route registration, the auth gate (307 to /login), and all
 three queries against the live database. Visual confirmation needs an admin
 session and is Travis's to do.
+
+
+---
+
+## 2026-08-28 — Off-site backups: the private `hugh-backups` repo
+
+Supabase's Free plan takes no backups of a project at all. Until today the only
+copy of Hugh's 28 tables and 853 storage objects was the live database itself,
+and migrations are forward-only with no rollback tooling — so the database was
+the one store in the project with no reconstruction path from source.
+
+**Two scheduled jobs, in a private repo, running scripts that live here.**
+`hugh-backups` is private by necessity: hugh-app is public, and workflow
+artifacts on a public repo are downloadable by anyone, while the dump carries
+real account emails. The scripts themselves are not copied into it. Both
+workflows check hugh-app out at runtime, so there is exactly one version of
+`backup-db.sh` and `mirror-storage.mjs` to review and to fix. hugh-app's own
+`ci.yml` stays secretless, as its policy requires.
+
+| Job | UTC | What it captures | Where it lands |
+|---|---|---|---|
+| `db-snapshot` | 15:17 | roles · schema · data | AES256 artifact, 30-day retention |
+| `storage-mirror` | 15:47 | `note-images` + `monitor-documents` | committed to `storage/`, kept forever |
+
+**The dump verifies itself.** `supabase db dump` can exit 0 having written a
+header and no content, so an exit code is not evidence. The script asserts at
+least 20 tables and the presence of COPY/INSERT blocks, and fails loudly
+otherwise. A backup job that greenly writes empty files every night is worse
+than no job, because it sells confidence that was never earned.
+
+**The mirror is incremental, and deletions are never propagated.** Every object
+is written under a fresh UUID and never edited, so "already on disk" and
+"already current" are the same question. A backup that faithfully reproduces an
+accidental delete is not a backup, so `storage/` only ever grows.
+
+**Three things only a real run could have told us.**
+
+*Node 20 has no global WebSocket.* The mirror ran clean locally on Node 24 and
+died on the runner inside `createClient`, which eagerly builds a RealtimeClient
+neither script ever uses. The job moved to Node 22 and `adminClient` now checks
+its own runtime, so an old Node reports itself in one sentence instead of
+throwing five frames deep in a dependency.
+
+*Windows MAX_PATH blocks the restore, not just the write.* Objects sit three
+nested UUIDs deep, which clears 260 characters before you have picked a clone
+directory. `core.longpaths` is now documented as mandatory in the README — a
+restore that quietly stops at 700 of 853 files is the worst way to learn this.
+
+*autocrlf could silently corrupt the mirror.* `storage/** binary` is pinned in
+`.gitattributes`, and all 853 staged blobs were verified to hash identically to
+their raw bytes. A CRLF-mangled JPEG restores as a broken image and nothing in
+the pipeline would say so.
+
+**Verified:** the storage mirror dispatched green against the real project —
+853 objects upstream, 853 already present, 0 copied, 0 failed, no commit. The
+DB snapshot is blocked on `SUPABASE_DB_URL` (session pooler, port 5432 — the
+direct `db.<ref>` host is IPv6-only and hangs a runner rather than failing).
+`BACKUP_PASSPHRASE` was generated and handed to Travis; if it is lost, every DB
+artifact is unrecoverable.
+
+**Not yet done:** a test restore into a scratch project. An untested backup is
+not a backup.
