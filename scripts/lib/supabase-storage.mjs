@@ -39,8 +39,22 @@ export function loadConfig(envUrl = import.meta.url) {
   return { url, key };
 }
 
-/** Service-role client: bypasses RLS on purpose, so it sees every learner's files. */
+/**
+ * Service-role client: bypasses RLS on purpose, so it sees every learner's files.
+ *
+ * Needs Node >= 22. `createClient` eagerly constructs a RealtimeClient, which
+ * requires a global WebSocket that Node 20 does not have — neither script here
+ * ever opens a channel, but both die in that constructor. Checked explicitly so
+ * an old runtime reports itself instead of throwing from inside a dependency.
+ */
 export function adminClient() {
+  const major = Number(process.versions.node.split(".")[0]);
+  if (major < 22) {
+    throw new Error(
+      `Node ${process.versions.node} is too old: @supabase/supabase-js builds a ` +
+        `realtime client on construction and needs a native WebSocket (Node >= 22).`
+    );
+  }
   const { url, key } = loadConfig();
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
