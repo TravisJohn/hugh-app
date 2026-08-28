@@ -5251,6 +5251,33 @@ it split statements on `;
 semicolon at end-of-line truncates the INSERT. A dump is only checkable with a
 parser that tracks quote and paren state.
 
-**Not yet done:** the replay. Nothing has loaded `schema.sql` and `data.sql`
-into a fresh Postgres, so ordering, FK constraints, extensions and role grants
-remain unproven. Knowing every row is present is not knowing it loads back.
+**The replay was then run, into `supabase/postgres:17.6.1.166` — the same
+Postgres version the dump came from.** `roles.sql` and `schema.sql` applied
+with zero errors: 28 tables, RLS on all 28, 28 policies, 64 indexes, 43 foreign
+keys, 23 check constraints. All 25 non-empty `public` tables came back at
+exactly the right counts — 3,774 rows, no mismatches. FK ordering never arose,
+because `data.sql` opens with `SET session_replication_role = replica`.
+
+Seven statements failed, every one in `auth` or `storage`, and they taught the
+two things the restore instructions had wrong.
+
+**The target must be a real Supabase project, not a bare Postgres.**
+`schema.sql` is `public`-only; the dump carries data for `auth` and `storage`
+but none of their DDL, because those schemas belong to GoTrue and the Storage
+service rather than to Hugh's migrations. A plain Postgres has nowhere to put
+12 users and 853 object rows.
+
+**And psql does not stop on error by default**, so those failures scroll past
+and the restore still exits 0 — a database that looks complete and has no users
+in it. The README now tees each step and greps for `ERROR:`.
+
+Two false alarms along the way, both mine and both worth recording because each
+would have been reported as a broken backup. A `^ERROR` grep matched nothing
+because psql prefixes `psql:/tmp/data.sql:123:`. And Git Bash rewrote
+`/tmp/data.sql` into a Windows path before Docker saw it, so two "clean" runs
+were psql never opening the files at all. A verification that cannot fail is
+not a verification.
+
+**Still owed:** nothing on the DB side beyond a restore into an actual scratch
+Supabase project to confirm the seven `auth`/`storage` statements land there.
+Everything Hugh's own migrations own is proven.
