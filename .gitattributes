@@ -1,0 +1,4 @@
+# Shell scripts run on Linux CI runners. This repo is developed on Windows with
+# core.autocrlf=true, and a CRLF-committed .sh fails there as `$'\r': command
+# not found` — a confusing error a long way from its cause.
+*.sh text eol=lf
