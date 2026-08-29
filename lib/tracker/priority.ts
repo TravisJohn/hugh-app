@@ -8,10 +8,25 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // caller alongside the token counts so it can log what was actually billed.
 const MODEL = "claude-sonnet-4-6";
 
-export interface PriorityUsage {
+/** One milestone's final place in the suggested build order. */
+export interface PriorityAssignment {
+  id:     string;
+  rank:   number;
+  reason: string | null;
+}
+
+export interface PriorityResult {
   inputTokens:  number;
   outputTokens: number;
   model:        string;
+  /**
+   * What was written, returned so the caller can snapshot the board as the
+   * learner receives it. Ranking happens by UPDATE after the milestone insert,
+   * so it is absent from the generation parse entirely — a provenance snapshot
+   * taken from that parse would record a curriculum with no order in it, and
+   * ordering is most of what makes a curriculum good or bad.
+   */
+  assignments:  PriorityAssignment[];
 }
 
 /**
@@ -27,7 +42,7 @@ export async function assignBacklogPriority(
   supabase: SupabaseClient,
   trackId:  string,
   topic:    string,
-): Promise<PriorityUsage | null> {
+): Promise<PriorityResult | null> {
   const { data: rows } = await supabase
     .from("milestones")
     .select("id, title, summary")
@@ -51,7 +66,7 @@ export async function assignBacklogPriority(
 
   // Build rank assignments from Claude's order; guard ranges + de-dupe.
   const seen = new Set<number>();
-  const assignments: Array<{ id: string; rank: number; reason: string | null }> = [];
+  const assignments: PriorityAssignment[] = [];
   let rank = 1;
   for (const entry of parsed.ordered ?? []) {
     const idx = entry.n - 1;
@@ -71,5 +86,10 @@ export async function assignBacklogPriority(
       .eq("id", a.id)
   ));
 
-  return { inputTokens: res.usage.input_tokens, outputTokens: res.usage.output_tokens, model: MODEL };
+  return {
+    inputTokens:  res.usage.input_tokens,
+    outputTokens: res.usage.output_tokens,
+    model:        MODEL,
+    assignments,
+  };
 }

@@ -44,23 +44,32 @@ function claudeReply(payload: unknown, tokensIn = 100, tokensOut = 50) {
 
 interface Script {
   trackInsert?:     { data: { id: string } | null; error: { message: string } | null };
-  milestoneInsert?: { data: { id: string }[] | null; error: { message: string } | null };
+  milestoneInsert?: { data: { id: string; position: number }[] | null; error: { message: string } | null };
   trackDelete?:     { error: { message: string } | null };
+  goalAnswers?:     { data: Array<{ question: string; answer: string }> | null; error: { message: string } | null };
 }
 
 interface Spy {
   deletedTrackIds:      string[];
   milestoneRowsWritten: number;
   trackRowWritten:      Record<string, unknown> | null;
+  generationRows:       Record<string, unknown>[];
 }
 
-// A hand-rolled stand-in for the two query chains generateTrack actually uses:
-//   tracks:     .insert(row).select("id").single()  and  .delete().eq("id", ...)
-//   milestones: .insert(rows).select("id")
+// A hand-rolled stand-in for the query chains generateTrack actually uses:
+//   tracks:            .insert(row).select("id").single()  and  .delete().eq("id", ...)
+//   milestones:        .insert(rows).select("id, position")
+//   goal_answers:      .select(...).eq(...).order(...)
+//   track_generations: .insert(row)
 // Anything else throws, so a change in the module's query shape fails loudly
 // here rather than silently passing against a permissive mock.
 function makeSupabase(script: Script): { client: SupabaseClient; spy: Spy } {
-  const spy: Spy = { deletedTrackIds: [], milestoneRowsWritten: 0, trackRowWritten: null };
+  const spy: Spy = {
+    deletedTrackIds:      [],
+    milestoneRowsWritten: 0,
+    trackRowWritten:      null,
+    generationRows:       [],
+  };
 
   const client = {
     from(table: string) {
@@ -90,10 +99,29 @@ function makeSupabase(script: Script): { client: SupabaseClient; spy: Spy } {
             return {
               select: async () =>
                 script.milestoneInsert ?? {
-                  data:  rows.map((_, i) => ({ id: `m-${i}` })),
+                  data:  rows.map((_, i) => ({ id: `m-${i}`, position: i })),
                   error: null,
                 },
             };
+          },
+        };
+      }
+      // Provenance (migration 048). Read to measure the learner's answers,
+      // written once per generation on both the success and failure branch.
+      if (table === "goal_answers") {
+        return {
+          select: () => ({
+            eq: () => ({
+              order: async () => script.goalAnswers ?? { data: [], error: null },
+            }),
+          }),
+        };
+      }
+      if (table === "track_generations") {
+        return {
+          insert: async (row: Record<string, unknown>) => {
+            spy.generationRows.push(row);
+            return { error: null };
           },
         };
       }
@@ -166,7 +194,7 @@ describe("generateTrack - a failed milestone insert must not look like success",
     // tell which third is missing.
     messagesCreate.mockResolvedValue(claudeReply(THREE_MILESTONES));
     const { client, spy } = makeSupabase({
-      milestoneInsert: { data: [{ id: "m-0" }, { id: "m-1" }], error: null },
+      milestoneInsert: { data: [{ id: "m-0", position: 0 }, { id: "m-1", position: 1 }], error: null },
     });
 
     await expect(generateTrack(client, "user-1", "SQL")).rejects.toThrow(/expected 3, saved 2/);
@@ -254,6 +282,7 @@ describe("generateTrack - backlog ranking is best-effort", () => {
     messagesCreate.mockResolvedValue(claudeReply(THREE_MILESTONES));
     assignBacklogPriorityMock.mockResolvedValue({
       model: "claude-haiku-4-5", inputTokens: 120, outputTokens: 40,
+      assignments: [{ id: "m-1", rank: 1, reason: "foundational" }],
     });
     const { client } = makeSupabase({});
 
@@ -262,5 +291,180 @@ describe("generateTrack - backlog ranking is best-effort", () => {
     expect(logUsageMock).toHaveBeenCalledWith(
       expect.objectContaining({ feature: "tracker/priority", model: "claude-haiku-4-5" }),
     );
+  });
+});
+
+// -- Provenance (migration 048) ---------------------------------------------
+
+describe("generateTrack - the provenance row", () => {
+  it("writes exactly one row on a successful build", async () => {
+    messagesCreate.mockResolvedValue(claudeReply(THREE_MILESTONES));
+    const { client, spy } = makeSupabase({});
+
+    await generateTrack(client, "user-1", "SQL window functions", "goal-9");
+
+    expect(spy.generationRows).toHaveLength(1);
+    expect(spy.generationRows[0]).toMatchObject({
+      user_id:     "user-1",
+      goal_id:     "goal-9",
+      track_id:    "track-1",
+      source_kind: "qa",
+      outcome:     "ok",
+      input_topic: "SQL window functions",
+      attempts:    1,
+    });
+  });
+
+  it("writes a row on the failure branch too - a failed generation is a data point", async () => {
+    messagesCreate.mockResolvedValue(claudeReply(THREE_MILESTONES));
+    const { client, spy } = makeSupabase({
+      milestoneInsert: { data: null, error: { message: "permission denied" } },
+    });
+
+    await expect(generateTrack(client, "user-1", "SQL")).rejects.toBeInstanceOf(TrackGenerationError);
+
+    expect(spy.generationRows).toHaveLength(1);
+    expect(spy.generationRows[0]).toMatchObject({
+      outcome:     "failed",
+      error_class: "TrackGenerationError",
+      track_id:    null,
+    });
+  });
+
+  it("records the retry count, which exists in no other store", async () => {
+    // usage_logs folds both attempts into one row, so this is the only place
+    // "the model needed a second try" is written down.
+    messagesCreate
+      .mockResolvedValueOnce(claudeReply({ nonsense: true }))
+      .mockResolvedValueOnce(claudeReply(THREE_MILESTONES));
+    const { client, spy } = makeSupabase({});
+
+    await generateTrack(client, "user-1", "SQL");
+
+    expect(spy.generationRows[0]).toMatchObject({ attempts: 2 });
+  });
+
+  it("names the document branch as its own prompt, and marks the source", async () => {
+    messagesCreate.mockResolvedValue(claudeReply(THREE_MILESTONES));
+    const qa  = makeSupabase({});
+    const doc = makeSupabase({});
+
+    await generateTrack(qa.client,  "user-1", "SQL", "goal-1");
+    await generateTrack(doc.client, "user-1", "SQL", "goal-1", "extracted document text");
+
+    expect(qa.spy.generationRows[0]).toMatchObject({ source_kind: "qa" });
+    expect(doc.spy.generationRows[0]).toMatchObject({ source_kind: "document" });
+    // Two structurally different prompts must not share one identity.
+    expect(qa.spy.generationRows[0].prompt_fingerprint)
+      .not.toBe(doc.spy.generationRows[0].prompt_fingerprint);
+  });
+
+  it("counts milestones the model filed under a column that isn't real", async () => {
+    messagesCreate.mockResolvedValue(claudeReply({
+      trackTitle: "T",
+      milestones: [
+        { title: "a", summary: "s", column: "learn" },
+        { title: "b", summary: "s", column: "study" },   // not a kanban column
+        { title: "c", summary: "s", column: "someday" }, // nor this
+      ],
+    }));
+    const { client, spy } = makeSupabase({});
+
+    await generateTrack(client, "user-1", "SQL");
+
+    expect(spy.generationRows[0]).toMatchObject({ columns_coerced: 2 });
+  });
+
+  it("snapshots the board as served, with the ranking the learner sees", async () => {
+    messagesCreate.mockResolvedValue(claudeReply(THREE_MILESTONES));
+    assignBacklogPriorityMock.mockResolvedValue({
+      model: "claude-sonnet-4-6", inputTokens: 100, outputTokens: 30,
+      assignments: [{ id: "m-2", rank: 1, reason: "needed first" }],
+    });
+    const { client, spy } = makeSupabase({});
+
+    await generateTrack(client, "user-1", "SQL");
+
+    const row   = spy.generationRows[0] as { milestones_out: Array<Record<string, unknown>> };
+    const ranked = row.milestones_out.find(m => m.position === 2);
+
+    // The rank is applied by UPDATE after the insert, so a snapshot taken from
+    // the generation parse alone would have no order in it at all.
+    expect(ranked).toMatchObject({ priority_rank: 1, priority_reason: "needed first" });
+    expect(row.milestones_out.find(m => m.position === 0)).toMatchObject({ priority_rank: null });
+  });
+
+  it("records that ranking failed, so a partial failure is not a clean success", async () => {
+    messagesCreate.mockResolvedValue(claudeReply(THREE_MILESTONES));
+    assignBacklogPriorityMock.mockRejectedValue(new Error("ranking exploded"));
+    const { client, spy } = makeSupabase({});
+
+    await generateTrack(client, "user-1", "SQL");
+
+    expect(spy.generationRows[0]).toMatchObject({
+      outcome:    "ok",     // the track is fine
+      ranked:     false,    // but the learner got no suggested order
+      rank_model: null,
+    });
+  });
+
+  it("sums both model calls into the token columns", async () => {
+    messagesCreate.mockResolvedValue(claudeReply(THREE_MILESTONES, 1000, 200));
+    assignBacklogPriorityMock.mockResolvedValue({
+      model: "claude-sonnet-4-6", inputTokens: 120, outputTokens: 40, assignments: [],
+    });
+    const { client, spy } = makeSupabase({});
+
+    await generateTrack(client, "user-1", "SQL");
+
+    expect(spy.generationRows[0]).toMatchObject({ tokens_in: 1120, tokens_out: 240 });
+  });
+
+  it("measures the learner's answers without copying them", async () => {
+    messagesCreate.mockResolvedValue(claudeReply(THREE_MILESTONES));
+    const { client, spy } = makeSupabase({
+      goalAnswers: {
+        data: [
+          { question: "Why?", answer: "I keep breaking window functions at work" },
+          { question: "Why?", answer: "partitions confuse me" },
+        ],
+        error: null,
+      },
+    });
+
+    await generateTrack(client, "user-1", "SQL", "goal-9");
+
+    const row = spy.generationRows[0];
+    expect(row).toMatchObject({ answer_count: 2, context_used: false });
+    expect(row.answer_chars).toBeGreaterThan(0);
+    expect(row.context_uptake).not.toBeNull();
+
+    // The whole point of R4: numbers, never the words.
+    const serialised = JSON.stringify(row);
+    expect(serialised).not.toContain("keep breaking window functions");
+    expect(serialised).not.toContain("partitions confuse me");
+  });
+
+  it("does not bill a replay to a learner, because usage_logs cannot hold it", async () => {
+    messagesCreate.mockResolvedValue(claudeReply(THREE_MILESTONES));
+    const { client, spy } = makeSupabase({});
+
+    await generateTrack(client, "user-1", "SQL", undefined, undefined, { isReplay: true });
+
+    expect(logUsageMock).not.toHaveBeenCalled();
+    expect(spy.generationRows[0]).toMatchObject({ is_replay: true, tokens_in: 100 });
+  });
+
+  it("never lets a failed provenance write break the build", async () => {
+    messagesCreate.mockResolvedValue(claudeReply(THREE_MILESTONES));
+    const { client } = makeSupabase({});
+    const original = client.from.bind(client);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (client as any).from = (table: string) =>
+      table === "track_generations"
+        ? { insert: async () => { throw new Error("provenance table is gone"); } }
+        : original(table);
+
+    await expect(generateTrack(client, "user-1", "SQL")).resolves.toBe("track-1");
   });
 });
