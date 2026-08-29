@@ -128,6 +128,29 @@ export async function POST(request: NextRequest) {
 
   const goalId = goal.id as string;
 
+  // Step 2b: keep the answers (migration 048). Until now they produced a
+  // 5-10 word refined title and were discarded, so nothing downstream could be
+  // evaluated against the context it was built from.
+  //
+  // Written before the response returns, so `after()` can measure them. The
+  // write is checked but not fatal: losing an eval sample is a smaller harm
+  // than losing the learner the goal they just spent five questions on, and
+  // `answer_count` on the generation row records how many actually landed.
+  if (answers.length > 0) {
+    const { error: answerError } = await supabase.from("goal_answers").insert(
+      answers.map((a, position) => ({
+        user_id:  userId,
+        goal_id:  goalId,
+        position,
+        question: String(a.question ?? ""),
+        answer:   String(a.answer ?? ""),
+      })),
+    );
+    if (answerError) {
+      logSafeError("dashboard/goals answers", answerError, [topic, ...answers.map(a => a.answer)]);
+    }
+  }
+
   // Step 3: generate the track AFTER the response is sent. The frontend watches
   // learning_goals.track_status over Realtime to know when this completes.
   // A service-role client is used because the cookie-bound request client is
