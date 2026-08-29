@@ -7,6 +7,7 @@ import {
 } from "@/lib/claude/prompts";
 import { assignBacklogPriority } from "@/lib/tracker/priority";
 import { logUsage } from "@/lib/usage";
+import { logSafeError } from "@/lib/observability/log";
 import { type KanbanColumn } from "@/types";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -69,7 +70,7 @@ async function deleteOrphanTrack(supabase: SupabaseClient, trackId: string): Pro
   if (error) {
     // Nothing more we can do here — the throw that follows is the real signal.
     // Logged loudly because it leaves a row that a retry will have to survive.
-    console.error("[generateTrack] orphan track cleanup failed:", trackId, error.message);
+    logSafeError(`generateTrack orphan cleanup ${trackId}`, error);
   }
 }
 
@@ -150,7 +151,7 @@ export async function generateTrack(
       void logUsage({ userId, model: usage.model, feature: "tracker/priority", tokensIn: usage.inputTokens, tokensOut: usage.outputTokens });
     }
   } catch (err) {
-    console.error("[generateTrack] backlog priority ranking failed:", err);
+    logSafeError("generateTrack backlog priority", err, [topic]);
   }
 
   return trackId;

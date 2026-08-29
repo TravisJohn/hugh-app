@@ -5,6 +5,7 @@ import { type TopicDomainVerdict } from "@/lib/learn/topic-domain";
 import { logUsage } from "@/lib/usage";
 import { recordOperation } from "@/lib/observability/record";
 import { messageOf } from "@/lib/observability/sanitize";
+import { logSafeError } from "@/lib/observability/log";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -89,7 +90,7 @@ export async function judgeTopicDomain(
     }
   }
 
-  console.error("[topic-domain-server] judge failed:", lastErr);
+  logSafeError("topic-domain-server judge", lastErr, [topic]);
   bill();
 
   // THE SILENT FAILURE. Both attempts are gone and this returns "in domain",

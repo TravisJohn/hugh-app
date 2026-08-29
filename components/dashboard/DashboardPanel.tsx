@@ -4,6 +4,7 @@ import { useState } from "react";
 import { BookMarked, Sparkles, Loader2, AlertTriangle, Upload, FileText, ArrowRight } from "lucide-react";
 import { type LearningGoal } from "@/types";
 import { classifyTopic, type TopicDomainVerdict } from "@/lib/learn/topic-domain";
+import { MAX_TOPIC_CHARS } from "@/lib/learn/topicInput";
 import GoalCard from "./GoalCard";
 import RefinementFlow from "./RefinementFlow";
 import DocumentUploadFlow, { ACCEPT as DOCUMENT_ACCEPT } from "./DocumentUploadFlow";
@@ -200,6 +201,7 @@ export default function DashboardPanel({ initialGoals }: Props) {
                     value={topic}
                     onChange={e => handleTopicChange(e.target.value)}
                     onKeyDown={handleKeyDown}
+                    maxLength={MAX_TOPIC_CHARS}
                     placeholder="e.g. Apache Airflow, dbt, SQL window functions, ML pipelines…"
                     className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500 transition-colors"
                   />

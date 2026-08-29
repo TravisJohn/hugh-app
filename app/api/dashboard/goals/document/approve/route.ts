@@ -3,6 +3,7 @@ import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { judgeTopicDomain } from "@/lib/learn/topic-domain-server";
+import { logSafeError } from "@/lib/observability/log";
 import { generateTrack } from "@/lib/tracker/generate";
 import { recordOperation } from "@/lib/observability/record";
 
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
     .eq("id", goalId);
 
   if (updateError) {
-    console.error("[goals/document/approve] failed to flip goal to pending:", updateError.message);
+    logSafeError("goals/document/approve pending", updateError, [topic]);
     return NextResponse.json({ error: "Failed to start track generation." }, { status: 500 });
   }
 
@@ -84,7 +85,7 @@ export async function POST(request: NextRequest) {
         durationMs: Date.now() - startedAt, detail: { source: "document" },
       });
     } catch (err) {
-      console.error("[goals/document/approve] background track generation failed:", err);
+      logSafeError("goals/document/approve background build", err, [topic]);
       await service.from("learning_goals").update({ track_status: "failed" }).eq("id", goalId);
       await recordOperation({
         userId, operation: "track.build", outcome: "failed",

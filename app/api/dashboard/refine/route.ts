@@ -3,6 +3,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { enforceUsageGate, logUsage } from "@/lib/usage";
 import { refinementQuestionPrompt, parseClaudeJson } from "@/lib/claude/prompts";
+import { checkTopic, TOPIC_REJECTION_MESSAGE } from "@/lib/learn/topicInput";
+import { logSafeError } from "@/lib/observability/log";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -23,12 +25,18 @@ export async function POST(request: NextRequest) {
     answers: Array<{ question: string; answer: string }>;
   };
 
-  const { topic, answers = [] } = body;
-  if (!topic?.trim()) {
-    return NextResponse.json({ error: "topic is required" }, { status: 400 });
+  const { answers = [] } = body;
+
+  // Same boundary as every other topic entry point.
+  const checked = checkTopic(body.topic ?? "");
+  if (!checked.ok) {
+    return NextResponse.json(
+      { error: TOPIC_REJECTION_MESSAGE[checked.rejection] },
+      { status: 400 },
+    );
   }
 
-  const prompt = refinementQuestionPrompt(topic, answers);
+  const prompt = refinementQuestionPrompt(checked.topic, answers);
 
   // Retry once: the Claude call or JSON parse can fail transiently. A single
   // retry keeps the refinement flow moving without hanging the client.
@@ -56,6 +64,10 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  console.error("[dashboard/refine]", lastErr);
+  // The richest learner text in the product travels through this route — five
+  // free-text answers about their job, motivation and circumstances. An SDK
+  // error can quote the request that carried them, so the topic and every
+  // answer are named as secrets here.
+  logSafeError("dashboard/refine", lastErr, [checked.topic, ...answers.map(a => a.answer)]);
   return NextResponse.json({ error: "Failed to generate question" }, { status: 502 });
 }

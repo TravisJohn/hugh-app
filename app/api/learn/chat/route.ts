@@ -5,6 +5,7 @@ import { focusedLearningSystemPrompt } from "@/lib/claude/prompts";
 import { parseChatResponse } from "@/lib/askcode/parse";
 import { checkUsageAllowed, logUsage } from "@/lib/usage";
 import { recordOperation } from "@/lib/observability/record";
+import { logSafeError } from "@/lib/observability/log";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -94,7 +95,11 @@ export async function POST(request: NextRequest) {
     // comes back empty, log the raw output + stop reason so we can diagnose
     // instead of silently showing the generic fallback.
     if (!reply.trim()) {
-      console.warn("[learn/chat] empty reply; stop_reason:", res.stop_reason, "raw:", raw.slice(0, 500));
+      // Was logging 500 characters of raw model output — a reply about
+      // whatever the learner is studying, written to the Vercel log drain. The
+      // diagnosis this line exists for (was it truncated? refused? empty?) is
+      // carried by stop_reason and the length; the text itself never was.
+      console.warn(`[learn/chat] empty reply; stop_reason: ${res.stop_reason}; raw_length: ${raw.length}`);
     }
 
     // Count fresh input + cache writes against usage; cache reads (~0.1x cost)
@@ -115,7 +120,7 @@ export async function POST(request: NextRequest) {
       covered,
     });
   } catch (err) {
-    console.error("[learn/chat] Claude error:", err);
+    logSafeError("learn/chat", err, [topic]);
     void recordOperation({
       userId, operation: "ask.chat", outcome: "failed",
       durationMs: Date.now() - startedAt, error: err,

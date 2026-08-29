@@ -9,6 +9,7 @@ import {
   type DocumentTopicExtraction,
 } from "@/lib/claude/prompts";
 import { judgeTopicDomain } from "@/lib/learn/topic-domain-server";
+import { logSafeError } from "@/lib/observability/log";
 import {
   extractDocumentText,
   EmptyExtractionError,
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
     if (err instanceof UnsupportedDocumentTypeError) {
       return NextResponse.json({ error: "Only PDF, DOCX, or HTML files are supported." }, { status: 415 });
     }
-    console.error("[goals/document/extract] extraction failed:", err);
+    logSafeError("goals/document/extract read", err, [file?.name ?? ""]);
     return NextResponse.json({ error: "Couldn't read that file." }, { status: 502 });
   }
 
@@ -114,7 +115,7 @@ export async function POST(request: NextRequest) {
       tokensOut: extraction.tokensOut,
     });
   } catch (err) {
-    console.error("[goals/document/extract] topic extraction failed:", err);
+    logSafeError("goals/document/extract topic", err, [extracted.text.slice(0, 200), file?.name ?? ""]);
     return NextResponse.json({ error: "Couldn't extract a topic from that document." }, { status: 502 });
   }
 
@@ -142,7 +143,7 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (goalError || !goal) {
-    console.error("[goals/document/extract] DB error:", goalError?.message);
+    logSafeError("goals/document/extract db", goalError, [candidate.candidateTopic]);
     return NextResponse.json({ error: "Failed to save goal" }, { status: 500 });
   }
 
@@ -156,7 +157,7 @@ export async function POST(request: NextRequest) {
     });
 
   if (extractionError) {
-    console.error("[goals/document/extract] failed to store extraction:", extractionError.message);
+    logSafeError("goals/document/extract store", extractionError, [candidate.candidateTopic]);
     // Roll back — an 'awaiting_approval' goal with no pending extraction row
     // is a dead end the `approve` route can never complete.
     await supabase.from("learning_goals").delete().eq("id", goal.id as string);
