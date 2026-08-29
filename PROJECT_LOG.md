@@ -5386,3 +5386,117 @@ which is unintentionally the strongest privacy posture in the product, and
 persisting them creates a PII store that does not currently exist. Retention,
 redaction and the untrusted-text framing have to be designed into that store
 from the start rather than bolted on, which is why the framing landed first.
+
+---
+
+## 2026-08-29 — Curriculum provenance: migration 048 (D1–D5)
+
+The 5-whys answers were used once, to produce a 5–10 word refined title, and then
+discarded. Nothing downstream could be evaluated against the context it was built
+from. This is the store that changes that — designed decision by decision in an
+addressable artifact first, then built.
+
+**Two tables, split along the deletion boundary.** `goal_answers` holds the
+learner's words: learner-owned, normal RLS, deletable. `track_generations` holds
+the eval record: service-role only, the same stance `operation_events` takes.
+Deleting the words leaves the model, the prompt, the milestone count and the
+outcome intact, so model comparison survives a deletion.
+
+Five design decisions were each walked through scenario by scenario before any
+code. Four of the five survived; every one of them changed shape.
+
+**The answers are not snapshotted twice — but measurements are.** A foreign key
+looked like enough, because the answers are genuinely immutable: the 5-whys flow
+has no edit affordance and the answers reach the server exactly once, in the same
+request that creates the goal. What that missed is that a foreign key is only as
+durable as the row it points at, and `GoalCard.tsx:90` deletes a goal in one
+click. That cascade wipes the answers and nulls the eval row's `goal_id` — and it
+is not a privacy action, it is tidying a library. Worse, the rejection measure
+wants exactly those deleted goals, so the rows carrying the strongest evidence
+would destroy their own input at the moment they produced it.
+
+The fix is `lib/learn/contextUptake.ts` (pure, 18 tests): the row stores
+`answer_chars`, `context_uptake` and `input_intact` — numbers derived from the
+answers, computed at write time. A number is not the sentence it came from, so it
+survives any deletion. Re-running the model on deleted input is genuinely lost,
+and that is what deletion ought to mean.
+
+Uptake is frozen at write time rather than joined at read time for a specific
+reason: a join silently returns a different number once the answers are gone, on
+a row that still says `answer_count = 5`.
+
+**"The model's raw output" was not a well-defined thing to freeze.** Three model
+calls shape a curriculum, not one. `generateMilestones` returns titles and
+summaries; `assignBacklogPriority` then writes `priority_rank` by UPDATE *after*
+the insert; `ensureLearningPoints` runs lazily days later, per card. Snapshotting
+the generation parse would have frozen a curriculum with no order in it — and
+ordering is most of what makes a curriculum good or bad. `milestones_out` is now
+the board **as served**, ranking included, with `ranked`, `rank_model`,
+`rank_fingerprint` and `columns_coerced` beside it.
+
+That last pair matters more than it looks. The ranking call's failure is
+swallowed by design — a failed ranking should cost a suggested order, not the
+learner's track — but without `ranked`, two tracks with identical output, one
+ranked and one not, read identically. And without a separate `rank_model`,
+moving the ranker to a cheaper model would move no field on the row at all.
+
+**The fourth store earns its place, but not for the reason first written.** The
+draft argued from what the other three cannot hold. The sharper argument is that
+`usage_logs`, `activity_events` and `operation_events` are all keyed to a learner
+and a span of time; this is the only one keyed to a single generation *event*
+with its input and output attached.
+
+Mapping the overlap found three things. `operation_events.duration_ms` times the
+whole `after()` block while the new column times generation alone — so it is
+named `generation_ms`, because two spans should not share a name. The token
+columns duplicate `usage_logs`, which stays authoritative for spend; these exist
+to price one generation against another and the migration says so. And the draft
+claimed the row was "written by `generateTrack` on both branches" when
+`generateTrack` throws and the three routes catch — so it now writes the row from
+one site, in a `finally`, and that write never throws.
+
+**Prompts are identified by a hash that cannot be forgotten.**
+`lib/claude/promptIdentity.ts` (pure, 13 tests). The failure D4 predicted is
+already in the codebase: `DRILL_PROMPT_VERSION = "1"` with an instruction to
+remember. Three things had to be settled first. `milestoneGenerationPrompt` is
+**two** templates, not one with a slot — and they have already drifted, since the
+Q&A branch frames the topic through `learnerTopicBlock` and the document branch
+interpolates it bare. There is no generic way to render a template with
+placeholders, so each prompt declares its own canonical call. And `max_tokens`
+shapes output while sitting outside all of it, so it became its own column.
+
+The model is deliberately **not** in the fingerprint: "same prompt, different
+model" is the eval's central comparison and has to stay expressible as
+fingerprint equality. `prompt_version` is looked up from a registry keyed by
+fingerprint, never typed, and a test fails the build when a template's
+fingerprint is unregistered. The enforcement is the test, not a person's memory.
+
+**Replay spend has nowhere legal to go, so it goes here.**
+`usage_logs.user_id` is NOT NULL against `auth.users`, so an offline replay —
+real money, no learner — cannot write a spend row at all. Billing it to a real
+learner would spend their quota on traffic they never triggered. A replay writes
+no usage row, and `is_replay` makes those rows excludable from every
+learner-facing number.
+
+**Shipped:** migration 048, `lib/learn/contextUptake.ts`,
+`lib/claude/promptIdentity.ts`, the `generateTrack` restructure, answer
+persistence on the goals route, and provenance redaction in the goal DELETE
+handler. 1,105 tests pass, `tsc` clean, lint clean.
+
+**Not built, deliberately.** The learner-facing "delete the context I gave"
+control and the disclosure line under the 5-whys question are both still owed —
+the answers are stored from this change onward, and a learner is not yet told so.
+The replay harness itself is not written. Migration 048 needs a manual apply.
+
+### Three things found while mapping that are not this migration
+
+`milestoneGenerationPrompt`'s document branch interpolates the learner topic bare
+where its sibling frames it — a gap left by the hardening pass in 8ce2eeb.
+
+`retryVerdict`'s "nothing-wrong" branch is the only thing between the rebuild
+button and a learner's diary: rebuild deletes the `tracks` row, and `milestones`,
+`milestone_entries` and `point_status_events` all cascade from it. The comment in
+`retry/route.ts` explains that guard purely as avoiding a second Sonnet call.
+
+Retry records no `source` in `operation_events`, so that store cannot answer "how
+many document-sourced tracks were built" once retries are in the mix.
