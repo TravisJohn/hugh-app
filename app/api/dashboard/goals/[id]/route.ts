@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
+import { logSafeError } from "@/lib/observability/log";
 
 export async function DELETE(
   request: NextRequest,
@@ -19,7 +20,7 @@ export async function DELETE(
     .eq("user_id", userId);
 
   if (error) {
-    console.error("[goals/delete] deletion failed", error);
+    logSafeError("goals/delete", error);
     return NextResponse.json({ error: "Could not delete goal" }, { status: 500 });
   }
 

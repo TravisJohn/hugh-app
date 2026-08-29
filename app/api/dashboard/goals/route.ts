@@ -4,7 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { enforceUsageGate, logUsage } from "@/lib/usage";
-import { refineTopicPrompt, parseClaudeJson } from "@/lib/claude/prompts";
+import { refineTopicPrompt, parseTopicRefinement } from "@/lib/claude/prompts";
+import { checkTopic, TOPIC_REJECTION_MESSAGE } from "@/lib/learn/topicInput";
+import { logSafeError } from "@/lib/observability/log";
 import { judgeTopicDomain } from "@/lib/learn/topic-domain-server";
 import { generateTrack } from "@/lib/tracker/generate";
 import { recordOperation } from "@/lib/observability/record";
@@ -46,12 +48,22 @@ export async function POST(request: NextRequest) {
     answers?: Array<{ question: string; answer: string }>;
   };
 
-  const topic    = body.topic?.trim();
   const end_date = body.end_date?.trim();
   const answers  = body.answers ?? [];
 
-  if (!topic || !end_date) {
-    return NextResponse.json({ error: "topic and end_date are required" }, { status: 400 });
+  // The boundary — same check the client and classify-topic run, so a topic
+  // cannot arrive here longer or more structured than either of those allow.
+  const checked = checkTopic(body.topic ?? "");
+  if (!checked.ok) {
+    return NextResponse.json(
+      { error: TOPIC_REJECTION_MESSAGE[checked.rejection] },
+      { status: 400 },
+    );
+  }
+  const topic = checked.topic;
+
+  if (!end_date) {
+    return NextResponse.json({ error: "end_date is required" }, { status: 400 });
   }
 
   const supabase = await createClient();
@@ -76,11 +88,18 @@ export async function POST(request: NextRequest) {
         tokensOut: msg.usage.output_tokens,
       });
       const text   = msg.content[0]?.type === "text" ? msg.content[0].text : "";
-      const result = parseClaudeJson<{ refinedTopic: string; tips: string[] }>(text);
-      if (result.refinedTopic) finalTopic = result.refinedTopic;
-      if (Array.isArray(result.tips)) tips = result.tips;
+      // Validated, not trusted. The refined topic becomes the goal's topic, the
+      // track's description, and the tutor's system prompt, so it goes through
+      // the same boundary the typed topic did — see parseTopicRefinement.
+      const result = parseTopicRefinement(text);
+      finalTopic = result.refinedTopic;
+      tips       = result.tips;
     } catch (err) {
-      console.error("[dashboard/goals] refinement error:", err);
+      // Deliberately swallowed: refinement is an improvement, not a
+      // requirement, and losing it should not cost the learner their goal.
+      // `finalTopic` stays as the typed topic, which checkTopic already
+      // normalised and bounded above.
+      logSafeError("dashboard/goals refinement", err, [topic, ...answers.map(a => a.answer)]);
     }
   }
 
@@ -103,7 +122,7 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (goalError || !goal) {
-    console.error("[dashboard/goals] DB error:", goalError?.message);
+    logSafeError("dashboard/goals db", goalError, [finalTopic, topic]);
     return NextResponse.json({ error: "Failed to save goal" }, { status: 500 });
   }
 
@@ -129,7 +148,7 @@ export async function POST(request: NextRequest) {
         durationMs: Date.now() - startedAt, detail: { source: "qa" },
       });
     } catch (err) {
-      console.error("[dashboard/goals] background track generation failed:", err);
+      logSafeError("dashboard/goals background build", err, [finalTopic, topic]);
       await service
         .from("learning_goals")
         .update({ track_status: "failed" })

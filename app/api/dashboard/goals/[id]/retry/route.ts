@@ -6,6 +6,7 @@ import { enforceUsageGate } from "@/lib/usage";
 import { generateTrack } from "@/lib/tracker/generate";
 import { buildState, retryVerdict } from "@/lib/tracker/buildState";
 import { recordOperation } from "@/lib/observability/record";
+import { logSafeError } from "@/lib/observability/log";
 import { type LearningGoal } from "@/types";
 
 // Rebuild the track for a goal whose build failed or died mid-flight.
@@ -106,7 +107,7 @@ export async function POST(
     .eq("user_id", userId);
 
   if (updateError) {
-    console.error("[goals/retry] failed to flip goal to pending:", updateError.message);
+    logSafeError("goals/retry pending", updateError, [g.topic]);
     return NextResponse.json({ error: "Could not start the rebuild." }, { status: 500 });
   }
 
@@ -135,7 +136,7 @@ export async function POST(
         durationMs: Date.now() - rebuiltAt, detail: { previousState: state },
       });
     } catch (err) {
-      console.error("[goals/retry] background track rebuild failed:", err);
+      logSafeError("goals/retry background rebuild", err, [g.topic]);
       await service.from("learning_goals").update({ track_status: "failed" }).eq("id", goalId);
       await recordOperation({
         userId, operation: "track.retry", outcome: "failed",

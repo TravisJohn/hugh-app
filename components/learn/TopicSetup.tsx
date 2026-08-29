@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Lightbulb, ArrowRight, Loader2, AlertTriangle } from "lucide-react";
 import { classifyTopic, type TopicDomainVerdict } from "@/lib/learn/topic-domain";
+import { MAX_TOPIC_CHARS } from "@/lib/learn/topicInput";
 
 const SUGGESTIONS = [
   "Apache Airflow",
@@ -73,6 +74,7 @@ export default function TopicSetup() {
           value={topic}
           onChange={e => handleTopicChange(e.target.value)}
           onKeyDown={handleKeyDown}
+          maxLength={MAX_TOPIC_CHARS}
           placeholder="What do you want to learn? e.g. Apache Airflow"
           className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-violet-500 transition-colors"
           autoFocus
