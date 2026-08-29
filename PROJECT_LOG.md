@@ -5486,7 +5486,12 @@ handler. 1,105 tests pass, `tsc` clean, lint clean.
 **Not built, deliberately.** The learner-facing "delete the context I gave"
 control and the disclosure line under the 5-whys question are both still owed —
 the answers are stored from this change onward, and a learner is not yet told so.
-The replay harness itself is not written. Migration 048 needs a manual apply.
+The replay harness itself is not written.
+
+Migration 048 was applied by hand the same day and verified from the client: both
+tables present, all 27 `track_generations` columns and all 7 on `goal_answers`, so
+nothing was half-applied. The store is live, which is what makes the disclosure
+urgent rather than tidy.
 
 ### Three things found while mapping that are not this migration
 
