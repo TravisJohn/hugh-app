@@ -5505,3 +5505,110 @@ button and a learner's diary: rebuild deletes the `tracks` row, and `milestones`
 
 Retry records no `source` in `operation_events`, so that store cannot answer "how
 many document-sourced tracks were built" once retries are in the mix.
+
+---
+
+## 2026-08-30 — The replay harness: what migration 048 was for
+
+`track_generations` had been live for a day and was, on its own, a table nobody
+read. This is the piece that makes it pay: a script that takes generations which
+really happened, re-runs them at the same prompt against a different model, and
+prints the two arms side by side.
+
+The decision it is built to answer: **can track generation move to Haiku?** It is
+the largest Claude call in the product, on Sonnet at $3/$15, and CLAUDE.md
+already says a route only moves to Haiku "after confirming the output quality
+holds" — while providing no mechanism to confirm anything. This is that
+mechanism.
+
+### Generation-only, and why that was the fork
+
+A replay does **not** call `generateTrack`. That function inserts a `tracks` row
+and `milestones` rows, and `assignBacklogPriority` then UPDATEs those same
+milestones — so replaying through it would put phantom tracks on real learners'
+boards and rewrite their cards. The harness re-runs the milestone-generation call
+only: read-only against every learner-owned table, append-only against
+`track_generations`.
+
+The cost of that choice is written on every row it produces. `track_id` is null,
+`ranked` is false, and `milestones_out` holds the generation parse rather than
+the board a learner was served, because no board was served. That diverges from
+D3, which says `milestones_out` is always the served board including ranking —
+and the divergence is self-describing, since `is_replay` and `ranked` together
+say exactly what the row is. Full-pipeline replay stays open as a later option;
+it would need `assignBacklogPriority` refactored to rank from in-memory
+milestones instead of a `track_id`, which is production code changed to serve the
+eval, and that was not worth doing first.
+
+### Two findings that shaped the build
+
+**Document generations are unreplayable forever, not for now.** The approve route
+deletes the extracted document text once it has been read. `input_topic` survives
+and the document does not, so re-running one from its topic alone would send
+`milestones.qa` where the original sent `milestones.document` — two different
+prompts, two different fingerprints, and precisely the comparison the fingerprint
+exists to prevent. They are filtered out with a stated reason rather than
+silently re-run.
+
+**The "does context help?" arm still does not exist.** `contextUsed` is
+hardcoded false: `milestoneGenerationPrompt` takes no answers. Every row in the
+store is a control-arm sample. The harness answers model-against-model today;
+context-against-no-context needs a prompt variant that reads the answers, and
+that is separate work.
+
+### What was built
+
+`lib/learn/replay.ts` (pure, 39 tests) holds every rule and every sum: which rows
+may be replayed and why not, what a run will cost, which fingerprints are
+present, how much the learner wrote, and how two arms compare. `scripts/replay-
+generations.ts` is the shell that talks to Supabase and Anthropic and calls in
+here for each decision.
+
+`generateMilestones` moved out of `generate.ts` into `lib/tracker/generateMilestones.ts`.
+It had to: `generate.ts` imports `logUsage` and `logSafeError`, both of which
+import `server-only`, and `server-only` throws the moment a plain Node process
+loads it — so a `tsx` script could not import anything from that file at all.
+The split follows the precedent `lib/tracker/priority.ts` already set for the
+backfill script. `generateMilestones` now takes a model, defaulting to `MODEL`,
+and **returns the model it actually called** so a caller cannot record one thing
+and call another.
+
+Two guards, both about money. A run is a dry run unless `--yes` is passed, and it
+prints its estimated cost first — that estimate is the only warning there is,
+because a replay writes no `usage_logs` row and its spend never reaches /admin.
+And baselines already replayed at the target model are skipped unless `--redo`,
+so a second run does not pay twice, invisibly.
+
+### One bug found by running it
+
+The first real run failed every row with a bare `Error`. The cause was import
+hoisting: `generateMilestones.ts` built its Anthropic client in the module body,
+so the client was constructed before the script's `.env.local` loader had run and
+the API key was undefined. Next injects the environment before anything is
+imported, which is why the app never saw this and a script did immediately.
+
+Fixed at the root — the client is now built on first use, which removes the
+ordering hazard for every future caller rather than asking each one to remember
+it. The failure was also unreadable, so a scrubbed one-line reason now rides
+alongside `error_class` to the operator's console, through the same `sanitize`
+that `logSafeError` uses, with the topic passed as a secret.
+
+### Verified end to end
+
+The store was empty, so two synthetic baselines were seeded against real goals
+with real answer rows — one terse (18 chars), one rich (560) — replayed against
+Haiku for $0.011, and then every seeded row was deleted and the counts confirmed
+back at zero. The run exercised selection, the already-replayed skip, the cost
+gate, the Anthropic call, the uptake measurement, the row write and the bucketed
+comparison. The baseline uptake figures in that run were fabricated by the seed,
+so only the Haiku side was a real measurement; the arithmetic joining them is
+covered by unit tests.
+
+1,144 tests pass (up from 1,105), `tsc` clean, lint clean. `npm run replay`.
+
+### Still open, unchanged by this
+
+Q1 and Q2 — the learner-facing disclosure and delete control — remain unbuilt,
+and the privacy gap they sit in is now recorded in `WISHLIST.md` as a
+release blocker covering every learner-text store, not just `goal_answers`.
+X1 to X3 are untouched.
