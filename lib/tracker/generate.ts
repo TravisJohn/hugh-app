@@ -1,10 +1,9 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { type SupabaseClient } from "@supabase/supabase-js";
 import {
-  milestoneGenerationPrompt,
-  parseMilestoneGeneration,
-  type MilestoneGenerationResult,
-} from "@/lib/claude/prompts";
+  generateMilestones,
+  MAX_TOKENS,
+  MODEL,
+} from "@/lib/tracker/generateMilestones";
 import {
   milestonePromptId,
   promptFingerprint,
@@ -17,17 +16,6 @@ import { logSafeError } from "@/lib/observability/log";
 import { errorClassOf } from "@/lib/observability/sanitize";
 import { type KanbanColumn } from "@/types";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-// Model for track generation — see CLAUDE.md "Model Selection". Kept in one
-// place so the API call and the usage log can never disagree about billing.
-const MODEL = "claude-sonnet-4-6";
-
-// Also recorded on the provenance row. It shapes the output — a long track can
-// be truncated by this ceiling, which presents as a parse error and burns the
-// retry — so a change to it has to be visible in the eval.
-const MAX_TOKENS = 2048;
-
 /** A track could not be built. Distinct from a Claude/parse error so the
  *  caller can tell "the model misbehaved" from "the database refused". */
 export class TrackGenerationError extends Error {
@@ -35,12 +23,6 @@ export class TrackGenerationError extends Error {
     super(message);
     this.name = "TrackGenerationError";
   }
-}
-
-/** Tokens spent generating a track, so the caller can log them. */
-interface GenerationUsage {
-  inputTokens:  number;
-  outputTokens: number;
 }
 
 /** Optional provenance context — see `track_generations` in migration 048. */
@@ -57,36 +39,6 @@ export interface GenerationOptions {
 
   /** True when called by the offline replay harness rather than a learner. */
   isReplay?: boolean;
-}
-
-// Retries once on a malformed/unparseable response — mirrors the retry
-// pattern already used for the refine/classify-topic/domain-gate calls.
-// Token counts accumulate across attempts: a discarded first attempt still
-// costs money, so it must still be billed to the user.
-async function generateMilestones(
-  topic:         string,
-  documentText?: string,
-): Promise<{ parsed: MilestoneGenerationResult; usage: GenerationUsage; attempts: number }> {
-  let lastErr: unknown = null;
-  const usage: GenerationUsage = { inputTokens: 0, outputTokens: 0 };
-
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const res = await anthropic.messages.create({
-        model:      MODEL,
-        max_tokens: MAX_TOKENS,
-        messages:   [{ role: "user", content: milestoneGenerationPrompt(topic, documentText) }],
-      });
-      usage.inputTokens  += res.usage.input_tokens;
-      usage.outputTokens += res.usage.output_tokens;
-      const raw = res.content[0]?.type === "text" ? res.content[0].text : "{}";
-      // `attempt` is 0-based; the count of attempts made is one more.
-      return { parsed: parseMilestoneGeneration(raw), usage, attempts: attempt + 1 };
-    } catch (err) {
-      lastErr = err;
-    }
-  }
-  throw lastErr ?? new Error("milestone generation failed");
 }
 
 // A track with no milestones is not a partial success, it is an empty Kanban

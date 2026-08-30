@@ -17,7 +17,8 @@
     "qa:notebooks": "node scripts/verify-notebooks.mjs",
     "health": "tsx scripts/health-check.ts",
     "cloud": "tsx scripts/cloud-meta.ts",
-    "cloud:check": "tsx scripts/cloud-meta.ts --check"
+    "cloud:check": "tsx scripts/cloud-meta.ts --check",
+    "replay": "tsx scripts/replay-generations.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
