@@ -86,6 +86,10 @@ export function retryVerdict(state: BuildState, hasUsableTrack: boolean): RetryV
   if (state === "building")          return "still-building";
   if (state === "awaiting_approval") return "needs-approval";
   if (state === "failed" || state === "stalled") return "allow";
-  // 'ready' is only genuinely fine if there is a board behind it.
+  // 'ready' is only genuinely fine if there is a board behind it. This branch
+  // is the one that guards learner data: a retry deletes the track row, and
+  // the diary and point history cascade off it, so answering "allow" for a
+  // healthy track would destroy work the learner cannot get back. The
+  // fallthrough is safe only because an empty board has nothing to lose.
   return hasUsableTrack ? "nothing-wrong" : "allow";
 }
