@@ -5612,3 +5612,109 @@ Q1 and Q2 — the learner-facing disclosure and delete control — remain unbuil
 and the privacy gap they sit in is now recorded in `WISHLIST.md` as a
 release blocker covering every learner-text store, not just `goal_answers`.
 X1 to X3 are untouched.
+
+---
+
+## 2026-08-31 — X2's comment, then the answers a learner can take back (Q2)
+
+Two items, both small, both about making an existing guarantee legible.
+
+### X2: saying what the retry guard actually protects
+
+`/api/dashboard/goals/[id]/retry` refuses a rebuild on three verdicts, and the
+comment above that check explained the refusal purely as avoiding a second
+Sonnet call. That framing invites a future cleanup to remove it as a cost
+optimisation, which would be a data loss.
+
+Confirmed the cascade before rewriting the comment rather than asserting it:
+`milestones.track_id → tracks` (005), then `milestone_entries.milestone_id →
+milestones` (005) and `point_status_events.milestone_id → milestones` (021),
+all `ON DELETE CASCADE`. The rebuild's `delete()` on `tracks` is therefore a
+three-level cascade that takes the board, the learning diary and the point
+history. The only survivor is `track_generations`, whose `track_id` is
+`ON DELETE SET NULL`.
+
+So the comment now leads with the data, names the chain, states that there is no
+rollback tooling, and says outright not to relax the guard to save a model call.
+The same note went onto `retryVerdict`'s `nothing-wrong` branch in
+`lib/tracker/buildState.ts`, because the route delegates the decision there and
+a cleanup pass is likelier to land in the pure module than in the route.
+
+Checked and found sound while writing it: `STALL_MS` is five minutes against the
+route's `maxDuration = 120`, so a build judged "stalled" really is dead and the
+delete cannot race a live `after()`.
+
+### Q2: the learner-facing delete for the 5-whys answers
+
+Migration 048 started keeping the answers, and said in its own closing comment
+that the learner-facing delete is a server-side action clearing `goal_answers`,
+nulling `input_topic` and `milestones_out`, and setting `input_intact = false`.
+Half of that existed — inside the goal DELETE handler. The half a learner could
+reach did not.
+
+**The redaction is now one shared implementation.**
+`lib/learn/answerProvenance.ts` holds `redactGenerationProvenance`, lifted out of
+the goal DELETE route. 048 calls these "the same outcome reached by a different
+button", so they must not be two copies that drift.
+
+It returns its outcome instead of throwing, because the two callers need
+opposite stances and neither is served by an exception:
+
+- **Deleting a goal** logs a redaction failure and proceeds. Provenance
+  bookkeeping must never be why a learner cannot remove something from their
+  library.
+- **Deleting the answers** stops and says so. Reporting success while the
+  redaction failed would tell someone their words are gone while a copy survives
+  in a table they cannot reach — the worst available outcome. Redaction runs
+  first, so a failure changes nothing and a retry is clean.
+
+**`/api/dashboard/goals/[id]/answers`** — `GET` returns what is stored, `DELETE`
+removes it. Deliberately separate from the goal DELETE next door: withdrawing
+what you said and abandoning what you are learning are different intentions, and
+making someone destroy a track to retract a sentence is a reason not to answer
+honestly in the first place. The track, the board and the diary are untouched.
+No model call on either verb, so no `logUsage` and no usage gate — a privacy
+control must not be rationed.
+
+**It shows before it deletes.** `components/dashboard/GoalAnswers.tsx` is a
+quiet icon on the goal card that expands to the stored questions and answers,
+with the delete underneath them. The questions are model-generated and dig at
+motivation and circumstance, and nobody remembers weeks later what they typed; a
+delete button over invisible data asks for trust, a delete button under the
+actual sentences is a decision. A dropped read renders as "we couldn't read
+them", never as "nothing is stored" — on this panel, that false reassurance is
+the whole failure mode.
+
+**`answers.forget` joined the operation registry.** Its two failure stages are
+both reported to the learner, so `failureIsSilent` is false, and the row records
+how many rows went and never what they said. The registry's source-scan test
+covers that the route actually records it.
+
+Why the numbers survive a deletion, unchanged from 048's design:
+`answer_chars`, `context_uptake` and `milestone_count` are frozen at write time
+and are not touched. A number is not the sentence it came from, so the eval
+still works after a learner takes their words back.
+
+1,144 tests pass, `tsc` clean, lint clean, production build clean. Not yet
+exercised in a browser — the store is empty, and filling it means a real track
+generation.
+
+### Q1: the line under the question
+
+The other half, and a copy decision rather than a build. It sits under the
+question card in `RefinementFlow.tsx`, at the moment of answering:
+
+> Hugh keeps your answers to shape this track. You can read them back or delete
+> them any time from your goal.
+
+One human line, deliberately not a legal notice — a warning under a warm
+question would thin the very context the store exists to capture, which was the
+stated reason this had been left unwritten. It earns its place now because the
+second sentence points at something that exists.
+
+### Still open
+
+This closes `goal_answers` and nothing else. The wider privacy pass in
+`WISHLIST.md` — no privacy policy anywhere in the app, `/notes`, the document
+path, `/monitor`, `operation_events`, retention, and what account deletion
+actually removes end to end — is untouched and still the release blocker.
