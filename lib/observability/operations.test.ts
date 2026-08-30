@@ -33,6 +33,7 @@ const EVERY_OPERATION: Record<OperationId, true> = {
   "quiz.generate":    true,
   "mastery.evaluate": true,
   "ask.chat":         true,
+  "answers.forget":   true,
 };
 
 const EVERY_OUTCOME: Record<OperationOutcome, true> = {
@@ -124,6 +125,10 @@ describe("failureIsSilent — the failures nobody sees", () => {
     expect(SILENT_FAILURE_IDS).not.toContain("quiz.generate");
     expect(SILENT_FAILURE_IDS).not.toContain("mastery.evaluate");
     expect(SILENT_FAILURE_IDS).not.toContain("ask.chat");
+    // The answers deletion reports both of its failure stages to the learner
+    // and changes nothing when the first one fails, so a silent half-delete
+    // is not a state this can reach.
+    expect(SILENT_FAILURE_IDS).not.toContain("answers.forget");
   });
 
   it("agrees with the flag on each definition", () => {

@@ -110,6 +110,21 @@ export interface LearningGoal {
   track_started_at: string | null;
 }
 
+// One 5-whys question and the learner's answer to it, as stored by migration
+// 048. `position` is the order asked and carries meaning: the prompt digs one
+// level deeper each turn, so answer 4 is not answer 0.
+//
+// This is the most personal text in the product. The questions are generated
+// to draw out real motivation and circumstance, so the answers are career
+// situations — the sort of thing a learner may be keeping from an employer.
+// The learner can read them back and delete them from their goal card; see
+// components/dashboard/GoalAnswers.tsx.
+export interface StoredAnswer {
+  position: number;
+  question: string;
+  answer:   string;
+}
+
 // ── Progress Tracker ──────────────────────────────────────────────────────
 export type KanbanColumn = 'backlog' | 'learn' | 'review' | 'done';
 

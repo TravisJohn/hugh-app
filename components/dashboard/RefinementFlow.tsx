@@ -289,6 +289,19 @@ export default function RefinementFlow({ topic, endDate, onGoalCreated, onCancel
         )}
       </div>
 
+      {/* Q1 — the disclosure, at the moment of answering.
+          These questions are written to draw out real motivation and
+          circumstance, so the answers are the most personal text in the
+          product, and since migration 048 they are kept rather than read once
+          and discarded. One human line, deliberately not a legal notice: a
+          warning under a warm question would thin the very context the store
+          exists to capture. It earns its place because the control it points
+          at is real - see components/dashboard/GoalAnswers.tsx. */}
+      <p className="text-xs leading-relaxed text-slate-600">
+        Hugh keeps your answers to shape this track. You can read them back or
+        delete them any time from your goal.
+      </p>
+
       {/* Error notice */}
       {apiError && (
         <p className="text-xs text-red-400">Something went wrong — please try again.</p>
