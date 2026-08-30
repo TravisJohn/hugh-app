@@ -75,9 +75,21 @@ export async function POST(
   }
 
   // The same rule the UI uses to decide whether to show the button. Enforced
-  // here too: a client sitting on a stale page must not be able to restart a
-  // build that is currently running, which would buy a second Sonnet call for
-  // a track that is about to arrive anyway.
+  // here too, and what it protects is learner data, not just spend.
+  //
+  // The rebuild below deletes the track row. `milestones` cascades off
+  // `tracks`, and `milestone_entries` (the learning diary) and
+  // `point_status_events` cascade off `milestones` — so one DELETE takes the
+  // whole board and everything the learner wrote on it. There is no rollback
+  // tooling and nothing to restore from. A rebuild is destructive and
+  // irreversible, not merely expensive.
+  //
+  // That makes each refusal below load-bearing. 'nothing-wrong' is the branch
+  // standing between a stale tab and the diary of a track that was never
+  // broken; 'still-building' stops a rebuild racing a live one, which would
+  // delete the track the running after() is mid-write into. The second Sonnet
+  // call these also avoid is the cheap half of what they are doing. Do not
+  // relax this guard as a cost optimisation.
   const state   = buildState(g.track_status, g.track_started_at ?? g.created_at, Date.now());
   const verdict = retryVerdict(state, Boolean(track) && milestoneCount > 0);
 
