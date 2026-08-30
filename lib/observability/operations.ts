@@ -41,13 +41,15 @@ export type OperationId =
   | "topic.gate"
   | "quiz.generate"
   | "mastery.evaluate"
-  | "ask.chat";
+  | "ask.chat"
+  | "answers.forget";
 
 /**
  * The prefix half of an id. Kept as its own type so a later surface joins as
  * `code.drill` or `notes.coach` without renaming anything that exists.
  */
-export type OperationDomain = "track" | "topic" | "quiz" | "mastery" | "ask";
+export type OperationDomain =
+  | "track" | "topic" | "quiz" | "mastery" | "ask" | "answers";
 
 export interface OperationDefinition {
   /** Stored in `operation_events.operation`. Stable — changing one orphans history. */
@@ -148,6 +150,20 @@ export const OPERATIONS: readonly OperationDefinition[] = [
     description:
       "One tutor-chat exchange. The highest-volume operation by a wide " +
       "margin, and the first candidate to drop if the table gets noisy.",
+  },
+  {
+    id:               "answers.forget",
+    domain:           "answers",
+    label:            "Delete 5-whys answers",
+    clientReportable: false,
+    failureIsSilent:  false,
+    description:
+      "A learner retracting the 5-whys answers behind one goal. The only " +
+      "operation here that spends nothing and is purely about data the " +
+      "learner owns, which is exactly why it needs a row: a deletion that " +
+      "half-succeeded leaves derived text in a table they cannot reach, and " +
+      "the count is the only evidence it ran at all. The row records how " +
+      "many rows went, never what they said.",
   },
 ] as const;
 

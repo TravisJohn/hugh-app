@@ -7,6 +7,7 @@ import { useTrackStatusWatch } from "@/hooks/useTrackStatusWatch";
 import { Sparkles, Trash2, Loader2, AlertTriangle, Pencil, RotateCcw } from "lucide-react";
 import { type LearningGoal } from "@/types";
 import { canRetry, STALL_MS, type BuildState } from "@/lib/tracker/buildState";
+import GoalAnswers from "./GoalAnswers";
 
 // The stall rule and the pending/stalled split now live in
 // lib/tracker/buildState.ts, shared with the track page and enforced by the
@@ -102,7 +103,11 @@ export default function GoalCard({ goal, onDelete }: Props) {
     : goal.track_status;
 
   return (
-    <div className="flex items-center gap-4 rounded-2xl border border-slate-700 bg-slate-800/60 px-5 py-4 transition-colors hover:border-slate-600 hover:bg-slate-800">
+    // flex-wrap, so GoalAnswers can drop its `w-full` panel onto a second line
+    // while its trigger button stays inline with the actions. That keeps the
+    // open/closed state inside GoalAnswers instead of spreading it across two
+    // components here.
+    <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-slate-700 bg-slate-800/60 px-5 py-4 transition-colors hover:border-slate-600 hover:bg-slate-800">
       {/* Status icon */}
       <div className="shrink-0">
         {status === "building" ? (
@@ -139,6 +144,11 @@ export default function GoalCard({ goal, onDelete }: Props) {
           </p>
         )}
       </div>
+
+      {/* What the learner told Hugh when they set this goal up — read it back,
+          or delete it. Sits outside the Actions cluster because its expanded
+          panel is a sibling that wraps to the row below. */}
+      <GoalAnswers goalId={goal.id} topic={goal.topic} />
 
       {/* Actions */}
       <div className="shrink-0 flex items-center gap-2">
