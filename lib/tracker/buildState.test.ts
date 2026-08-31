@@ -6,6 +6,7 @@ import {
   trackViewState,
   retryVerdict,
   STALL_MS,
+  MAX_BUILDS_PER_GOAL,
 } from "./buildState";
 
 const NOW = new Date("2026-08-24T12:00:00Z").getTime();
@@ -139,5 +140,53 @@ describe("retryVerdict - the button appears exactly where the server would accep
 
   it("refuses when there is nothing wrong", () => {
     expect(retryVerdict("ready", true)).toBe("nothing-wrong");
+  });
+});
+
+
+// ── The rebuild ceiling (Learn-map X5) ──────────────────────────────────────
+//
+// Retry was restricted to failed and stalled states and gated on budget, but
+// nothing bounded ATTEMPTS - and a repeatedly-stalling build is exactly where
+// someone clicks rebuild over and over, two Sonnet calls at a time.
+
+describe("retryVerdict - the rebuild ceiling", () => {
+  it("allows a rebuild below the ceiling", () => {
+    expect(retryVerdict("failed", false, MAX_BUILDS_PER_GOAL - 1)).toBe("allow");
+  });
+
+  it("refuses once the goal has been generated its full allowance", () => {
+    expect(retryVerdict("failed", false, MAX_BUILDS_PER_GOAL)).toBe("rebuild-limit");
+    expect(retryVerdict("stalled", false, MAX_BUILDS_PER_GOAL + 3)).toBe("rebuild-limit");
+  });
+
+  it("defaults to allowing when no count is supplied", () => {
+    // The UI calls this without a count, and a goal built before migration 048
+    // has no rows to count. Both must behave as they did before the ceiling
+    // existed rather than locking anyone out.
+    expect(retryVerdict("failed", false)).toBe("allow");
+    expect(retryVerdict("stalled", false, 0)).toBe("allow");
+  });
+
+  it("still reports a live build as still-building, ceiling or not", () => {
+    // Ordering matters: a running build must never be described as a
+    // rebuild-limit, because the learner's next move is to wait, not to
+    // delete their goal.
+    expect(retryVerdict("building", false, MAX_BUILDS_PER_GOAL + 10)).toBe("still-building");
+    expect(retryVerdict("awaiting_approval", false, MAX_BUILDS_PER_GOAL)).toBe("needs-approval");
+  });
+
+  it("still reports a healthy track as nothing-wrong, ceiling or not", () => {
+    // The more specific truth. Telling someone with a working board that they
+    // have rebuilt too often would send them to delete a goal that is fine.
+    expect(retryVerdict("ready", true, MAX_BUILDS_PER_GOAL + 10)).toBe("nothing-wrong");
+  });
+
+  it("applies the ceiling to a ready goal with no board behind it", () => {
+    // 'ready' with an empty board is broken, so it reaches the rebuild path -
+    // and therefore has to reach the ceiling too, or it becomes the way to
+    // loop forever.
+    expect(retryVerdict("ready", false, MAX_BUILDS_PER_GOAL)).toBe("rebuild-limit");
+    expect(retryVerdict("ready", false, 0)).toBe("allow");
   });
 });

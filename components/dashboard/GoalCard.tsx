@@ -127,8 +127,10 @@ export default function GoalCard({ goal, onDelete }: Props) {
         {status === "building" ? (
           <p className="mt-0.5 text-xs text-amber-400/80">Building your track…</p>
         ) : status === "stalled" ? (
+          // The server's refusal wins over the generic advice: at the rebuild
+          // ceiling, "rebuild to try again" is an instruction that cannot work.
           <p className="mt-0.5 text-xs text-red-400/90">
-            Track build stopped partway — rebuild to try again.
+            {retryError ?? "Track build stopped partway — rebuild to try again."}
           </p>
         ) : status === "failed" ? (
           <p className="mt-0.5 text-xs text-red-400/90">

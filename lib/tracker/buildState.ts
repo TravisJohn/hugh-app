@@ -80,16 +80,57 @@ export function trackViewState(
 // Why a retry was refused, so the route can say something true rather than a
 // generic 409. Shared with the UI so the button is offered exactly where the
 // server would accept it.
-export type RetryVerdict = "allow" | "still-building" | "needs-approval" | "nothing-wrong";
+export type RetryVerdict =
+  | "allow"
+  | "still-building"
+  | "needs-approval"
+  | "nothing-wrong"
+  | "rebuild-limit";
 
-export function retryVerdict(state: BuildState, hasUsableTrack: boolean): RetryVerdict {
+/**
+ * How many times one goal may be generated, in total, ever.
+ *
+ * Retry is already restricted to failed and stalled states and gated on the
+ * learner's budget, but neither bounds ATTEMPTS. A repeatedly-stalling build is
+ * exactly the situation where someone clicks rebuild over and over, and each
+ * click is two Sonnet calls. The usage gate is measured in tokens, so it stops
+ * a learner who has spent a lot on real study long before it stops one whose
+ * only spend is a loop on a broken goal.
+ *
+ * Five is the initial build plus four rebuilds. A build that is going to
+ * succeed almost always does so on the first retry; by the fifth attempt the
+ * evidence says something about this goal is wrong, and the honest answer is
+ * to say so rather than to keep charging for the same failure.
+ *
+ * Counted from `track_generations`, which has one row per generation call
+ * including the failures \u2014 so it is a count of money actually spent, not of
+ * buttons pressed. Goals built before migration 048 have no rows and therefore
+ * a full allowance, which is the safe direction to be wrong in.
+ */
+export const MAX_BUILDS_PER_GOAL = 5;
+
+export function retryVerdict(
+  state:          BuildState,
+  hasUsableTrack: boolean,
+  buildCount    = 0,
+): RetryVerdict {
   if (state === "building")          return "still-building";
   if (state === "awaiting_approval") return "needs-approval";
-  if (state === "failed" || state === "stalled") return "allow";
+
   // 'ready' is only genuinely fine if there is a board behind it. This branch
   // is the one that guards learner data: a retry deletes the track row, and
   // the diary and point history cascade off it, so answering "allow" for a
   // healthy track would destroy work the learner cannot get back. The
   // fallthrough is safe only because an empty board has nothing to lose.
-  return hasUsableTrack ? "nothing-wrong" : "allow";
+  const brokenEnoughToRebuild =
+    state === "failed" || state === "stalled" || !hasUsableTrack;
+
+  if (!brokenEnoughToRebuild) return "nothing-wrong";
+
+  // Checked LAST among the refusals, so a learner at the ceiling is told the
+  // most specific true thing. Telling someone with a healthy track that they
+  // have rebuilt too often would be a worse answer than "nothing is wrong".
+  if (buildCount >= MAX_BUILDS_PER_GOAL) return "rebuild-limit";
+
+  return "allow";
 }

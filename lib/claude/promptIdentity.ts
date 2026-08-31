@@ -168,7 +168,11 @@ const FINGERPRINTS: Record<PromptId, string> = {
 export const KNOWN_PROMPT_VERSIONS: Record<string, string> = {
   "3309ed3a3d9d3926": "milestones.qa@1",
   "8d9d9467486640fc": "milestones.qa.context@1",
+  // @1 framed the topic as a bare interpolation on this branch alone, while
+  // every sibling used learnerTopicBlock. @2 closed that gap. Rows written
+  // under @1 keep pointing here, so the two eras stay comparable and separate.
   "eb74a8bd940e372b": "milestones.document@1",
+  "b3c3a2e80991c16b": "milestones.document@2",
   "d3198277d58e4850": "backlog.priority@1",
 };
 
