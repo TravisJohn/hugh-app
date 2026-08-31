@@ -5842,3 +5842,61 @@ hardening anything else around goal creation.
 `failedOpen: true`; only a query would tell you. **X6** (coverage is
 self-report) and **C3** (`end_date` shapes nothing, confirmed: it reaches
 neither `generate.ts` nor `prompts.ts`) are design questions rather than gaps.
+
+---
+
+## 2026-08-31 — Deleting `/learn`, the second entry point (X4)
+
+X4 was framed as a product decision — keep a "just chat" mode or delete it. Two
+findings collapsed it into a straightforward removal.
+
+**It had no door.** The `/home` activity grid links to `/home/learn`,
+`/code/start`, `/cases`, `/cloud`, `/notes` and `/monitor`. There was no `href`
+to `/learn` anywhere in the app. Its only three references were inside the room:
+its own "Change topic" link, `TopicSetup`'s `router.push` (which only runs once
+you are already there), and a fallback in `MilestoneDrawer` that could not fire,
+because the only page rendering that drawer finds its track BY `goal_id` and so
+always supplies one. A learner could reach `/learn` only by typing the URL. It
+lost its front-door status when the top-level activity picker shipped.
+
+**What it produced could not be reached either.** A session saved from it
+created a `tracks` row with no `goal_id`, and the board page looks a track up by
+its goal — so that track had no URL. Eleven such tracks hold 134 milestones
+nobody can open. This path made exactly one of them, on 2026-06-23; the other
+ten are older rows from the deleted `/tracker` generator.
+
+An earlier claim in this log's predecessor conversation — that deleting `/learn`
+would break the Ask button on those 134 milestones — was wrong. Nothing reaches
+them today.
+
+### What changed
+
+Deleted `app/learn/page.tsx`, `components/learn/TopicSetup.tsx`, the dead
+fallback in `MilestoneDrawer.askHref`, and `/learn` from
+`lib/pomodoro/routes.ts`. The rest of `components/learn/` stays: it is what
+`/study/[goalId]/ask` is built from.
+
+**`save-summary` no longer creates tracks.** A goal-scoped session with no card
+now appends a milestone to the track the learner is already studying, and takes
+`goalId` to do it. With neither a card nor a goal there is no track it belongs
+to, so it refuses instead of inventing one — a combination only `/learn` could
+produce. This matters because Ask IS reachable without a card (`focusId` falls
+back to the track's focus and can be null), so refusing outright would have
+broken a live flow.
+
+`goalId` is now required on `KanbanBoard` and `MilestoneDrawer`. Typing it
+optional is what made the fallback look live rather than dead. `topicContext`
+went with it — the drawer used it only to build that URL.
+
+### Rollback
+
+One commit, so `git revert 589f500` restores all of it; the prior state is also
+tagged `pre-learn-removal`. The revert was rehearsed rather than assumed: it
+restored both deleted files and every edit, `tsc` clean, 1,183 tests passing —
+the pre-removal count — then aborted.
+
+1,184 tests pass. `/learn` returns 404 and `/home/learn` is unchanged, both
+checked in the running app against the real database.
+
+The 11 orphaned tracks are untouched. Giving them goals would resurface 10 old
+tracks on the owner's dashboard, which is a product call, not a correctness one.
