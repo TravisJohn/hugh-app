@@ -4,7 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { enforceUsageGate } from "@/lib/usage";
 import { generateTrack } from "@/lib/tracker/generate";
-import { buildState, retryVerdict } from "@/lib/tracker/buildState";
+import { buildState, retryVerdict, MAX_BUILDS_PER_GOAL } from "@/lib/tracker/buildState";
 import { recordOperation } from "@/lib/observability/record";
 import { logSafeError } from "@/lib/observability/log";
 import { type LearningGoal } from "@/types";
@@ -35,6 +35,9 @@ export async function POST(
   if (usageGate) {
     void recordOperation({
       userId, operation: "track.retry", outcome: "refused",
+      // No `source` here, deliberately: this refusal happens before the goal
+      // is loaded, and loading it just to label a budget refusal would add a
+      // query to the one path that is meant to spend nothing.
       detail: { reason: "usage-gate" },
     });
     return usageGate;
@@ -65,6 +68,22 @@ export async function POST(
     .eq("user_id", userId)
     .maybeSingle();
 
+  // How many times this goal has actually been generated, failures included.
+  // Service-role because `track_generations` has RLS enabled and no policy: it
+  // is operator data, and the learner cannot read their own rows.
+  //
+  // A head-count, so none of that table's learner-derived text is loaded to
+  // answer a question that is only ever a number. `is_replay` is excluded
+  // because an offline eval run is not something the learner did, and must
+  // never eat their allowance.
+  const { count: buildCount, error: buildCountError } = await createServiceClient()
+    .from("track_generations")
+    .select("id", { count: "exact", head: true })
+    .eq("goal_id", goalId)
+    .eq("is_replay", false);
+
+  if (buildCountError) logSafeError("goals/retry build count", buildCountError);
+
   let milestoneCount = 0;
   if (track) {
     const { count } = await supabase
@@ -91,7 +110,11 @@ export async function POST(
   // call these also avoid is the cheap half of what they are doing. Do not
   // relax this guard as a cost optimisation.
   const state   = buildState(g.track_status, g.track_started_at ?? g.created_at, Date.now());
-  const verdict = retryVerdict(state, Boolean(track) && milestoneCount > 0);
+  // A failed count reads as 0, which allows the rebuild. That is deliberate:
+  // the ceiling exists to stop a runaway loop, and refusing a legitimate
+  // rebuild because a telemetry query blipped would break the learner's only
+  // way out of a broken track to protect a budget rule.
+  const verdict = retryVerdict(state, Boolean(track) && milestoneCount > 0, buildCount ?? 0);
 
   if (verdict !== "allow") {
     // Each of the three 409s is the server declining correctly - a stale tab
@@ -100,12 +123,13 @@ export async function POST(
     // which refusal dominates without a second query.
     void recordOperation({
       userId, operation: "track.retry", outcome: "refused",
-      detail: { verdict, state },
+      detail: { verdict, state, source: g.source_kind },
     });
 
     const reason =
       verdict === "still-building"  ? "This track is still building - give it a moment." :
       verdict === "needs-approval"  ? "This goal is waiting for you to approve its topic." :
+      verdict === "rebuild-limit"   ? `This track has been rebuilt ${MAX_BUILDS_PER_GOAL} times without succeeding. Remove the goal and add it again to start over.` :
                                       "This track is fine - there is nothing to rebuild.";
     return NextResponse.json({ error: reason, verdict }, { status: 409 });
   }
@@ -145,7 +169,14 @@ export async function POST(
       await service.from("learning_goals").update({ track_status: "ready" }).eq("id", goalId);
       await recordOperation({
         userId, operation: "track.retry", outcome: "ok",
-        durationMs: Date.now() - rebuiltAt, detail: { previousState: state },
+        durationMs: Date.now() - rebuiltAt,
+        // `source` matches what goals/route.ts and document/approve record, so
+        // "which entry path produces the most rebuilds?" is answerable from
+        // one column instead of a join nobody will write. A rebuild of a
+        // document-sourced goal is also a materially different operation: the
+        // extracted text was deleted after the first read, so it regenerates
+        // from the topic alone.
+        detail: { previousState: state, source: g.source_kind },
       });
     } catch (err) {
       logSafeError("goals/retry background rebuild", err, [g.topic]);
@@ -153,7 +184,7 @@ export async function POST(
       await recordOperation({
         userId, operation: "track.retry", outcome: "failed",
         durationMs: Date.now() - rebuiltAt, error: err, redact: [g.topic],
-        detail: { previousState: state },
+        detail: { previousState: state, source: g.source_kind },
       });
     }
   });
