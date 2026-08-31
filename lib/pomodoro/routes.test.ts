@@ -37,10 +37,17 @@ describe("isSilentRoute", () => {
 });
 
 describe("isAskRoute", () => {
-  it("flags the pages that carry their own inline timer control", () => {
-    expect(isAskRoute("/learn")).toBe(true);
+  it("flags the goal-scoped Ask page, which carries its own inline timer", () => {
     expect(isAskRoute("/study/abc/ask")).toBe(true);
     expect(isAskRoute("/study/abc/track")).toBe(false);
     expect(isAskRoute("/code/drill")).toBe(false);
+  });
+
+  it("no longer flags /learn, which was deleted", () => {
+    // /learn was a second, unlinked entry point into tutoring. Nothing in the
+    // app navigated to it, and anything saved from it created a track with no
+    // goal - a track the board page could never find. If this route ever comes
+    // back it needs a deliberate decision, not a silent re-match here.
+    expect(isAskRoute("/learn")).toBe(false);
   });
 });

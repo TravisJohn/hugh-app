@@ -23,8 +23,11 @@ import PointTagSelect from "@/components/learn/PointTagSelect";
 
 interface Props {
   milestone:        Milestone | null;
-  topicContext?:    string;
-  goalId?:          string;
+  // Required, not optional. A milestone always belongs to a track, and the only
+  // page that renders this board finds that track BY its goal — so a drawer
+  // without a goal was never a state the app could reach. Typing it as optional
+  // is what made `/learn` look like a live fallback rather than dead code.
+  goalId:           string;
   onClose:          () => void;
   // Lets the parent board keep its milestone copy (and thus the card chips) in
   // sync as the learner changes self-assessment statuses, without a reload.
@@ -76,7 +79,7 @@ function SectionToggle({ label, icon, open, onToggle, count }: SectionProps) {
   );
 }
 
-export default function MilestoneDrawer({ milestone, topicContext, goalId, onClose, onCoverageChange }: Props) {
+export default function MilestoneDrawer({ milestone, goalId, onClose, onCoverageChange }: Props) {
   const pathname = usePathname();
 
   const [entries, setEntries]               = useState<MilestoneEntry[]>([]);
@@ -368,16 +371,15 @@ export default function MilestoneDrawer({ milestone, topicContext, goalId, onClo
     }
   }
 
+  // One destination, because there is only one chat surface. This used to fall
+  // back to `/learn?topic=…` when a track had no goal behind it — a path that
+  // could not actually be reached, since the only page that renders this drawer
+  // finds its track BY goal_id and always supplies one. `/learn` has since been
+  // deleted; see lib/pomodoro/routes.ts.
   function askHref(): string {
     if (!milestone) return "#";
     const titleParam = encodeURIComponent(milestone.title);
-    if (goalId) {
-      return `/study/${goalId}/ask?milestoneId=${milestone.id}&milestone=${titleParam}`;
-    }
-    const topicParam = topicContext
-      ? encodeURIComponent(`${topicContext}: ${milestone.title}`)
-      : titleParam;
-    return `/learn?topic=${topicParam}`;
+    return `/study/${goalId}/ask?milestoneId=${milestone.id}&milestone=${titleParam}`;
   }
 
   function quizHref(): string {

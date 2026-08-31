@@ -66,6 +66,10 @@ export default function SummaryPanel({ topic, data, loading, goalId, milestoneId
           story:       data.story,
           takeaway:    data.takeaway,
           title:       data.title ?? undefined,
+          // Sent so a session with no card still has a track to land on. Before
+          // this the route had no idea which goal the learner was studying, so
+          // a card-less save created a fresh, unreachable track instead.
+          goalId,
           milestoneId,
           pointId,
           covered:     data.covered ?? null,
@@ -73,9 +77,14 @@ export default function SummaryPanel({ topic, data, loading, goalId, milestoneId
         }),
       });
 
-      if (!res.ok) throw new Error();
-
-      const result = await res.json() as { milestoneId?: string };
+      // The route's own words when it has them: "there is nowhere to save this"
+      // and "we could not save it" are different problems, and only one is
+      // worth retrying.
+      const result = await res.json() as { milestoneId?: string; error?: string };
+      if (!res.ok) {
+        setSaveError(result.error ?? "Couldn't save — please try again.");
+        return;
+      }
       setSaved(true);
 
       // Navigate back to the tracker and pulse the updated card
@@ -84,7 +93,7 @@ export default function SummaryPanel({ topic, data, loading, goalId, milestoneId
         setTimeout(() => router.push(`/study/${goalId}/track?pulse=${pulseId}`), 800);
       }
     } catch {
-      setSaveError("Couldn't save — please try again.");
+      setSaveError("Couldn't reach the server — please try again.");
     } finally {
       setSaving(false);
     }
