@@ -20,8 +20,7 @@ import MilestoneDrawer from "./MilestoneDrawer";
 
 interface Props {
   initialMilestones: Milestone[];
-  topicContext?:     string;
-  goalId?:           string;
+  goalId:            string;   // required — see MilestoneDrawer's Props
   trackId?:          string;
   focusMilestoneId?: string | null;
   backlogPriorityMode?: BacklogPriorityMode;
@@ -33,7 +32,7 @@ interface Props {
 }
 
 export default function KanbanBoard({
-  initialMilestones, topicContext, goalId, trackId, focusMilestoneId,
+  initialMilestones, goalId, trackId, focusMilestoneId,
   backlogPriorityMode = "auto",
   pulseId: initialPulseId, validatedId, masteredId,
   isPremium = false, isAdmin = false,
@@ -314,7 +313,6 @@ export default function KanbanBoard({
 
       <MilestoneDrawer
         milestone={activeMilestone}
-        topicContext={topicContext}
         goalId={goalId}
         onClose={handleDrawerClose}
         onCoverageChange={handleCoverageChange}

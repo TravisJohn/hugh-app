@@ -13,6 +13,14 @@ had become the unhardened path into track generation. **The learning loop is
 the product.** Its voice (`/api/tts`, `lib/personas.ts`, `useAudioPlayer`,
 `useSpeechRecognition`) was never interview-only and survives in `/mastery`.
 
+`/learn` — a second, standalone "Focused Learning" chat with its own topic
+picker — was deleted on 2026-08-31 for the same reason. Nothing in the app
+linked to it (the `/home` grid points at `/home/learn`), so it was reachable
+only by typing the URL, and a session saved from it created a `tracks` row with
+no `goal_id` — which the board page can never find, because it looks a track up
+BY its goal. Do not reintroduce a chat surface outside `/study/[goalId]/ask`.
+`components/learn/` survives; it is what that page is built from.
+
 ### The surfaces
 | Route | What it is |
 |---|---|

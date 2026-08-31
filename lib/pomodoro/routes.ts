@@ -16,6 +16,10 @@ export function isSilentRoute(path: string): boolean {
 
 // Pages that carry their own inline timer control (the Ask chat toolbar). The
 // floating dock countdown is hidden there to avoid showing two of the same timer.
+//
+// `/learn` used to be listed here too. It was a second, unlinked entry point
+// into tutoring and was deleted with the rest of that path; the goal-scoped Ask
+// page is the only chat surface now.
 export function isAskRoute(path: string): boolean {
-  return path === "/learn" || /^\/study\/[^/]+\/ask$/.test(path);
+  return /^\/study\/[^/]+\/ask$/.test(path);
 }
