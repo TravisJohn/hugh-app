@@ -66,6 +66,19 @@ export const PLACEHOLDER_TOPIC    = "PLACEHOLDER_TOPIC";
 export const PLACEHOLDER_DOCUMENT = "PLACEHOLDER_DOCUMENT_TEXT";
 
 /**
+ * Canonical 5-whys answers for the context arm.
+ *
+ * Two pairs, not one, for the same reason `PLACEHOLDER_ITEMS` has two entries:
+ * `learnerAnswersBlock` joins them, and the separator between answers is part
+ * of the template. One pair would leave that join out of the hash, so a change
+ * to it would move no fingerprint.
+ */
+const PLACEHOLDER_ANSWERS = [
+  { question: "PLACEHOLDER_QUESTION_1", answer: "PLACEHOLDER_ANSWER_1" },
+  { question: "PLACEHOLDER_QUESTION_2", answer: "PLACEHOLDER_ANSWER_2" },
+];
+
+/**
  * Canonical milestone list for the ranking prompt.
  *
  * `backlogPriorityPrompt` interpolates a variable-length list, and the shape of
@@ -90,6 +103,7 @@ const PLACEHOLDER_ITEMS = [
  */
 export const PROMPT_IDS = [
   "milestones.qa",
+  "milestones.qa.context",
   "milestones.document",
   "backlog.priority",
 ] as const;
@@ -106,9 +120,10 @@ export type PromptId = (typeof PROMPT_IDS)[number];
  * helper that produces a structurally wrong template for some callers.
  */
 const TEMPLATE_BUILDERS: Record<PromptId, () => string> = {
-  "milestones.qa":       () => milestoneGenerationPrompt(PLACEHOLDER_TOPIC),
-  "milestones.document": () => milestoneGenerationPrompt(PLACEHOLDER_TOPIC, PLACEHOLDER_DOCUMENT),
-  "backlog.priority":    () => backlogPriorityPrompt(PLACEHOLDER_TOPIC, PLACEHOLDER_ITEMS),
+  "milestones.qa":         () => milestoneGenerationPrompt(PLACEHOLDER_TOPIC),
+  "milestones.qa.context": () => milestoneGenerationPrompt(PLACEHOLDER_TOPIC, undefined, PLACEHOLDER_ANSWERS),
+  "milestones.document":   () => milestoneGenerationPrompt(PLACEHOLDER_TOPIC, PLACEHOLDER_DOCUMENT),
+  "backlog.priority":      () => backlogPriorityPrompt(PLACEHOLDER_TOPIC, PLACEHOLDER_ITEMS),
 };
 
 /**
@@ -132,9 +147,10 @@ export function fingerprintOf(templateText: string): string {
  * happens when the module is first imported and never again.
  */
 const FINGERPRINTS: Record<PromptId, string> = {
-  "milestones.qa":       fingerprintOf(TEMPLATE_BUILDERS["milestones.qa"]()),
-  "milestones.document": fingerprintOf(TEMPLATE_BUILDERS["milestones.document"]()),
-  "backlog.priority":    fingerprintOf(TEMPLATE_BUILDERS["backlog.priority"]()),
+  "milestones.qa":         fingerprintOf(TEMPLATE_BUILDERS["milestones.qa"]()),
+  "milestones.qa.context": fingerprintOf(TEMPLATE_BUILDERS["milestones.qa.context"]()),
+  "milestones.document":   fingerprintOf(TEMPLATE_BUILDERS["milestones.document"]()),
+  "backlog.priority":      fingerprintOf(TEMPLATE_BUILDERS["backlog.priority"]()),
 };
 
 /**
@@ -151,6 +167,7 @@ const FINGERPRINTS: Record<PromptId, string> = {
  */
 export const KNOWN_PROMPT_VERSIONS: Record<string, string> = {
   "3309ed3a3d9d3926": "milestones.qa@1",
+  "8d9d9467486640fc": "milestones.qa.context@1",
   "eb74a8bd940e372b": "milestones.document@1",
   "d3198277d58e4850": "backlog.priority@1",
 };
@@ -173,7 +190,21 @@ export function promptVersion(id: PromptId): string {
   return KNOWN_PROMPT_VERSIONS[fp] ?? fp;
 }
 
-/** Which milestone-generation template a given call will actually use. */
-export function milestonePromptId(documentText?: string): PromptId {
-  return documentText ? "milestones.document" : "milestones.qa";
+/**
+ * Which milestone-generation template a given call will actually use.
+ *
+ * Mirrors the branching inside `milestoneGenerationPrompt` exactly, including
+ * the "empty answers is not the context arm" rule: a learner who skipped the
+ * questions gets the plain template and stays comparable with everyone else
+ * who did. If this ever disagrees with the builder, the row records a
+ * fingerprint for a prompt that was never sent — which is the one failure
+ * this whole module exists to prevent, so the test asserts they agree.
+ */
+export function milestonePromptId(
+  documentText?: string,
+  answers?:      readonly unknown[],
+): PromptId {
+  if (documentText)                return "milestones.document";
+  if (answers && answers.length)   return "milestones.qa.context";
+  return "milestones.qa";
 }

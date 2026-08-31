@@ -6,10 +6,29 @@
  * really happened, re-runs them at the SAME prompt with a different model, and
  * prints the two arms side by side.
  *
+ * Two runs live here, and each varies exactly ONE thing:
+ *
+ *   --model    same prompt, different model. The comparison migration 048 was
+ *              designed around (D4).
+ *   --context  same model, different prompt: the plain generation prompt
+ *              against one that reads the learner's 5-whys answers. This is
+ *              the treatment arm for "does the learner's own context produce a
+ *              better curriculum?", which is the question the store exists for.
+ *
+ * A context run replays each baseline at ITS OWN model, so every pair differs
+ * in the prompt and nothing else. That is why --context and --model are
+ * refused together.
+ *
+ * The live build is never the treatment arm: it passes no answers, so it keeps
+ * writing context_used=false and accumulating the control for free, exactly as
+ * 048 planned. Flipping the live path is a decision that should follow this
+ * evidence rather than precede it.
+ *
  * Usage:
  *   npx tsx scripts/replay-generations.ts --model claude-haiku-4-5
  *   npx tsx scripts/replay-generations.ts --model claude-haiku-4-5 --limit 50 --yes
- *   npx tsx scripts/replay-generations.ts --model claude-haiku-4-5 --out report.json
+ *   npx tsx scripts/replay-generations.ts --context --limit 20 --yes
+ *   npx tsx scripts/replay-generations.ts --context --out context-arm.json
  *
  * Without `--yes` it is a dry run: it selects, prices, and stops. Nothing is
  * sent to Anthropic and nothing is written.
@@ -50,27 +69,32 @@ loadEnvLocal();
 // the moment a plain Node process loads it. That split is the reason the module
 // exists — see its top comment.
 import { generateMilestones, MAX_TOKENS } from "@/lib/tracker/generateMilestones";
-import { promptFingerprint, promptVersion } from "@/lib/claude/promptIdentity";
+import { milestonePromptId, promptFingerprint, promptVersion } from "@/lib/claude/promptIdentity";
 import { answerChars, contextUptake, type QAPair } from "@/lib/learn/contextUptake";
 import { errorClassOf, sanitize } from "@/lib/observability/sanitize";
 import { estimateCost } from "@/lib/pricing";
 import {
   compareArms,
   distinctFingerprints,
+  dropMissingAnswers,
   estimateReplayCost,
   excludeAlreadyReplayed,
+  replayKey,
+  replayModelFor,
   selectReplayable,
   INELIGIBLE_EXPLANATIONS,
   type ArmStat,
   type ComparisonReport,
   type GenerationRow,
+  type ReplayMode,
 } from "@/lib/learn/replay";
 import { type KanbanColumn } from "@/types";
 
 /** The columns a replay reads. Kept in one place so the select and the type agree. */
 const ROW_COLUMNS =
   "id,user_id,goal_id,source_kind,model,prompt_fingerprint,input_topic," +
-  "answer_chars,context_uptake,milestone_count,outcome,tokens_in,tokens_out,is_replay";
+  "answer_chars,context_uptake,milestone_count,outcome,tokens_in,tokens_out,is_replay," +
+  "context_used";
 
 /**
  * Only QA generations are replayable, so only that fingerprint is ever the
@@ -78,6 +102,14 @@ const ROW_COLUMNS =
  * reason `generateTrack` does: a hand-copied hash is a hash that can go stale.
  */
 const QA_PROMPT_ID = "milestones.qa" as const;
+
+/**
+ * The treatment arm's prompt: the same generation call, with the learner's
+ * 5-whys answers framed and fed in (C2). Its fingerprint differs from
+ * `QA_PROMPT_ID` by construction, which is what makes "did the context help?"
+ * a comparison the store can express at all.
+ */
+const CONTEXT_PROMPT_ID = "milestones.qa.context" as const;
 
 /** Mirrors `generateTrack` — a model naming a column that is not real is coerced. */
 const VALID_COLUMNS: KanbanColumn[] = ["backlog", "learn", "review", "done"];
@@ -87,11 +119,12 @@ interface Args {
   limit:       number;
   spend:       boolean;
   redo:        boolean;
+  context:     boolean;
   out:         string | null;
 }
 
 function parseArgs(argv: readonly string[]): Args {
-  const args: Args = { model: "", limit: 10, spend: false, redo: false, out: null };
+  const args: Args = { model: "", limit: 10, spend: false, redo: false, context: false, out: null };
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -100,6 +133,7 @@ function parseArgs(argv: readonly string[]): Args {
     else if (arg === "--out")         args.out   = argv[++i] ?? null;
     else if (arg === "--yes")         args.spend = true;
     else if (arg === "--redo")        args.redo  = true;
+    else if (arg === "--context")     args.context = true;
     else if (arg === "--help" || arg === "-h") { usage(); process.exit(0); }
     else { console.error(`Unknown argument: ${arg}`); usage(); process.exit(1); }
   }
@@ -110,11 +144,19 @@ function usage(): void {
   console.log(`
 Replay stored curriculum generations against a different model.
 
-  --model <id>    Model to replay with (required), e.g. claude-haiku-4-5
+  --model <id>    Model to replay with, e.g. claude-haiku-4-5.
+                  Required for a model run; rejected with --context.
+  --context       Replay through the CONTEXT prompt instead, feeding each
+                  learner's 5-whys answers in. Each baseline is re-run at its
+                  own model, so the only thing that differs is the prompt.
   --limit <n>     How many generations to replay (default 10)
   --yes           Actually spend. Without it this is a dry run.
-  --redo          Replay goals already covered at this model.
+  --redo          Replay goals already covered by this arm.
   --out <path>    Write the full comparison, with pairing, as JSON.
+
+A run varies exactly one thing: the model, or the prompt. Naming a model for a
+context run would vary both and produce a number nobody can attribute, so the
+two flags are refused together.
 
 A replay writes no usage_logs row, so its spend never reaches the admin cost
 dashboard. The estimate printed before the run is the only warning you get.
@@ -136,7 +178,7 @@ function armCell(stat: ArmStat): string {
 
 function printComparison(report: ComparisonReport): void {
   console.log(`\n  Context uptake — mean over measured rows, (measured/rows)\n`);
-  console.log(`  ${"".padEnd(16)}  ${report.baselineModel.padEnd(20)}  ${report.replayModel}`);
+  console.log(`  ${"".padEnd(16)}  ${report.baselineArm.padEnd(20)}  ${report.replayArm}`);
   console.log(`  ${"-".repeat(16)}  ${"-".repeat(20)}  ${"-".repeat(20)}`);
   console.log(
     `  ${"OVERALL".padEnd(16)}  ${armCell(report.overall.baseline).padEnd(20)}  ${armCell(report.overall.replay)}`,
@@ -160,13 +202,22 @@ function printComparison(report: ComparisonReport): void {
 /**
  * The learner's answers for a set of goals, in one query.
  *
- * Read to MEASURE, exactly as `generateTrack` reads them: the words are turned
- * into a number and dropped. Nothing here writes them anywhere, and the replay
- * prompt does not receive them — `context_used` stays false because the
- * generation prompt still does not consume answers.
+ * Used for two different things depending on the run, and the difference is
+ * the whole experiment:
  *
- * A goal whose answers the learner has deleted simply comes back empty, and
- * its replay records a null uptake. That is what deletion is supposed to cost.
+ *   model run    read to MEASURE only, exactly as `generateTrack` reads them.
+ *                The words become a number and are dropped; the prompt never
+ *                sees them, so `context_used` stays false on both arms.
+ *   context run  read to MEASURE and to SEND. The words are framed by
+ *                `learnerAnswersBlock` and go to the model, and the row
+ *                records `context_used: true`.
+ *
+ * A goal whose answers the learner has deleted comes back empty. In a model
+ * run that costs a null uptake; in a context run the baseline is dropped
+ * entirely, because a "treatment" row with no treatment would sit in the rich
+ * bucket dragging its arm toward the control. See `dropMissingAnswers`.
+ *
+ * Nothing here ever writes the answers anywhere.
  */
 async function readAnswersByGoal(
   supabase: SupabaseClient,
@@ -195,28 +246,35 @@ async function readAnswersByGoal(
   return byGoal;
 }
 
-/** Goals already replayed at this model, so a second run does not pay twice. */
-async function readReplayedGoalIds(
+/**
+ * Goal-and-model pairs already covered by this arm, so a second run does not
+ * pay twice — and pay it invisibly, since replay spend never reaches
+ * `usage_logs`.
+ *
+ * Scoped by the TARGET fingerprint, then keyed by goal and model. The model is
+ * read from the rows rather than filtered in SQL because a context run replays
+ * each baseline at its own model, so one run can legitimately span several.
+ */
+async function readReplayedKeys(
   supabase:    SupabaseClient,
-  model:       string,
   fingerprint: string,
 ): Promise<Set<string>> {
   const { data, error } = await supabase
     .from("track_generations")
-    .select("goal_id")
+    .select("goal_id, model")
     .eq("is_replay", true)
-    .eq("model", model)
     .eq("prompt_fingerprint", fingerprint);
 
   if (error) {
     console.error(`  ! could not read prior replays: ${error.message}`);
     return new Set();
   }
-  return new Set(
-    (data ?? [])
-      .map(r => (r as { goal_id: string | null }).goal_id)
-      .filter((id): id is string => Boolean(id)),
-  );
+  const keys = new Set<string>();
+  for (const raw of data ?? []) {
+    const row = raw as { goal_id: string | null; model: string };
+    if (row.goal_id) keys.add(replayKey(row.goal_id, row.model));
+  }
+  return keys;
 }
 
 /** One baseline, replayed. */
@@ -255,9 +313,20 @@ async function replayOne(
   baseline: GenerationRow,
   answers:  readonly QAPair[],
   model:    string,
+  mode:     ReplayMode,
 ): Promise<ReplayOutcome> {
   const startedAt = Date.now();
   let failureReason: string | null = null;
+
+  // What the prompt will actually receive. In a model run the answers are read
+  // for measurement only and never sent, which is what keeps both arms of that
+  // comparison on one prompt.
+  const sentAnswers = mode === "context" ? answers : undefined;
+
+  // Derived up front so a FAILED replay still records which prompt it was
+  // trying, and overwritten below with what `generateMilestones` reports it
+  // actually rendered — one binding, carried across the call.
+  let promptId = milestonePromptId(undefined, sentAnswers);
 
   const record: Record<string, unknown> = {
     user_id:            baseline.user_id,
@@ -265,12 +334,12 @@ async function replayOne(
     track_id:           null,
     source_kind:        "qa",
     model,
-    prompt_version:     promptVersion(QA_PROMPT_ID),
-    prompt_fingerprint: promptFingerprint(QA_PROMPT_ID),
+    prompt_version:     promptVersion(promptId),
+    prompt_fingerprint: promptFingerprint(promptId),
     max_tokens:         MAX_TOKENS,
     input_topic:        baseline.input_topic,
     answer_count:       answers.length,
-    context_used:       false,
+    context_used:       mode === "context",
     answer_chars:       baseline.answer_chars,
     context_uptake:     null,
     milestones_out:     null,
@@ -289,15 +358,16 @@ async function replayOne(
   };
 
   try {
-    const { parsed, usage, attempts, model: usedModel } = await generateMilestones(
-      baseline.input_topic,
-      undefined,
-      model,
-    );
+    const {
+      parsed, usage, attempts, model: usedModel, promptId: usedPromptId,
+    } = await generateMilestones(baseline.input_topic, undefined, model, sentAnswers);
 
-    // The model actually called, not the one requested — one binding, as
-    // CLAUDE.md requires, held across the function boundary.
-    record.model      = usedModel;
+    // The model and prompt actually used, not the ones requested — one
+    // binding, as CLAUDE.md requires, held across the function boundary.
+    promptId                  = usedPromptId;
+    record.model              = usedModel;
+    record.prompt_version     = promptVersion(usedPromptId);
+    record.prompt_fingerprint = promptFingerprint(usedPromptId);
     record.attempts   = attempts;
     record.tokens_in  = usage.inputTokens;
     record.tokens_out = usage.outputTokens;
@@ -355,6 +425,7 @@ async function replayOne(
           tokens_in:          record.tokens_in as number,
           tokens_out:         record.tokens_out as number,
           is_replay:          true,
+          context_used:       mode === "context",
         }
       : null,
   };
@@ -363,8 +434,18 @@ async function replayOne(
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
 
-  if (!args.model) {
-    console.error("\n--model is required.\n");
+  const mode: ReplayMode = args.context ? "context" : "model";
+
+  // One axis per run. Naming a model for a context run would move the prompt
+  // AND the model between the two arms, and no number off that table could be
+  // attributed to either.
+  if (args.context && args.model) {
+    console.error("\n--model cannot be combined with --context.");
+    console.error("A context run replays each baseline at its own model, so the prompt is the only thing that differs.\n");
+    process.exit(1);
+  }
+  if (!args.context && !args.model) {
+    console.error("\n--model is required (or use --context to vary the prompt instead).\n");
     usage();
     process.exit(1);
   }
@@ -380,9 +461,19 @@ async function main(): Promise<void> {
     { auth: { persistSession: false } },
   );
 
-  const fingerprint = promptFingerprint(QA_PROMPT_ID);
-  console.log(`\nReplaying ${QA_PROMPT_ID} @ ${fingerprint} (${promptVersion(QA_PROMPT_ID)})`);
-  console.log(`Target model: ${args.model}\n`);
+  // The baseline is always the plain QA prompt: it is the control arm, and the
+  // only generations that exist in any volume. The TARGET is what a run varies.
+  const fingerprint       = promptFingerprint(QA_PROMPT_ID);
+  const targetPromptId    = mode === "context" ? CONTEXT_PROMPT_ID : QA_PROMPT_ID;
+  const targetFingerprint = promptFingerprint(targetPromptId);
+
+  console.log(`\nBaseline: ${QA_PROMPT_ID} @ ${fingerprint} (${promptVersion(QA_PROMPT_ID)})`);
+  if (mode === "context") {
+    console.log(`Replay:   ${targetPromptId} @ ${targetFingerprint} (${promptVersion(targetPromptId)})`);
+    console.log("Each baseline runs at its own model - the prompt is the only difference.\n");
+  } else {
+    console.log(`Replay:   same prompt, model ${args.model}\n`);
+  }
 
   // Over-fetch, because filtering happens in the pure module rather than in SQL
   // — the reasons a row is unreplayable are rules with explanations attached,
@@ -413,7 +504,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const selection = selectReplayable(candidates, args.limit);
+  const selection = selectReplayable(candidates, args.limit, mode);
 
   console.log(`  ${candidates.length} candidate rows`);
   for (const skip of selection.skipped) {
@@ -421,13 +512,32 @@ async function main(): Promise<void> {
   }
 
   let toReplay = selection.eligible;
+  const modelFor = (row: GenerationRow) => replayModelFor(row, mode, args.model || null);
+
   if (!args.redo) {
-    const done = await readReplayedGoalIds(supabase, args.model, fingerprint);
-    const fresh = excludeAlreadyReplayed(toReplay, done);
+    const done  = await readReplayedKeys(supabase, targetFingerprint);
+    const fresh = excludeAlreadyReplayed(
+      toReplay, done, r => replayKey(r.goal_id ?? "", modelFor(r)),
+    );
     if (fresh.alreadyDone > 0) {
-      console.log(`  ${String(fresh.alreadyDone).padStart(4)} skipped — already replayed at this model (--redo to repeat)`);
+      console.log(`  ${String(fresh.alreadyDone).padStart(4)} skipped — already covered by this arm (--redo to repeat)`);
     }
     toReplay = fresh.fresh;
+  }
+
+  // A context run has to know the answers still EXIST before it prices itself,
+  // not after: `answer_chars` survives a deletion by design, so a row can
+  // promise 600 characters that `goal_answers` no longer holds. Reading first
+  // costs one query and makes both the estimate and the arm honest.
+  let answersByGoal = new Map<string, QAPair[]>();
+  if (mode === "context") {
+    const goalIds = toReplay.map(r => r.goal_id).filter((id): id is string => Boolean(id));
+    answersByGoal = await readAnswersByGoal(supabase, goalIds);
+    const available = dropMissingAnswers(toReplay, answersByGoal);
+    if (available.dropped > 0) {
+      console.log(`  ${String(available.dropped).padStart(4)} skipped — answers deleted since, so there is no context to feed`);
+    }
+    toReplay = available.kept;
   }
 
   console.log(`  ${selection.eligibleFound} eligible, ${toReplay.length} selected for this run`);
@@ -437,7 +547,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const estimate = estimateReplayCost(toReplay, args.model);
+  const estimate = estimateReplayCost(toReplay, modelFor);
   console.log(`\n  Estimated cost: $${estimate.toFixed(4)} for ${toReplay.length} generations`);
   console.log("  This spend is NOT recorded in usage_logs and will not appear in /admin.\n");
 
@@ -446,8 +556,12 @@ async function main(): Promise<void> {
     return;
   }
 
-  const goalIds = toReplay.map(r => r.goal_id).filter((id): id is string => Boolean(id));
-  const answersByGoal = await readAnswersByGoal(supabase, goalIds);
+  // A model run reads the answers only to measure uptake, so it defers that
+  // query until it is actually going to spend.
+  if (mode === "model") {
+    const goalIds = toReplay.map(r => r.goal_id).filter((id): id is string => Boolean(id));
+    answersByGoal = await readAnswersByGoal(supabase, goalIds);
+  }
 
   const outcomes: ReplayOutcome[] = [];
   let spentIn = 0;
@@ -459,7 +573,7 @@ async function main(): Promise<void> {
       `  [${String(index + 1).padStart(3)}/${toReplay.length}] ${baseline.input_topic.slice(0, 48).padEnd(48)} `,
     );
 
-    const outcome = await replayOne(supabase, baseline, answers, args.model);
+    const outcome = await replayOne(supabase, baseline, answers, modelFor(baseline), mode);
     outcomes.push(outcome);
 
     if (outcome.row) {
@@ -476,8 +590,16 @@ async function main(): Promise<void> {
   const replayedBaselineIds = new Set(outcomes.filter(o => o.ok).map(o => o.baselineId));
   const baselineRows = toReplay.filter(r => replayedBaselineIds.has(r.id));
 
+  // What the two columns of the table actually are. A model run varies the
+  // model, so the models label them; a context run holds the model fixed per
+  // pair and varies the prompt, so the prompt versions do. Labelling a context
+  // run by its model would print the same string twice.
   const baselineModel = [...new Set(baselineRows.map(r => r.model))].join(", ") || "baseline";
-  const report = compareArms(baselineRows, replayRows, baselineModel, args.model);
+  const [baselineArm, replayArm] = mode === "context"
+    ? [promptVersion(QA_PROMPT_ID), promptVersion(CONTEXT_PROMPT_ID)]
+    : [baselineModel, args.model];
+
+  const report = compareArms(baselineRows, replayRows, baselineArm, replayArm);
 
   printComparison(report);
 
@@ -490,11 +612,25 @@ async function main(): Promise<void> {
     // `replay_of` column — this file is what makes a run re-analysable later
     // without guessing which baseline produced which replay.
     const payload = {
-      ranAt:       new Date().toISOString(),
-      fingerprint,
-      promptId:    QA_PROMPT_ID,
-      promptVersion: promptVersion(QA_PROMPT_ID),
-      replayModel: args.model,
+      ranAt: new Date().toISOString(),
+      mode,
+      // Both fingerprints, always. In a model run they are the same value and
+      // saying so costs nothing; in a context run they are the entire point,
+      // and a report that recorded only one could not be re-read later as the
+      // comparison it was.
+      baseline: {
+        promptId:      QA_PROMPT_ID,
+        promptVersion: promptVersion(QA_PROMPT_ID),
+        fingerprint,
+      },
+      replay: {
+        promptId:      targetPromptId,
+        promptVersion: promptVersion(targetPromptId),
+        fingerprint:   targetFingerprint,
+        // Null in a context run: each pair ran at its own baseline's model, so
+        // there is no single one to name. The per-pair models are below.
+        model:         mode === "context" ? null : args.model,
+      },
       report,
       pairs: outcomes.map(o => ({
         baselineId: o.baselineId,
@@ -502,6 +638,9 @@ async function main(): Promise<void> {
         ok:         o.ok,
         errorClass: o.errorClass,
         reason:     o.reason,
+        // The model this pair actually ran at, which in a context run differs
+        // from pair to pair and is the thing held constant WITHIN the pair.
+        model:      o.row?.model ?? null,
         uptake:     o.row?.context_uptake ?? null,
         milestones: o.row?.milestone_count ?? null,
       })),

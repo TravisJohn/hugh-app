@@ -4,9 +4,12 @@ import {
   bucketFor,
   compareArms,
   distinctFingerprints,
+  dropMissingAnswers,
   estimateReplayCost,
   excludeAlreadyReplayed,
   replayEligibility,
+  replayKey,
+  replayModelFor,
   selectReplayable,
   summariseArm,
   type GenerationRow,
@@ -31,6 +34,7 @@ const row = (over: Partial<GenerationRow> = {}): GenerationRow => ({
   tokens_in:          3000,
   tokens_out:         2000,
   is_replay:          false,
+  context_used:       false,
   ...over,
 });
 
@@ -176,10 +180,13 @@ describe("distinctFingerprints - a prompt change must not masquerade as a model 
   });
 });
 
+/** The key a run would compute for a row, at one fixed target model. */
+const keyAt = (model: string) => (r: GenerationRow) => replayKey(r.goal_id ?? "", model);
+
 describe("excludeAlreadyReplayed - a second run must not pay twice, invisibly", () => {
   it("skips a baseline whose goal has already been replayed at this model", () => {
     const rows = [row({ id: "a", goal_id: "goal-1" }), row({ id: "b", goal_id: "goal-2" })];
-    const result = excludeAlreadyReplayed(rows, new Set(["goal-1"]));
+    const result = excludeAlreadyReplayed(rows, new Set([replayKey("goal-1", "claude-haiku-4-5")]), keyAt("claude-haiku-4-5"));
 
     expect(result.fresh.map(r => r.id)).toEqual(["b"]);
     expect(result.alreadyDone).toBe(1);
@@ -187,12 +194,12 @@ describe("excludeAlreadyReplayed - a second run must not pay twice, invisibly", 
 
   it("keeps everything when nothing has been replayed yet", () => {
     const rows = [row({ goal_id: "goal-1" }), row({ goal_id: "goal-2" })];
-    expect(excludeAlreadyReplayed(rows, new Set()).fresh).toHaveLength(2);
+    expect(excludeAlreadyReplayed(rows, new Set(), keyAt("claude-haiku-4-5")).fresh).toHaveLength(2);
   });
 
   it("treats a row with no goal as fresh, since it cannot be matched", () => {
     const rows = [row({ id: "orphan", goal_id: null })];
-    const result = excludeAlreadyReplayed(rows, new Set(["goal-1"]));
+    const result = excludeAlreadyReplayed(rows, new Set([replayKey("goal-1", "claude-haiku-4-5")]), keyAt("claude-haiku-4-5"));
     expect(result.fresh.map(r => r.id)).toEqual(["orphan"]);
     expect(result.alreadyDone).toBe(0);
   });
@@ -202,7 +209,20 @@ describe("excludeAlreadyReplayed - a second run must not pay twice, invisibly", 
     // goal_id, so one replay covers both - the safe direction for a default
     // whose spend never reaches usage_logs.
     const rows = [row({ id: "first", goal_id: "goal-1" }), row({ id: "second", goal_id: "goal-1" })];
-    expect(excludeAlreadyReplayed(rows, new Set(["goal-1"])).fresh).toHaveLength(0);
+    expect(
+      excludeAlreadyReplayed(rows, new Set([replayKey("goal-1", "claude-haiku-4-5")]), keyAt("claude-haiku-4-5")).fresh,
+    ).toHaveLength(0);
+  });
+
+  it("does not let a replay at one model mask a pending one at another", () => {
+    // The bug the model half of the key exists to stop. A context run replays
+    // each baseline at its own model, so one fingerprint can legitimately span
+    // models - keying on the goal alone would silently retire them all.
+    const rows = [row({ id: "a", goal_id: "goal-1", model: "claude-sonnet-4-6" })];
+    const doneAtHaiku = new Set([replayKey("goal-1", "claude-haiku-4-5")]);
+
+    expect(excludeAlreadyReplayed(rows, doneAtHaiku, r => replayKey(r.goal_id ?? "", r.model)).fresh)
+      .toHaveLength(1);
   });
 });
 
@@ -344,9 +364,138 @@ describe("compareArms - the split that the aggregate hides", () => {
     expect(rich?.replay.meanUptake).toBeNull();
   });
 
-  it("carries both model names, so a saved report can be read months later", () => {
+  it("carries both arm labels, so a saved report can be read months later", () => {
     const report = compareArms([row()], [], "claude-sonnet-4-6", "claude-haiku-4-5");
-    expect(report.baselineModel).toBe("claude-sonnet-4-6");
-    expect(report.replayModel).toBe("claude-haiku-4-5");
+    expect(report.baselineArm).toBe("claude-sonnet-4-6");
+    expect(report.replayArm).toBe("claude-haiku-4-5");
+  });
+
+  it("labels a context run by its prompts rather than its model", () => {
+    // The reason the fields are named Arm and not Model: in a context run both
+    // sides are the same model, and a column headed with it would say nothing.
+    const report = compareArms([row()], [], "milestones.qa@1", "milestones.qa.context@1");
+    expect(report.baselineArm).toBe("milestones.qa@1");
+    expect(report.replayArm).toBe("milestones.qa.context@1");
+  });
+});
+
+
+// ── The context arm (C2) ────────────────────────────────────────────────────
+//
+// migration 048 stores what a learner said so that "does their own context
+// produce a better curriculum?" can be answered. These are the rules that make
+// the second arm of that comparison trustworthy.
+
+describe("replayEligibility in context mode", () => {
+  it("refuses a baseline the learner wrote nothing for", () => {
+    // The prompt builder renders the plain template for an empty answers
+    // array, so this "treatment" would be the control again under a different
+    // label - a row that quietly votes for no-difference.
+    const verdict = replayEligibility(row({ answer_chars: 0 }), "context");
+    expect(verdict).toEqual({ ok: false, reason: "no-answers" });
+  });
+
+  it("refuses a row that already used context, since it is the treatment", () => {
+    const verdict = replayEligibility(row({ context_used: true }), "context");
+    expect(verdict).toEqual({ ok: false, reason: "already-context" });
+  });
+
+  it("accepts an ordinary no-context baseline that has answers behind it", () => {
+    expect(replayEligibility(row({ answer_chars: 300 }), "context")).toEqual({ ok: true });
+  });
+
+  it("still applies every rule a model run applies", () => {
+    // The context rules are additional, not a replacement - a failed or
+    // document-sourced generation is no more replayable here than there.
+    expect(replayEligibility(row({ outcome: "failed" }), "context"))
+      .toEqual({ ok: false, reason: "generation-failed" });
+    expect(replayEligibility(row({ source_kind: "document" }), "context"))
+      .toEqual({ ok: false, reason: "document-source" });
+  });
+
+  it("does not apply the context rules to a model run", () => {
+    // A learner who wrote nothing is a perfectly good model-comparison
+    // baseline: the prompt is identical on both arms either way.
+    expect(replayEligibility(row({ answer_chars: 0 }), "model")).toEqual({ ok: true });
+    expect(replayEligibility(row({ answer_chars: 0 }))).toEqual({ ok: true });
+  });
+});
+
+describe("selectReplayable carries the mode through", () => {
+  it("counts context-only skips against the right reason", () => {
+    const rows = [row({ id: "a", answer_chars: 0 }), row({ id: "b", answer_chars: 400 })];
+    const selection = selectReplayable(rows, 10, "context");
+
+    expect(selection.eligible.map(r => r.id)).toEqual(["b"]);
+    expect(selection.skipped).toEqual([{ reason: "no-answers", count: 1 }]);
+  });
+});
+
+describe("dropMissingAnswers - a deletion must not become a fake treatment row", () => {
+  it("drops a baseline whose answers the learner has since deleted", () => {
+    // answer_chars is frozen at generation time and survives the deletion by
+    // design, so the row still claims 600 characters. Only reading the answers
+    // reveals there is nothing left to send.
+    const rows = [row({ id: "a", goal_id: "goal-1", answer_chars: 600 })];
+    const result = dropMissingAnswers(rows, new Map());
+
+    expect(result.kept).toHaveLength(0);
+    expect(result.dropped).toBe(1);
+  });
+
+  it("drops a goal whose answers row exists but is empty", () => {
+    const rows = [row({ goal_id: "goal-1" })];
+    expect(dropMissingAnswers(rows, new Map([["goal-1", []]])).dropped).toBe(1);
+  });
+
+  it("keeps a baseline whose answers are still there", () => {
+    const rows = [row({ id: "a", goal_id: "goal-1" })];
+    const answers = new Map([["goal-1", [{ question: "why?", answer: "an interview" }]]]);
+
+    expect(dropMissingAnswers(rows, answers).kept.map(r => r.id)).toEqual(["a"]);
+    expect(dropMissingAnswers(rows, answers).dropped).toBe(0);
+  });
+
+  it("drops a row with no goal, because its answers can never be found", () => {
+    expect(dropMissingAnswers([row({ goal_id: null })], new Map()).dropped).toBe(1);
+  });
+});
+
+describe("replayModelFor - which model each arm runs at", () => {
+  it("runs a context replay at the baseline's own model, so only the prompt differs", () => {
+    const baseline = row({ model: "claude-sonnet-4-6" });
+    expect(replayModelFor(baseline, "context", null)).toBe("claude-sonnet-4-6");
+  });
+
+  it("ignores a target model in context mode even if one is somehow passed", () => {
+    // The script refuses --model with --context, and this is the second half
+    // of that guarantee: a context run cannot vary two axes even by accident.
+    const baseline = row({ model: "claude-sonnet-4-6" });
+    expect(replayModelFor(baseline, "context", "claude-haiku-4-5")).toBe("claude-sonnet-4-6");
+  });
+
+  it("runs a model replay at the named model", () => {
+    expect(replayModelFor(row(), "model", "claude-haiku-4-5")).toBe("claude-haiku-4-5");
+  });
+});
+
+describe("estimateReplayCost prices a context run per row", () => {
+  it("uses each baseline's own model when the models differ", () => {
+    // A context run can span models, and Hugh's rates differ by up to 20x -
+    // pricing the whole run at one of them is the exact mistake CLAUDE.md
+    // forbids for usage_logs, and it is no more acceptable here.
+    const rows = [
+      row({ model: "claude-sonnet-4-6", tokens_in: 1000, tokens_out: 1000 }),
+      row({ model: "claude-haiku-4-5",  tokens_in: 1000, tokens_out: 1000 }),
+    ];
+    const perRow = estimateReplayCost(rows, r => r.model);
+    const allSonnet = estimateReplayCost(rows, "claude-sonnet-4-6");
+
+    expect(perRow).toBeLessThan(allSonnet);
+    expect(perRow).toBeGreaterThan(0);
+  });
+
+  it("still accepts a plain model string for a model run", () => {
+    expect(estimateReplayCost([row()], "claude-haiku-4-5")).toBeGreaterThan(0);
   });
 });

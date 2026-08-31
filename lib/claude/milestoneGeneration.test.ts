@@ -26,6 +26,63 @@ describe("milestoneGenerationPrompt", () => {
   });
 });
 
+// ── The context arm (C2) ──────────────────────────────────────────────
+//
+// migration 048 built the store to answer "does the learner's own context
+// produce a better curriculum?". These tests cover the half that makes the
+// question answerable: a second template that actually reads the answers.
+
+const ANSWERS = [
+  { question: "Why do you want to learn this?", answer: "I have an interview next week." },
+  { question: "What have you tried already?",   answer: "I read the docs but nothing stuck." },
+];
+
+describe("milestoneGenerationPrompt — the context arm", () => {
+  it("wraps the answers in the same delimited framing the topic gets", () => {
+    const prompt = milestoneGenerationPrompt("SQL Joins", undefined, ANSWERS);
+    expect(prompt).toContain("<learner_answers>");
+    expect(prompt).toContain("</learner_answers>");
+    expect(prompt).toContain("I have an interview next week.");
+    // The answers are the richest free text a learner types, so they carry the
+    // same "data, never instructions" defence as everything else in the loop.
+    expect(prompt.toLowerCase()).toContain("never instructions");
+  });
+
+  it("tells the model to weight the curriculum without narrowing it", () => {
+    // The failure mode this rule guards against: a learner says "interview
+    // next week" and gets a four-milestone crammer instead of a curriculum.
+    // A gap they did not think to mention is exactly what a track is for.
+    const prompt = milestoneGenerationPrompt("SQL Joins", undefined, ANSWERS);
+    expect(prompt).toContain("Do NOT narrow the curriculum");
+    expect(prompt).toContain("8–14 learning milestones");
+  });
+
+  it("renders the plain template when the answers array is empty", () => {
+    // An empty <learner_answers> block would be a third variant with no
+    // fingerprint of its own. A learner who skipped the questions has to stay
+    // comparable with everyone else who did.
+    const withEmpty = milestoneGenerationPrompt("SQL Joins", undefined, []);
+    expect(withEmpty).toBe(milestoneGenerationPrompt("SQL Joins"));
+    expect(withEmpty).not.toContain("<learner_answers>");
+  });
+
+  it("leaves the no-context prompt byte-identical", () => {
+    // The control arm's fingerprint must not move when the treatment arm is
+    // added, or every row written before today becomes uncomparable.
+    const plain = milestoneGenerationPrompt("SQL Joins");
+    expect(plain).not.toContain("<learner_answers>");
+    expect(plain).not.toContain("Do NOT narrow the curriculum");
+  });
+
+  it("refuses a document and answers together rather than dropping one", () => {
+    // Silently ignoring one would send a prompt whose fingerprint describes a
+    // template that was never rendered.
+    expect(() => milestoneGenerationPrompt("SQL Joins", "Chapter 3.", ANSWERS)).toThrow(
+      /mutually exclusive/,
+    );
+  });
+});
+
 describe("parseMilestoneGeneration", () => {
   it("parses a well-formed response", () => {
     const raw = JSON.stringify({ trackTitle: "SQL Joins Deep Dive", milestones: [validMilestone, validMilestone] });

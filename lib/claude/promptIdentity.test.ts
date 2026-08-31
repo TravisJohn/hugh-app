@@ -59,6 +59,38 @@ describe("the two milestone templates are separate artifacts", () => {
     expect(milestonePromptId(undefined)).toBe("milestones.qa");
     expect(milestonePromptId("some extracted text")).toBe("milestones.document");
   });
+
+  it("names the context arm only when there are answers to read", () => {
+    const answers = [{ question: "why?", answer: "an interview next week" }];
+    expect(milestonePromptId(undefined, answers)).toBe("milestones.qa.context");
+    // Empty is not the context arm — the builder renders the plain template,
+    // so naming it otherwise would record a fingerprint that was never sent.
+    expect(milestonePromptId(undefined, [])).toBe("milestones.qa");
+    expect(milestonePromptId(undefined, undefined)).toBe("milestones.qa");
+  });
+
+  it("agrees with the builder for every combination of inputs", () => {
+    // The invariant, stated directly: whatever `milestonePromptId` names, the
+    // template that `milestoneGenerationPrompt` renders under the same
+    // arguments must hash to that id's fingerprint. If these two ever drift,
+    // every provenance row written in between describes the wrong prompt.
+    const answers = [
+      { question: "PLACEHOLDER_QUESTION_1", answer: "PLACEHOLDER_ANSWER_1" },
+      { question: "PLACEHOLDER_QUESTION_2", answer: "PLACEHOLDER_ANSWER_2" },
+    ];
+    const cases: Array<[string | undefined, typeof answers | undefined]> = [
+      [undefined,              undefined],
+      [undefined,              []],
+      [undefined,              answers],
+      [PLACEHOLDER_DOCUMENT,   undefined],
+    ];
+
+    for (const [doc, ans] of cases) {
+      const id       = milestonePromptId(doc, ans);
+      const rendered = milestoneGenerationPrompt(PLACEHOLDER_TOPIC, doc, ans);
+      expect(fingerprintOf(rendered)).toBe(promptFingerprint(id));
+    }
+  });
 });
 
 describe("fingerprints are stable across calls and sensitive to edits", () => {

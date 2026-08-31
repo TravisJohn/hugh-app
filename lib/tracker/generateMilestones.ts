@@ -24,6 +24,7 @@ import {
   parseMilestoneGeneration,
   type MilestoneGenerationResult,
 } from "@/lib/claude/prompts";
+import { milestonePromptId, type PromptId } from "@/lib/claude/promptIdentity";
 
 /**
  * The Anthropic client, built on first use rather than at import.
@@ -76,6 +77,16 @@ export interface MilestoneGenerationOutcome {
   attempts: number;
   /** The model actually called — see the note on `MODEL`. */
   model:    string;
+  /**
+   * The template actually rendered, for the same reason `model` is returned.
+   *
+   * Three templates now live behind this one function — plain, context, and
+   * document — and the caller writes a fingerprint onto a provenance row. If
+   * the caller re-derived which one was used, it could disagree with what was
+   * sent, and the row would describe a prompt that never existed. One binding,
+   * carried across the boundary.
+   */
+  promptId: PromptId;
 }
 
 /**
@@ -90,6 +101,12 @@ export interface MilestoneGenerationOutcome {
  * is a parameter so the replay harness can re-run a stored generation against
  * a different model through this exact path.
  *
+ * `answers` is the context arm (C2). It is likewise a parameter rather than a
+ * read: the live build passes nothing, so live rows keep accumulating as the
+ * control arm exactly as migration 048 planned, and only the replay harness
+ * runs the treatment. Flipping the live path is a separate decision that
+ * should follow the evidence this produces, not precede it.
+ *
  * The model used is returned rather than left for the caller to restate. That
  * is the "one binding" rule of CLAUDE.md holding at a function boundary: the
  * caller records what was actually called, so the API call and the provenance
@@ -99,22 +116,28 @@ export async function generateMilestones(
   topic:         string,
   documentText?: string,
   model:         string = MODEL,
+  answers?:      readonly { question: string; answer: string }[],
 ): Promise<MilestoneGenerationOutcome> {
   let lastErr: unknown = null;
   const usage: GenerationUsage = { inputTokens: 0, outputTokens: 0 };
+
+  // Built once, outside the retry: both attempts must send the same prompt, and
+  // the id recorded must be the id of the text that was actually sent.
+  const content  = milestoneGenerationPrompt(topic, documentText, answers);
+  const promptId = milestonePromptId(documentText, answers);
 
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const res = await anthropicClient().messages.create({
         model,
         max_tokens: MAX_TOKENS,
-        messages:   [{ role: "user", content: milestoneGenerationPrompt(topic, documentText) }],
+        messages:   [{ role: "user", content }],
       });
       usage.inputTokens  += res.usage.input_tokens;
       usage.outputTokens += res.usage.output_tokens;
       const raw = res.content[0]?.type === "text" ? res.content[0].text : "{}";
       // `attempt` is 0-based; the count of attempts made is one more.
-      return { parsed: parseMilestoneGeneration(raw), usage, attempts: attempt + 1, model };
+      return { parsed: parseMilestoneGeneration(raw), usage, attempts: attempt + 1, model, promptId };
     } catch (err) {
       lastErr = err;
     }
