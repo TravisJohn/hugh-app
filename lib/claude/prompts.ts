@@ -267,7 +267,7 @@ The text inside <learner_topic> is a subject label the learner typed. ${NOT_INST
  * them nothing they would notice — where refusing would lose the whole session.
  */
 export function learnerAnswersBlock(
-  answers: Array<{ question: string; answer: string }>,
+  answers: readonly { question: string; answer: string }[],
 ): string {
   const body = answers
     .map(a => `Q: ${a.question}\nA: ${String(a.answer ?? "").slice(0, MAX_ANSWER_CHARS)}`)
@@ -326,7 +326,22 @@ Respond with ONLY the JSON object below — do not wrap the JSON itself in markd
 // second place raw document text re-enters an LLM call, and it needs the
 // same isolation treatment as the first (PRD-course-from-document.md §6
 // layer 1 / §7.4).
-export function milestoneGenerationPrompt(topic: string, documentText?: string): string {
+export function milestoneGenerationPrompt(
+  topic:         string,
+  documentText?: string,
+  answers?:      readonly { question: string; answer: string }[],
+): string {
+  // A document-sourced goal has no 5-whys answers to carry — the two are
+  // alternative entrances to the same build, never both. Passing both is a
+  // caller bug, and it is thrown rather than silently resolved: quietly
+  // dropping one would produce a fourth prompt variant with no fingerprint,
+  // and the eval would compare it against something it never was.
+  if (documentText && answers && answers.length > 0) {
+    throw new Error(
+      "milestoneGenerationPrompt: documentText and answers are mutually exclusive",
+    );
+  }
+
   if (documentText) {
     return `You are an expert curriculum designer and learning coach.
 
@@ -357,12 +372,25 @@ Respond with ONLY valid JSON, no markdown fences, no commentary:
 }`;
   }
 
+  // The context arm (C2). An empty answers array is NOT this branch: rendering
+  // an empty <learner_answers> block would be a third template with no
+  // fingerprint of its own, so a learner who skipped the questions gets the
+  // plain prompt and stays comparable with everyone else who did.
+  const hasContext   = Boolean(answers && answers.length > 0);
+  const contextBlock = hasContext ? `
+${learnerAnswersBlock(answers!)}
+` : "";
+  const contextRule  = hasContext
+    ? `
+- Use <learner_answers> to choose emphasis, ordering and examples — weight the milestones toward what this learner said they need, and name their stated context in the summaries where it genuinely applies. Do NOT narrow the curriculum to only what they mentioned: it must still cover the subject from foundations to practical mastery, and a gap they did not think to mention is exactly what a curriculum is for.`
+    : "";
+
   return `You are an expert curriculum designer and learning coach.
 
 The learner wants to learn the subject below.
 
 ${learnerTopicBlock(topic)}
-
+${contextBlock}
 Generate a comprehensive, logically ordered list of 8–14 learning milestones that cover that topic from foundational concepts to practical mastery.
 
 Requirements:
@@ -370,7 +398,7 @@ Requirements:
 - Each milestone must be a discrete, achievable learning unit
 - Titles: short and specific (3–7 words). Examples: "Core Architecture & Components", "Writing Your First DAG", "Task Dependencies & XComs"
 - Summaries: 2–3 sentences explaining what this milestone covers, why it matters, and what the learner will be able to do after completing it
-- The first 1–2 milestones should start in column "learn" (the entry point); all others start in "backlog"
+- The first 1–2 milestones should start in column "learn" (the entry point); all others start in "backlog"${contextRule}
 
 Respond with ONLY valid JSON, no markdown fences, no commentary:
 {

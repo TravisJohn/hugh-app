@@ -56,14 +56,47 @@ export interface GenerationRow {
   tokens_in:          number;
   tokens_out:         number;
   is_replay:          boolean;
+  /**
+   * Whether the generation prompt actually READ the learner's answers.
+   *
+   * The axis the context experiment turns on, and not derivable from anything
+   * else on the row: `answer_count > 0` says answers existed, never that the
+   * prompt consumed them. Every live build writes false here on purpose — see
+   * `ReplayMode` below.
+   */
+  context_used:       boolean;
 }
+
+/**
+ * What a run varies. Exactly one thing, ever.
+ *
+ * `"model"` — same prompt, different model. The comparison migration 048 was
+ * designed around (D4), expressible only because the model is deliberately not
+ * part of `prompt_fingerprint`.
+ *
+ * `"context"` — same model, different prompt: `milestones.qa` against
+ * `milestones.qa.context`, which is the C2 treatment arm. Each baseline is
+ * re-run at ITS OWN model rather than at one named model, so every pair
+ * differs in exactly one thing even when the corpus spans models. That is why
+ * a context run takes no `--model`: naming one would vary two axes at once and
+ * produce a number nobody can attribute.
+ *
+ * The live build is never the treatment arm. It passes no answers, so it keeps
+ * writing `context_used: false` and accumulating the control arm exactly as
+ * 048 planned — real learners, real topics, demonstrably no context, for free.
+ * Flipping the live path is a decision that should follow this evidence, not
+ * precede it.
+ */
+export type ReplayMode = "model" | "context";
 
 /** Why a stored generation cannot serve as a replay baseline. */
 export type IneligibleReason =
   | "already-a-replay"
   | "document-source"
   | "generation-failed"
-  | "no-topic";
+  | "no-topic"
+  | "no-answers"
+  | "already-context";
 
 export type Eligibility =
   | { ok: true }
@@ -79,6 +112,10 @@ export const INELIGIBLE_EXPLANATIONS: Record<IneligibleReason, string> = {
     "the original generation failed - there is no curriculum to compare against",
   "no-topic":
     "no input topic recorded - nothing to re-run",
+  "no-answers":
+    "the learner wrote nothing - there is no context to feed, so this row is already its own control",
+  "already-context":
+    "generated WITH context - it is the treatment arm, not a baseline for it",
 };
 
 /**
@@ -95,11 +132,27 @@ export const INELIGIBLE_EXPLANATIONS: Record<IneligibleReason, string> = {
  * prevent. A document generation is therefore unreplayable forever, not
  * unreplayable for now.
  */
-export function replayEligibility(row: GenerationRow): Eligibility {
+export function replayEligibility(
+  row:  GenerationRow,
+  mode: ReplayMode = "model",
+): Eligibility {
   if (row.is_replay)                  return { ok: false, reason: "already-a-replay" };
   if (row.source_kind === "document") return { ok: false, reason: "document-source" };
   if (row.outcome !== "ok")           return { ok: false, reason: "generation-failed" };
   if (!row.input_topic.trim())        return { ok: false, reason: "no-topic" };
+
+  if (mode === "context") {
+    // A row generated WITH context is the treatment, not a baseline for it.
+    if (row.context_used)     return { ok: false, reason: "already-context" };
+    // A learner who wrote nothing cannot produce a context arm: the builder
+    // renders the plain template for an empty answers array, so the "replay"
+    // would be the baseline again under a different label. `answer_chars` is
+    // frozen at generation time, so this is a first filter only — answers
+    // deleted since still read as non-zero here and are caught at read time
+    // by `dropMissingAnswers`.
+    if (row.answer_chars <= 0) return { ok: false, reason: "no-answers" };
+  }
+
   return { ok: true };
 }
 
@@ -123,12 +176,13 @@ export interface Selection {
 export function selectReplayable(
   rows:  readonly GenerationRow[],
   limit: number,
+  mode:  ReplayMode = "model",
 ): Selection {
   const eligible: GenerationRow[] = [];
   const counts = new Map<IneligibleReason, number>();
 
   for (const row of rows) {
-    const verdict = replayEligibility(row);
+    const verdict = replayEligibility(row, mode);
     if (verdict.ok) {
       eligible.push(row);
     } else {
@@ -163,12 +217,64 @@ export function selectReplayable(
  */
 export function estimateReplayCost(
   rows:  readonly GenerationRow[],
-  model: string,
+  model: string | ((row: GenerationRow) => string),
 ): number {
+  const resolve = typeof model === "string" ? () => model : model;
   return rows.reduce(
-    (sum, r) => sum + estimateCost(r.tokens_in, r.tokens_out, 0, model),
+    (sum, r) => sum + estimateCost(r.tokens_in, r.tokens_out, 0, resolve(r)),
     0,
   );
+}
+
+/**
+ * Which model a baseline will be replayed at.
+ *
+ * A model run replays everything at the one named model. A context run replays
+ * each baseline at its own, so the pair differs only in the prompt — see
+ * `ReplayMode`. Kept here rather than inlined in the script because it is the
+ * rule that makes a context comparison mean anything, and a rule belongs
+ * somewhere a test can reach it.
+ */
+export function replayModelFor(
+  row:         GenerationRow,
+  mode:        ReplayMode,
+  targetModel: string | null,
+): string {
+  if (mode === "context") return row.model;
+  return targetModel ?? row.model;
+}
+
+export interface AnswerAvailability {
+  /** Baselines whose answers still exist and can feed the context prompt. */
+  kept:    GenerationRow[];
+  /** Baselines dropped because the learner has since deleted their answers. */
+  dropped: number;
+}
+
+/**
+ * Drop baselines whose answers are gone.
+ *
+ * `answer_chars` is frozen at generation time and deliberately survives a
+ * deletion — that is what keeps the eval working after a learner takes their
+ * words back (migration 048). So a row can read "600 chars" while
+ * `goal_answers` holds nothing, and only reading the answers reveals it.
+ *
+ * Running such a baseline anyway would send the plain template under the
+ * context arm's label: a treatment row that had no treatment, sitting in the
+ * "rich 600+" bucket, dragging the arm toward its control. Dropping it and
+ * saying how many were dropped is the honest alternative — and the count is
+ * how a deletion becomes visible in the eval rather than silent.
+ */
+export function dropMissingAnswers(
+  rows:          readonly GenerationRow[],
+  answersByGoal: ReadonlyMap<string, readonly unknown[]>,
+): AnswerAvailability {
+  const kept = rows.filter(r => {
+    if (!r.goal_id) return false;
+    const answers = answersByGoal.get(r.goal_id);
+    return Boolean(answers && answers.length > 0);
+  });
+  return { kept, dropped: rows.length - kept.length };
 }
 
 /**
@@ -210,11 +316,26 @@ export interface FreshSelection {
  * A row with no `goal_id` cannot be matched and is always treated as fresh.
  */
 export function excludeAlreadyReplayed(
-  rows:            readonly GenerationRow[],
-  replayedGoalIds: ReadonlySet<string>,
+  rows:         readonly GenerationRow[],
+  replayedKeys: ReadonlySet<string>,
+  keyOf:        (row: GenerationRow) => string,
 ): FreshSelection {
-  const fresh = rows.filter(r => !(r.goal_id && replayedGoalIds.has(r.goal_id)));
+  const fresh = rows.filter(r => !(r.goal_id && replayedKeys.has(keyOf(r))));
   return { fresh, alreadyDone: rows.length - fresh.length };
+}
+
+/**
+ * The identity of "this baseline, already replayed like this".
+ *
+ * Goal AND model, not goal alone. A context run replays at each baseline's own
+ * model and writes a different fingerprint, so the prior-replay query is
+ * already scoped by fingerprint — but within one fingerprint a corpus can span
+ * models, and keying on the goal alone would let a replay at Sonnet mask a
+ * pending one at Haiku. Erring toward not spending is right for a default;
+ * erring toward never spending is a harness that quietly stops working.
+ */
+export function replayKey(goalId: string, model: string): string {
+  return `${goalId}::${model}`;
 }
 
 /**
@@ -309,8 +430,17 @@ export interface BucketComparison {
 }
 
 export interface ComparisonReport {
-  baselineModel: string;
-  replayModel:   string;
+  /**
+   * What each side of the comparison IS, in words.
+   *
+   * Named `Arm`, not `Model`, since the context run added a second axis: in a
+   * model run these read "claude-sonnet-4-6" against "claude-haiku-4-5", and in
+   * a context run they read "milestones.qa@1" against "milestones.qa.context@1"
+   * at one model. A field called `baselineModel` would be a false label on half
+   * the runs, printed at the top of the table an operator reads a decision off.
+   */
+  baselineArm:   string;
+  replayArm:     string;
   overall:       { baseline: ArmStat; replay: ArmStat };
   byAnswerChars: BucketComparison[];
 }
@@ -323,10 +453,10 @@ export interface ComparisonReport {
  * is kept: "the replay produced nothing here" is a finding, not a blank.
  */
 export function compareArms(
-  baseline:      readonly GenerationRow[],
-  replay:        readonly GenerationRow[],
-  baselineModel: string,
-  replayModel:   string,
+  baseline:    readonly GenerationRow[],
+  replay:      readonly GenerationRow[],
+  baselineArm: string,
+  replayArm:   string,
 ): ComparisonReport {
   const byAnswerChars: BucketComparison[] = [];
 
@@ -343,8 +473,8 @@ export function compareArms(
   }
 
   return {
-    baselineModel,
-    replayModel,
+    baselineArm,
+    replayArm,
     overall: { baseline: summariseArm(baseline), replay: summariseArm(replay) },
     byAnswerChars,
   };
