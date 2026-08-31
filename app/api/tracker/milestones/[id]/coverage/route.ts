@@ -2,7 +2,8 @@ import { type NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
-import { learningPointsPrompt, parseClaudeJson } from "@/lib/claude/prompts";
+import { learningPointsPrompt, parseLearningPoints } from "@/lib/claude/prompts";
+import { logSafeError } from "@/lib/observability/log";
 import { checkUsageAllowed, logUsage } from "@/lib/usage";
 import { normalizeCoverage } from "@/utils/coverage";
 import { type LearningPoint, type PointStatus } from "@/types";
@@ -37,12 +38,23 @@ async function loadOwnedMilestone(
   return row;
 }
 
-/** Generate the learning-points checklist for a milestone if it doesn't have one yet. */
+/**
+ * Generate the learning-points checklist for a milestone if it doesn't have one
+ * yet.
+ *
+ * Returns null when the model's response could not be trusted, rather than
+ * writing a partial one. An empty rail reads as "this milestone has no key
+ * ideas", which is a different sentence from "we could not build the
+ * checklist" — and only one of them is true. Nothing is written on that path,
+ * so opening the card again retries cleanly.
+ *
+ * Tokens are logged either way: a discarded response still cost money.
+ */
 async function ensureLearningPoints(
   supabase: Awaited<ReturnType<typeof createClient>>,
   ms:       MilestoneRow,
   userId:   string,
-): Promise<LearningPoint[]> {
+): Promise<LearningPoint[] | null> {
   if (ms.learning_points && ms.learning_points.length > 0) return ms.learning_points;
 
   const topic = ms.tracks?.topic_description ?? ms.title;
@@ -51,14 +63,35 @@ async function ensureLearningPoints(
     max_tokens: 500,
     messages:   [{ role: "user", content: learningPointsPrompt(topic, ms.title, ms.summary) }],
   });
-  const raw    = res.content[0]?.type === "text" ? res.content[0].text : "{}";
-  const parsed = parseClaudeJson<{ points: string[] }>(raw);
-  const points: LearningPoint[] = (parsed.points ?? [])
-    .filter(p => p?.trim())
-    .map((text, i) => ({ id: `p${i + 1}`, text: text.trim() }));
-
-  await supabase.from("milestones").update({ learning_points: points }).eq("id", ms.id);
   void logUsage({ userId, model: MODEL, feature: "tracker/points", tokensIn: res.usage.input_tokens, tokensOut: res.usage.output_tokens });
+
+  const raw = res.content[0]?.type === "text" ? res.content[0].text : "{}";
+
+  let texts: string[];
+  try {
+    texts = parseLearningPoints(raw);
+  } catch (err) {
+    logSafeError("tracker/points parse", err, [topic, ms.title]);
+    return null;
+  }
+
+  // Ids are POSITIONAL and externally referenced — `milestones.coverage`,
+  // `point_status_events.point_id` and `milestone_entries.point_id` all point
+  // at them. They are assigned once, here, and must never be renumbered: doing
+  // so would silently reattach a learner's diary entries and stuck-flags to
+  // different ideas. Any future re-ordering has to move the array and FREEZE
+  // the ids, not recompute them.
+  const points: LearningPoint[] = texts.map((text, i) => ({ id: `p${i + 1}`, text }));
+
+  const { error } = await supabase
+    .from("milestones")
+    .update({ learning_points: points })
+    .eq("id", ms.id);
+
+  if (error) {
+    logSafeError("tracker/points write", error, [topic, ms.title]);
+    return null;
+  }
   return points;
 }
 
@@ -79,6 +112,18 @@ export async function GET(
   const { allowed } = await checkUsageAllowed(userId);
   // If usage is blocked, still return whatever points already exist (no new call).
   const points = allowed ? await ensureLearningPoints(supabase, ms, userId) : (ms.learning_points ?? []);
+
+  // A null here is a failure, not an empty checklist, and it gets its own
+  // status so the rail can say so instead of rendering as "nothing to learn".
+  if (points === null) {
+    return NextResponse.json(
+      {
+        error: "The checklist for this milestone could not be built. Reopen the card to try again.",
+        coverage: normalizeCoverage(ms.coverage),
+      },
+      { status: 502 },
+    );
+  }
 
   return NextResponse.json({ learningPoints: points, coverage: normalizeCoverage(ms.coverage) });
 }

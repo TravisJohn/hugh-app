@@ -3,6 +3,10 @@ import {
   milestoneGenerationPrompt,
   parseMilestoneGeneration,
   MilestoneGenerationError,
+  parseLearningPoints,
+  LearningPointsError,
+  MAX_LEARNING_POINTS,
+  MAX_LEARNING_POINT_CHARS,
 } from "./prompts";
 
 const validMilestone = { title: "Core Concepts", summary: "Covers the foundational ideas needed for everything after.", column: "learn" };
@@ -127,5 +131,66 @@ describe("parseMilestoneGeneration", () => {
     const bad = { ...validMilestone, column: 5 };
     const raw = JSON.stringify({ trackTitle: "T", milestones: [bad] });
     expect(() => parseMilestoneGeneration(raw)).toThrow(MilestoneGenerationError);
+  });
+});
+
+
+// ── Learning points (Learn-map X1) ──────────────────────────────────────────
+//
+// Track generation has been validated field by field since the document path
+// was hardened. Learning points went from a bare cast straight into a JSONB
+// column and onto the learner's rail. These are the checks that closes that.
+
+const points = (list: unknown) => JSON.stringify({ points: list });
+
+describe("parseLearningPoints", () => {
+  it("returns the trimmed points of a well-formed response", () => {
+    const parsed = parseLearningPoints(points(["  How joins fan out  ", "Why grain matters"]));
+    expect(parsed).toEqual(["How joins fan out", "Why grain matters"]);
+  });
+
+  it("refuses a non-string entry instead of throwing from inside the route", () => {
+    // The old filter was `p?.trim()`, so a number did not get filtered out —
+    // it raised a TypeError deep in the handler, which reaches the learner as
+    // an unexplained 500 rather than a handled bad response.
+    expect(() => parseLearningPoints(points(["fine", 42]))).toThrow(LearningPointsError);
+  });
+
+  it("refuses more points than a checklist can honestly hold", () => {
+    // The rail lives on a screen the no-scroll rule says must fit the
+    // viewport. Forty checkboxes is not a checklist.
+    const many = Array.from({ length: MAX_LEARNING_POINTS + 1 }, (_, i) => `point ${i}`);
+    expect(() => parseLearningPoints(points(many))).toThrow(/exceeds 12 items/);
+  });
+
+  it("allows a model that returns slightly more than the prompt asked for", () => {
+    // The prompt asks for 4-6. The cap is a ceiling on absurdity, not an
+    // enforcement of that request: seven good points should not fail a card.
+    const seven = Array.from({ length: 7 }, (_, i) => `point ${i}`);
+    expect(parseLearningPoints(points(seven))).toHaveLength(7);
+  });
+
+  it("refuses a single point long enough to be a paragraph", () => {
+    const essay = "x".repeat(MAX_LEARNING_POINT_CHARS + 1);
+    expect(() => parseLearningPoints(points(["fine", essay]))).toThrow(/exceeds 200 chars/);
+  });
+
+  it("refuses a response with no points array at all", () => {
+    expect(() => parseLearningPoints("{}")).toThrow(/not an array/);
+    expect(() => parseLearningPoints(JSON.stringify({ points: "a, b" }))).toThrow(/not an array/);
+  });
+
+  it("refuses a response whose points are all blank", () => {
+    // Distinct from the length cap: this parses, and every entry is padding.
+    // Writing it would put an empty checklist on the card and call it done.
+    expect(() => parseLearningPoints(points(["", "   "]))).toThrow(/no usable points/);
+    expect(() => parseLearningPoints(points([]))).toThrow(/no usable points/);
+  });
+
+  it("drops a padded blank without failing the whole checklist", () => {
+    // A blank among real points is the model padding its array, not a
+    // malformed response — losing that slot costs the learner nothing.
+    expect(parseLearningPoints(points(["real", "", "also real"])))
+      .toEqual(["real", "also real"]);
   });
 });

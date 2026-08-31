@@ -39,6 +39,12 @@ export default function SummaryPanel({ topic, data, loading, goalId, milestoneId
   useEffect(() => {
     if (!milestoneId) return;
     let active = true;
+    // No failure branch here, unlike ChecklistRail and MilestoneDrawer. Those
+    // two RENDER the checklist, so an empty list there is a statement about
+    // the card and has to be distinguishable from a failed build. This only
+    // uses the points to offer an optional "tag this summary to a point"
+    // selector, which simply does not appear — a missing convenience, not a
+    // false claim.
     fetch(`/api/tracker/milestones/${milestoneId}/coverage`)
       .then(r => r.json())
       .then(d => { if (active) setPoints(d.learningPoints ?? []); })

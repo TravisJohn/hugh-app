@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ListChecks, Loader2, ArrowLeftToLine } from "lucide-react";
-import { type LearningPoint, type PointStatus } from "@/types";
+import { type CoverageResponse, type LearningPoint, type PointStatus } from "@/types";
 import { normalizeCoverage, countByStatus } from "@/utils/coverage";
 import PointStatusControl from "./PointStatusControl";
 
@@ -25,22 +25,34 @@ export default function ChecklistRail({ milestoneId, milestoneTitle, onInsertToP
   const [points, setPoints]     = useState<LearningPoint[]>([]);
   const [statuses, setStatuses] = useState<Record<string, PointStatus>>({});
   const [loading, setLoading]   = useState(true);
+  // Distinct from "no points": the checklist is built by a model on first open,
+  // and a response that could not be trusted is written nowhere. Reporting that
+  // as an empty rail would tell the learner this milestone has no key ideas.
+  const [failed, setFailed]     = useState(false);
+  // Bumped by "Try again" to re-run the effect, since milestoneId cannot change.
+  const [attempt, setAttempt]   = useState(0);
 
   // Load the checklist + saved statuses on open. `loading` starts true and
   // milestoneId is fixed for this component's life, so no in-effect reset needed.
   useEffect(() => {
     let active = true;
+    // No synchronous reset here: `loading` starts true, and "Try again" clears
+    // the failed state itself before bumping `attempt`, so the effect only ever
+    // sets state from its own async result.
     fetch(`/api/tracker/milestones/${milestoneId}/coverage`)
-      .then(r => r.json())
-      .then(d => {
+      .then(async r => ({ ok: r.ok, body: await r.json() as CoverageResponse }))
+      .then(({ ok, body }) => {
         if (!active) return;
-        setPoints(d.learningPoints ?? []);
-        setStatuses(normalizeCoverage(d.coverage)?.statuses ?? {});
+        // The statuses are returned even on the failure path, so a learner who
+        // has already ticked things keeps seeing them.
+        setStatuses(normalizeCoverage(body.coverage)?.statuses ?? {});
+        if (!ok) { setFailed(true); return; }
+        setPoints(body.learningPoints ?? []);
       })
-      .catch(() => {})
+      .catch(() => { if (active) setFailed(true); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [milestoneId]);
+  }, [milestoneId, attempt]);
 
   function setStatus(id: string, next: PointStatus | undefined) {
     const updated = { ...statuses };
@@ -75,6 +87,22 @@ export default function ChecklistRail({ milestoneId, milestoneTitle, onInsertToP
           <div className="flex items-center gap-2 py-3 text-xs text-slate-500">
             <Loader2 size={12} className="animate-spin" />
             Building your checklist…
+          </div>
+        ) : failed ? (
+          <div className="py-3">
+            <p className="text-xs leading-relaxed text-slate-400">
+              The checklist for this card could not be built.
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-slate-600">
+              Nothing is wrong with your card — this step just did not come
+              back cleanly.
+            </p>
+            <button
+              onClick={() => { setFailed(false); setLoading(true); setAttempt(n => n + 1); }}
+              className="mt-2 text-xs font-semibold text-sky-400 transition-colors hover:text-sky-300"
+            >
+              Try again
+            </button>
           </div>
         ) : points.length === 0 ? (
           <p className="py-3 text-xs text-slate-600">
