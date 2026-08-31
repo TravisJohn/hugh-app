@@ -5796,12 +5796,39 @@ answerable.
 
 1,183 tests pass (up from 1,144), `tsc` clean, lint clean, build clean.
 
-### Not verified end to end
+### Verified end to end
 
-The context arm has never run against real data — the store is empty, so filling
-it means a real track generation and real spend. The dry run, both one-axis
-guards and the rendered prompt were checked; the Anthropic call and the row
-write are the same code the model arm already verified.
+Two synthetic baselines were seeded against the test learner — one terse
+("Work needs it.", 14 chars) and one rich (3 answers, 430 chars) — then replayed
+through the context arm for $0.0471 against an estimate of $0.0504, and every
+seeded row deleted afterwards with the counts confirmed back at
+`goal_answers=0, track_generations=0`.
+
+Every column on the written rows was correct: `context_used: true`,
+`prompt_version: milestones.qa.context@1`, fingerprint `8d9d9467486640fc`,
+`is_replay: true`, `track_id` null, `ranked` false, and `answer_chars` copied
+from the baseline rather than recomputed. Both arms ran at
+`claude-sonnet-4-6` — the baseline's own model — which is the one-axis rule
+holding in practice. Re-running the same command then skipped both rows as
+already covered, so the goal-and-model dedupe key works.
+
+The output is the part worth recording. The rich baseline's context arm produced
+"Diagnosing a Lag Spike Incident" (the learner had described exactly that
+incident), "Tuning for Large Kafka Estates", "Session Timeout vs Poll Interval"
+(their stated confusion about a consumer dropping mid-poll) and
+"Interview-Ready Mental Models" — while still opening with a core-concepts
+refresher. That is the "weight it, do NOT narrow it" rule doing its job rather
+than collapsing into a crammer. The terse baseline got a sound generic
+curriculum, which is the right answer when there is nothing to work with.
+
+Its uptake came back NULL rather than 0.0, because "Work needs it." carries no
+distinct content terms — the null rule from `contextUptake.ts` working as
+designed, and the reason the table reports `measured/rows` separately: the
+overall replay arm reads (1/2), honest about resting on one sample.
+
+The baseline uptakes in that run were fabricated by the seed, so only the
+replayed side was a real measurement. What the run proves is the machinery, not
+a finding about context.
 
 ### Still open on the Learn map
 
