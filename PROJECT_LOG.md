@@ -5718,3 +5718,100 @@ This closes `goal_answers` and nothing else. The wider privacy pass in
 `WISHLIST.md` — no privacy policy anywhere in the app, `/notes`, the document
 path, `/monitor`, `operation_events`, retention, and what account deletion
 actually removes end to end — is untouched and still the release blocker.
+
+---
+
+## 2026-08-31 — C2's treatment arm, then three guardrail gaps
+
+### The experiment had a control arm and nothing to compare it to
+
+`track_generations` has recorded every generation since migration 048 with
+`context_used = false`, because nothing in the system could set it true.
+`generate.ts` reads the 5-whys answers only to measure them into two numbers,
+and the replay harness hardcoded `context_used: false`. The store, the uptake
+measurement and the harness all exist to answer "does the learner's own context
+produce a better curriculum?", and the question had never had a second arm.
+
+**A second generation template.** `milestoneGenerationPrompt` takes the answers,
+frames them through the existing `learnerAnswersBlock`, and tells the model to
+weight emphasis and ordering toward what the learner said *without narrowing the
+curriculum to it* — a gap they did not think to mention is exactly what a track
+is for. An empty answers array renders the plain template rather than an empty
+block, so a learner who skipped the questions stays comparable with everyone who
+did. The no-context template is byte-identical, which the fingerprint test
+confirmed: `milestones.qa@1` did not move, so every row written so far stays
+comparable.
+
+Passing a document and answers together throws rather than dropping one.
+Silently resolving it would send a prompt whose fingerprint describes a template
+that was never rendered.
+
+**The harness gains `--context`, and one rule about axes.** A run varies exactly
+one thing — the model or the prompt, never both — so `--context` and `--model`
+are refused together, and a context run replays each baseline at *its own*
+model, so every pair differs in the prompt and nothing else.
+
+Three rules carry that, all pure and tested. A baseline with no answers is
+ineligible, because the builder would render the control template under the
+treatment's label. A baseline whose answers were deleted since is dropped at
+read time, because `answer_chars` survives a deletion by design and would
+otherwise place a treatment row that had no treatment into the "rich 600+"
+bucket, dragging the arm toward its control. And the already-replayed key is now
+goal *and* model, since one context run can legitimately span models.
+
+`ComparisonReport` now carries `baselineArm`/`replayArm` rather than
+`baselineModel`/`replayModel`: in a context run both sides are the same model,
+and a column headed with it would say nothing.
+
+**The live build stays the control arm**, passing no answers, exactly as 048
+planned. Flipping it is a decision that should follow this evidence rather than
+precede it.
+
+### Three guardrail gaps
+
+**X1 — learning points had no validation at all.** `parseLearningPoints` now
+mirrors `parseMilestoneGeneration` one altitude down: 12 points, 200 chars each,
+and a real type check. That last one was worse than "unvalidated" — the old
+filter was `p?.trim()`, so a non-string threw a TypeError from inside the
+handler and reached the learner as an unexplained 500.
+
+The route no longer writes a checklist it could not validate, and the two
+surfaces that *render* one now distinguish "could not build it" from "there is
+nothing to build". `SummaryPanel` deliberately keeps no failure branch and says
+why: it only uses the points for an optional tag selector, so a missing list is
+a missing convenience, not a false claim about the card.
+
+The positional-id hazard is now written down where the ids are assigned.
+
+**X5 — no rebuild ceiling.** Five builds per goal, counted from
+`track_generations` so it counts money actually spent rather than buttons
+pressed. Replays excluded. A failed count reads as zero and allows the rebuild:
+refusing a legitimate one over a telemetry blip would break the learner's only
+way out of a broken track to protect a budget rule.
+
+**048's X1 and X3.** The document branch interpolated the topic bare while all
+six siblings framed it; `milestones.document@2` is registered beside `@1`. Retry
+now records `source`, so "which entry path produces the most rebuilds?" is
+answerable.
+
+1,183 tests pass (up from 1,144), `tsc` clean, lint clean, build clean.
+
+### Not verified end to end
+
+The context arm has never run against real data — the store is empty, so filling
+it means a real track generation and real spend. The dry run, both one-axis
+guards and the rendered prompt were checked; the Anthropic call and the row
+write are the same code the model arm already verified.
+
+### Still open on the Learn map
+
+**X4 needs a decision, not a fix.** `/learn` + `TopicSetup.tsx` is a second
+entry point that gates the topic but creates no goal, track, milestones or
+diary, and is absent from CLAUDE.md's surfaces table. Keep it as a deliberate
+"just chat" mode or delete it the way `/tracker` was — but decide before
+hardening anything else around goal creation.
+
+**X3 — the domain gate fails open and nothing alerts.** Recorded with
+`failedOpen: true`; only a query would tell you. **X6** (coverage is
+self-report) and **C3** (`end_date` shapes nothing, confirmed: it reaches
+neither `generate.ts` nor `prompts.ts`) are design questions rather than gaps.
