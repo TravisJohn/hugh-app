@@ -30,7 +30,7 @@ export async function POST(
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { allowed } = await checkUsageAllowed(userId);
+  const { allowed } = await checkUsageAllowed(userId, "tracker/verify");
   if (!allowed) {
     // Soft-fail: don't block the learner from writing, just skip the check.
     return NextResponse.json({ skipped: true });

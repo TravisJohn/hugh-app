@@ -31,7 +31,7 @@ export async function POST(
 
   // A retry spends a full track-generation call, so it is gated like any
   // other spend. Without this, a failing build would be an unmetered loop.
-  const usageGate = await enforceUsageGate(userId);
+  const usageGate = await enforceUsageGate(userId, "tracker/generate");
   if (usageGate) {
     void recordOperation({
       userId, operation: "track.retry", outcome: "refused",

@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { masterySummaryPrompt } from "@/lib/claude/prompts";
-import { checkUsageAllowed, logUsage } from "@/lib/usage";
+import { enforceUsageGate, logUsage } from "@/lib/usage";
 import { normalizeCoverage } from "@/utils/coverage";
 import { type LearningPoint } from "@/types";
 
@@ -35,13 +35,8 @@ export async function POST(
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { allowed, reason } = await checkUsageAllowed(userId);
-  if (!allowed) {
-    const msg = reason === "limit_reached"
-      ? "Monthly usage limit reached. Please contact Travis to reset or upgrade."
-      : "Your access has been restricted. Please contact support.";
-    return NextResponse.json({ error: msg }, { status: reason === "limit_reached" ? 429 : 403 });
-  }
+  const usageGate = await enforceUsageGate(userId, "tracker/summary");
+  if (usageGate) return usageGate;
 
   const { id } = await params;
   const supabase = await createClient();

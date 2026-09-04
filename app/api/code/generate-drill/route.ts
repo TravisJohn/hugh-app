@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
   if (cached) return NextResponse.json({ content: cached, generated: true, cached: true });
 
   // Miss → generation is the billable path, so gate on usage here.
-  const { allowed } = await checkUsageAllowed(userId);
+  const { allowed } = await checkUsageAllowed(userId, "code/generate-drill");
   if (!allowed) return sample("usage-limit");
 
   try {

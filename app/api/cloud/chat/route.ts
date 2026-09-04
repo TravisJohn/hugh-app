@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
-import { checkUsageAllowed, logUsage } from "@/lib/usage";
+import { enforceUsageGate, logUsage } from "@/lib/usage";
 import { loadService } from "@/lib/cloud/loader";
 import { GROUP_LABELS } from "@/types/cloud";
 
@@ -59,11 +59,8 @@ export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return NextResponse.json({ error: "Please sign in to use the assistant." }, { status: 401 });
 
-  const { allowed, reason } = await checkUsageAllowed(userId);
-  if (!allowed) {
-    const msg = reason === "limit_reached" ? "Monthly usage limit reached." : "Your access has been restricted.";
-    return NextResponse.json({ error: msg }, { status: reason === "limit_reached" ? 429 : 403 });
-  }
+  const usageGate = await enforceUsageGate(userId, "cloud/chat");
+  if (usageGate) return usageGate;
 
   const body = (await request.json()) as {
     provider?: string;

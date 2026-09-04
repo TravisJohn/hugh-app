@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
-import { checkUsageAllowed, logUsage } from "@/lib/usage";
+import { enforceUsageGate, logUsage } from "@/lib/usage";
 import { stripEmphasis } from "@/lib/claude/prompts";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -39,13 +39,8 @@ export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { allowed, reason } = await checkUsageAllowed(userId);
-  if (!allowed) {
-    const msg = reason === "limit_reached"
-      ? "Monthly usage limit reached. Please contact Travis to reset or upgrade."
-      : "Your access has been restricted. Please contact support.";
-    return NextResponse.json({ error: msg }, { status: reason === "limit_reached" ? 429 : 403 });
-  }
+  const usageGate = await enforceUsageGate(userId, "mastery/session");
+  if (usageGate) return usageGate;
 
   const body = (await request.json()) as RequestBody;
   const { milestoneId, scenario, phase, messages } = body;
