@@ -5,6 +5,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { checkUsageAllowed, logUsage } from "@/lib/usage";
+import { messageForDenial, statusForDenial } from "@/lib/tokenBudget";
 import {
   buildEntriesText, sourceCharCount, questionTarget, keepGroundedQuestions,
   MIN_QUESTIONS, type DiaryEntry,
@@ -22,16 +23,22 @@ export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { allowed, reason } = await checkUsageAllowed(userId);
+  // Kept on checkUsageAllowed rather than enforceUsageGate because the refusal
+  // has to be recorded before the response goes out — `operation_events` counts
+  // a refusal as the system working correctly, not as a failure (047).
+  const { allowed, reason, retryAfter } = await checkUsageAllowed(userId, "review/quiz");
   if (!allowed) {
-    const msg = reason === "limit_reached"
-      ? "Monthly usage limit reached. Please contact Travis to reset or upgrade."
-      : "Your access has been restricted. Please contact support.";
     void recordOperation({
       userId, operation: "quiz.generate", outcome: "refused",
       detail: { reason: reason ?? "usage-gate" },
     });
-    return NextResponse.json({ error: msg }, { status: reason === "limit_reached" ? 429 : 403 });
+    return NextResponse.json(
+      { error: messageForDenial(reason), retryAfter },
+      {
+        status:  statusForDenial(reason),
+        headers: retryAfter ? { "Retry-After": String(retryAfter) } : undefined,
+      },
+    );
   }
 
   const body = (await request.json()) as { milestoneId?: string };

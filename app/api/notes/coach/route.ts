@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return unauth();
 
-  const usageGate = await enforceUsageGate(userId);
+  const usageGate = await enforceUsageGate(userId, "notes/coach");
   if (usageGate) return usageGate;
 
   const body = (await request.json().catch(() => ({}))) as { image_id?: string };

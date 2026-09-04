@@ -3,7 +3,7 @@ import { recordOperation } from "@/lib/observability/record";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
-import { checkUsageAllowed, logUsage } from "@/lib/usage";
+import { enforceUsageGate, logUsage } from "@/lib/usage";
 import type { LearningPoint, MasteryEndReason, MasteryTranscriptTurn } from "@/types";
 import {
   buildCriteria,
@@ -52,13 +52,8 @@ export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { allowed, reason } = await checkUsageAllowed(userId);
-  if (!allowed) {
-    const msg = reason === "limit_reached"
-      ? "Monthly usage limit reached."
-      : "Your access has been restricted.";
-    return NextResponse.json({ error: msg }, { status: reason === "limit_reached" ? 429 : 403 });
-  }
+  const usageGate = await enforceUsageGate(userId, "mastery/evaluate");
+  if (usageGate) return usageGate;
 
   const body = (await request.json()) as {
     milestoneId?: string;

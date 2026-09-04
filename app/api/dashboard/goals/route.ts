@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const usageGate = await enforceUsageGate(userId);
+  const usageGate = await enforceUsageGate(userId, "tracker/generate");
   if (usageGate) {
     // 'refused', not 'failed'. The budget gate doing its job is the system
     // working, and folding it into the failure rate would make a month of

@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { focusedLearningSystemPrompt } from "@/lib/claude/prompts";
 import { parseChatResponse } from "@/lib/askcode/parse";
-import { checkUsageAllowed, logUsage } from "@/lib/usage";
+import { enforceUsageGate, logUsage } from "@/lib/usage";
 import { recordOperation } from "@/lib/observability/record";
 import { logSafeError } from "@/lib/observability/log";
 
@@ -28,13 +28,8 @@ export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { allowed, reason } = await checkUsageAllowed(userId);
-  if (!allowed) {
-    const msg = reason === "limit_reached"
-      ? "Monthly usage limit reached. Please contact Travis to reset or upgrade."
-      : "Your access has been restricted. Please contact support.";
-    return NextResponse.json({ error: msg }, { status: reason === "limit_reached" ? 429 : 403 });
-  }
+  const usageGate = await enforceUsageGate(userId, "learn/chat");
+  if (usageGate) return usageGate;
 
   const body = (await request.json()) as {
     topic:             string;

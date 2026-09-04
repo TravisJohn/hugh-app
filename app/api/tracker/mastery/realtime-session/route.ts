@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
-import { checkUsageAllowed } from "@/lib/usage";
+import { enforceUsageGate } from "@/lib/usage";
 import type { LearningPoint } from "@/types";
 import {
   buildCriteria,
@@ -41,13 +41,8 @@ export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { allowed, reason } = await checkUsageAllowed(userId);
-  if (!allowed) {
-    const msg = reason === "limit_reached"
-      ? "Monthly usage limit reached."
-      : "Your access has been restricted.";
-    return NextResponse.json({ error: msg }, { status: reason === "limit_reached" ? 429 : 403 });
-  }
+  const usageGate = await enforceUsageGate(userId, "mastery/realtime");
+  if (usageGate) return usageGate;
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {

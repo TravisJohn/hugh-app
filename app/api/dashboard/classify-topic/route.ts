@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const usageGate = await enforceUsageGate(userId);
+  const usageGate = await enforceUsageGate(userId, "learn/topic-domain");
   if (usageGate) return usageGate;
 
   const body = (await request.json()) as { topic?: string };

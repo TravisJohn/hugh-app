@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const usageGate = await enforceUsageGate(userId);
+  const usageGate = await enforceUsageGate(userId, "tts");
   if (usageGate) return usageGate;
 
   const body = (await request.json()) as {

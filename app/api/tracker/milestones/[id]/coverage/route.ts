@@ -109,7 +109,7 @@ export async function GET(
   const ms = await loadOwnedMilestone(supabase, id, userId);
   if (!ms) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const { allowed } = await checkUsageAllowed(userId);
+  const { allowed } = await checkUsageAllowed(userId, "tracker/points");
   // If usage is blocked, still return whatever points already exist (no new call).
   const points = allowed ? await ensureLearningPoints(supabase, ms, userId) : (ms.learning_points ?? []);
 

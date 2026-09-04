@@ -2,34 +2,58 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { isKnownModel } from "@/lib/pricing";
+import {
+  type QuotaProfile,
+  type QuotaDecision,
+  type QuotaDenial,
+  PRO_MONTHLY_TOKEN_LIMIT,
+  RATE_LIMIT_MAX_REQUESTS,
+  RATE_LIMIT_WINDOW_SECONDS,
+  RESERVE_TTL_SECONDS,
+  accountAllowed,
+  messageForDenial,
+  periodStart,
+  recordedTokens,
+  reserveEstimateFor,
+  statusForDenial,
+  tokenLimitFor,
+} from "@/lib/tokenBudget";
 
 // Pricing lives in lib/pricing.ts (pure, unit-tested). Re-exported here so the
 // many existing `from "@/lib/usage"` importers keep working.
 export { estimateCost, totalCost, MODEL_RATES, rateFor } from "@/lib/pricing";
 export type { ModelRate, PricedUsageRow } from "@/lib/pricing";
 
+// Budget rules live in lib/tokenBudget.ts (pure, unit-tested), for the same reason.
+export { DEFAULT_MONTHLY_TOKEN_LIMIT } from "@/lib/tokenBudget";
+export { PRO_MONTHLY_TOKEN_LIMIT };
+export type { QuotaDenial } from "@/lib/tokenBudget";
+
 // Sentinel userId used by the interview routes in local dev — not a real
 // auth.users row, so usage rows are never written for it.
 const DEV_BYPASS_USER_ID = "dev-test-bypass";
 
-// Free users get 100k combined tokens per calendar month (enforced).
-export const DEFAULT_MONTHLY_TOKEN_LIMIT = 100_000;
+const PROFILE_COLUMNS = "plan, is_admin, is_blocked, approved, token_limit, usage_reset_at";
 
-// Pro/admin monthly token allowance. Shown on the usage gauge for awareness;
-// currently display-only (we don't hard-block paying users in checkUsageAllowed).
-export const PRO_MONTHLY_TOKEN_LIMIT = 1_000_000;
-
-function startOfMonth(): string {
-  const d = new Date();
-  d.setDate(1);
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString();
+async function readProfile(userId: string): Promise<QuotaProfile | null> {
+  const supabase = createServiceClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select(PROFILE_COLUMNS)
+    .eq("user_id", userId)
+    .single();
+  return data as QuotaProfile | null;
 }
 
 /**
  * Record one billable call. `model` is required for any call that spent tokens
  * so the row can be priced at that model's real rate (migration 036); TTS-only
  * rows legitimately omit it.
+ *
+ * Since migration 049 this also adds the spend to `usage_counters`, the running
+ * total the gate compares against. That write is purely additive and knows
+ * nothing about what was reserved — a single gated request can log several
+ * times, so the reservation is expired on a window rather than cancelled here.
  */
 export async function logUsage({
   userId,
@@ -79,62 +103,161 @@ export async function logUsage({
   if (error) {
     console.error(`[usage] failed to log "${feature}" for ${userId}:`, error.message);
   }
+
+  await recordAgainstCounter(userId, feature, tokensIn, tokensOut);
 }
 
+/**
+ * Add this call's real spend to the period counter the gate reads.
+ *
+ * Runs on the fire-and-forget path behind `logUsage`, so its extra profile read
+ * costs the learner no latency. The read is needed because the counter is keyed
+ * by period, and the period depends on `usage_reset_at` — a rule that lives in
+ * `lib/tokenBudget.ts` and is deliberately not duplicated into SQL.
+ *
+ * A failure here leaves the spend uncounted by the gate until the next period
+ * seeds itself from `usage_logs`, which stays the authoritative record either
+ * way. It must never throw: accounting is not the request.
+ */
+async function recordAgainstCounter(
+  userId:    string,
+  feature:   string,
+  tokensIn:  number,
+  tokensOut: number,
+): Promise<void> {
+  const tokens = recordedTokens(tokensIn, tokensOut);
+  // TTS-only rows spend characters, not tokens, and reserve none. The monthly
+  // cap has never counted them; the rate limit is what governs that route.
+  if (tokens === 0) return;
+
+  try {
+    const profile  = await readProfile(userId);
+    const supabase = createServiceClient();
+    const { error } = await supabase.rpc("record_usage", {
+      p_user_id:      userId,
+      p_period_start: periodStart(profile),
+      p_tokens:       tokens,
+    });
+    if (error) {
+      console.error(`[usage] failed to count "${feature}" for ${userId}:`, error.message);
+    }
+  } catch (err) {
+    console.error(`[usage] counter write threw for "${feature}"`, err);
+  }
+}
+
+/**
+ * Reserve this request's estimated cost, atomically, and say whether it may run.
+ *
+ * `feature` is required, and is the same string the route passes to `logUsage`.
+ * It selects the reservation size and lets the reconcile find its way back to
+ * the same number without any state being handed between the two calls.
+ */
 export async function checkUsageAllowed(
-  userId: string
-): Promise<{ allowed: boolean; reason?: "blocked" | "limit_reached" }> {
+  userId:  string,
+  feature: string,
+): Promise<QuotaDecision> {
+  const profile = await readProfile(userId);
+
+  // The account check comes first and never touches the counter: a blocked or
+  // unapproved account should not reach Postgres to find that out, and this
+  // refusal must hold even if the reservation machinery is unavailable.
+  const account = accountAllowed(profile);
+  if (!account.allowed) return account;
+
   const supabase = createServiceClient();
+  const { data, error } = await supabase.rpc("reserve_usage", {
+    p_user_id:       userId,
+    p_period_start:  periodStart(profile),
+    p_estimate:      reserveEstimateFor(feature),
+    p_token_limit:   tokenLimitFor(profile),
+    p_max_requests:  RATE_LIMIT_MAX_REQUESTS,
+    p_rate_window_s: RATE_LIMIT_WINDOW_SECONDS,
+    p_reserve_ttl_s: RESERVE_TTL_SECONDS,
+  });
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("plan, is_admin, is_blocked, approved, token_limit, usage_reset_at")
-    .eq("user_id", userId)
-    .single();
+  if (error) {
+    // Migration 049 is applied by hand (forward-only, no rollback tooling), so
+    // the code can legitimately be running ahead of the database. Degrade to
+    // the pre-049 sum rather than locking every learner out of the product.
+    //
+    // This is a degradation, not a bypass: the legacy path still enforces the
+    // same cap, just without the reservation that closes the race. The account
+    // check above has already run and fails closed regardless.
+    console.error(`[usage] reserve_usage unavailable for ${userId} — falling back:`, error.message);
+    return legacyTokenCheck(userId, profile);
+  }
 
-  if (profile?.is_blocked)                     return { allowed: false, reason: "blocked" };
-  if (!profile?.approved && !profile?.is_admin) return { allowed: false, reason: "blocked" };
-  if (profile?.is_admin || profile?.plan === "pro") return { allowed: true };
+  const row = Array.isArray(data) ? data[0] : data;
+  if (row?.granted) return { allowed: true };
 
-  // Free user — enforce monthly token budget
-  const monthStart     = startOfMonth();
-  const resetAt        = profile?.usage_reset_at ?? null;
-  const effectiveStart = resetAt && resetAt > monthStart ? resetAt : monthStart;
+  return {
+    allowed:    false,
+    reason:     (row?.reason as QuotaDenial) ?? "limit_reached",
+    retryAfter: row?.retry_after ?? undefined,
+  };
+}
 
-  const { data: logs } = await supabase
+/**
+ * The pre-049 budget check: sum every log row for the period and compare.
+ *
+ * Kept only as the fallback above. It is O(rows this month) and racy by
+ * construction — two concurrent callers both read the same pre-spend total —
+ * which is the whole reason 049 exists. Do not call it directly.
+ */
+async function legacyTokenCheck(
+  userId:  string,
+  profile: QuotaProfile | null,
+): Promise<QuotaDecision> {
+  const limit = tokenLimitFor(profile);
+  if (limit === null) return { allowed: true };
+
+  const supabase = createServiceClient();
+  const { data: logs, error } = await supabase
     .from("usage_logs")
     .select("tokens_in, tokens_out")
     .eq("user_id", userId)
-    .gte("created_at", effectiveStart);
+    .gte("created_at", periodStart(profile));
+
+  // A dropped read must not read as "no spend yet" — that would hand an
+  // exhausted account a fresh allowance every time the query flaked.
+  if (error) {
+    console.error(`[usage] legacy token check failed for ${userId}:`, error.message);
+    return { allowed: false, reason: "limit_reached" };
+  }
 
   const total = (logs ?? []).reduce(
     (sum, r) => sum + (r.tokens_in ?? 0) + (r.tokens_out ?? 0), 0
   );
-  const limit = profile?.token_limit ?? DEFAULT_MONTHLY_TOKEN_LIMIT;
-
-  if (total >= limit) return { allowed: false, reason: "limit_reached" };
-  return { allowed: true };
+  return total >= limit ? { allowed: false, reason: "limit_reached" } : { allowed: true };
 }
 
 /**
  * Route-handler gate for every billable AI/TTS endpoint (HIGH-03/HIGH-05 —
- * deployment readiness audit). Wraps `checkUsageAllowed` (which already
- * covers `is_blocked`/`approved` as well as the token budget) into the
- * 403/429 JSON response every route should return on rejection, so each
- * handler doesn't hand-roll its own copy of this logic.
+ * deployment readiness audit). Wraps `checkUsageAllowed` (which covers
+ * `is_blocked`/`approved`, the token budget and the request rate) into the
+ * 403/429 JSON response every route should return on rejection.
  *
  * Usage:
- *   const gate = await enforceUsageGate(userId);
+ *   const gate = await enforceUsageGate(userId, "learn/chat");
  *   if (gate) return gate;
  */
-export async function enforceUsageGate(userId: string): Promise<NextResponse | null> {
-  const { allowed, reason } = await checkUsageAllowed(userId);
+export async function enforceUsageGate(
+  userId:  string,
+  feature: string,
+): Promise<NextResponse | null> {
+  const { allowed, reason, retryAfter } = await checkUsageAllowed(userId, feature);
   if (allowed) return null;
 
-  const msg = reason === "limit_reached"
-    ? "Monthly usage limit reached."
-    : "Your access has been restricted.";
-  return NextResponse.json({ error: msg }, { status: reason === "limit_reached" ? 429 : 403 });
+  // Retry-After is what makes a rate limit actionable rather than a wall: the
+  // client is told when to come back instead of guessing (Rule 5 — a failure
+  // needs its own way out).
+  const headers = retryAfter ? { "Retry-After": String(retryAfter) } : undefined;
+
+  return NextResponse.json(
+    { error: messageForDenial(reason), retryAfter },
+    { status: statusForDenial(reason), headers },
+  );
 }
 
 export interface UsageSummary {
@@ -144,34 +267,27 @@ export interface UsageSummary {
 /**
  * Monthly token consumption for the header gauge. Everyone has an allowance:
  * free uses the enforced cap; pro/admin get the larger (display-only) allowance.
- * Mirrors checkUsageAllowed's month/reset window so the figure stays consistent
- * with what enforcement actually counts.
+ *
+ * Reads `usage_logs`, not `usage_counters`, on purpose: the gauge should show
+ * what the learner has actually spent, not what is momentarily reserved by
+ * in-flight requests. It shares `periodStart` with the gate, so the two cannot
+ * disagree about when the month began.
  */
 export async function getUsageSummary(userId: string): Promise<UsageSummary> {
   const supabase = createServiceClient();
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("plan, is_admin, token_limit, usage_reset_at")
-    .eq("user_id", userId)
-    .single();
-
-  const monthStart     = startOfMonth();
-  const resetAt        = profile?.usage_reset_at ?? null;
-  const effectiveStart = resetAt && resetAt > monthStart ? resetAt : monthStart;
+  const profile  = await readProfile(userId);
 
   const { data: logs } = await supabase
     .from("usage_logs")
     .select("tokens_in, tokens_out")
     .eq("user_id", userId)
-    .gte("created_at", effectiveStart);
+    .gte("created_at", periodStart(profile));
 
-  const used       = (logs ?? []).reduce((s, r) => s + (r.tokens_in ?? 0) + (r.tokens_out ?? 0), 0);
-  const isUpgraded = Boolean(profile?.is_admin) || profile?.plan === "pro";
-  const limit      = isUpgraded
-    ? PRO_MONTHLY_TOKEN_LIMIT
-    : (profile?.token_limit ?? DEFAULT_MONTHLY_TOKEN_LIMIT);
-  const pct        = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+  const used  = (logs ?? []).reduce((s, r) => s + (r.tokens_in ?? 0) + (r.tokens_out ?? 0), 0);
+  // The gauge shows the pro allowance for pro/admin even though it is not
+  // enforced (tokenLimitFor returns null for them) — awareness, not a cap.
+  const limit = tokenLimitFor(profile) ?? PRO_MONTHLY_TOKEN_LIMIT;
+  const pct   = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
 
   return { tokens: { used, limit, pct } };
 }
