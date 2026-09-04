@@ -5900,3 +5900,165 @@ checked in the running app against the real database.
 
 The 11 orphaned tracks are untouched. Giving them goals would resurface 10 old
 tracks on the owner's dashboard, which is a product call, not a correctness one.
+
+---
+
+## 2026-09-04 — The money path: an atomic reservation and a rate limit (blocker #5)
+
+Release blocker #5 from `DEPLOYMENT_READINESS_AUDIT.md` — the last of the six
+originals still open, and the reason the audit's standing verdict is "not ready
+for public deployment".
+
+### What was actually wrong
+
+`checkUsageAllowed` summed every `usage_logs` row for the month in JavaScript,
+returned `allowed`, and only *after* the model replied did `logUsage` insert the
+row. Between the read and the write there was no lock and no claim, so N
+concurrent requests all read the same pre-spend total and all passed. A learner
+at 99k of a 100k cap could fire twenty parallel requests and every one was
+authorised.
+
+Nothing limited request rate anywhere in the codebase.
+
+A third gap the audit did not name: **pro and admin accounts are not capped at
+all.** `checkUsageAllowed` returned early for them before looking at tokens.
+That is a deliberate product position, not a bug, so it is preserved — but it
+means an admin account with a runaway client had nothing at all standing between
+it and the Anthropic bill. The rate limit now applies to every plan including
+admin, which closes the abuse half without changing the billing posture.
+
+### What gate coverage actually looked like
+
+The audit implied routes were ungated. They were not. Coverage was complete but
+split across two idioms: 8 routes called `enforceUsageGate`, 13 called
+`checkUsageAllowed` and hand-rolled their own 403/429. `/api/margin` matched a
+`logUsage` grep only through a comment saying it deliberately does not log, and
+`goals/[id]/answers` is gate-free on purpose — a privacy control must not be
+rationed.
+
+### The shape
+
+```
+TypeScript (lib/tokenBudget.ts)  decides WHAT the limit is and WHAT to reserve
+Postgres   (migration 049)       applies it atomically, under a row lock
+```
+
+The comparison rule exists once, in SQL. The plan rules exist once, in
+TypeScript. Postgres is handed numbers and knows nothing about plans.
+
+`usage_counters` is keyed `(user_id, period_start)` and holds `tokens_spent`
+(seeded from `usage_logs` on first touch, incremented by `record_usage`) beside
+`reserved_tokens` (in-flight claims). The cap compares against the sum of the
+two: what is gone, plus what is in the air.
+
+**Reservations expire; they are never released.** That is what makes a crashed
+or platform-killed request self-healing — nothing has to run in a failure path
+to give the budget back. The TTL is 150s, chosen to clear the 120s `maxDuration`
+the track-build routes set, so a build's own reservation cannot expire while the
+build is still running.
+
+### The design error worth recording
+
+The first cut had `logUsage` reconcile against the estimate the gate reserved,
+both sides deriving it from the same `feature` string so no state had to travel
+between them. That is wrong, and the route that proves it is `POST
+/api/dashboard/goals`: it gates **once** and then bills **three** features —
+`dashboard/refine-topic`, `tracker/generate`, `tracker/priority`. Three
+reconciles against one reservation leave the counter short by the two estimates
+that were never reserved.
+
+Splitting spent from reserved removes the problem rather than patching it.
+`record_usage` is now purely additive and knows nothing about reservations, so a
+gate covering any number of logged calls needs no bookkeeping at all.
+
+### Seeding
+
+`reserve_usage` seeds `tokens_spent` from `usage_logs` the first time it touches
+a period. Without it, applying 049 would hand every learner who had already
+spent that month a brand new allowance, and the first month after launch would
+be effectively uncapped.
+
+### What changed
+
+`lib/tokenBudget.ts` (new, pure, 28 tests) — limits, period window, per-feature
+reserve estimates, the two window constants, and the refusal vocabulary. Named
+`tokenBudget` and not `quota` because **`lib/quota.ts` already exists** and caps
+free *sessions*; the two are unrelated and must not be merged.
+
+`lib/usage.ts` — `checkUsageAllowed(userId, feature)` and
+`enforceUsageGate(userId, feature)` now take the feature, which is what sizes
+the reservation. Making the argument required was deliberate: `tsc` then
+enumerated all 21 call sites, so none could be missed. The month-window rule,
+previously duplicated verbatim in `checkUsageAllowed` and `getUsageSummary`,
+now has one home.
+
+Nine routes moved from a hand-rolled refusal block to `enforceUsageGate`, which
+gives them the `rate_limited` vocabulary and a `Retry-After` header they had no
+way to express before. Three routes were deliberately left alone:
+`code/generate-drill` returns a sample drill, `tracker/entries/verify`
+soft-fails, and `milestones/coverage` returns the points that already exist.
+Those degrade gracefully on purpose, and converting them would have turned a
+fallback into an error. `review/quiz` keeps `checkUsageAllowed` because it must
+record the refusal to `operation_events` before responding, but now uses the
+shared message and status helpers.
+
+`getUsageSummary` still reads `usage_logs`, not the counter: the gauge should
+show what a learner has spent, not what is momentarily reserved.
+
+### Degradation, not a bypass
+
+If `reserve_usage` is missing — the code can legitimately ship ahead of a
+hand-applied migration — `checkUsageAllowed` falls back to the pre-049 sum
+rather than locking every learner out. The legacy path still enforces the same
+cap, just racily. The account check (blocked / unapproved) runs first and fails
+closed regardless. The legacy path's dropped-read case was also fixed on the way
+past: it used to read a failed query as "no spend yet", which handed an
+exhausted account a fresh allowance every time the query flaked.
+
+### State
+
+1,213 tests pass (up from 1,184), `tsc` clean, lint clean, `npm run build`
+clean.
+
+### Verified against the real database
+
+Travis applied 049. Two verification passes then ran against the live Supabase
+project, both driven entirely through the test learner.
+
+`scripts/verify-049.mjs` exercises the SQL contract directly — 24 checks, all
+passing. The one that matters: **25 concurrent `reserve_usage` calls against a
+10,000 cap at 1,000 each granted exactly 10.** That is the defect closed and
+measured, not asserted; pre-049 all 25 read the same pre-spend total of zero and
+all passed. Also confirmed: a new period seeds from `usage_logs` (5,387 real
+tokens picked up rather than a fresh allowance), the ceiling counts spent plus
+in-flight together, `record_usage` cannot be made to refund budget with a
+negative, an expired reservation is cleared rather than accumulated, the rate
+window trips and then rolls, and a null limit is unenforced while the rate limit
+still applies to it. It runs on synthetic `period_start` values so it cannot
+disturb a real month, and confirms its own cleanup.
+
+`scripts/verify-049-e2e.mjs` proves a real request reaches 049 *through*
+`lib/usage.ts` rather than silently falling back to the pre-049 sum — 11 checks,
+all passing. It signs the test learner in for a genuine session cookie and drives
+`/api/dashboard/classify-topic`. The refusal case is driven by setting
+`token_limit` to 0, which walks the whole path (profile read, `tokenLimitFor`,
+`reserve_usage`, `messageForDenial`, 429) while spending nothing; the learner's
+original settings are restored and the restoration confirmed.
+
+### What running it changed
+
+**The topic-gate estimate was wrong.** The live call cost 743 + 41 = 784 tokens
+against a 500 reservation. An estimate below the real cost lets a burst overshoot
+the cap by the difference, which is the one direction these must not err in.
+Raised to 1,200, with the measurement recorded beside it.
+
+**One test was proving nothing.** It compared `tracker/generate` against
+`"topic/gate"` — a feature string no route uses — so it was silently comparing
+against the fallback. It now asserts both names are registered before comparing,
+which is what would have caught it.
+
+The e2e script's first run reported tokens spent on a refused request. That was
+the harness, not the product: `logUsage` is fire-and-forget, so the previous
+request's write was still in flight when the baseline was taken. `usage_logs`
+showed exactly one row for the window. The script now waits for the counter to
+settle before measuring.
