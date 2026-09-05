@@ -232,6 +232,16 @@ export default function SignupPage() {
             >
               {loading ? "Creating account…" : "Create Account"}
             </button>
+
+            {/* Shown before the account exists, not after. A privacy notice a
+                learner can only reach once they have signed up is not a notice. */}
+            <p className="text-center text-xs leading-relaxed text-slate-600">
+              Hugh sends what you write to AI providers to answer you, and stores it
+              until you delete your account.{" "}
+              <Link href="/privacy" className="text-slate-400 underline-offset-2 hover:underline">
+                What Hugh stores
+              </Link>
+            </p>
           </form>
 
           <p className="mt-6 text-center text-sm text-slate-500">

@@ -6548,3 +6548,90 @@ no TTL), the stated position on learner text sent to Anthropic, OpenAI and
 ElevenLabs, and the disclosure page itself — now much easier to write, because
 what a public learner stores is email, diary and 5-whys answers, and what
 deletion removes is defined and tested.
+
+---
+
+## 2026-09-05 — Privacy pass, step 3: the disclosure page
+
+Standard shape, Hugh-specific facts. The headings are the conventional ones
+because readers scan for them; the text is not, because a boilerplate template
+would have been wrong in both directions at once — claiming things Hugh does not
+do (advertising cookies, analytics partners, data sharing) while omitting the
+two things a reader would actually be surprised by.
+
+### Provider positions were verified, not recalled
+
+- **Anthropic** — does not use commercial API data for model training by
+  default; the exception is explicit thumbs-up/down feedback, which Hugh never
+  sends. Quotable.
+- **OpenAI** — API data is not used to train models unless you opt in; retained
+  up to 30 days for abuse monitoring on most endpoints. Quotable.
+- **ElevenLabs** — **not clean.** The "does not train" default they publish is
+  stated for *enterprise* customers, and there is an account-level data-use
+  toggle. So the page claims nothing about training for them and says only what
+  is certainly true: it receives the text Hugh speaks, not the learner's voice.
+  The account's toggle should be checked before that wording is tightened.
+
+### A fourth processor nobody had listed
+
+`hooks/useSpeechRecognition.ts` uses `webkitSpeechRecognition` and is live in
+`/mastery`. CLAUDE.md describes the Web Speech API as "browser-native,
+Chrome/Edge only", which reads as *processed on the device*. It is not — in
+Chrome the API is server-based, so the learner's **voice is sent to Google** to
+be transcribed. Hugh only ever receives the text back.
+
+Not a bug; it is how the API works. But it made Google a data processor that no
+document mentioned, and it is exactly the sort of thing a learner would not
+expect. Now disclosed. `WISHLIST.md` notes that the CLAUDE.md wording should be
+corrected so the wrong conclusion is not re-derived from it later.
+
+### And one real bug, found while checking
+
+`app/api/tracker/mastery/realtime-session/route.ts` calls `enforceUsageGate` and
+never calls `logUsage` — the CLAUDE.md rule stated outright. Worse since 049:
+the gate now *reserves* budget and `logUsage` is what confirms it, so the
+reservation expires unconfirmed and OpenAI Realtime voice minutes are spent with
+no record anywhere. It is the last hole in the money path.
+
+`MASTERY_REALTIME_ENABLED=true` locally but **confirmed off in Vercel**, so it
+is not live and not urgent. Recorded in `WISHLIST.md` as "do not enable until
+the route logs usage", along with the note that enabling it would also send
+learner voice to OpenAI and change what this page has to say.
+
+### What the page says
+
+What is stored (account, what you write, what you upload where provisioned,
+usage records); who else processes it (Anthropic, OpenAI, ElevenLabs, Google,
+plus Supabase and Vercel as hosts); that nothing is sold, shared for advertising
+or fed to third-party analytics; that it is kept **until you delete it**; what
+deletion removes; and the one thing deliberately retained de-identified — the
+technical record that a curriculum was generated, with the topic and generated
+content erased and no link to the account.
+
+Retention needed no decision in the end. "Until you delete it" is the honest
+description of current behaviour, and since step 2 it is a tested guarantee
+rather than an aspiration.
+
+### Reachable before signing up, which is the point
+
+The page is deliberately **public** — no `verifyUserAccess`. A privacy notice
+that can only be read after creating an account is not a notice. Gating in this
+app lives in the pages themselves, so omitting the call is all that is needed;
+`proxy.ts` only refreshes sessions.
+
+Verified against a production build with **no session cookie**: `/privacy`
+returns 200, does not redirect to `/login`, and renders in full. Linked from the
+landing footer, from `/account`, and from the **signup form itself**, above the
+point where the account is created.
+
+Rule 4 exception, same as the landing page: it is a document, so it scrolls.
+
+### State
+
+1,255 tests pass. `tsc` clean, lint clean, build clean; `/privacy` prerenders as
+a static route.
+
+Not legal advice, and the page says so in its own way — it describes what Hugh
+actually does, which is the part a template cannot supply. Provider terms change,
+so the page states that its descriptions reflect their published positions as of
+its last-updated date.

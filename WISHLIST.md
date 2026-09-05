@@ -50,3 +50,39 @@ in front of real users, and it should be treated as release-blocking.
   indefinitely with no TTL job, by decision), what an account deletion actually
   removes end to end, and what the Anthropic / OpenAI / ElevenLabs data-handling
   position is for learner text sent to them.
+
+## Realtime mastery spends without logging — do not enable (found 2026-09-05)
+
+`app/api/tracker/mastery/realtime-session/route.ts` calls `enforceUsageGate`
+but never calls `logUsage`. That is the CLAUDE.md rule stated outright: "A
+route that calls `enforceUsageGate` but never logs is a bug: it checks the
+learner's budget and then spends against it invisibly."
+
+The August audit already flagged this. It is **worse since migration 049**:
+`enforceUsageGate` now *reserves* budget and `logUsage` is what converts the
+reservation into recorded spend. With no log, the reservation expires
+unconfirmed, the budget springs back, and OpenAI Realtime voice minutes — which
+are not cheap — were spent with no record anywhere.
+
+`MASTERY_REALTIME_ENABLED=true` in local `.env.local`; confirmed **off in
+Vercel**, so this is not live. It is therefore not urgent, but it is the last
+hole in the money path.
+
+**Do not turn that flag on in production until the route logs usage**, naming
+its model once for both the API call and the log, and accounting for both the
+Realtime model and the transcription model.
+
+Disclosure note: enabling it also sends learner **voice audio to OpenAI**, which
+the privacy page would then have to say.
+
+## Browser speech recognition sends audio to Google (found 2026-09-05)
+
+`hooks/useSpeechRecognition.ts` uses `webkitSpeechRecognition`, live in
+`/mastery`. CLAUDE.md describes the Web Speech API as "browser-native,
+Chrome/Edge only", which reads as *processed on the device*. It is not: in
+Chrome the API is server-based, so the learner's voice is sent to Google for
+transcription.
+
+Not a bug — it is how the API works — but it makes Google a data processor that
+no document listed. Now covered on `/privacy`. Worth correcting the wording in
+CLAUDE.md so nobody re-derives the wrong conclusion from it.

@@ -34,6 +34,13 @@ export default async function AccountPage() {
 
         <DeleteAccount email={user.email ?? ""} />
 
+        <Link
+          href="/privacy"
+          className="text-center text-xs text-slate-600 transition-colors hover:text-slate-400"
+        >
+          What Hugh stores about you
+        </Link>
+
       </div>
     </div>
   );
