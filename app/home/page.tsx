@@ -65,6 +65,13 @@ export default async function HomePage() {
           </div>
           <span className="hidden sm:block text-slate-500">{user.email}</span>
           <span className="hidden sm:block text-slate-700">|</span>
+          {/* The only route to account deletion. A learner who cannot find it
+              cannot exercise it, which would make the privacy policy that
+              describes it untrue. */}
+          <Link href="/account" className="text-slate-400 transition-colors hover:text-white">
+            Account
+          </Link>
+          <span className="hidden sm:block text-slate-700">|</span>
           <SignOutButton />
         </div>
       </header>

@@ -6437,3 +6437,114 @@ That mistake also corrected a wrong inference: a single account owning every row
 in the gated tables was read as "the test user is the admin". It is not — the
 admin is a separate account, and `test_user` is a real non-admin learner, so the
 earlier fail-closed run was a genuine learner test.
+
+---
+
+## 2026-09-05 — Privacy pass, step 2: account deletion that actually deletes
+
+"What an account deletion actually removes end to end" was undefined. Worse, it
+was wrong in two places, and there was no way for a learner to ask for one at
+all — only `scripts/delete-user.mjs`, run locally with the service key.
+
+### What deletion did before
+
+`auth.admin.deleteUser` and nothing else, relying entirely on the FK cascade.
+The cascade covers all 25 user-owned tables (and `pending_document_extractions`
+via `learning_goals`). It does **not** reach two things:
+
+**1. Storage.** `note-images` and `monitor-documents` are keyed
+`<user_id>/<parent_id>/<file>`, and `storage.objects` has no foreign key to
+`auth.users`. Deleting an account left the screenshots and résumés sitting in
+the bucket with nothing pointing at them. No orphans existed yet only because
+nobody holding files had been deleted — the gap was real and latent.
+
+**2. `track_generations`.** `ON DELETE SET NULL` on purpose (048): the record
+that a model produced a 14-milestone track in 40s should survive de-identified.
+But 048's own comment says *"the learner's words go with the account, because
+goal_answers cascades"* — true of the 5-whys answers, and **not** true of
+`input_topic`, which is the topic the learner typed. That is their words too,
+and it was being left behind. `milestones_out` likewise.
+
+A third, smaller one: `input_intact` is documented to go false when "answers
+deleted, goal deleted, or account deleted", but nothing implemented the account
+case, because no account-deletion handler existed to do it.
+
+### The routine
+
+`lib/account/deletionPlan.ts` (pure, 10 tests) holds the order and the
+redaction. **The order is load-bearing and is the reason it is written down
+rather than implied by statement sequence:** `delete-auth-user` runs last
+because the cascade is what destroys the ability to do the earlier steps. Once
+the row is gone, `track_generations.user_id` is already NULL and there is
+nothing left to select on. Deleting first and tidying afterwards is not a slower
+version of this order — it is one that cannot work.
+
+The redaction sets `input_topic` to `[deleted]`, drops `milestones_out`, and
+flips `input_intact`. The numbers stay: `answer_chars`, `context_uptake`,
+`milestone_count`, the timings and the model. That is not a compromise, it is
+what 048 designed for — it recorded them apart from the text precisely so a
+deletion could remove the words without blinding the eval. A test asserts the
+patch covers every column listed as learner content, so adding a text column to
+that table without adding it here fails rather than quietly surviving deletion.
+
+`lib/account/deleteAccount.ts` executes it and **fails loudly**. A deletion that
+half-succeeds and reports success is the worst outcome available: the learner is
+told their data is gone and the policy describing it becomes untrue. A failed
+sweep or redaction aborts before the account is dropped, leaving a state that
+can be retried rather than one that cannot be repaired.
+
+The error copy does **not** say "nothing was removed", because that may not be
+true — the storage sweep runs first, so a failure can land with files already
+gone. It says so outright: the account still exists, some uploaded files may
+already have been removed, and finishing is the cleanest thing to do. The
+narrow case that wording exists for is someone who starts a deletion, sees it
+fail, changes their mind, and would otherwise discover their files missing later
+without ever being told. All four surfaces — the two routes, the settings page
+and the script — say the same thing.
+
+### One routine, three callers
+
+Self-serve (`/account`), admin console, and the script all call the same
+function. Two implementations of "delete everything" is how one of them quietly
+stops covering a bucket.
+
+To make that possible the routine takes its Supabase client as a **parameter**
+and does not import `server-only` — the same shape `replay-generations.ts`
+needed for the same reason. `scripts/delete-user.mjs` was therefore deleted and
+replaced by `scripts/delete-user.ts`, which imports the real routine instead of
+re-implementing a worse one. The old script's failure mode was the dangerous
+kind: it printed success.
+
+- **`/account`** — a settings page reachable from the `/home` header. Typed-email
+  confirmation, enforced by the API too, because a client-side guard is a
+  courtesy and not a control. It states plainly what goes and what is kept
+  de-identified, which is the first honest draft of the disclosure text.
+- **Admin console** — a two-press Delete on each user row, separated from the
+  reversible actions. Refuses to delete an admin, and refuses to delete you,
+  because doing it through the console would take the console with it.
+
+### Verified end to end on a throwaway account
+
+A real account was created, given the two things the cascade cannot reach, and
+deleted. **16 checks, all passing:** both files removed and both folders empty,
+the auth user gone, the profile cascaded, and the provenance row still present
+with `user_id` NULL, the topic redacted, `milestones_out` dropped,
+`input_intact` false — and `answer_chars`, `milestone_count` and `model` intact.
+
+The first run failed 8 checks and the cause was the probe, not the routine: the
+insert omitted a NOT NULL column, so the provenance row never existed and the
+redaction half went untested rather than broken. Worth recording because the
+failure looked like a product defect and was not.
+
+Audited afterwards: 12 auth users and 12 profiles (the original count), no probe
+accounts, no orphaned storage folders, no probe rows.
+
+### State
+
+1,255 tests pass (up from 1,245). `tsc` clean, lint clean, build clean.
+
+Still open in the privacy pass: retention (048 keeps its rows indefinitely with
+no TTL), the stated position on learner text sent to Anthropic, OpenAI and
+ElevenLabs, and the disclosure page itself — now much easier to write, because
+what a public learner stores is email, diary and 5-whys answers, and what
+deletion removes is defined and tested.
