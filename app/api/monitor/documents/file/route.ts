@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
+import { requireProvisionedApi } from "@/lib/auth/requireProvisioned";
 import { createServiceClient } from "@/lib/supabase/service";
 import { MONITOR_DOCS_BUCKET, SIGNED_URL_TTL } from "@/lib/monitor/storage";
 
@@ -21,6 +22,13 @@ const unauth = () => NextResponse.json({ error: "Not signed in." }, { status: 40
 export async function GET(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return unauth();
+
+  // Privacy pass: this surface holds personal material and is off by
+  // default (migration 050). RLS stops the browser reaching the tables
+  // and bucket directly; this stops our own service-role client, which
+  // bypasses RLS entirely.
+  const denied = await requireProvisionedApi(userId, "monitorDocs");
+  if (denied) return denied;
 
   const versionId = request.nextUrl.searchParams.get("version");
   if (!versionId) return NextResponse.json({ error: "version required" }, { status: 400 });

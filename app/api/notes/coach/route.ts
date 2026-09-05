@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
+import { requireProvisionedApi } from "@/lib/auth/requireProvisioned";
 import { enforceUsageGate, logUsage } from "@/lib/usage";
 import { createServiceClient } from "@/lib/supabase/service";
 import { NOTE_IMAGES_BUCKET } from "@/lib/notes/storage";
@@ -35,6 +36,13 @@ const unauth = () => NextResponse.json({ error: "Not signed in." }, { status: 40
 export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return unauth();
+
+  // Privacy pass: this surface holds personal material and is off by
+  // default (migration 050). RLS stops the browser reaching the tables
+  // and bucket directly; this stops our own service-role client, which
+  // bypasses RLS entirely.
+  const denied = await requireProvisionedApi(userId, "notes");
+  if (denied) return denied;
 
   const usageGate = await enforceUsageGate(userId, "notes/coach");
   if (usageGate) return usageGate;

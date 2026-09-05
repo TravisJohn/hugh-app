@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
+import { requireProvisionedApi } from "@/lib/auth/requireProvisioned";
 import { createServiceClient } from "@/lib/supabase/service";
 import { canGroup, planDissolve, planGroup, type TreeItem, type TreeKind } from "@/lib/notes/tree";
 import type { Note, Notebook } from "@/types";
@@ -43,6 +44,13 @@ const touched = () => ({ updated_at: new Date().toISOString() });
 export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return unauth();
+
+  // Privacy pass: this surface holds personal material and is off by
+  // default (migration 050). RLS stops the browser reaching the tables
+  // and bucket directly; this stops our own service-role client, which
+  // bypasses RLS entirely.
+  const denied = await requireProvisionedApi(userId, "notes");
+  if (denied) return denied;
 
   const body = (await request.json().catch(() => ({}))) as { kind?: string; ids?: string[] };
   const kind = parseKind(body.kind);
@@ -97,6 +105,13 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return unauth();
+
+  // Privacy pass: this surface holds personal material and is off by
+  // default (migration 050). RLS stops the browser reaching the tables
+  // and bucket directly; this stops our own service-role client, which
+  // bypasses RLS entirely.
+  const denied = await requireProvisionedApi(userId, "notes");
+  if (denied) return denied;
 
   const kind = parseKind(request.nextUrl.searchParams.get("kind"));
   const id = request.nextUrl.searchParams.get("id");

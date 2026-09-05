@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
+import { requireProvisionedApi } from "@/lib/auth/requireProvisioned";
 import { createServiceClient } from "@/lib/supabase/service";
 import { canMove, planMove, type TreeItem, type TreeKind } from "@/lib/notes/tree";
 import type { Note, Notebook } from "@/types";
@@ -25,6 +26,13 @@ const TABLE: Record<TreeKind, "notebooks" | "notes"> = {
 export async function PATCH(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return unauth();
+
+  // Privacy pass: this surface holds personal material and is off by
+  // default (migration 050). RLS stops the browser reaching the tables
+  // and bucket directly; this stops our own service-role client, which
+  // bypasses RLS entirely.
+  const denied = await requireProvisionedApi(userId, "notes");
+  if (denied) return denied;
 
   const body = (await request.json().catch(() => ({}))) as {
     kind?: string; id?: string; parent_id?: string | null; index?: number; notebook_id?: string;

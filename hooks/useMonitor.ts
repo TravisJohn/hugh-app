@@ -327,18 +327,29 @@ export interface MonitorApplicationsState {
  * particular application can be linked to and survives a refresh — the same
  * reason the tab itself is a search param rather than component state.
  */
-export function useMonitorApplications(): MonitorApplicationsState {
+/**
+ * `enabled` is the surface-provisioning flag (migration 050). When false the
+ * account may not hold applications at all, so the fetch is skipped rather than
+ * sent and refused — a 403 here would surface as "Couldn't load your
+ * applications", which says the wrong thing entirely: nothing failed, the
+ * surface simply is not available.
+ */
+export function useMonitorApplications(enabled = true): MonitorApplicationsState {
   const router = useRouter();
   const params = useSearchParams();
   const selectedId = params.get("app");
 
   const [applications, setApplications] = useState<MonitorApplication[]>([]);
   const [events,       setEvents]       = useState<MonitorApplicationEvent[]>([]);
-  const [loading,      setLoading]      = useState(true);
+  const [loading,      setLoading]      = useState(enabled);
   const [busy,         setBusy]         = useState(false);
   const [error,        setError]        = useState<string | null>(null);
 
   useEffect(() => {
+    // Not provisioned: never ask. `loading` already initialises to `enabled`,
+    // so there is no state to correct here.
+    if (!enabled) return;
+
     let cancelled = false;
     (async () => {
       try {
@@ -355,7 +366,7 @@ export function useMonitorApplications(): MonitorApplicationsState {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [enabled]);
 
   const sorted = useMemo(() => sortApplications(applications), [applications]);
   const stats  = useMemo(() => summariseApplications(applications, events), [applications, events]);
@@ -552,18 +563,23 @@ export interface MonitorDocumentsState {
  * attach it in the same gesture — pasting a cover letter into an application
  * should file it and attach it, not file it and then ask you to go and find it.
  */
-export function useMonitorDocuments(): MonitorDocumentsState {
+/** `enabled` — see `useMonitorApplications`. Same flag, same reasoning. */
+export function useMonitorDocuments(enabled = true): MonitorDocumentsState {
   const router = useRouter();
   const params = useSearchParams();
   const selectedId = params.get("doc");
 
   const [documents, setDocuments] = useState<MonitorDocument[]>([]);
   const [versions,  setVersions]  = useState<MonitorDocumentVersion[]>([]);
-  const [loading,   setLoading]   = useState(true);
+  const [loading,   setLoading]   = useState(enabled);
   const [busy,      setBusy]      = useState(false);
   const [error,     setError]     = useState<string | null>(null);
 
   useEffect(() => {
+    // Not provisioned: never ask. `loading` already initialises to `enabled`,
+    // so there is no state to correct here.
+    if (!enabled) return;
+
     let cancelled = false;
     (async () => {
       try {
@@ -580,7 +596,7 @@ export function useMonitorDocuments(): MonitorDocumentsState {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [enabled]);
 
   const createDocument = useCallback(async (
     kind: DocumentKind, label: string, body: VersionBody,

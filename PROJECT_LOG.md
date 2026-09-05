@@ -6274,3 +6274,166 @@ inferred: lint 0, `tsc` 0, cloud content OK, **1,230 tests passing** (up from
 Two moderate advisories exist in transitive dependencies (`qs`,
 `@xmldom/xmldom`) and sit below the `high` gate, so they do not block. Noted
 rather than silently passed over.
+
+---
+
+## 2026-09-05 — Privacy pass, step 1: provisioning the personal-data surfaces
+
+The privacy pass is the last release blocker. It was waiting on a product
+decision, not on code. Travis made it: **signup stays open, but the surfaces
+that hold personal material are not available to a new learner** — off by
+default, admin-provisioned, opened deliberately later.
+
+### Correcting the premise first
+
+The plan was framed as "the résumé is the only PII input". Checked against the
+code, and it is the richest but not the only:
+
+- **Two Storage buckets**, not one — `monitor-documents` (résumés, cover
+  letters) and `note-images` (`/notes` screenshots, every one sent to OpenAI's
+  vision model to be read).
+- `monitor_applications` — which companies, which roles, what happened. That is
+  employment history sitting beside the résumés.
+- `pending_document_extractions` — CV and job-description text from the
+  course-from-document path. Transient: deleted once the track builds.
+- `goal_answers`, `milestone_entries`, and the email address on every account.
+
+Travis then extended the decision to cover `/notes` as well, which also takes
+the OpenAI vision path out of the public product entirely.
+
+### Why this had to be SQL, not an environment variable
+
+The first proposal was an env flag with an admin bypass, no migration. That was
+wrong, and the reason matters. The API routes use the **service-role client,
+which bypasses RLS** and enforce ownership by hand — but the browser also holds
+a real session, and the existing storage policy is:
+
+```
+FOR INSERT WITH CHECK (bucket_id = 'note-images'
+                       AND (storage.foldername(name))[1] = auth.uid()::text)
+```
+
+Any signed-in learner could therefore upload **directly** with the anon key. A
+gate living only in TypeScript would hold for the UI and not for anyone willing
+to open devtools, and a privacy claim that depends on nobody trying is not a
+privacy claim. Postgres cannot read an env var, so the flag had to be a column.
+
+Both halves are needed and neither substitutes for the other: RLS stops the
+browser going direct, the route checks stop our own service-role client.
+
+### Migration 050
+
+Two booleans on `profiles` — `notes_enabled`, `monitor_docs_enabled`, both
+DEFAULT false, backfilled true for admins. Two rather than one because
+screenshots and résumés are different material and will open at different times;
+separating them costs nothing now and avoids a second migration later.
+
+Two `SECURITY DEFINER STABLE` predicates with a pinned `search_path`, then
+**14 policies amended** — 8 table, 6 storage — each keeping its ownership rule
+and gaining the provisioning check.
+
+**No admin bypass in the policies.** Admins are provisioned by having the
+columns set true, not by the rule special-casing them. One rule, evaluated the
+same way in the app and in the database; a bypass on one side only is how a UI
+comes to offer something the database then refuses.
+
+Checked before writing it: of 12 profiles, every row in `notes`, `note_images`,
+`monitor_documents` and `monitor_applications` belongs to the single admin
+account. No learner loses access to data they already had, so no grandfathering
+clause was needed.
+
+### The gate fails CLOSED, deliberately
+
+`isProvisioned` returns true only for exactly `true`. A missing profile, a null
+column, or — the case that will really happen — **code deployed before 050 is
+hand-applied**, where the column does not exist and the read errors. All read as
+"not provisioned".
+
+That is the opposite of the usage gate in `lib/usage.ts`, which fails open so a
+flaky query cannot lock a learner out. The asymmetry is the point: availability
+should degrade toward letting someone in, privacy toward keeping them out.
+
+### What was built
+
+- `lib/auth/provisioning.ts` (pure, 7 tests) — the decision, the surface→column
+  mapping, and the select list, so asking for one set of columns while reading
+  another cannot drift into a permanent silent `false`.
+- `lib/auth/requireProvisioned.ts` — the server reads and the 403 gate.
+- `lib/monitor/provisioning.ts` (pure, 8 tests) — which Monitor views survive.
+  **Monitor is gated by half, not whole:** Skills and Your Usage stay available
+  to everyone, because "I am level 3 at SQL" is not a résumé. The Job
+  Applications tab disappears entirely rather than appearing empty, and a gated
+  `?view=` lands on a real view rather than a blank pane.
+- **27 handlers across 13 API routes** gated, each placed after the auth check
+  and *before* the usage gate, so a refusal costs no tokens.
+- `useMonitorApplications`/`useMonitorDocuments` gained an `enabled` flag: an
+  unprovisioned account never sends the request, because a 403 would surface as
+  "Couldn't load your applications" — which says the wrong thing entirely.
+  Nothing failed; the surface is not available.
+- `/notes` renders a "Not available yet" screen with **no retry** — nothing
+  broke, so rule 5 says do not offer one.
+- `/home` hides the Notes card and drops the applications clause from Monitor's
+  subheading rather than advertising a surface that would refuse on arrival.
+
+### Verified, not assumed
+
+050 is **not yet applied**, which made the pre-migration state directly
+testable. Against a production build, signed in as a real learner: **7 checks,
+all passing** — `/api/notes/notebooks`, `/api/notes/images`,
+`/api/monitor/documents` and `/api/monitor/applications` all return 403;
+`/api/monitor/skills` and `/api/monitor/activity` do not; and the refusal
+carries the provisioning sentence rather than an auth error.
+
+Noted while verifying, then corrected: `test_user@testmail.com` was briefly
+assumed to be the admin because a single account owned every row in the gated
+tables. It is not — it is a genuine non-admin learner, and the admin is a
+separate account. The fixture does exercise the plain-learner path.
+
+### State
+
+1,245 tests pass (up from 1,230). `tsc` clean, lint clean, build clean.
+
+**Migration 050 needs applying by hand** (forward-only, Supabase dashboard).
+Until it is, every gated surface is closed — including for the admin — which is
+the fail-closed design working, not a fault.
+
+### Migration 050 applied — verified against the live database
+
+Travis applied 050. Three passes ran against the real Supabase project.
+
+**Schema and backfill (5 checks).** The columns exist; the single admin is
+backfilled `true`/`true`; all 11 non-admin profiles default `false`/`false`;
+both predicates are callable.
+
+**RLS blocks the direct path (7 checks).** This is the pass that justifies the
+migration existing at all, driven with the **anon key and a real user session**
+— the path a browser has, which the API routes cannot police:
+
+- provisioned, the direct `notebooks` and `monitor_applications` inserts
+  **succeed** — proving the policy is a gate and not a blanket deny;
+- un-provisioned, the same inserts are **refused**, existing rows become
+  **unreadable**, and a `note-images` Storage upload is **refused**;
+- `monitor_skills` still accepts a write throughout — the ungated control,
+  proving the pass did not over-reach.
+
+**The app grants and refuses correctly (7 checks).** Through a production build
+with a genuine session cookie: un-provisioned gives 403 on
+`/api/notes/notebooks` and `/api/monitor/documents`; provisioned gives 200 on
+both; and with `notes_enabled` true while `monitor_docs_enabled` is false, notes
+answers 200 while monitor documents still refuses — the two flags are genuinely
+independent, which was the reason for having two.
+
+**A mistake worth recording.** The first RLS probe restored the learner's flags
+to hardcoded `true` rather than to the values it had captured, briefly leaving a
+non-admin account provisioned. It was caught by the probe's own restore
+assertion, corrected immediately, and a full audit confirmed the end state: 12
+profiles, 1 admin provisioned, 11 learners un-provisioned, and no probe rows
+left in `notebooks`, `monitor_applications` or `monitor_skills`. The second
+probe captures the original and restores to it, which is what the 049 harness
+already did and what this one should have done from the start. A test that
+mutates production state must restore what it found, not what it assumes.
+
+That mistake also corrected a wrong inference: a single account owning every row
+in the gated tables was read as "the test user is the admin". It is not — the
+admin is a separate account, and `test_user` is a real non-admin learner, so the
+earlier fail-closed run was a genuine learner test.

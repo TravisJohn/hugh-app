@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
+import { requireProvisionedApi } from "@/lib/auth/requireProvisioned";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
   normaliseText, normaliseJobUrl, statusChange, isApplicationStatus,
@@ -28,6 +29,13 @@ export async function PATCH(
 ) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return unauth();
+
+  // Privacy pass: this surface holds personal material and is off by
+  // default (migration 050). RLS stops the browser reaching the tables
+  // and bucket directly; this stops our own service-role client, which
+  // bypasses RLS entirely.
+  const denied = await requireProvisionedApi(userId, "monitorDocs");
+  if (denied) return denied;
 
   const { id } = await params;
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
@@ -135,6 +143,13 @@ export async function DELETE(
 ) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return unauth();
+
+  // Privacy pass: this surface holds personal material and is off by
+  // default (migration 050). RLS stops the browser reaching the tables
+  // and bucket directly; this stops our own service-role client, which
+  // bypasses RLS entirely.
+  const denied = await requireProvisionedApi(userId, "monitorDocs");
+  if (denied) return denied;
 
   const { id } = await params;
 

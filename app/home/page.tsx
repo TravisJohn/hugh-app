@@ -3,6 +3,8 @@ import Link from "next/link";
 import { GraduationCap, Code2, Trophy, Cloud, NotebookPen, Activity, Headphones, Newspaper, PieChart, Briefcase } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { verifyUserAccess } from "@/lib/supabase/verify-access";
+import { readProvisioning } from "@/lib/auth/requireProvisioned";
+import { isProvisioned } from "@/lib/auth/provisioning";
 import SignOutButton from "@/components/landing/SignOutButton";
 import HeaderUsage from "@/components/usage/HeaderUsage";
 
@@ -32,6 +34,14 @@ export default async function HomePage() {
   const { user } = await verifyUserAccess(supabase);
 
   const firstName = (user.email ?? "").split("@")[0] ?? "there";
+
+  // Privacy pass (migration 050). Both flags are read in one round-trip: the
+  // grid should not advertise a surface the account cannot use. Monitor still
+  // appears when documents are off — Skills and Your Usage remain available —
+  // so only its subheading changes, not its presence.
+  const provisioning     = await readProvisioning(user.id);
+  const notesEnabled     = isProvisioned(provisioning, "notes");
+  const monitorDocsOn    = isProvisioned(provisioning, "monitorDocs");
   const initial   = firstName[0]?.toUpperCase() ?? "?";
 
   return (
@@ -195,7 +205,10 @@ export default async function HomePage() {
             </span>
           </Link>
 
-          {/* Notes — review a wrong answer with Hugh (personal utility) */}
+          {/* Notes — review a wrong answer with Hugh (personal utility).
+              Hidden unless provisioned (migration 050): the grid must not
+              advertise a surface that would refuse the learner on arrival. */}
+          {notesEnabled && (
           <Link
             href="/notes"
             className="group flex flex-col gap-[clamp(0.4rem,1.2vh,0.75rem)] rounded-2xl border border-rose-500/40 bg-rose-900/10 p-[clamp(0.75rem,2.2vh,1.25rem)] shadow-lg shadow-rose-900/20 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-rose-400/60 hover:bg-rose-900/20 hover:shadow-xl hover:shadow-rose-500/20"
@@ -213,6 +226,7 @@ export default async function HomePage() {
               Open →
             </span>
           </Link>
+          )}
 
           {/* Monitor — the tracking surface (Skills · Applications · Usage).
               The subheading names all three views on purpose: Applications is
@@ -232,9 +246,15 @@ export default async function HomePage() {
                   New
                 </span>
               </div>
+              {/* The subheading names only the views this account actually has.
+                  Promising "jobs you've applied for" to someone whose documents
+                  are not provisioned would be a card that lies about itself. */}
               <p className="text-xs text-slate-500 leading-snug">
-                Your own record, kept by hand — skills you&apos;re learning, jobs you&apos;ve
-                applied for, and where your time on Hugh actually went.
+                {monitorDocsOn
+                  ? <>Your own record, kept by hand — skills you&apos;re learning, jobs you&apos;ve
+                      applied for, and where your time on Hugh actually went.</>
+                  : <>Your own record, kept by hand — the skills you&apos;re learning, and
+                      where your time on Hugh actually went.</>}
               </p>
             </div>
             <span className="mt-auto text-xs font-semibold text-cyan-400 transition-all group-hover:text-cyan-300">

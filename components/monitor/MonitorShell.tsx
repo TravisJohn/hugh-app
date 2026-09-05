@@ -6,7 +6,8 @@ import {
   useMonitorView, useMonitorSkills, useMonitorApplications,
   useMonitorDocuments, useMonitorUsage,
 } from "@/hooks/useMonitor";
-import { MONITOR_TABS, VIEW_LABEL, tabForView } from "@/types/monitor";
+import { VIEW_LABEL, tabForView } from "@/types/monitor";
+import { visibleTabs, resolveView } from "@/lib/monitor/provisioning";
 import SkillsView from "./SkillsView";
 import ApplicationsView from "./ApplicationsView";
 import DocumentsView from "./DocumentsView";
@@ -21,12 +22,30 @@ import UsageView from "./UsageView";
 //
 // Nothing on this surface calls a model. Monitor records; it does not teach.
 
-export default function MonitorShell({ today }: { today: string }) {
-  const [view, setView] = useMonitorView();
+export default function MonitorShell({
+  today,
+  docsEnabled,
+}: {
+  today:       string;
+  /**
+   * Surface provisioning from migration 050. False means this account may not
+   * hold résumés, cover letters or an applications history at all, so the
+   * Job Applications tab is not shown and its fetches never run. Skills and
+   * Your Usage are unaffected — they hold nothing personal.
+   */
+  docsEnabled: boolean;
+}) {
+  const [rawView, setView] = useMonitorView();
+
+  // ?view= is user-supplied, so a gated view asked for directly lands on a real
+  // one rather than a blank pane.
+  const view      = resolveView(rawView, docsEnabled);
+  const tabs      = visibleTabs(docsEnabled);
   const activeTab = tabForView(view);
+
   const skills = useMonitorSkills();
-  const apps   = useMonitorApplications();
-  const docs   = useMonitorDocuments();
+  const apps   = useMonitorApplications(docsEnabled);
+  const docs   = useMonitorDocuments(docsEnabled);
   const usage  = useMonitorUsage();
 
   // One banner, whichever view raised the error. Both hooks surface failures
@@ -57,9 +76,12 @@ export default function MonitorShell({ today }: { today: string }) {
         {/* Three tabs over four views: résumés and applications are one activity,
             so they share a tab and separate below it. Clicking a tab lands on
             its first view — the library, because a document has to exist before
-            an application can be sent with it. */}
+            an application can be sent with it.
+
+            `tabs`, not MONITOR_TABS: an unprovisioned account loses the whole
+            Job Applications tab rather than being shown one that is empty. */}
         <nav className="ml-2 flex items-center gap-1">
-          {MONITOR_TABS.map(t => (
+          {tabs.map(t => (
             <button
               key={t.id}
               type="button"

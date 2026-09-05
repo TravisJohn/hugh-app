@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { verifyUserAccess } from "@/lib/supabase/verify-access";
+import { hasSurface } from "@/lib/auth/requireProvisioned";
 import { todayISO } from "@/lib/monitor/skills";
 import MonitorShell from "@/components/monitor/MonitorShell";
 
@@ -12,7 +13,13 @@ import MonitorShell from "@/components/monitor/MonitorShell";
 // there is no model to name and no usage to log.
 export default async function MonitorPage() {
   const supabase = await createClient();
-  await verifyUserAccess(supabase);
+  const { user } = await verifyUserAccess(supabase);
+
+  // Privacy pass (migration 050). Résumés, cover letters and the applications
+  // history are off by default; Skills and Your Usage are not gated, so Monitor
+  // stays useful rather than disappearing. The database enforces the same rule
+  // in RLS — this only decides what is worth drawing.
+  const docsEnabled = await hasSurface(user.id, "monitorDocs");
 
   // The header's date is computed here rather than in the browser. Monitor
   // buckets days in UTC server-side, so a header rendered from the browser's
@@ -26,7 +33,7 @@ export default async function MonitorPage() {
   // Suspense boundary above it.
   return (
     <Suspense fallback={<div className="h-screen bg-[#0A0F1E]" />}>
-      <MonitorShell today={today} />
+      <MonitorShell today={today} docsEnabled={docsEnabled} />
     </Suspense>
   );
 }
