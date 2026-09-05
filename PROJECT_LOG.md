@@ -6062,3 +6062,106 @@ the harness, not the product: `logUsage` is fire-and-forget, so the previous
 request's write was still in flight when the baseline was taken. `usage_logs`
 showed exactly one row for the window. The script now waits for the counter to
 settle before measuring.
+
+---
+
+## 2026-09-05 — Finishing the money path: the write that could be lost (audit finding #1)
+
+The reservation shipped on 2026-09-04 was only half a transaction. This is the
+other half.
+
+### What was wrong
+
+All 21 `logUsage` call sites were `void logUsage(...)`. **None were awaited.**
+On Vercel the invocation can freeze the moment the response returns, so the
+insert could be started and then simply never land.
+
+The August audit ranked this as a tidy-up, and at the time it was one: the
+consequence was an under-reported admin gauge. **049 changed what it costs.**
+`logUsage` now ends in `recordAgainstCounter`, the call that converts the gate's
+reservation into recorded spend. So a dropped write no longer just mis-states a
+dashboard — the reservation expires unconfirmed, the learner's budget springs
+back as though nothing was spent, and the provider bill still arrives. The
+defect did not change; its price did. That is why it was pulled up the list.
+
+### Why this is one change and not twenty-one
+
+The audit prescribed a mechanical `void` → `after()` sweep across all sites.
+Checking Next 16.3.1's source first turned that into a much smaller job.
+
+`node_modules/next/dist/server/after/after-context.js` binds every callback with
+`bindSnapshot`, preserving all async-local storage, and carries an explicit
+`nested after` branch for `rootTaskSpawnPhase`. Above it, Next states the
+equivalence directly: `after(() => x())`, `after(x())` and `await x()` are "the
+same in every regard except timing". So the deferral can live **inside**
+`logUsage` — one function — and all 21 call sites stay exactly as they are.
+
+That matters more than the line count. A sweep leaves the trap armed for call
+site 22; moving it into the callee means there is nothing left to remember.
+It is the same "fix the shape, not the instances" reasoning the audit applied to
+finding #2, which is the one that has since closed cleanly.
+
+The two `lib/tracker/generate.ts` sites are the proof. They already run inside
+an `after()`, so a sweep would have needed a *different* fix there (`await`, per
+`lib/observability/record.ts:53`). With the shape fix they produce a nested
+`after()` instead — correct, and correct without anyone having to notice they
+were the odd ones out.
+
+### The one risk, and why it turned out to be nearly moot
+
+`after()` throws hard outside a request scope — `E468`, no degradation — so
+putting it inside `logUsage` narrows where `logUsage` may be called. But
+`lib/usage.ts` already imports `server-only`, which throws the moment a plain
+Node process loads it; `scripts/replay-generations.ts:67` documents importing
+`generateMilestones.ts` rather than `generate.ts` for exactly that reason. The
+contract narrows from "Next server" to "Next request scope", and no caller lives
+in the gap. `deferOrRun` falls back to an inline write regardless, so a lost
+deferral costs latency, never the row.
+
+### What was built
+
+- **`lib/afterResponse.ts`** (new, pure) — `deferOrRun(schedule, task, onError)`.
+  The scheduler is **injected**, which is the only reason any of this is
+  testable: `lib/usage.ts` cannot load under Vitest, and `after()` cannot be
+  called without a request. Both problems stay on the far side of the boundary
+  (CLAUDE.md rule 7). The task is guarded once, so a failure is reported
+  identically whether it ran post-response or inline, and can never escape into
+  the caller's request.
+- **`lib/afterResponse.test.ts`** (new) — 7 tests. The load-bearing ones: the
+  write is deferred rather than run during the request; a thrown scheduler falls
+  back inline rather than dropping the row; that fallback is reported, never
+  silent; and the task cannot run twice — `record_usage` is purely additive, so
+  double-counting spend is as wrong as losing it.
+- **`lib/usage.ts`** — the insert plus counter update split into a private
+  `writeUsage`; `logUsage` wraps it in `deferOrRun(after, …)`.
+
+### The timing contract changed, deliberately
+
+`await logUsage(...)` now means "the write is scheduled", **not** "the row
+exists". Nothing depends on the stronger meaning — there are zero `await
+logUsage` call sites — and `writeUsage` exists for anything that ever needs it.
+Written at the function, not only here.
+
+### State
+
+1,220 tests pass (up from 1,213), `tsc` clean, lint clean, `npm run build`
+clean.
+
+### Verified against the real database, not just the fakes
+
+The unit tests use a fake scheduler, so they prove the logic and not the wiring.
+`scripts/verify-049-e2e.mjs` was re-run against a live dev server and the real
+Supabase project: **11 checks, all passing**, the gate still reached through
+`lib/usage.ts` rather than the pre-049 fallback.
+
+The deferral itself was then measured directly, because that script predates
+this change and does not test for it:
+
+- A `usage_logs` row landed **34 seconds before the probe** —
+  `learn/topic-domain`, `claude-haiku-4-5`, 743/45.
+- `usage_counters.tokens_spent` read 2,370, which is exactly 788 + 798 + 784 —
+  this run's row plus the two from 2026-09-04. So `recordAgainstCounter` ran to
+  completion *inside* the `after()` callback, not just the insert.
+- The dev server log carried **no `[usage] schedule failed` line**, so `after()`
+  never threw and the inline fallback was never taken. Passing `after` as a bare
+  unbound reference is safe — it touches no `this`.
