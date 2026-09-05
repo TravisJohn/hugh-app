@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, ShieldOff, ShieldCheck, Crown, Zap, RotateCcw, Loader2 } from "lucide-react";
+import { CheckCircle2, ShieldOff, ShieldCheck, Crown, Zap, RotateCcw, Loader2, Trash2 } from "lucide-react";
 
 type Action = "approve" | "block" | "unblock" | "set_pro" | "set_free" | "reset_usage";
 
@@ -45,6 +45,32 @@ function Btn({
 export default function AdminActions({ userId, approved, isBlocked, isAdmin, plan }: Props) {
   const router            = useRouter();
   const [busy, setBusy]   = useState<Action | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [deleting,   setDeleting]   = useState(false);
+  const [error,      setError]      = useState<string | null>(null);
+
+  async function remove() {
+    setDeleting(true);
+    setError(null);
+    try {
+      const res  = await fetch(`/api/admin/users/${userId}`, { method: "DELETE" });
+      const body = await res.json().catch(() => ({})) as { error?: string };
+      if (!res.ok) {
+        // Never swallowed: an admin has to know the account still exists.
+        setError(body.error ?? "That account was not deleted.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError(
+        "That account was not deleted. Some of its uploaded files may already " +
+        "have been removed — run it again to finish."
+      );
+    } finally {
+      setDeleting(false);
+      setConfirming(false);
+    }
+  }
 
   async function act(action: Action) {
     setBusy(action);
@@ -87,6 +113,35 @@ export default function AdminActions({ userId, approved, isBlocked, isAdmin, pla
       )}
       <Btn action="reset_usage" label="Reset" icon={RotateCcw} busy={busy} onAct={act}
         color="bg-slate-800 text-slate-500 hover:bg-slate-700 hover:text-slate-300" />
+
+      {/* Deletion is separated from the reversible actions above, and asks
+          twice, because nothing here can undo it. It is the same routine the
+          learner's own settings page calls. */}
+      <button
+        onClick={confirming ? remove : () => setConfirming(true)}
+        disabled={!!busy || deleting}
+        className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${
+          confirming
+            ? "bg-red-600 text-white hover:bg-red-500"
+            : "bg-slate-800 text-slate-600 hover:bg-red-500/15 hover:text-red-400"
+        }`}
+      >
+        {deleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+        {deleting ? "Deleting…" : confirming ? "Confirm delete" : "Delete"}
+      </button>
+
+      {confirming && !deleting && (
+        <button
+          onClick={() => setConfirming(false)}
+          className="rounded-lg px-2 py-1.5 text-xs text-slate-500 hover:text-slate-300"
+        >
+          Cancel
+        </button>
+      )}
+
+      {error && (
+        <span className="w-full text-xs text-red-400">{error}</span>
+      )}
     </div>
   );
 }

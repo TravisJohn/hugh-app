@@ -6062,3 +6062,576 @@ the harness, not the product: `logUsage` is fire-and-forget, so the previous
 request's write was still in flight when the baseline was taken. `usage_logs`
 showed exactly one row for the window. The script now waits for the counter to
 settle before measuring.
+
+---
+
+## 2026-09-05 — Finishing the money path: the write that could be lost (audit finding #1)
+
+The reservation shipped on 2026-09-04 was only half a transaction. This is the
+other half.
+
+### What was wrong
+
+All 21 `logUsage` call sites were `void logUsage(...)`. **None were awaited.**
+On Vercel the invocation can freeze the moment the response returns, so the
+insert could be started and then simply never land.
+
+The August audit ranked this as a tidy-up, and at the time it was one: the
+consequence was an under-reported admin gauge. **049 changed what it costs.**
+`logUsage` now ends in `recordAgainstCounter`, the call that converts the gate's
+reservation into recorded spend. So a dropped write no longer just mis-states a
+dashboard — the reservation expires unconfirmed, the learner's budget springs
+back as though nothing was spent, and the provider bill still arrives. The
+defect did not change; its price did. That is why it was pulled up the list.
+
+### Why this is one change and not twenty-one
+
+The audit prescribed a mechanical `void` → `after()` sweep across all sites.
+Checking Next 16.3.1's source first turned that into a much smaller job.
+
+`node_modules/next/dist/server/after/after-context.js` binds every callback with
+`bindSnapshot`, preserving all async-local storage, and carries an explicit
+`nested after` branch for `rootTaskSpawnPhase`. Above it, Next states the
+equivalence directly: `after(() => x())`, `after(x())` and `await x()` are "the
+same in every regard except timing". So the deferral can live **inside**
+`logUsage` — one function — and all 21 call sites stay exactly as they are.
+
+That matters more than the line count. A sweep leaves the trap armed for call
+site 22; moving it into the callee means there is nothing left to remember.
+It is the same "fix the shape, not the instances" reasoning the audit applied to
+finding #2, which is the one that has since closed cleanly.
+
+The two `lib/tracker/generate.ts` sites are the proof. They already run inside
+an `after()`, so a sweep would have needed a *different* fix there (`await`, per
+`lib/observability/record.ts:53`). With the shape fix they produce a nested
+`after()` instead — correct, and correct without anyone having to notice they
+were the odd ones out.
+
+### The one risk, and why it turned out to be nearly moot
+
+`after()` throws hard outside a request scope — `E468`, no degradation — so
+putting it inside `logUsage` narrows where `logUsage` may be called. But
+`lib/usage.ts` already imports `server-only`, which throws the moment a plain
+Node process loads it; `scripts/replay-generations.ts:67` documents importing
+`generateMilestones.ts` rather than `generate.ts` for exactly that reason. The
+contract narrows from "Next server" to "Next request scope", and no caller lives
+in the gap. `deferOrRun` falls back to an inline write regardless, so a lost
+deferral costs latency, never the row.
+
+### What was built
+
+- **`lib/afterResponse.ts`** (new, pure) — `deferOrRun(schedule, task, onError)`.
+  The scheduler is **injected**, which is the only reason any of this is
+  testable: `lib/usage.ts` cannot load under Vitest, and `after()` cannot be
+  called without a request. Both problems stay on the far side of the boundary
+  (CLAUDE.md rule 7). The task is guarded once, so a failure is reported
+  identically whether it ran post-response or inline, and can never escape into
+  the caller's request.
+- **`lib/afterResponse.test.ts`** (new) — 7 tests. The load-bearing ones: the
+  write is deferred rather than run during the request; a thrown scheduler falls
+  back inline rather than dropping the row; that fallback is reported, never
+  silent; and the task cannot run twice — `record_usage` is purely additive, so
+  double-counting spend is as wrong as losing it.
+- **`lib/usage.ts`** — the insert plus counter update split into a private
+  `writeUsage`; `logUsage` wraps it in `deferOrRun(after, …)`.
+
+### The timing contract changed, deliberately
+
+`await logUsage(...)` now means "the write is scheduled", **not** "the row
+exists". Nothing depends on the stronger meaning — there are zero `await
+logUsage` call sites — and `writeUsage` exists for anything that ever needs it.
+Written at the function, not only here.
+
+### State
+
+1,220 tests pass (up from 1,213), `tsc` clean, lint clean, `npm run build`
+clean.
+
+### Verified against the real database, not just the fakes
+
+The unit tests use a fake scheduler, so they prove the logic and not the wiring.
+`scripts/verify-049-e2e.mjs` was re-run against a live dev server and the real
+Supabase project: **11 checks, all passing**, the gate still reached through
+`lib/usage.ts` rather than the pre-049 fallback.
+
+The deferral itself was then measured directly, because that script predates
+this change and does not test for it:
+
+- A `usage_logs` row landed **34 seconds before the probe** —
+  `learn/topic-domain`, `claude-haiku-4-5`, 743/45.
+- `usage_counters.tokens_spent` read 2,370, which is exactly 788 + 798 + 784 —
+  this run's row plus the two from 2026-09-04. So `recordAgainstCounter` ran to
+  completion *inside* the `after()` callback, not just the insert.
+- The dev server log carried **no `[usage] schedule failed` line**, so `after()`
+  never threw and the inline fallback was never taken. Passing `after` as a bare
+  unbound reference is safe — it touches no `this`.
+
+---
+
+## 2026-09-05 — Error boundaries: giving a failure its own screen (audit finding #5)
+
+Before this, `app/` contained **zero** `error.tsx`, `global-error.tsx` and
+`not-found.tsx`. Any render throw in production showed Next's raw error page —
+unbranded, with no way back, and indistinguishable from the app hanging. The
+audit's one `loading.tsx` had also gone, deleted along with `/tracker`, so it
+really was none of all four.
+
+### The rule this is really about
+
+Architecture rule 5: *a failure must be distinguishable from a wait, and needs
+its own way out — a retry that reuses the existing machine, not advice to
+refresh.* An error screen that offers a button which cannot work is the same
+defect wearing a different coat, so the interesting part here is not the screens
+but **which exit each failure gets**.
+
+### `lib/errors/recovery.ts` (new, pure, 10 tests)
+
+React's `reset()` re-renders the same tree. That is right for a transient
+failure — a dropped query, a flaky fetch — and wrong after a deploy: the browser
+holds a stale chunk manifest, so re-rendering re-requests the same missing chunk
+and throws again. `recoveryFor(error)` decides between them:
+
+- a `ChunkLoadError`, or any of the dynamic-import message shapes browsers and
+  bundlers use for the same condition, resolves to **reload**;
+- everything else resolves to **retry**, so client state is not thrown away for
+  no reason.
+
+It also extracts `error.digest` as a quotable reference — the only handle on a
+failure once production has redacted the message — while **dropping `NEXT_`
+prefixed digests**, which are control flow (`notFound()`, `redirect()`) and not
+a reference to anything a human can chase.
+
+Pure, so the decision is tested rather than buried in a client component
+(rule 7).
+
+### The screens
+
+- **`components/ui/ErrorScreen.tsx`** — one failure surface, built from the same
+  parts as `/blocked` and `/pending` so it reads as Hugh rather than as a crash.
+  `h-screen`, centred, never scrolls (rule 4).
+- **`app/error.tsx`** — the catch-all inside the root layout.
+- **`app/not-found.tsx`** — deliberately offers **no** action button. Nothing
+  broke and nothing will ever load, so "try again" would be the same lie as a
+  spinner on a failure. Rule 5 cuts both ways.
+- **`app/global-error.tsx`** — the last line, for a throw in the root layout
+  itself. **A deliberate DRY exception:** it duplicates the markup, uses inline
+  styles rather than Tailwind, a plain `<a>` rather than `<Link>`, and no icon
+  package. This is the screen that renders when the layout is broken, so it must
+  not depend on the stylesheet, fonts, icons or router — any of which may be
+  exactly what failed. Shared code here would be shared risk.
+
+### Three segment boundaries, chosen rather than blanketed
+
+Only where the exit genuinely differs:
+
+- **`app/study/[goalId]/`** — the wording matters most here. A track that failed
+  to *build* is a different thing with its own status
+  (`lib/tracker/buildState.ts`), its own copy and its own Rebuild button. A
+  generic "something went wrong" would send a learner reaching for a rebuild
+  that discards a perfectly good track, so this one says the screen failed, not
+  the learning.
+- **`app/notes/`** and **`app/monitor/`** — the two records tools. Their content
+  is material the learner uploaded or typed by hand and cannot regenerate, so
+  the reassurance *is* the message.
+
+`/cases`, `/code`, `/cloud`, `/admin` and the milestone activities fall through
+to the root boundary on purpose: "back to your activities" is an honest exit
+from all of them.
+
+### Verified in a real browser, not just asserted
+
+`curl` was not enough and saying so mattered: a server-component throw streams
+to the client and the boundary renders **after hydration**, so the initial HTML
+contains only the error marker. The first pass looked like a failure and was
+not.
+
+A worse trap surfaced on the way. `npm start` had died with `EADDRINUSE` and the
+checks were silently answered by a **leftover dev server** — the payload said
+`"b":"development"`. Stopping a backgrounded `npm` task kills the wrapper, not
+the `next` process under it; the port has to be checked directly. Both server
+shutdowns this session orphaned a process that way.
+
+Against a genuine production build, driven through Playwright (already a
+dependency — see the notebook QA harness), **11 checks, all passing**:
+
+- a render throw returns 500 and shows the boundary's own title, its
+  reassurance, a working retry, and a way out;
+- the digest appears as a quotable reference;
+- **the internal error message does not leak** — production redaction holds;
+- a 404 shows the not-found screen, still offers a way out, and offers **no**
+  retry.
+
+The throwing route and the driver script were temporary and are deleted; `.next`
+was cleared afterwards, because the stale route validator it left behind fails
+`tsc` on a dirty tree (CI runs on a fresh checkout and never sees this).
+
+### State
+
+Full CI gate re-run locally in order, every exit code checked rather than
+inferred: lint 0, `tsc` 0, cloud content OK, **1,230 tests passing** (up from
+1,220), `npm audit --omit=dev --audit-level=high` 0, build 0.
+
+Two moderate advisories exist in transitive dependencies (`qs`,
+`@xmldom/xmldom`) and sit below the `high` gate, so they do not block. Noted
+rather than silently passed over.
+
+---
+
+## 2026-09-05 — Privacy pass, step 1: provisioning the personal-data surfaces
+
+The privacy pass is the last release blocker. It was waiting on a product
+decision, not on code. Travis made it: **signup stays open, but the surfaces
+that hold personal material are not available to a new learner** — off by
+default, admin-provisioned, opened deliberately later.
+
+### Correcting the premise first
+
+The plan was framed as "the résumé is the only PII input". Checked against the
+code, and it is the richest but not the only:
+
+- **Two Storage buckets**, not one — `monitor-documents` (résumés, cover
+  letters) and `note-images` (`/notes` screenshots, every one sent to OpenAI's
+  vision model to be read).
+- `monitor_applications` — which companies, which roles, what happened. That is
+  employment history sitting beside the résumés.
+- `pending_document_extractions` — CV and job-description text from the
+  course-from-document path. Transient: deleted once the track builds.
+- `goal_answers`, `milestone_entries`, and the email address on every account.
+
+Travis then extended the decision to cover `/notes` as well, which also takes
+the OpenAI vision path out of the public product entirely.
+
+### Why this had to be SQL, not an environment variable
+
+The first proposal was an env flag with an admin bypass, no migration. That was
+wrong, and the reason matters. The API routes use the **service-role client,
+which bypasses RLS** and enforce ownership by hand — but the browser also holds
+a real session, and the existing storage policy is:
+
+```
+FOR INSERT WITH CHECK (bucket_id = 'note-images'
+                       AND (storage.foldername(name))[1] = auth.uid()::text)
+```
+
+Any signed-in learner could therefore upload **directly** with the anon key. A
+gate living only in TypeScript would hold for the UI and not for anyone willing
+to open devtools, and a privacy claim that depends on nobody trying is not a
+privacy claim. Postgres cannot read an env var, so the flag had to be a column.
+
+Both halves are needed and neither substitutes for the other: RLS stops the
+browser going direct, the route checks stop our own service-role client.
+
+### Migration 050
+
+Two booleans on `profiles` — `notes_enabled`, `monitor_docs_enabled`, both
+DEFAULT false, backfilled true for admins. Two rather than one because
+screenshots and résumés are different material and will open at different times;
+separating them costs nothing now and avoids a second migration later.
+
+Two `SECURITY DEFINER STABLE` predicates with a pinned `search_path`, then
+**14 policies amended** — 8 table, 6 storage — each keeping its ownership rule
+and gaining the provisioning check.
+
+**No admin bypass in the policies.** Admins are provisioned by having the
+columns set true, not by the rule special-casing them. One rule, evaluated the
+same way in the app and in the database; a bypass on one side only is how a UI
+comes to offer something the database then refuses.
+
+Checked before writing it: of 12 profiles, every row in `notes`, `note_images`,
+`monitor_documents` and `monitor_applications` belongs to the single admin
+account. No learner loses access to data they already had, so no grandfathering
+clause was needed.
+
+### The gate fails CLOSED, deliberately
+
+`isProvisioned` returns true only for exactly `true`. A missing profile, a null
+column, or — the case that will really happen — **code deployed before 050 is
+hand-applied**, where the column does not exist and the read errors. All read as
+"not provisioned".
+
+That is the opposite of the usage gate in `lib/usage.ts`, which fails open so a
+flaky query cannot lock a learner out. The asymmetry is the point: availability
+should degrade toward letting someone in, privacy toward keeping them out.
+
+### What was built
+
+- `lib/auth/provisioning.ts` (pure, 7 tests) — the decision, the surface→column
+  mapping, and the select list, so asking for one set of columns while reading
+  another cannot drift into a permanent silent `false`.
+- `lib/auth/requireProvisioned.ts` — the server reads and the 403 gate.
+- `lib/monitor/provisioning.ts` (pure, 8 tests) — which Monitor views survive.
+  **Monitor is gated by half, not whole:** Skills and Your Usage stay available
+  to everyone, because "I am level 3 at SQL" is not a résumé. The Job
+  Applications tab disappears entirely rather than appearing empty, and a gated
+  `?view=` lands on a real view rather than a blank pane.
+- **27 handlers across 13 API routes** gated, each placed after the auth check
+  and *before* the usage gate, so a refusal costs no tokens.
+- `useMonitorApplications`/`useMonitorDocuments` gained an `enabled` flag: an
+  unprovisioned account never sends the request, because a 403 would surface as
+  "Couldn't load your applications" — which says the wrong thing entirely.
+  Nothing failed; the surface is not available.
+- `/notes` renders a "Not available yet" screen with **no retry** — nothing
+  broke, so rule 5 says do not offer one.
+- `/home` hides the Notes card and drops the applications clause from Monitor's
+  subheading rather than advertising a surface that would refuse on arrival.
+
+### Verified, not assumed
+
+050 is **not yet applied**, which made the pre-migration state directly
+testable. Against a production build, signed in as a real learner: **7 checks,
+all passing** — `/api/notes/notebooks`, `/api/notes/images`,
+`/api/monitor/documents` and `/api/monitor/applications` all return 403;
+`/api/monitor/skills` and `/api/monitor/activity` do not; and the refusal
+carries the provisioning sentence rather than an auth error.
+
+Noted while verifying, then corrected: `test_user@testmail.com` was briefly
+assumed to be the admin because a single account owned every row in the gated
+tables. It is not — it is a genuine non-admin learner, and the admin is a
+separate account. The fixture does exercise the plain-learner path.
+
+### State
+
+1,245 tests pass (up from 1,230). `tsc` clean, lint clean, build clean.
+
+**Migration 050 needs applying by hand** (forward-only, Supabase dashboard).
+Until it is, every gated surface is closed — including for the admin — which is
+the fail-closed design working, not a fault.
+
+### Migration 050 applied — verified against the live database
+
+Travis applied 050. Three passes ran against the real Supabase project.
+
+**Schema and backfill (5 checks).** The columns exist; the single admin is
+backfilled `true`/`true`; all 11 non-admin profiles default `false`/`false`;
+both predicates are callable.
+
+**RLS blocks the direct path (7 checks).** This is the pass that justifies the
+migration existing at all, driven with the **anon key and a real user session**
+— the path a browser has, which the API routes cannot police:
+
+- provisioned, the direct `notebooks` and `monitor_applications` inserts
+  **succeed** — proving the policy is a gate and not a blanket deny;
+- un-provisioned, the same inserts are **refused**, existing rows become
+  **unreadable**, and a `note-images` Storage upload is **refused**;
+- `monitor_skills` still accepts a write throughout — the ungated control,
+  proving the pass did not over-reach.
+
+**The app grants and refuses correctly (7 checks).** Through a production build
+with a genuine session cookie: un-provisioned gives 403 on
+`/api/notes/notebooks` and `/api/monitor/documents`; provisioned gives 200 on
+both; and with `notes_enabled` true while `monitor_docs_enabled` is false, notes
+answers 200 while monitor documents still refuses — the two flags are genuinely
+independent, which was the reason for having two.
+
+**A mistake worth recording.** The first RLS probe restored the learner's flags
+to hardcoded `true` rather than to the values it had captured, briefly leaving a
+non-admin account provisioned. It was caught by the probe's own restore
+assertion, corrected immediately, and a full audit confirmed the end state: 12
+profiles, 1 admin provisioned, 11 learners un-provisioned, and no probe rows
+left in `notebooks`, `monitor_applications` or `monitor_skills`. The second
+probe captures the original and restores to it, which is what the 049 harness
+already did and what this one should have done from the start. A test that
+mutates production state must restore what it found, not what it assumes.
+
+That mistake also corrected a wrong inference: a single account owning every row
+in the gated tables was read as "the test user is the admin". It is not — the
+admin is a separate account, and `test_user` is a real non-admin learner, so the
+earlier fail-closed run was a genuine learner test.
+
+---
+
+## 2026-09-05 — Privacy pass, step 2: account deletion that actually deletes
+
+"What an account deletion actually removes end to end" was undefined. Worse, it
+was wrong in two places, and there was no way for a learner to ask for one at
+all — only `scripts/delete-user.mjs`, run locally with the service key.
+
+### What deletion did before
+
+`auth.admin.deleteUser` and nothing else, relying entirely on the FK cascade.
+The cascade covers all 25 user-owned tables (and `pending_document_extractions`
+via `learning_goals`). It does **not** reach two things:
+
+**1. Storage.** `note-images` and `monitor-documents` are keyed
+`<user_id>/<parent_id>/<file>`, and `storage.objects` has no foreign key to
+`auth.users`. Deleting an account left the screenshots and résumés sitting in
+the bucket with nothing pointing at them. No orphans existed yet only because
+nobody holding files had been deleted — the gap was real and latent.
+
+**2. `track_generations`.** `ON DELETE SET NULL` on purpose (048): the record
+that a model produced a 14-milestone track in 40s should survive de-identified.
+But 048's own comment says *"the learner's words go with the account, because
+goal_answers cascades"* — true of the 5-whys answers, and **not** true of
+`input_topic`, which is the topic the learner typed. That is their words too,
+and it was being left behind. `milestones_out` likewise.
+
+A third, smaller one: `input_intact` is documented to go false when "answers
+deleted, goal deleted, or account deleted", but nothing implemented the account
+case, because no account-deletion handler existed to do it.
+
+### The routine
+
+`lib/account/deletionPlan.ts` (pure, 10 tests) holds the order and the
+redaction. **The order is load-bearing and is the reason it is written down
+rather than implied by statement sequence:** `delete-auth-user` runs last
+because the cascade is what destroys the ability to do the earlier steps. Once
+the row is gone, `track_generations.user_id` is already NULL and there is
+nothing left to select on. Deleting first and tidying afterwards is not a slower
+version of this order — it is one that cannot work.
+
+The redaction sets `input_topic` to `[deleted]`, drops `milestones_out`, and
+flips `input_intact`. The numbers stay: `answer_chars`, `context_uptake`,
+`milestone_count`, the timings and the model. That is not a compromise, it is
+what 048 designed for — it recorded them apart from the text precisely so a
+deletion could remove the words without blinding the eval. A test asserts the
+patch covers every column listed as learner content, so adding a text column to
+that table without adding it here fails rather than quietly surviving deletion.
+
+`lib/account/deleteAccount.ts` executes it and **fails loudly**. A deletion that
+half-succeeds and reports success is the worst outcome available: the learner is
+told their data is gone and the policy describing it becomes untrue. A failed
+sweep or redaction aborts before the account is dropped, leaving a state that
+can be retried rather than one that cannot be repaired.
+
+The error copy does **not** say "nothing was removed", because that may not be
+true — the storage sweep runs first, so a failure can land with files already
+gone. It says so outright: the account still exists, some uploaded files may
+already have been removed, and finishing is the cleanest thing to do. The
+narrow case that wording exists for is someone who starts a deletion, sees it
+fail, changes their mind, and would otherwise discover their files missing later
+without ever being told. All four surfaces — the two routes, the settings page
+and the script — say the same thing.
+
+### One routine, three callers
+
+Self-serve (`/account`), admin console, and the script all call the same
+function. Two implementations of "delete everything" is how one of them quietly
+stops covering a bucket.
+
+To make that possible the routine takes its Supabase client as a **parameter**
+and does not import `server-only` — the same shape `replay-generations.ts`
+needed for the same reason. `scripts/delete-user.mjs` was therefore deleted and
+replaced by `scripts/delete-user.ts`, which imports the real routine instead of
+re-implementing a worse one. The old script's failure mode was the dangerous
+kind: it printed success.
+
+- **`/account`** — a settings page reachable from the `/home` header. Typed-email
+  confirmation, enforced by the API too, because a client-side guard is a
+  courtesy and not a control. It states plainly what goes and what is kept
+  de-identified, which is the first honest draft of the disclosure text.
+- **Admin console** — a two-press Delete on each user row, separated from the
+  reversible actions. Refuses to delete an admin, and refuses to delete you,
+  because doing it through the console would take the console with it.
+
+### Verified end to end on a throwaway account
+
+A real account was created, given the two things the cascade cannot reach, and
+deleted. **16 checks, all passing:** both files removed and both folders empty,
+the auth user gone, the profile cascaded, and the provenance row still present
+with `user_id` NULL, the topic redacted, `milestones_out` dropped,
+`input_intact` false — and `answer_chars`, `milestone_count` and `model` intact.
+
+The first run failed 8 checks and the cause was the probe, not the routine: the
+insert omitted a NOT NULL column, so the provenance row never existed and the
+redaction half went untested rather than broken. Worth recording because the
+failure looked like a product defect and was not.
+
+Audited afterwards: 12 auth users and 12 profiles (the original count), no probe
+accounts, no orphaned storage folders, no probe rows.
+
+### State
+
+1,255 tests pass (up from 1,245). `tsc` clean, lint clean, build clean.
+
+Still open in the privacy pass: retention (048 keeps its rows indefinitely with
+no TTL), the stated position on learner text sent to Anthropic, OpenAI and
+ElevenLabs, and the disclosure page itself — now much easier to write, because
+what a public learner stores is email, diary and 5-whys answers, and what
+deletion removes is defined and tested.
+
+---
+
+## 2026-09-05 — Privacy pass, step 3: the disclosure page
+
+Standard shape, Hugh-specific facts. The headings are the conventional ones
+because readers scan for them; the text is not, because a boilerplate template
+would have been wrong in both directions at once — claiming things Hugh does not
+do (advertising cookies, analytics partners, data sharing) while omitting the
+two things a reader would actually be surprised by.
+
+### Provider positions were verified, not recalled
+
+- **Anthropic** — does not use commercial API data for model training by
+  default; the exception is explicit thumbs-up/down feedback, which Hugh never
+  sends. Quotable.
+- **OpenAI** — API data is not used to train models unless you opt in; retained
+  up to 30 days for abuse monitoring on most endpoints. Quotable.
+- **ElevenLabs** — **not clean.** The "does not train" default they publish is
+  stated for *enterprise* customers, and there is an account-level data-use
+  toggle. So the page claims nothing about training for them and says only what
+  is certainly true: it receives the text Hugh speaks, not the learner's voice.
+  The account's toggle should be checked before that wording is tightened.
+
+### A fourth processor nobody had listed
+
+`hooks/useSpeechRecognition.ts` uses `webkitSpeechRecognition` and is live in
+`/mastery`. CLAUDE.md describes the Web Speech API as "browser-native,
+Chrome/Edge only", which reads as *processed on the device*. It is not — in
+Chrome the API is server-based, so the learner's **voice is sent to Google** to
+be transcribed. Hugh only ever receives the text back.
+
+Not a bug; it is how the API works. But it made Google a data processor that no
+document mentioned, and it is exactly the sort of thing a learner would not
+expect. Now disclosed. `WISHLIST.md` notes that the CLAUDE.md wording should be
+corrected so the wrong conclusion is not re-derived from it later.
+
+### And one real bug, found while checking
+
+`app/api/tracker/mastery/realtime-session/route.ts` calls `enforceUsageGate` and
+never calls `logUsage` — the CLAUDE.md rule stated outright. Worse since 049:
+the gate now *reserves* budget and `logUsage` is what confirms it, so the
+reservation expires unconfirmed and OpenAI Realtime voice minutes are spent with
+no record anywhere. It is the last hole in the money path.
+
+`MASTERY_REALTIME_ENABLED=true` locally but **confirmed off in Vercel**, so it
+is not live and not urgent. Recorded in `WISHLIST.md` as "do not enable until
+the route logs usage", along with the note that enabling it would also send
+learner voice to OpenAI and change what this page has to say.
+
+### What the page says
+
+What is stored (account, what you write, what you upload where provisioned,
+usage records); who else processes it (Anthropic, OpenAI, ElevenLabs, Google,
+plus Supabase and Vercel as hosts); that nothing is sold, shared for advertising
+or fed to third-party analytics; that it is kept **until you delete it**; what
+deletion removes; and the one thing deliberately retained de-identified — the
+technical record that a curriculum was generated, with the topic and generated
+content erased and no link to the account.
+
+Retention needed no decision in the end. "Until you delete it" is the honest
+description of current behaviour, and since step 2 it is a tested guarantee
+rather than an aspiration.
+
+### Reachable before signing up, which is the point
+
+The page is deliberately **public** — no `verifyUserAccess`. A privacy notice
+that can only be read after creating an account is not a notice. Gating in this
+app lives in the pages themselves, so omitting the call is all that is needed;
+`proxy.ts` only refreshes sessions.
+
+Verified against a production build with **no session cookie**: `/privacy`
+returns 200, does not redirect to `/login`, and renders in full. Linked from the
+landing footer, from `/account`, and from the **signup form itself**, above the
+point where the account is created.
+
+Rule 4 exception, same as the landing page: it is a document, so it scrolls.
+
+### State
+
+1,255 tests pass. `tsc` clean, lint clean, build clean; `/privacy` prerenders as
+a static route.
+
+Not legal advice, and the page says so in its own way — it describes what Hugh
+actually does, which is the part a template cannot supply. Provider terms change,
+so the page states that its descriptions reflect their published positions as of
+its last-updated date.

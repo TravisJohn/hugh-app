@@ -178,7 +178,12 @@ export default async function LandingPage() {
       <footer className="border-t border-white/5 py-10">
         <div className="mx-auto max-w-5xl px-6 flex items-center justify-between">
           <span className="font-serif text-sm text-slate-600">Hugh</span>
-          <p className="text-xs text-slate-700">Skill Prep App · Free to use</p>
+          <div className="flex items-center gap-4">
+            <Link href="/privacy" className="text-xs text-slate-600 transition-colors hover:text-slate-400">
+              Privacy
+            </Link>
+            <p className="text-xs text-slate-700">Skill Prep App · Free to use</p>
+          </div>
         </div>
       </footer>
 

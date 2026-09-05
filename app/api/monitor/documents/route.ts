@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
+import { requireProvisionedApi } from "@/lib/auth/requireProvisioned";
 import { createServiceClient } from "@/lib/supabase/service";
 import { normaliseLabel, isDocumentKind, findDuplicateDocument } from "@/lib/monitor/documents";
 import { readVersionInput, rejectBadVersion, writeVersion } from "@/lib/monitor/versionWrite";
@@ -22,6 +23,13 @@ const unauth = () => NextResponse.json({ error: "Not signed in." }, { status: 40
 export async function GET(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return unauth();
+
+  // Privacy pass: this surface holds personal material and is off by
+  // default (migration 050). RLS stops the browser reaching the tables
+  // and bucket directly; this stops our own service-role client, which
+  // bypasses RLS entirely.
+  const denied = await requireProvisionedApi(userId, "monitorDocs");
+  if (denied) return denied;
 
   try {
     const db = createServiceClient();
@@ -64,6 +72,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return unauth();
+
+  // Privacy pass: this surface holds personal material and is off by
+  // default (migration 050). RLS stops the browser reaching the tables
+  // and bucket directly; this stops our own service-role client, which
+  // bypasses RLS entirely.
+  const denied = await requireProvisionedApi(userId, "monitorDocs");
+  if (denied) return denied;
 
   const input = await readVersionInput(request);
   if (!input) return NextResponse.json({ error: "Couldn't read that upload." }, { status: 400 });
@@ -124,6 +139,13 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return unauth();
+
+  // Privacy pass: this surface holds personal material and is off by
+  // default (migration 050). RLS stops the browser reaching the tables
+  // and bucket directly; this stops our own service-role client, which
+  // bypasses RLS entirely.
+  const denied = await requireProvisionedApi(userId, "monitorDocs");
+  if (denied) return denied;
 
   const body = (await request.json().catch(() => ({}))) as {
     id?: string; label?: unknown; archived?: unknown;

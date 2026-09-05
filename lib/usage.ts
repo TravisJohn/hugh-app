@@ -1,6 +1,7 @@
 import "server-only";
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { deferOrRun } from "@/lib/afterResponse";
 import { isKnownModel } from "@/lib/pricing";
 import {
   type QuotaProfile,
@@ -54,6 +55,16 @@ async function readProfile(userId: string): Promise<QuotaProfile | null> {
  * total the gate compares against. That write is purely additive and knows
  * nothing about what was reserved — a single gated request can log several
  * times, so the reservation is expired on a window rather than cancelled here.
+ *
+ * TIMING CONTRACT — awaiting this means "the write is scheduled", NOT "the row
+ * exists". The write is handed to `after()` so it survives the response: on
+ * Vercel the invocation can freeze the moment the response returns, and every
+ * one of the ~21 call sites `void`s this promise, so an inline insert can be
+ * cut off mid-flight and lost. Since 049 that is not merely an under-reported
+ * gauge — `recordAgainstCounter` is what turns the gate's reservation into
+ * recorded spend, so a lost write returns budget the learner really spent while
+ * the provider bill still arrives. Anything needing the row to exist before it
+ * continues must call `writeUsage` directly rather than awaiting this.
  */
 export async function logUsage({
   userId,
@@ -87,6 +98,42 @@ export async function logUsage({
   // emit a misleading error on every dev request.
   if (userId === DEV_BYPASS_USER_ID) return;
 
+  await deferOrRun(
+    after,
+    () => writeUsage({ userId, feature, model, tokensIn, tokensOut, ttsChars }),
+    (stage, err) => {
+      // Neither branch may throw — see the timing contract above. `schedule`
+      // means the deferral itself is broken, which is worth distinguishing:
+      // the write still happened, just on the request's critical path.
+      console.error(`[usage] ${stage} failed for "${feature}" (${userId}):`, err);
+    },
+  );
+}
+
+/**
+ * The write itself: the `usage_logs` row, then the counter the gate reads.
+ *
+ * Separated from `logUsage` so the deferral wraps exactly the part that can be
+ * lost, and so a caller that genuinely needs the row to exist before continuing
+ * has something to await. Ordering matters — `usage_logs` is the authoritative
+ * record and seeds the next period, so it is written first and the counter
+ * update follows it.
+ */
+async function writeUsage({
+  userId,
+  feature,
+  model,
+  tokensIn,
+  tokensOut,
+  ttsChars,
+}: {
+  userId:    string;
+  feature:   string;
+  model?:    string;
+  tokensIn:  number;
+  tokensOut: number;
+  ttsChars:  number;
+}): Promise<void> {
   const supabase = createServiceClient();
   const { error } = await supabase.from("usage_logs").insert({
     user_id:    userId,
@@ -97,9 +144,9 @@ export async function logUsage({
     tts_chars:  ttsChars,
   });
 
-  // Callers `void` this promise, so a rejected insert would vanish entirely and
-  // the spend would go unrecorded with nothing to show for it. Logging is the
-  // right level of handling: usage accounting must never fail a user request.
+  // A rejected insert must not vanish: the spend has already happened and this
+  // is the only record of it. Logging is the right level of handling — usage
+  // accounting must never fail a user request.
   if (error) {
     console.error(`[usage] failed to log "${feature}" for ${userId}:`, error.message);
   }
@@ -110,8 +157,8 @@ export async function logUsage({
 /**
  * Add this call's real spend to the period counter the gate reads.
  *
- * Runs on the fire-and-forget path behind `logUsage`, so its extra profile read
- * costs the learner no latency. The read is needed because the counter is keyed
+ * Runs post-response behind `logUsage`, so its extra profile read costs the
+ * learner no latency. The read is needed because the counter is keyed
  * by period, and the period depends on `usage_reset_at` — a rule that lives in
  * `lib/tokenBudget.ts` and is deliberately not duplicated into SQL.
  *
