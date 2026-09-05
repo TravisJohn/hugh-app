@@ -6165,3 +6165,112 @@ this change and does not test for it:
 - The dev server log carried **no `[usage] schedule failed` line**, so `after()`
   never threw and the inline fallback was never taken. Passing `after` as a bare
   unbound reference is safe — it touches no `this`.
+
+---
+
+## 2026-09-05 — Error boundaries: giving a failure its own screen (audit finding #5)
+
+Before this, `app/` contained **zero** `error.tsx`, `global-error.tsx` and
+`not-found.tsx`. Any render throw in production showed Next's raw error page —
+unbranded, with no way back, and indistinguishable from the app hanging. The
+audit's one `loading.tsx` had also gone, deleted along with `/tracker`, so it
+really was none of all four.
+
+### The rule this is really about
+
+Architecture rule 5: *a failure must be distinguishable from a wait, and needs
+its own way out — a retry that reuses the existing machine, not advice to
+refresh.* An error screen that offers a button which cannot work is the same
+defect wearing a different coat, so the interesting part here is not the screens
+but **which exit each failure gets**.
+
+### `lib/errors/recovery.ts` (new, pure, 10 tests)
+
+React's `reset()` re-renders the same tree. That is right for a transient
+failure — a dropped query, a flaky fetch — and wrong after a deploy: the browser
+holds a stale chunk manifest, so re-rendering re-requests the same missing chunk
+and throws again. `recoveryFor(error)` decides between them:
+
+- a `ChunkLoadError`, or any of the dynamic-import message shapes browsers and
+  bundlers use for the same condition, resolves to **reload**;
+- everything else resolves to **retry**, so client state is not thrown away for
+  no reason.
+
+It also extracts `error.digest` as a quotable reference — the only handle on a
+failure once production has redacted the message — while **dropping `NEXT_`
+prefixed digests**, which are control flow (`notFound()`, `redirect()`) and not
+a reference to anything a human can chase.
+
+Pure, so the decision is tested rather than buried in a client component
+(rule 7).
+
+### The screens
+
+- **`components/ui/ErrorScreen.tsx`** — one failure surface, built from the same
+  parts as `/blocked` and `/pending` so it reads as Hugh rather than as a crash.
+  `h-screen`, centred, never scrolls (rule 4).
+- **`app/error.tsx`** — the catch-all inside the root layout.
+- **`app/not-found.tsx`** — deliberately offers **no** action button. Nothing
+  broke and nothing will ever load, so "try again" would be the same lie as a
+  spinner on a failure. Rule 5 cuts both ways.
+- **`app/global-error.tsx`** — the last line, for a throw in the root layout
+  itself. **A deliberate DRY exception:** it duplicates the markup, uses inline
+  styles rather than Tailwind, a plain `<a>` rather than `<Link>`, and no icon
+  package. This is the screen that renders when the layout is broken, so it must
+  not depend on the stylesheet, fonts, icons or router — any of which may be
+  exactly what failed. Shared code here would be shared risk.
+
+### Three segment boundaries, chosen rather than blanketed
+
+Only where the exit genuinely differs:
+
+- **`app/study/[goalId]/`** — the wording matters most here. A track that failed
+  to *build* is a different thing with its own status
+  (`lib/tracker/buildState.ts`), its own copy and its own Rebuild button. A
+  generic "something went wrong" would send a learner reaching for a rebuild
+  that discards a perfectly good track, so this one says the screen failed, not
+  the learning.
+- **`app/notes/`** and **`app/monitor/`** — the two records tools. Their content
+  is material the learner uploaded or typed by hand and cannot regenerate, so
+  the reassurance *is* the message.
+
+`/cases`, `/code`, `/cloud`, `/admin` and the milestone activities fall through
+to the root boundary on purpose: "back to your activities" is an honest exit
+from all of them.
+
+### Verified in a real browser, not just asserted
+
+`curl` was not enough and saying so mattered: a server-component throw streams
+to the client and the boundary renders **after hydration**, so the initial HTML
+contains only the error marker. The first pass looked like a failure and was
+not.
+
+A worse trap surfaced on the way. `npm start` had died with `EADDRINUSE` and the
+checks were silently answered by a **leftover dev server** — the payload said
+`"b":"development"`. Stopping a backgrounded `npm` task kills the wrapper, not
+the `next` process under it; the port has to be checked directly. Both server
+shutdowns this session orphaned a process that way.
+
+Against a genuine production build, driven through Playwright (already a
+dependency — see the notebook QA harness), **11 checks, all passing**:
+
+- a render throw returns 500 and shows the boundary's own title, its
+  reassurance, a working retry, and a way out;
+- the digest appears as a quotable reference;
+- **the internal error message does not leak** — production redaction holds;
+- a 404 shows the not-found screen, still offers a way out, and offers **no**
+  retry.
+
+The throwing route and the driver script were temporary and are deleted; `.next`
+was cleared afterwards, because the stale route validator it left behind fails
+`tsc` on a dirty tree (CI runs on a fresh checkout and never sees this).
+
+### State
+
+Full CI gate re-run locally in order, every exit code checked rather than
+inferred: lint 0, `tsc` 0, cloud content OK, **1,230 tests passing** (up from
+1,220), `npm audit --omit=dev --audit-level=high` 0, build 0.
+
+Two moderate advisories exist in transitive dependencies (`qs`,
+`@xmldom/xmldom`) and sit below the `high` gate, so they do not block. Noted
+rather than silently passed over.
