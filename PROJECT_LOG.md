@@ -6635,3 +6635,36 @@ Not legal advice, and the page says so in its own way — it describes what Hugh
 actually does, which is the part a template cannot supply. Provider terms change,
 so the page states that its descriptions reflect their published positions as of
 its last-updated date.
+
+---
+
+## PR #3 merged — both release blockers closed (2026-09-05)
+
+`feat/failure-paths` merged to `main` as `0b57441`, preserving all five commits
+rather than squashing, because each one carries its own verification record.
+
+The branch closes the last two items on the release punch-list: architecture
+rule 5 now holds across `app/` (every failure has its own screen and its own
+exit), and the personal-data surfaces are off the public path.
+
+**The full CI gate was run locally on the branch head before the PR opened**,
+with every exit code checked: lint, `tsc --noEmit`, cloud content integrity
+(63 services), 1,255 tests, and a production build — then again by CI on the PR,
+green in 1m39s, alongside a passing Vercel preview.
+
+**The ordering that mattered.** Migration 050 was already applied and verified
+against the live database, so the RLS gate was enforcing in production while
+`main` held no code that knew about it. Un-provisioned learners were meeting raw
+policy refusals with nothing to explain them. This merge is the application
+catching up to a gate that was already live — which is the argument for merging
+promptly rather than a reason to hesitate over it.
+
+Provisioning state at merge: 1 admin granted both flags, 11 learners
+un-provisioned. Both flags are independent and granted per learner.
+
+**Carried forward, flagged and not fixed here.** `mastery/realtime-session`
+calls `enforceUsageGate` and never calls `logUsage`, so since 049 its
+reservation expires unconfirmed. `MASTERY_REALTIME_ENABLED` is confirmed off in
+Vercel, so it is not live. Recorded in `WISHLIST.md` as "do not enable until the
+route logs usage" — the gate on that surface is now the wishlist entry, not the
+code.
