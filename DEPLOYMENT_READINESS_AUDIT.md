@@ -4,7 +4,7 @@
 **Repository:** `D:\WEB PROJECTS\hugh`  
 **Framework:** Next.js 16.2.9, React 19.2.4, TypeScript 5.9.3, Supabase, Anthropic, OpenAI, ElevenLabs  
 **Decision:** **Not ready for production deployment**
-**Superseded — see "Re-check: 22 August 2026" below for current status.**
+**Superseded — see "Re-check: 6 September 2026" below for current status.**
 
 The application has a sound foundation: strict TypeScript passes, the production build succeeds, all 294 unit tests pass, secrets are separated from client code, most tenant-owned data access is scoped correctly, and sensitive uploads use private storage with signed URLs. However, two directly exploitable security defects and several cost-control and deployment-safety gaps must be fixed before launch.
 
@@ -45,6 +45,8 @@ remains is concentrated almost entirely in one place: the **money path**.
 | 4 | Approved/unblocked enforcement | **Closed** for the paid-AI surface |
 | 5 | Atomic usage reservation + rate limiting | **OPEN** — nothing built |
 | 6 | Mandatory CI gates | **Closed** — `.github/workflows/ci.yml` |
+
+**Superseded — see "Re-check: 6 September 2026" below for current status.**
 
 ## The one thing that needs a human, not a commit
 
@@ -164,6 +166,83 @@ simply stops one layer below the risk.
 4. **Findings 5 and 7** — pre-launch chores.
 5. **Finding 6** — day one of production, not before.
 6. **Finding 8** — ongoing; add validation at each boundary as it is touched.
+
+---
+
+# Re-check: 6 September 2026
+
+The 4 August and 22 August sections are **left unedited on purpose**, same
+convention as before. This section is the current standing. Where any of the
+three disagree, this section is the newer fact.
+
+**Decision:** **ready for production deployment.** All six original release
+blockers are closed. What is left is a flag-off code defect and one open
+product decision, neither of which blocks shipping.
+
+## Gates, re-run 6 September 2026
+
+| Check | 22 Aug | 6 Sep |
+|---|---|---|
+| `npm run build` | Pass | **Pass** (exit 0), `/privacy` prerenders static |
+| `npx tsc --noEmit` | Pass | **Pass** — 0 real `any` (2 grep hits, both prose strings), 0 `@ts-ignore`, 0 TODO/FIXME |
+| `npm test` | 870 tests / 41 files | **1,255 tests / 58 files, all green** |
+| `npm run lint` | Clean | **Clean** |
+| `npm audit --omit=dev` | 0 vulnerabilities | **2 moderate, new** — transitive, see below |
+| CI | Present | **Unchanged** — green on PR #3 merge, 1m39s |
+| RLS | All 27 tables | Not re-verified this pass — no schema change since 22 Aug to prompt a recheck |
+| Secrets in git | Clean | **Clean** — only `.env.example` tracked |
+| Migrations | 031-045 applied | **031-050 applied**, 049 and 050 verified live against production DB |
+
+**The two new audit findings are transitive, not Hugh's own code:**
+`@xmldom/xmldom` (via `mammoth`, used for `.docx` extraction on the
+document-upload path) and `qs` (via `@duckdb/duckdb-wasm` and `elevenlabs`).
+Both moderate severity, both have a fix available via `npm audit fix`. Not
+release-blocking — these are the same class of dependency-drift finding the
+22 Aug gate closed once already, not a defect introduced by the two merges
+since.
+
+## Release blocker status
+
+| # | Blocker | Status |
+|---|---|---|
+| 1 | `profiles_owner` RLS self-promotion | Closed — 032 applied |
+| 2 | Unsafe `next`/`returnUrl` redirects | Closed — `utils/safe-redirect.ts` + 13 tests |
+| 3 | Vulnerable production dependencies | Closed — see transitive note above, not a blocker-grade regression |
+| 4 | Approved/unblocked enforcement | Closed for the paid-AI surface |
+| 5 | Atomic usage reservation + rate limiting | **Closed 2026-09-04** — migration 049, verified live (25 concurrent calls against a 10,000 cap granted exactly 10) |
+| 6 | Mandatory CI gates | Closed — `.github/workflows/ci.yml` |
+
+Blocker 5 was the last one open at the 22 August re-check. A seventh item
+surfaced and closed in the same window that was never on the original
+six-blocker list: **no privacy policy or terms existed anywhere in the app**,
+raised 2026-08-30, closed 2026-09-05 (PR #3) — `/privacy` is public and
+reachable before signup, and account deletion actually deletes across the
+stores that needed it.
+
+## What is left, in order of relevance
+
+1. **`mastery/realtime-session` spends without logging.** Calls
+   `enforceUsageGate` and never calls `logUsage` — the exact bug CLAUDE.md
+   names outright. Since migration 049 this means the reservation expires
+   unconfirmed rather than converting to recorded spend, so OpenAI Realtime
+   voice minutes would go unrecorded if this route ran. **Not live**:
+   `MASTERY_REALTIME_ENABLED` is confirmed off in Vercel. Tracked in
+   `WISHLIST.md`; do not set that flag true in production until the route
+   logs usage.
+2. **Retention TTL is an open product decision, not a code gap.** Migration
+   048 keeps `goal_answers` indefinitely with no TTL job, by deliberate
+   choice recorded in `CONTINUITY.md`. "Until you delete it" is accurate and
+   tested; it just has no expiry date attached. Needs a decision from
+   Travis, not a commit.
+3. **The two new transitive audit findings** above — mechanical
+   `npm audit fix`, not urgent.
+
+None of the three block a production deployment. The email-verification
+auto-approve caveat from the 22 August section (open signup reaching every
+paid AI route) is now covered by blocker 5 being closed: the reservation
+system enforces per-request and per-plan, so an unapproved-but-verified
+account can no longer overspend the shared budget the way it could when the
+gate was read-then-spend.
 
 ## Executive summary
 

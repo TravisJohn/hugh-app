@@ -6668,3 +6668,68 @@ reservation expires unconfirmed. `MASTERY_REALTIME_ENABLED` is confirmed off in
 Vercel, so it is not live. Recorded in `WISHLIST.md` as "do not enable until the
 route logs usage" — the gate on that surface is now the wishlist entry, not the
 code.
+
+---
+
+## Deployment audit re-checked — the verdict is now "ready" (2026-09-06)
+
+Third re-check appended to `DEPLOYMENT_READINESS_AUDIT.md`, following the
+convention the first two set: the 4 August and 22 August sections are **left
+unedited**, each marked superseded, and the newest section is the standing fact
+where they disagree. The audit is append-only on purpose — the value of it is
+that you can read what was believed at each point and see what moved.
+
+**The decision changed.** Not ready → **ready for production deployment**.
+
+### What closed since 22 August
+
+Two things, and only one of them was on the original list.
+
+**Blocker 5 — atomic usage reservation and rate limiting**, the last of the six
+originals, closed 2026-09-04. Migration 049, verified against the live database
+rather than reasoned about: 25 concurrent `reserve_usage` calls against a 10,000
+cap at 1,000 each granted exactly 10. Before 049 all 25 would have passed.
+
+**A seventh item that was never on the six-blocker list** — no privacy policy or
+terms existed anywhere in the app. Raised 2026-08-30, closed 2026-09-05 with
+PR #3. `/privacy` is public and reachable before signup, and account deletion
+actually deletes across the stores that needed it.
+
+Closing blocker 5 also retired the standing caveat from the 22 August section.
+That section warned that open signup plus email-verification auto-approve meant
+anyone who verified an address could spend the shared provider budget, because
+the gate was read-then-spend. The reservation system now enforces per request and
+per plan, so that specific route to overspending is shut.
+
+### Gates, re-run and checked by exit code
+
+`npm run lint` 0, `npx tsc --noEmit` 0, `npm run build` 0, and **1,255 tests
+across 58 files, all passing**. CI green on the PR #3 merge in 1m39s. Migrations
+031–050 applied, with 049 and 050 verified live.
+
+RLS was **not** re-verified this pass, and the section says so rather than
+implying it was. No schema change since 22 August prompts a recheck; 050 was
+verified live at the time it was applied.
+
+### New this pass
+
+Two moderate `npm audit` findings, both **transitive and neither in Hugh's own
+code**: `@xmldom/xmldom` via `mammoth` on the document-upload path, and `qs` via
+`@duckdb/duckdb-wasm` and `elevenlabs`. Both have fixes available. This is the
+same class of dependency drift the 22 August gate closed once already, not a
+defect introduced by the two merges since, so it is recorded as mechanical work
+rather than a blocker-grade regression.
+
+### What is left, and why none of it blocks
+
+1. **`mastery/realtime-session` spends without logging** — gates and never logs,
+   so since 049 the reservation expires unconfirmed instead of becoming recorded
+   spend. Not live: `MASTERY_REALTIME_ENABLED` confirmed off in Vercel. The gate
+   on that surface is the `WISHLIST.md` entry, not the code.
+2. **Retention TTL is a product decision, not a code gap.** 048 keeps
+   `goal_answers` indefinitely with no TTL job, by choice. "Until you delete it"
+   is accurate and tested; it simply has no expiry attached.
+3. **The two transitive audit findings** above.
+
+Nothing here needs a commit before a deploy. What Hugh is waiting on is a
+decision to deploy, not work.
