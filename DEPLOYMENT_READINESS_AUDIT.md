@@ -187,7 +187,7 @@ product decision, neither of which blocks shipping.
 | `npx tsc --noEmit` | Pass | **Pass** — 0 real `any` (2 grep hits, both prose strings), 0 `@ts-ignore`, 0 TODO/FIXME |
 | `npm test` | 870 tests / 41 files | **1,255 tests / 58 files, all green** |
 | `npm run lint` | Clean | **Clean** |
-| `npm audit --omit=dev` | 0 vulnerabilities | **2 moderate, new** — transitive, see below |
+| `npm audit --omit=dev` | 0 vulnerabilities | **0 vulnerabilities** — 2 moderate found and cleared this pass, see below |
 | CI | Present | **Unchanged** — green on PR #3 merge, 1m39s |
 | RLS | All 27 tables | Not re-verified this pass — no schema change since 22 Aug to prompt a recheck |
 | Secrets in git | Clean | **Clean** — only `.env.example` tracked |
@@ -234,8 +234,14 @@ stores that needed it.
    choice recorded in `CONTINUITY.md`. "Until you delete it" is accurate and
    tested; it just has no expiry date attached. Needs a decision from
    Travis, not a commit.
-3. **The two new transitive audit findings** above — mechanical
-   `npm audit fix`, not urgent.
+3. **The two new transitive audit findings** above — **closed the same
+   day.** `npm audit fix` took them lockfile-only, with no `package.json`
+   change and no direct dependency moved; `npm audit --omit=dev` now reports
+   0 vulnerabilities. All four gates were re-run after the bump because both
+   packages sit on live paths. Dev-only findings in `vitest` and `vite`
+   remain and are deliberately untouched: clearing them needs
+   `npm audit fix --force`, which is a breaking-change upgrade, and they are
+   not production exposure — the CI gate audits with `--omit=dev`.
 
 None of the three block a production deployment. The email-verification
 auto-approve caveat from the 22 August section (open signup reaching every

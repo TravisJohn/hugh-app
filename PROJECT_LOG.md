@@ -6733,3 +6733,60 @@ rather than a blocker-grade regression.
 
 Nothing here needs a commit before a deploy. What Hugh is waiting on is a
 decision to deploy, not work.
+
+---
+
+## Close-out: audit findings cleared, branches pruned (2026-09-06)
+
+A tidying pass, so the next piece of work starts from a clean tree rather than
+from a backlog of small unfinished things.
+
+### The two transitive audit findings, closed
+
+`npm audit fix` resolved both. **Lockfile only** — no `package.json` change and
+no direct dependency moved, 41 lines changed. `npm audit --omit=dev` went from
+2 moderate to **0 vulnerabilities**.
+
+All four gates were re-run after the bump rather than assumed, because both
+packages sit on live paths: `@xmldom/xmldom` is under `mammoth` on the
+document-upload path, and `qs` is under both `@duckdb/duckdb-wasm` and
+`elevenlabs`. Lint 0, `tsc` 0, build 0, 1,255 tests green.
+
+Dev-only findings in `vitest` and `vite` are left alone on purpose. Clearing
+them needs `npm audit fix --force`, which is a breaking-change upgrade, and they
+are not production exposure — the CI gate audits with `--omit=dev`.
+
+### Branch pruning, and why ancestry was the wrong question
+
+Four branches existed. `git branch --merged` claimed only one was merged, which
+was **misleading in three different ways**, and taking it at face value would
+have deleted real work or kept dead weight. Each was checked by comparing trees
+against `main`, not by ancestry:
+
+- **`feat/failure-paths`** — merged normally. GitHub had already auto-deleted it
+  at merge; only the stale local tracking ref remained. Pruned.
+- **`feat/curriculum-provenance`** — read as 20 ahead because it was
+  **rebase-merged**, so its commits are not ancestors of `main` even though its
+  content is. Everything unique to it was superseded: `delete-user.mjs`, which
+  `main` replaced with `delete-user.ts` during the privacy pass, and older
+  variants of files `main` has since moved past. Deleted, local and remote.
+- **`feat/topic-input-hardening`** — the one that looked alarming. Its commit
+  subject reads "harden the topic input against injection and PII leaks", which
+  sounds like unshipped security work. It is not: `lib/learn/topicInput.ts`, its
+  two test files, and `lib/observability/log.ts` are **byte-identical to
+  `main`**. The only files it holds that `main` lacks are `app/learn/page.tsx`
+  and `components/learn/TopicSetup.tsx` — the `/learn` surface **deliberately
+  deleted on 2026-08-31** — plus the superseded `delete-user.mjs`. Deleted.
+- **`feat/realtime-interview`** — **kept, deliberately.** This is the only
+  branch holding work that exists nowhere else: the OpenAI Realtime interview
+  voice, parked at `7652e60` and rolled back from `main` by product decision.
+  Deleting it would destroy it.
+
+The general lesson worth keeping: on a repo that rebase-merges, `--merged` is a
+statement about commit ancestry, not about whether the work landed. The question
+that actually matters is which files a branch holds that `main` does not.
+
+### State
+
+`main` at `2e277f6`, pushed, working tree clean. Remote holds `main` only.
+One local branch survives, and it is the parked one.
