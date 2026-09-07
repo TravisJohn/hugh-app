@@ -7018,3 +7018,58 @@ Stage 3 complete. Release blocker on observability is closed: every route in
 Hugh that spends money now says whether it worked. Stage 4 (restructuring
 `/admin` around the new page) is the remaining item from
 PRD-feature-registry.md. Nothing is committed yet.
+
+---
+
+## 2026-09-07 — Stage 4: the admin console, restructured
+
+The last item in PRD-feature-registry.md. `/admin` now answers one question
+before it reports anything else: does anything need me?
+
+### What changed
+
+- **`/admin` is an overview.** An attention panel first — accounts waiting for
+  approval, failures in the last 7 days named by feature, surfaces spending
+  without reporting, spend belonging to no feature, and any store that failed
+  to load. When all of those are clear it says "Nothing needs you", and says
+  plainly that this is a positive statement rather than an absence of data.
+- **Spend by feature**, which the old page could not produce at all. It groups
+  `usage_logs` by feature, which is only possible because the registry knows
+  that `learn/chat`, `learn/summarize`, `tracker/verify` and `tracker/points`
+  are all Ask Hugh.
+- **Provider status kept**, unchanged in substance: ElevenLabs quota bar and
+  the per-model Anthropic breakdown.
+- **`/admin/users` is new** and holds the account table, moved intact —
+  including the per-row per-model costing, which is load-bearing.
+- **Four nav cards** to Features, Users, Observability and Architecture, each
+  carrying a live figure rather than a label.
+
+### The one departure from the PRD
+
+The PRD said the feature table becomes the headline of `/admin`. It is not,
+because the full table already lives at `/admin/features`, and putting it in
+both places would make two near-identical pages and a summary that fits no
+screen. `/admin` instead carries the ONE number from it that matters at a
+glance — how many spending surfaces are reporting — on the Features card.
+
+### Why the user table moved rather than stayed
+
+Before launch it is the least informative thing in the console: a handful of
+accounts, most of them the founder's own test users, occupying the majority of
+the page. Every figure on it was per-user or per-model, which is precisely the
+grouping that could not answer "how is Notes doing?". It is unchanged, one
+click away, and now sits under a heading that says what it is for.
+
+### Verification
+
+Full suite 60 files / 1296 tests green. `tsc --noEmit` clean, eslint clean,
+`npm run build` compiles with `/admin`, `/admin/features` and `/admin/users`
+all registered. The drift guard caught `/admin/users` as an unclaimed page
+before it was added to the registry, which is the guard doing its job.
+
+### State
+
+PRD-feature-registry.md is complete: registry, guards, health page, fourteen
+routes instrumented, console restructured. `8 of 8` money-spending surfaces
+report an outcome. None of it has been viewed in a browser — the seeded test
+user is not an admin.

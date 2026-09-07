@@ -1,6 +1,6 @@
 # PRD — Feature Registry and the Operator's Console
 
-Status: proposed, awaiting approval
+Status: SHIPPED — all four stages, 2026-09-07
 Date: 2026-09-07
 Supersedes nothing. Extends PRD-observability.md.
 
@@ -13,11 +13,16 @@ folders with a master folder on top, for easier administration and better
 visibility.
 
 They should not, and the measurement says why. Across the 16 feature modules in
-`lib/`, there are **9 import edges between features in total** — `code` reads one
-thing from `case-lab`, `tracker` reads one thing from `learn`, and a few modules
-read the observability logger. Nothing else touches anything else. The features
-are already decoupled; the decoupling is simply expressed as folders inside one
-project rather than as separate projects.
+`lib/`, there are **two feature-to-feature import edges in total** —
+`tracker → learn`, because track generation runs the topic gate before it
+spends, and `code → case-lab`, because the notebook reuses the Pyodide session
+client. In `components/` there are five. Everything else each feature touches is
+shared infrastructure. The features are already decoupled; the decoupling is
+simply expressed as folders inside one project rather than as separate projects.
+
+(An earlier count in this document said nine. That was wrong: it counted
+features importing `lib/observability`, which is infrastructure every feature
+may use freely, not a dependency between features.)
 
 Splitting them physically would cost the single deploy, the single login session
 and the single database, and would buy nothing on the coupling axis, because the
