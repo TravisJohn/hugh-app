@@ -12,7 +12,11 @@ import {
   type DragStartEvent,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { Trophy, Medal, Crown } from "lucide-react";
+import { Trophy, Medal, Crown, AlertCircle } from "lucide-react";
+import {
+  outcomeOfStatus, outcomeOfThrown,
+  type SaveOutcome, type SaveFailure,
+} from "@/lib/errors/saveOutcome";
 import { type Milestone, type KanbanColumn, type BacklogPriorityMode, KANBAN_COLUMNS } from "@/types";
 import KanbanColumnComponent from "./KanbanColumn";
 import MilestoneCard from "./MilestoneCard";
@@ -48,6 +52,9 @@ export default function KanbanBoard({
   const [focusId, setFocusId]                     = useState<string | null>(focusMilestoneId ?? null);
   const [priorityMode, setPriorityMode]           = useState<BacklogPriorityMode>(backlogPriorityMode);
   const [showPremiumGate, setShowPremiumGate]     = useState(false);
+
+  // Set when an optimistic change was rolled back because the save was refused.
+  const [saveFailure, setSaveFailure] = useState<SaveFailure | null>(null);
 
   // Celebration state
   const [toastVisible, setToastVisible] = useState(false);
@@ -111,6 +118,36 @@ export default function KanbanBoard({
     setDraggingMilestone(ms ?? null);
   }
 
+  /**
+   * Send an optimistic change, and undo it on screen if the server refused.
+   *
+   * A dragged card is applied locally before the request so the board feels
+   * immediate. The undo used to hang off `.catch()` — but that only fires when
+   * the request never reached a server at all. A 401 or a 500 *resolves*, so
+   * the card sat happily in its new column while the database kept the old one,
+   * and the move quietly evaporated on the next page load. Reading the status
+   * is what makes the rollback fire for the failures that actually happen.
+   */
+  async function persistOrRollBack(url: string, body: object, rollBack: () => void) {
+    let outcome: SaveOutcome;
+    try {
+      const res = await fetch(url, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(body),
+      });
+      outcome = outcomeOfStatus(res.status);
+    } catch (err) {
+      outcome = outcomeOfThrown(err);
+    }
+
+    if (outcome.ok) return;
+
+    rollBack();
+    setToastVisible(false); // never leave a celebration up beside a failure
+    setSaveFailure(outcome);
+  }
+
   function handleDragEnd({ active, over }: DragEndEvent) {
     setDraggingMilestone(null);
     if (!over) return;
@@ -138,15 +175,13 @@ export default function KanbanBoard({
     if (newColumn === "review") patchBody.reviewValidated  = false;
     if (newColumn === "done")   patchBody.masteryValidated = false;
 
-    fetch(`/api/tracker/milestones/${milestoneId}`, {
-      method:  "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(patchBody),
-    }).catch(() => {
-      setMilestones(prev =>
+    void persistOrRollBack(
+      `/api/tracker/milestones/${milestoneId}`,
+      patchBody,
+      () => setMilestones(prev =>
         prev.map(m => m.id === milestoneId ? { ...m, ...current } : m)
-      );
-    });
+      ),
+    );
   }
 
   function handleDragCancel() {
@@ -208,18 +243,16 @@ export default function KanbanBoard({
     const orderedIds = newOrder.map(m => m.id);
 
     if (trackId) {
-      fetch(`/api/tracker/tracks/${trackId}/reorder`, {
-        method:  "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ orderedIds }),
-      }).catch(() => {
+      void persistOrRollBack(
+        `/api/tracker/tracks/${trackId}/reorder`,
+        { orderedIds },
         // Revert on failure
-        setMilestones(prev => prev.map(m =>
+        () => setMilestones(prev => prev.map(m =>
           m.id === a.id ? { ...m, position: a.position }
           : m.id === b.id ? { ...m, position: b.position }
           : m
-        ));
-      });
+        )),
+      );
     }
   }
 
@@ -355,6 +388,30 @@ export default function KanbanBoard({
               className="w-full text-center text-xs text-slate-600 hover:text-slate-400 transition-colors py-1"
             >
               Maybe later
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Save-refused notice ───────────────────────────────────────────
+          Sits where the celebration sits, and stays until dismissed. A move
+          that silently snapped back is the thing a learner is most likely to
+          miss, so this one does not time itself out. */}
+      {saveFailure && (
+        <div className="fixed bottom-8 left-1/2 z-50 animate-toast-in">
+          <div className="flex max-w-md items-start gap-3 rounded-2xl border border-red-500/50 bg-[#1a0505] px-5 py-4 shadow-2xl shadow-black/60 backdrop-blur-sm">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-500/20">
+              <AlertCircle size={18} className="text-red-400" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-red-300">Card moved back</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-red-200/80">{saveFailure.message}</p>
+            </div>
+            <button
+              onClick={() => setSaveFailure(null)}
+              className="shrink-0 self-start rounded-lg px-2 py-1 text-xs text-red-300/70 hover:bg-red-500/15 hover:text-red-200 transition-colors"
+            >
+              Dismiss
             </button>
           </div>
         </div>
