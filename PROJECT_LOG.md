@@ -7240,3 +7240,83 @@ loud.
 Items 1 and 2 done and committed on `fix/learn-failure-paths` (`2793ef2`,
 `b8fb0fa`). Items 3-5 queued. Board republished to the same URL with the
 widening recorded on the card rather than absorbed.
+
+## 2026-09-08 — Learn repair item 3: writes that never proved they wrote
+
+Item 3 of five. The card said three routes ignore the error their Supabase
+write returns. True, and not the whole defect.
+
+### The card was wrong about the fix, in a way worth keeping
+
+`if (error)` is necessary and **not sufficient**. A Supabase update or delete
+whose filter matches no rows does not fail: it answers `error: null` with no
+data, and a route checking only the error concludes it worked. Every RLS denial
+looks exactly like that from the route's side — asked, politely declined,
+nothing said. The only proof a row moved is to make the write hand one back.
+
+**New: `lib/supabase/writeResult.ts`** — `writeOutcome` reads a write's reply
+and separates `rejected` (the database complained) from `no-row` (it agreed and
+changed nothing). Structurally typed so it reads the same for `.single()` (an
+object or null) and a plain `.select()` (an array, possibly empty). Pure, 7
+tests (rule 7). All three routes now `.select(...)` on the write and run the
+reply through it.
+
+- **coverage POST** stored the checklist snapshot with a bare `await`. The
+  drawer ticks optimistically and publishes to the board card as it goes, so a
+  refusal reported here is what puts both back — this is the server half of
+  item 2's worst client defect.
+- **summary POST** wrote `outcome: "ok"` to `operations` regardless, which is
+  how `/admin/features` reports a feature as working while nothing is stored.
+  Now records `failed` with `detail.stage = "store"`.
+- **extract** rollback delete was itself unchecked, making its own comment a
+  hope rather than a guarantee: a failed rollback leaves exactly the
+  `awaiting_approval` goal with no pending extraction row that the comment says
+  can never be completed. A clean failure and a failure that stranded a dead
+  goal on the learner's board are now different sentences, because they leave
+  the learner in different places.
+
+### Two the card did not name, both forced by the work
+
+`logUsage` in summary POST sat **after** the store. Adding a failure exit above
+it would have skipped the log — creating item 4's defect inside the route item 3
+was fixing. Hoisted to the moment Claude answers: the spend is real whatever
+happens to the document next.
+
+The `point_status_events` insert is a deliberate best-effort inversion (the
+NEVER rule: observability must not break the thing it observes) and its comment
+already promised it never blocks the learner's save. A bare `await` did not
+guarantee that — a thrown connection failure would have propagated and turned a
+stored save into a 500. Now wrapped.
+
+### The money decision, Travis's call
+
+Asked first whether a failed store could be prevented database-side. It cannot,
+and the numbers are worth recording so nobody re-derives them:
+`MAX_SUMMARY_CHARS = 20_000` guards only the PUT path; the generated doc is
+capped by `max_tokens: 1024` at roughly 4,000 chars, ~5x under a limit that does
+not apply to it; and `summary_doc` is unbounded `TEXT` (migration 020). Size was
+never a plausible cause. What remains — dropped connections, timeouts, RLS —
+cannot be designed away.
+
+So Travis chose: **the learner keeps the document.** The route answers 200 with
+`saved: false` rather than discarding words already billed for. The panel renders
+the summary, says plainly it will not be there next time, keeps Download live,
+and offers **Try saving again** — which goes through **PUT**, not POST, because
+the document already exists and only the store failed. A rescue must never bill
+a second time for the same words.
+
+### Verification
+
+63 files / 1332 tests green (was 62 / 1325). `tsc --noEmit` clean, eslint clean,
+`npm run build` compiles.
+
+Stated plainly on the board: those tests cover the decision, not the three
+routes wired to it. There is no harness here for running a route against a fake
+database, and this run is not building one — the same stance as items 1 and 2.
+Offered to Travis as its own item if he wants it.
+
+### State
+
+Items 1-3 done and committed on `fix/learn-failure-paths` (`2793ef2`, `b8fb0fa`,
+`c60f714`). Items 4-5 queued. Expect `/admin/features` to look worse now: it has
+stopped reporting failed saves as successes.

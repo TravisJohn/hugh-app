@@ -423,11 +423,11 @@
     </p>
     <dl class="runstate">
       <div><dt>Items</dt><dd>5</dd></div>
-      <div><dt>Done</dt><dd class="green">2</dd></div>
+      <div><dt>Done</dt><dd class="green">3</dd></div>
       <div><dt>In progress</dt><dd>None</dd></div>
       <div><dt>Blocked</dt><dd>0</dd></div>
-      <div><dt>Gates</dt><dd class="green">lint · types · build · 1,325 tests pass</dd></div>
-      <div><dt>Updated</dt><dd>8 Sep 2026 · item 2 landed</dd></div>
+      <div><dt>Gates</dt><dd class="green">lint · types · build · 1,332 tests pass</dd></div>
+      <div><dt>Updated</dt><dd>8 Sep 2026 · item 3 landed</dd></div>
     </dl>
   </header>
 
@@ -441,14 +441,9 @@
     <div class="board">
 
       <div class="col col-queued">
-        <div class="col-head"><span>Queued</span><b>3</b></div>
+        <div class="col-head"><span>Queued</span><b>2</b></div>
 
 
-        <a class="card" href="#item-3">
-          <div class="card-top"><span class="card-num">03</span><span class="card-title">The server doesn't check its own saves</span></div>
-          <p class="card-sub">Ticks that come back unticked, and a paid-for summary that may never be stored.</p>
-          <div class="card-meta"><span>3 files</span><span>breaks a written rule</span></div>
-        </a>
 
         <a class="card" href="#item-4">
           <div class="card-top"><span class="card-num">04</span><span class="card-title">Money spent that nothing records</span></div>
@@ -474,7 +469,13 @@
       </div>
 
       <div class="col col-done">
-        <div class="col-head"><span>Done</span><b>2</b></div>
+        <div class="col-head"><span>Done</span><b>3</b></div>
+
+        <a class="card" href="#item-3">
+          <div class="card-top"><span class="card-num">03</span><span class="card-title">The server doesn't check its own saves</span></div>
+          <p class="card-sub">Three writes now prove a row actually changed — and a paid-for summary is no longer thrown away when it can't be stored.</p>
+          <div class="card-meta"><span>6 files</span><span>+7 tests</span></div>
+        </a>
 
         <a class="card" href="#item-2">
           <div class="card-top"><span class="card-num">02</span><span class="card-title">The milestone panel never says anything went wrong</span></div>
@@ -814,7 +815,7 @@
         <div class="entry-head">
           <span class="entry-num">03</span>
           <h3>The server doesn't check its own saves</h3>
-          <span class="pill pill-queued">Queued</span>
+          <span class="pill pill-done">Done</span>
         </div>
         <div class="entry-body">
           <div class="prose">
@@ -855,12 +856,79 @@
               </p>
             </div>
             <div class="block">
-              <h4>How you'll know it worked</h4>
+              <h4>What landed — and the card was wrong about the fix</h4>
               <p>
-                Tests that force each save to fail and confirm the server reports the
-                failure. There is nothing to click for this one — it's underneath the
-                screens in items 1 and 2, and it's what makes their error messages
-                truthful rather than guesswork.
+                "Look at the answer" turned out to be necessary and not enough.
+                A database write that matches <em>no rows</em> doesn't report an
+                error — it reports nothing at all, and quietly changes nothing.
+                So a route that only checks for errors still concludes it
+                worked.
+              </p>
+              <p>
+                That is not a rare case. It is exactly what a permission refusal
+                looks like from the server's side: the row simply isn't visible,
+                so nothing matches, so nothing is written, so nothing is said.
+                The quietest failure in the stack.
+              </p>
+              <p>
+                The real fix is to make each write hand back the row it changed,
+                and treat "nothing came back" as a failure. That check lives in
+                one small file with its own tests, so no route has to remember
+                the trap.
+              </p>
+            </div>
+            <div class="block">
+              <h4>Your call on the paid-for summary</h4>
+              <p>
+                You chose: when Hugh has written your summary but the database
+                won't keep it, you get the summary anyway. It renders, with a
+                plain line saying it couldn't be saved and won't be there next
+                time, and the Download button beside it still works.
+              </p>
+              <p>
+                There's also a <strong>Try saving again</strong> that costs
+                nothing. The words already exist — only the storing failed — so
+                the retry stores what's on screen rather than asking Claude to
+                write it a second time.
+              </p>
+              <p class="quiet">
+                Worth recording why this came up: I asked whether the failure
+                could be prevented on the database side instead. It can't. The
+                column is unlimited text, and the summary is capped by the model
+                at roughly 4,000 characters — about five times under the only
+                limit in that file, which doesn't even apply to this path. Size
+                was never the problem. What's left is dropped connections,
+                timeouts and permission refusals, and none of those can be
+                designed away.
+              </p>
+            </div>
+            <div class="block">
+              <h4>Something item 4 had to fix early</h4>
+              <p>
+                The summary route recorded what it spent <em>after</em> storing
+                the document. Adding a failure exit above that line would have
+                skipped the spend record entirely — quietly creating item 4's
+                defect in the very route item 3 was fixing. The cost is now
+                recorded the moment Claude answers, before anything can go
+                wrong, because the money is gone either way.
+              </p>
+            </div>
+            <div class="block">
+              <h4>How to check me</h4>
+              <p>
+                7 new tests on the check itself, including the one this item
+                exists for: <em>a write that matched no rows is reported as a
+                failure, not a success</em>. The suite went from 1,325 to 1,332,
+                all passing, with lint, types and a production build clean.
+              </p>
+              <p class="quiet">
+                Being straight about the limit: those tests cover the decision,
+                not the three routes wired to it. This project has no harness
+                for testing a route against a fake database, and this run isn't
+                building one — same approach as items 1 and 2, where the
+                decision is tested and the wiring is verified by reading. If
+                you'd rather I built that harness, say so and it becomes its own
+                item.
               </p>
             </div>
           </div>
@@ -868,15 +936,28 @@
             <section>
               <h5>Files</h5>
               <ul class="files">
+                <li>writeResult.ts <em>— new, the check</em></li>
+                <li>writeResult.test.ts <em>— new, 7 tests</em></li>
                 <li>coverage/route.ts <em>— checklist ticks</em></li>
                 <li>summary/route.ts <em>— milestone summary</em></li>
                 <li>extract/route.ts <em>— document cleanup</em></li>
+                <li>MilestoneDrawer.tsx <em>— the unsaved summary</em></li>
               </ul>
+            </section>
+            <section>
+              <h5>Scope note</h5>
+              <p class="risk-note">
+                Two beyond the card, both forced by the work: the summary
+                route's spend record had to move before a failure exit could be
+                added above it, and the checklist's history log was claiming to
+                be harmless while still able to fail a save. Recorded rather
+                than absorbed.
+              </p>
             </section>
             <section>
               <h5>Risk</h5>
               <div class="risk"><span class="risk-low">Low</span></div>
-              <p class="risk-note">Worth knowing: your admin health page may look <em>worse</em> after this, because it will stop reporting failed saves as successes.</p>
+              <p class="risk-note">Still expect your admin health page to look <em>worse</em> after this. It has stopped reporting failed saves as successes, which is the point.</p>
             </section>
           </aside>
         </div>
@@ -1019,7 +1100,7 @@
     <div class="rule-grid">
       <dl class="rule queued">
         <dt>Queued</dt>
-        <dd>Understood and scoped, not started. Items 3, 4 and 5 are here right now.</dd>
+        <dd>Understood and scoped, not started. Items 4 and 5 are here right now.</dd>
       </dl>
       <dl class="rule active">
         <dt>In progress</dt>
