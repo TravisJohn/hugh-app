@@ -6790,3 +6790,286 @@ that actually matters is which files a branch holds that `main` does not.
 
 `main` at `2e277f6`, pushed, working tree clean. Remote holds `main` only.
 One local branch survives, and it is the parked one.
+
+---
+
+## 2026-09-07 — The feature registry, and why Hugh is not being split up
+
+### The question
+
+Whether to decouple Hugh's features into separate work folders with a master
+folder on top, for easier administration and better visibility before the
+January launch.
+
+### The answer: no, and the measurement is why
+
+Across the 16 feature modules in `lib/`, there are **two** feature-to-feature
+import edges — `tracker -> learn` (the topic gate runs before generation spends)
+and `code -> case-lab` (the notebook reuses the Pyodide session client). In
+`components/` there are five. Everything else each feature touches is shared
+infrastructure: Supabase, auth, usage, observability, Claude.
+
+The decoupling being asked for already exists. It is expressed as folders inside
+one project rather than as separate projects. Splitting it physically would cost
+the single deploy, the single auth session and the single database — Next.js
+routes ARE the folder structure — and would buy nothing on the coupling axis,
+because the coupling is already near zero.
+
+**The real gap was never structural. Hugh had no feature axis.** Every figure on
+`/admin` is grouped by user or by model; not one is grouped by feature. That is
+not a page-layout problem: the three telemetry stores speak three different
+vocabularies by design (`usage_logs` route-level, `activity_events`
+surface-level, `operation_events` operation-level) and nothing mapped between
+them. No page could group by feature no matter how it was written.
+
+### Shipped — Stage 1 of PRD-feature-registry.md
+
+- **`lib/registry/features.ts`** — 18 surfaces, each declaring its pages, API
+  routes, lib and component directories, tables, and — the part that did not
+  exist anywhere — which rows in each of the three stores belong to it. This is
+  the join key that makes `/admin/features` possible.
+- **`lib/registry/features.test.ts`** — 21 tests, two jobs. The **drift guard**
+  fails the build when a route, folder, spend string or operation id is added
+  without an owner. The **boundary guard** fails the build on any undeclared
+  feature-to-feature import.
+
+Verified by planting a deliberate violation: `lib/cases` importing `lib/notes`
+failed the build and named the file. A guard that has never been seen to fail is
+not known to work.
+
+### Decisions
+
+- **`lib/monitor/features.ts` was left alone, not absorbed.** It already is a
+  surface registry for the ten learner-facing calendars, and it owns display
+  concerns (order, seed caveats) the app registry has no business holding. The
+  new registry declares its own `activityFeatures` and a test asserts the two
+  agree. Two lists that cannot drift beat one list that must serve two masters.
+- **TTS spend is not credited to Mastery.** `lib/monitor/features.ts` had already
+  settled this: `tts` rows belong to whichever surface was speaking and cannot be
+  attributed to one. It is owned by an internal `voice` feature so the spend
+  stays visible without being mis-attributed.
+- **A directory may be claimed by more than one feature; a route may not.**
+  `lib/learn` serves both the board and Ask Hugh; `lib/code` serves both the
+  drills and the sandbox. Code layout and surface boundaries are different
+  partitions, and forcing them to be one would make one of them a lie. Routes
+  partition cleanly, so those are asserted as exactly-one.
+- **`spendsTokens: false` is now machine-checked.** The rule that the margin,
+  Cases and Case Lab spend nothing was held by a comment. Comments cannot fail a
+  build; this now does.
+
+### Findings surfaced by the work
+
+- **The instrumentation gap is worse than first reported: 14 of 18
+  money-spending routes record no outcome, not 11.** The earlier count credited
+  three routes that import `logSafeError` — console-only sanitized logging — as
+  though they wrote to `operation_events`. They do not. By surface, it reads
+  4 of 8 spending features instrumented; Code, Cloud, Notes and Voice are blind.
+  The test suite now prints this on every run.
+- **One dependency inversion exists:** `lib/claude/prompts.ts` imports
+  `lib/learn`. Infrastructure that depends on a feature is effectively imported
+  by everything. Reported, not failed — it predates the registry and untangling
+  it is not part of introducing the guard.
+
+### State
+
+Full suite green: 59 files, 1276 tests. `tsc --noEmit` clean, eslint clean.
+Nothing shipped in this stage touches running code — the registry is pure data
+and the guards are tests. Stage 2 (the `/admin/features` health page) is next.
+
+---
+
+## 2026-09-07 — Stage 2: the feature health page
+
+Option A chosen: the page ships now, showing what it cannot see, rather than in
+November complete. The deciding argument was that a page which cannot say "I
+cannot see this" has no way to tell you when it is wrong — and that a missed
+route on a page with no such state looks identical to a healthy one.
+
+### Shipped
+
+- **`lib/registry/health.ts`** — the three-store join, pure and tested. Takes
+  raw `usage_logs`, `activity_events` and `operation_events` rows and returns
+  one health row per feature.
+- **`lib/registry/health.test.ts`** — 17 tests.
+- **`app/admin/features/page.tsx`** — the console. Progress banner, read-failure
+  banner, unattributed-spend banner, and one row per surface across a 7d / 30d /
+  all-time window.
+- `/admin` header now links to it.
+
+### Decisions
+
+- **Three instrumentation states, not two.** `reporting`, `blind`, `no-spend`.
+  A feature that spends and records nothing is neither healthy nor broken — it
+  is invisible, and renders as its own amber state. Cases, Case Lab and the
+  margin are `no-spend` and render grey, because showing them as gaps would
+  manufacture work that does not exist.
+- **The test count moved into the registry.** It was going to be counted from
+  the filesystem at request time, which would have been right locally and blank
+  on Vercel, where the source tree is not deployed. It is now a declared number
+  with a guard asserting it against the real count — accurate in production, and
+  unable to go stale.
+- **Unattributed spend is surfaced, not dropped.** A `usage_logs.feature` string
+  matching no registry entry is summed into its own banner and counted in the
+  total. The drift guard makes this impossible at build time, but a historic row
+  from deleted code can still arrive at runtime, and money belonging to nothing
+  must be visible as exactly that.
+- **Each store's read failure is tracked separately.** If spend fails to load
+  its column shows "—" and a red banner names it; it never renders as zero.
+  "We could not load it" and "there is none" are different sentences.
+- **The page uses `min-h-screen` and scrolls**, following the existing `/admin`
+  and `/admin/observability` precedent. Rule 4 governs teaching surfaces; the
+  operator console has always been the other thing.
+
+### Verification
+
+Full suite 60 files / 1294 tests green. `tsc --noEmit` clean, eslint clean,
+`npm run build` succeeds with `/admin/features` registered as a dynamic route.
+The page has NOT been viewed in a browser: the seeded test user is not an admin,
+and granting it admin would mean writing to the live Supabase project.
+
+### State
+
+`4 of 8` money-spending surfaces instrumented. Code, Cloud, Notes and Voice are
+blind and now say so on the page. Stage 3 is closing those, and progress will be
+visible on the page itself as it happens.
+
+---
+
+## 2026-09-07 — Stage 3: closing the observability gap
+
+`8 of 8` money-spending surfaces now record whether the spend worked. The page
+built in Stage 2 has no amber rows left.
+
+### The grain problem, and why the work was bigger than the page implied
+
+Turning the four amber rows green needed only four operations. But fourteen
+ROUTES were blind, and several sat inside features that already showed green —
+`learn/summarize` and `mastery/recap` among them. Instrumenting only enough to
+clear the amber would have turned every row green while a third of Hugh's
+spending routes still recorded nothing: the same "a blank reads as a pass"
+failure the project exists to prevent, one level down.
+
+So all fourteen were instrumented, and a new guard now makes a spending route
+without an outcome record a **failed build**.
+
+### Shipped
+
+- **Fourteen new operations** in `lib/observability/operations.ts`, taking the
+  vocabulary from 7 to 21, with four new domains: `code`, `cloud`, `notes`,
+  `voice`.
+- **Fourteen routes instrumented**: cloud/chat, code/chat, code/generate-drill,
+  notes/coach, notes/summarize, tts, learn/summarize, mastery/recap,
+  mastery/session, dashboard/refine, document/extract, entries/verify,
+  milestones/coverage, milestones/summary.
+- **The route-coverage guard** in `lib/registry/features.test.ts`.
+
+### Two silent failures found, which is the point of having looked
+
+- **`code.drill` fails open.** A generation failure serves `SAMPLE_DRILL`. The
+  learner practises something real and never learns it was not the drill meant
+  for them, so a generator that had stopped generating looked exactly like one
+  that was working.
+- **`ask.coverage` fails open.** A parse failure returns null and the milestone
+  simply has no learning points. An empty rail is indistinguishable from a
+  milestone that legitimately has none, so nobody would ever report it.
+
+Both are marked `failureIsSilent`, which puts them in the existing "Failures
+nobody saw" panel on `/admin/observability`. Before today, Hugh had exactly one
+known fail-open path (`topic.gate`). It had three.
+
+### Decisions
+
+- **Usage-gate blocks are recorded as `refused`, not ignored.** A learner hitting
+  their quota is now visible as its own outcome rather than as silence.
+- **Cache hits are deliberately not recorded.** `code.drill` counts attempts to
+  GENERATE; counting a cache hit as `ok` would pad the success rate with work
+  that never ran and hide a broken generator behind a warm cache.
+- **`mastery/session` gained an outer try/catch.** It had none, so an SDK throw
+  became an unhandled 500 that left no trace. Now it records and returns 502,
+  matching every sibling route.
+- **`dashboard/refine` records one row per REQUEST, not per attempt.** It retries
+  once and both attempts bill, so `detail.attempts` carries the charge count
+  while the outcome stays "did the learner get their question".
+- **Document extract records only the file's MIME type.** Never the filename,
+  never extracted text — that route carries learner-supplied documents.
+
+### A guard that did not work, and now does
+
+The route-coverage guard originally matched `recordOperation` anywhere in the
+source. Probing it by deleting cloud/chat's import left the call sites behind,
+and the test still passed — a route that merely mentioned the function in a
+comment would have counted as instrumented. It now matches on the IMPORT, the
+same way it detects `logUsage`. Re-probed: the build fails and names the file.
+
+Worth recording that the first probe was itself broken — a `perl` substitution
+with `\n` against CRLF line endings silently matched nothing, so an earlier
+"passing" run had tested precisely nothing. Two probes were needed before the
+guard was known to work.
+
+### Verification
+
+Full suite 60 files / 1296 tests green. `tsc --noEmit` clean, eslint clean,
+`npm run build` compiles with `/admin/features` registered. Guard verified by
+deliberate violation, twice.
+
+### State
+
+Stage 3 complete. Release blocker on observability is closed: every route in
+Hugh that spends money now says whether it worked. Stage 4 (restructuring
+`/admin` around the new page) is the remaining item from
+PRD-feature-registry.md. Nothing is committed yet.
+
+---
+
+## 2026-09-07 — Stage 4: the admin console, restructured
+
+The last item in PRD-feature-registry.md. `/admin` now answers one question
+before it reports anything else: does anything need me?
+
+### What changed
+
+- **`/admin` is an overview.** An attention panel first — accounts waiting for
+  approval, failures in the last 7 days named by feature, surfaces spending
+  without reporting, spend belonging to no feature, and any store that failed
+  to load. When all of those are clear it says "Nothing needs you", and says
+  plainly that this is a positive statement rather than an absence of data.
+- **Spend by feature**, which the old page could not produce at all. It groups
+  `usage_logs` by feature, which is only possible because the registry knows
+  that `learn/chat`, `learn/summarize`, `tracker/verify` and `tracker/points`
+  are all Ask Hugh.
+- **Provider status kept**, unchanged in substance: ElevenLabs quota bar and
+  the per-model Anthropic breakdown.
+- **`/admin/users` is new** and holds the account table, moved intact —
+  including the per-row per-model costing, which is load-bearing.
+- **Four nav cards** to Features, Users, Observability and Architecture, each
+  carrying a live figure rather than a label.
+
+### The one departure from the PRD
+
+The PRD said the feature table becomes the headline of `/admin`. It is not,
+because the full table already lives at `/admin/features`, and putting it in
+both places would make two near-identical pages and a summary that fits no
+screen. `/admin` instead carries the ONE number from it that matters at a
+glance — how many spending surfaces are reporting — on the Features card.
+
+### Why the user table moved rather than stayed
+
+Before launch it is the least informative thing in the console: a handful of
+accounts, most of them the founder's own test users, occupying the majority of
+the page. Every figure on it was per-user or per-model, which is precisely the
+grouping that could not answer "how is Notes doing?". It is unchanged, one
+click away, and now sits under a heading that says what it is for.
+
+### Verification
+
+Full suite 60 files / 1296 tests green. `tsc --noEmit` clean, eslint clean,
+`npm run build` compiles with `/admin`, `/admin/features` and `/admin/users`
+all registered. The drift guard caught `/admin/users` as an unclaimed page
+before it was added to the registry, which is the guard doing its job.
+
+### State
+
+PRD-feature-registry.md is complete: registry, guards, health page, fourteen
+routes instrumented, console restructured. `8 of 8` money-spending surfaces
+report an outcome. None of it has been viewed in a browser — the seeded test
+user is not an admin.

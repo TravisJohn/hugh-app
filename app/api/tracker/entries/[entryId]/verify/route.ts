@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { factCheckEntryPrompt, parseClaudeJson } from "@/lib/claude/prompts";
 import { checkUsageAllowed, logUsage } from "@/lib/usage";
+import { recordOperation } from "@/lib/observability/record";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -59,6 +60,8 @@ export async function POST(
   const topic =
     (milestone?.tracks as { topic_description?: string } | null)?.topic_description ?? title;
 
+  const startedAt = Date.now();
+
   try {
     const res = await anthropic.messages.create({
       model:      MODEL,
@@ -89,9 +92,19 @@ export async function POST(
       .single();
 
     void logUsage({ userId, model: MODEL, feature: "tracker/verify", tokensIn: res.usage.input_tokens, tokensOut: res.usage.output_tokens });
+    // The verdict is recorded, never the entry: only a verified line may be
+    // quoted by a review quiz, so the ratio here is worth watching.
+    void recordOperation({
+      userId, operation: "ask.verify", outcome: "ok",
+      durationMs: Date.now() - startedAt, detail: { verdict: parsed.status },
+    });
     return NextResponse.json({ entry: updated });
   } catch (err) {
     console.error("[tracker/verify] error:", err);
+    void recordOperation({
+      userId, operation: "ask.verify", outcome: "failed",
+      durationMs: Date.now() - startedAt, error: err, redact: [topic, title],
+    });
     return NextResponse.json({ error: "Failed to verify entry" }, { status: 502 });
   }
 }

@@ -38,10 +38,24 @@ export const OPERATION_OUTCOMES: readonly OperationOutcome[] = [
 export type OperationId =
   | "track.build"
   | "track.retry"
+  | "track.refine"
+  | "track.extract"
+  | "track.summary"
   | "topic.gate"
   | "quiz.generate"
   | "mastery.evaluate"
+  | "mastery.recap"
+  | "mastery.session"
   | "ask.chat"
+  | "ask.summarize"
+  | "ask.verify"
+  | "ask.coverage"
+  | "code.chat"
+  | "code.drill"
+  | "cloud.chat"
+  | "notes.coach"
+  | "notes.summarize"
+  | "voice.speak"
   | "answers.forget";
 
 /**
@@ -49,7 +63,8 @@ export type OperationId =
  * `code.drill` or `notes.coach` without renaming anything that exists.
  */
 export type OperationDomain =
-  | "track" | "topic" | "quiz" | "mastery" | "ask" | "answers";
+  | "track" | "topic" | "quiz" | "mastery" | "ask" | "answers"
+  | "code" | "cloud" | "notes" | "voice";
 
 export interface OperationDefinition {
   /** Stored in `operation_events.operation`. Stable — changing one orphans history. */
@@ -164,6 +179,159 @@ export const OPERATIONS: readonly OperationDefinition[] = [
       "half-succeeded leaves derived text in a table they cannot reach, and " +
       "the count is the only evidence it ran at all. The row records how " +
       "many rows went, never what they said.",
+  },
+
+  // ── v2, 2026-09-07 ────────────────────────────────────────────────────────
+  // The fourteen routes that spent money and reported nothing. Before these,
+  // four of eighteen spending routes recorded an outcome; the registry's
+  // route-coverage guard now makes a silent spender a failed build.
+  {
+    id:               "track.refine",
+    domain:           "track",
+    label:            "Refine topic question",
+    clientReportable: false,
+    failureIsSilent:  false,
+    description:
+      "Generating the next 5-whys question while a learner shapes a topic. " +
+      "Retries internally and each attempt bills, so a 'failed' row here can " +
+      "represent several charges.",
+  },
+  {
+    id:               "track.extract",
+    domain:           "track",
+    label:            "Extract topic from document",
+    clientReportable: false,
+    failureIsSilent:  false,
+    description:
+      "Reading an uploaded PDF, DOCX or HTML and proposing a topic from it. " +
+      "The entry point that carries learner-supplied files, so its failures " +
+      "are also the ones most worth watching for prompt injection.",
+  },
+  {
+    id:               "track.summary",
+    domain:           "track",
+    label:            "Summarise milestone",
+    clientReportable: false,
+    failureIsSilent:  false,
+    description:
+      "Writing the summary shown on a milestone card.",
+  },
+  {
+    id:               "mastery.recap",
+    domain:           "mastery",
+    label:            "Write mastery recap",
+    clientReportable: false,
+    failureIsSilent:  false,
+    description:
+      "Composing the written recap after a spoken mastery attempt. Separate " +
+      "from mastery.evaluate because scoring can succeed while the recap fails.",
+  },
+  {
+    id:               "mastery.session",
+    domain:           "mastery",
+    label:            "Open mastery session",
+    clientReportable: false,
+    failureIsSilent:  false,
+    description:
+      "Starting a scripted mastery session and generating its opening line.",
+  },
+  {
+    id:               "ask.summarize",
+    domain:           "ask",
+    label:            "Summarise chat to diary",
+    clientReportable: false,
+    failureIsSilent:  false,
+    description:
+      "Turning a tutor-chat exchange into a diary entry. The step the review " +
+      "quiz depends on, so a run of failures here starves quizzes of material.",
+  },
+  {
+    id:               "ask.verify",
+    domain:           "ask",
+    label:            "Fact-check diary entry",
+    clientReportable: false,
+    failureIsSilent:  false,
+    description:
+      "Checking a learner's diary entry against what was taught. Only " +
+      "verified lines may be quoted by a review quiz.",
+  },
+  {
+    id:               "ask.coverage",
+    domain:           "ask",
+    label:            "Generate learning points",
+    clientReportable: false,
+    // Fails OPEN: a parse failure returns null and the milestone simply has no
+    // learning points. The learner sees an empty list, which is
+    // indistinguishable from a milestone that legitimately has none — so
+    // nobody reports it. The second fail-open path found in Hugh, after
+    // topic.gate.
+    failureIsSilent:  true,
+    description:
+      "Deriving a milestone's learning points. A parse failure returns null " +
+      "and the points are silently absent, so the failure reaches nobody.",
+  },
+  {
+    id:               "code.chat",
+    domain:           "code",
+    label:            "Code helper",
+    clientReportable: false,
+    failureIsSilent:  false,
+    description:
+      "One exchange with the sandbox's code helper.",
+  },
+  {
+    id:               "code.drill",
+    domain:           "code",
+    label:            "Generate code drill",
+    clientReportable: false,
+    // Fails OPEN: generation failure serves SAMPLE_DRILL instead. The learner
+    // gets a working drill and never learns it was not the one meant for them,
+    // so a generator that has stopped generating looks exactly like one that
+    // is working.
+    failureIsSilent:  true,
+    description:
+      "Generating a fluency drill. Falls back to a sample drill on failure, " +
+      "so the learner practises something real and reports nothing.",
+  },
+  {
+    id:               "cloud.chat",
+    domain:           "cloud",
+    label:            "Cloud assistant",
+    clientReportable: false,
+    failureIsSilent:  false,
+    description:
+      "One exchange with the cloud-services assistant. The only AI on an " +
+      "otherwise zero-runtime-AI surface.",
+  },
+  {
+    id:               "notes.coach",
+    domain:           "notes",
+    label:            "Notes Coach",
+    clientReportable: false,
+    failureIsSilent:  false,
+    description:
+      "Reading a learner's screenshot and correcting their reasoning. The " +
+      "only vision call in Hugh, and the most expensive per attempt.",
+  },
+  {
+    id:               "notes.summarize",
+    domain:           "notes",
+    label:            "Summarise screenshot",
+    clientReportable: false,
+    failureIsSilent:  false,
+    description:
+      "Condensing a screenshot into a one-line note title.",
+  },
+  {
+    id:               "voice.speak",
+    domain:           "voice",
+    label:            "Speak (TTS)",
+    clientReportable: false,
+    failureIsSilent:  false,
+    description:
+      "Turning text into speech through ElevenLabs. Billed in characters " +
+      "rather than tokens, and called by whichever surface is speaking — " +
+      "which is why its spend cannot be credited to one of them.",
   },
 ] as const;
 

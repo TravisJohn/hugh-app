@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { enforceUsageGate, logUsage } from "@/lib/usage";
+import { recordOperation } from "@/lib/observability/record";
 import { sanitizeCovered } from "@/lib/learn/sessionRecord";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -17,7 +18,13 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const usageGate = await enforceUsageGate(user.id, "learn/summarize");
-  if (usageGate) return usageGate;
+  if (usageGate) {
+    void recordOperation({
+      userId: user.id, operation: "ask.summarize", outcome: "refused",
+      detail: { reason: "usage-gate" },
+    });
+    return usageGate;
+  }
 
   const body = await req.json() as {
     topic: string;
@@ -62,6 +69,8 @@ Rules:
 - Do not use markdown inside the JSON values
 - Return ONLY the JSON object, no fences, no commentary`;
 
+  const startedAt = Date.now();
+
   try {
     const response = await anthropic.messages.create({
       model:      MODEL,
@@ -73,6 +82,10 @@ Rules:
 
     const block = response.content[0];
     if (block.type !== "text") {
+      void recordOperation({
+        userId: user.id, operation: "ask.summarize", outcome: "failed",
+        durationMs: Date.now() - startedAt, detail: { stage: "non-text-block" },
+      });
       return NextResponse.json({ error: "Unexpected response type" }, { status: 500 });
     }
 
@@ -83,13 +96,23 @@ Rules:
       story: string; takeaway: string; title?: string; covered?: unknown;
     };
 
+    void recordOperation({
+      userId: user.id, operation: "ask.summarize", outcome: "ok",
+      durationMs: Date.now() - startedAt,
+    });
     return NextResponse.json({
       story:    parsed.story,
       takeaway: parsed.takeaway,
       title:    parsed.title ?? null,
       covered:  sanitizeCovered(parsed.covered),
     });
-  } catch {
+  } catch (err) {
+    // A run of failures here starves review quizzes of material, because only
+    // a saved diary entry can be quoted by one.
+    void recordOperation({
+      userId: user.id, operation: "ask.summarize", outcome: "failed",
+      durationMs: Date.now() - startedAt, error: err, redact: [topic],
+    });
     return NextResponse.json({ error: "Failed to generate summary" }, { status: 500 });
   }
 }

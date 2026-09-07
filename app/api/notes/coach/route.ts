@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { requireProvisionedApi } from "@/lib/auth/requireProvisioned";
 import { enforceUsageGate, logUsage } from "@/lib/usage";
+import { recordOperation } from "@/lib/observability/record";
 import { createServiceClient } from "@/lib/supabase/service";
 import { NOTE_IMAGES_BUCKET } from "@/lib/notes/storage";
 import { buildCoachMessages, type CoachThreadMessage } from "@/lib/notes/coachPrompt";
@@ -42,10 +43,24 @@ export async function POST(request: NextRequest) {
   // and bucket directly; this stops our own service-role client, which
   // bypasses RLS entirely.
   const denied = await requireProvisionedApi(userId, "notes");
-  if (denied) return denied;
+  if (denied) {
+    // Notes is off by default since the privacy pass. Being turned away is the
+    // system working, so it is 'refused' — never a failure.
+    void recordOperation({
+      userId, operation: "notes.coach", outcome: "refused",
+      detail: { reason: "not-provisioned" },
+    });
+    return denied;
+  }
 
   const usageGate = await enforceUsageGate(userId, "notes/coach");
-  if (usageGate) return usageGate;
+  if (usageGate) {
+    void recordOperation({
+      userId, operation: "notes.coach", outcome: "refused",
+      detail: { reason: "usage-gate" },
+    });
+    return usageGate;
+  }
 
   const body = (await request.json().catch(() => ({}))) as { image_id?: string };
   const imageId = body.image_id?.trim();
@@ -60,6 +75,8 @@ export async function POST(request: NextRequest) {
       { status: 503 },
     );
   }
+
+  const startedAt = Date.now();
 
   try {
     const db = createServiceClient();
@@ -94,6 +111,10 @@ export async function POST(request: NextRequest) {
     // something the learner never asked.
     const dataUrls = await Promise.all(slices.map((s) => toDataUrl(db, s.storage_path, s.mime)));
     if (dataUrls.some((u) => u === null)) {
+      void recordOperation({
+        userId, operation: "notes.coach", outcome: "failed",
+        durationMs: Date.now() - startedAt, detail: { stage: "read-screenshot" },
+      });
       return NextResponse.json({ error: "Couldn't read that screenshot. Try again." }, { status: 502 });
     }
 
@@ -123,6 +144,12 @@ export async function POST(request: NextRequest) {
 
     const reply = res.choices[0]?.message?.content?.trim();
     if (!reply) {
+      // Billed and empty: logUsage above already charged for this attempt, so
+      // it must show as a failure rather than vanish.
+      void recordOperation({
+        userId, operation: "notes.coach", outcome: "failed",
+        durationMs: Date.now() - startedAt, detail: { stage: "empty-reply" },
+      });
       return NextResponse.json({ error: "The Coach couldn't respond just now. Try again." }, { status: 502 });
     }
 
@@ -133,9 +160,17 @@ export async function POST(request: NextRequest) {
       .single();
     if (error) throw error;
 
+    void recordOperation({
+      userId, operation: "notes.coach", outcome: "ok",
+      durationMs: Date.now() - startedAt,
+    });
     return NextResponse.json({ message: data as NoteMessage });
   } catch (e) {
     console.error("[notes/coach] failed:", e);
+    void recordOperation({
+      userId, operation: "notes.coach", outcome: "failed",
+      durationMs: Date.now() - startedAt, error: e,
+    });
     return NextResponse.json({ error: "The Coach ran into a problem. Try again." }, { status: 502 });
   }
 }

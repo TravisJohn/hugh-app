@@ -1,25 +1,49 @@
 import Link from "next/link";
-import { ArrowLeft, Users, Zap, DollarSign, AlertTriangle, ExternalLink } from "lucide-react";
+import {
+  ArrowLeft, ArrowRight, Layers, Users, Activity, Boxes,
+  CheckCircle2, AlertTriangle, ExternalLink,
+} from "lucide-react";
 import { requireAdminPage } from "@/lib/auth/requireAdmin";
 import { createServiceClient } from "@/lib/supabase/service";
-import { estimateCost, DEFAULT_MONTHLY_TOKEN_LIMIT } from "@/lib/usage";
+import { estimateCost } from "@/lib/usage";
 import { MODEL_RATES } from "@/lib/pricing";
-import AdminActions from "./AdminActions";
+import {
+  buildHealthReport, formatUsd,
+  type UsageRow, type OperationRow,
+} from "@/lib/registry/health";
 
-// ── ElevenLabs subscription fetch ─────────────────────────────────────────
+// ── Admin console ───────────────────────────────────────────────────────────
+//
+// The operator's landing page. It answers one question first — does anything
+// need me? — and only then reports spend.
+//
+// It used to lead with a table of every user account, which before launch is
+// the least informative thing on the page and crowded out everything else.
+// That table now lives at /admin/users, unchanged. Detail lives one click
+// away in each case; this page is a summary that must fit one screen.
+//
+// Spend is broken down BY FEATURE here, which the old page could not do at
+// all: usage_logs.feature is route-level, and only lib/registry/features.ts
+// knows which routes make up Notes.
+
+export const dynamic = "force-dynamic";
+
+const ATTENTION_WINDOW_DAYS = 7;
+const ROW_CAP = 5000;
+
 interface ElevenLabsSubscription {
-  tier:                         string;
-  character_count:              number;
-  character_limit:              number;
+  tier:                            string;
+  character_count:                 number;
+  character_limit:                 number;
   next_character_count_reset_unix: number;
-  status:                       string;
+  status:                          string;
 }
 
 async function fetchElevenLabsStatus(): Promise<ElevenLabsSubscription | null> {
   try {
     const res = await fetch("https://api.elevenlabs.io/v1/user", {
       headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY! },
-      next:    { revalidate: 300 }, // cache 5 min
+      next:    { revalidate: 300 },
     });
     if (!res.ok) return null;
     const data = await res.json() as { subscription: ElevenLabsSubscription };
@@ -36,359 +60,373 @@ function startOfMonth(): string {
   return d.toISOString();
 }
 
-function badge(label: string, color: string) {
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${color}`}>
-      {label}
-    </span>
-  );
-}
-
-function statusBadge(approved: boolean, isBlocked: boolean, isAdmin: boolean) {
-  if (isAdmin)    return badge("Admin",   "bg-violet-500/20 text-violet-300");
-  if (isBlocked)  return badge("Blocked", "bg-red-500/15 text-red-400");
-  if (approved)   return badge("Active",  "bg-green-500/15 text-green-400");
-  return badge("Pending", "bg-amber-500/15 text-amber-400");
-}
-
 function fmt(n: number) {
-  return n >= 1_000_000
-    ? `${(n / 1_000_000).toFixed(1)}M`
-    : n >= 1_000
-    ? `${(n / 1_000).toFixed(1)}k`
-    : String(n);
+  return n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M`
+       : n >= 1_000     ? `${(n / 1_000).toFixed(1)}k`
+       : String(n);
 }
 
 export default async function AdminPage() {
   await requireAdminPage();
 
-  // Fetch all data via service role
   const service    = createServiceClient();
   const monthStart = startOfMonth();
+  // Server Component with force-dynamic: renders once per request, so "now" is
+  // a request timestamp rather than a value that shifts between re-renders.
+  // eslint-disable-next-line react-hooks/purity
+  const windowStart = new Date(Date.now() - ATTENTION_WINDOW_DAYS * 86_400_000).toISOString();
 
-  const [
-    { data: { users: authUsers } },
-    { data: profiles },
-    { data: usageLogs },
-    elevenLabs,
-  ] = await Promise.all([
-    service.auth.admin.listUsers({ perPage: 200 }),
-    service.from("profiles").select("*"),
+  const [usageRes, opsRes, profilesRes, elevenLabs] = await Promise.all([
     service.from("usage_logs")
-      .select("user_id, tokens_in, tokens_out, tts_chars, model, created_at")
-      .gte("created_at", monthStart),
+      .select("feature, tokens_in, tokens_out, tts_chars, model")
+      .gte("created_at", monthStart)
+      .limit(ROW_CAP),
+    service.from("operation_events")
+      .select("operation, outcome")
+      .gte("created_at", windowStart)
+      .limit(ROW_CAP),
+    service.from("profiles").select("user_id, approved, is_blocked, is_admin"),
     fetchElevenLabsStatus(),
   ]);
 
-  // Build lookup maps
-  const profileMap = new Map((profiles ?? []).map(p => [p.user_id as string, p]));
+  // Each read is tracked separately: a dropped query must never render as a
+  // clean bill of health (CLAUDE.md rule 5).
+  const failed = {
+    spend:    usageRes.error    !== null,
+    outcomes: opsRes.error      !== null,
+    accounts: profilesRes.error !== null,
+  };
 
-  // Per-user usage totals (respecting usage_reset_at).
-  //
-  // Cost accumulates PER ROW, priced at that row's own model, because Hugh
-  // deliberately mixes models whose rates differ by up to 20x. Summing tokens
-  // first and applying one rate — what this page used to do — priced every
-  // Haiku call at Sonnet rates and overstated spend accordingly.
-  interface UserUsage {
-    tokensIn:  number;
-    tokensOut: number;
-    ttsChars:  number;
-    cost:      number;
-  }
-  const EMPTY_USAGE: UserUsage = { tokensIn: 0, tokensOut: 0, ttsChars: 0, cost: 0 };
+  const usage = (usageRes.data ?? []) as UsageRow[];
+  const ops   = (opsRes.data   ?? []) as OperationRow[];
+  const report = buildHealthReport(usage, [], ops);
 
-  const usageMap  = new Map<string, UserUsage>();
-  // Spend by model, for the breakdown below the cost total.
+  // Provider split, priced per row at that row's own model rate.
   const modelCost = new Map<string, number>();
-
-  for (const log of usageLogs ?? []) {
-    const p = profileMap.get(log.user_id as string);
-    const resetAt = p?.usage_reset_at as string | null ?? null;
-    const effectiveStart = resetAt && resetAt > monthStart ? resetAt : monthStart;
-    if ((log.created_at as string) < effectiveStart) continue;
-
-    const tokensIn  = log.tokens_in  as number ?? 0;
-    const tokensOut = log.tokens_out as number ?? 0;
-    const ttsChars  = log.tts_chars  as number ?? 0;
-    const model     = log.model as string | null;
-    const rowCost   = estimateCost(tokensIn, tokensOut, ttsChars, model);
-
-    const cur = usageMap.get(log.user_id as string) ?? EMPTY_USAGE;
-    usageMap.set(log.user_id as string, {
-      tokensIn:  cur.tokensIn  + tokensIn,
-      tokensOut: cur.tokensOut + tokensOut,
-      ttsChars:  cur.ttsChars  + ttsChars,
-      cost:      cur.cost      + rowCost,
-    });
-
-    const key = model ?? (ttsChars && !tokensIn && !tokensOut ? "elevenlabs-tts" : "unattributed");
-    modelCost.set(key, (modelCost.get(key) ?? 0) + rowCost);
+  let tokensIn = 0, tokensOut = 0;
+  for (const row of usage) {
+    const cost = estimateCost(row.tokens_in, row.tokens_out, row.tts_chars, row.model);
+    tokensIn  += row.tokens_in  ?? 0;
+    tokensOut += row.tokens_out ?? 0;
+    const key = row.model ?? (row.tts_chars && !row.tokens_in ? "elevenlabs-tts" : "unattributed");
+    modelCost.set(key, (modelCost.get(key) ?? 0) + cost);
   }
-
-  // Split by provider. The Anthropic panel below must not quote a number that
-  // silently folds in OpenAI and ElevenLabs spend.
-  let anthropicCost = 0;
-  let openaiCost    = 0;
+  let anthropicCost = 0, openaiCost = 0, ttsCost = 0;
   for (const [model, cost] of modelCost) {
-    if (model.startsWith("gpt")) openaiCost += cost;
-    // Rows with no model fall back to Claude rates, so they count as Anthropic.
-    else if (model !== "elevenlabs-tts") anthropicCost += cost;
+    if (model === "elevenlabs-tts") ttsCost += cost;
+    else if (model.startsWith("gpt")) openaiCost += cost;
+    else anthropicCost += cost; // unpriced rows fall back to Claude rates
   }
 
-  // Merge into rows
-  const rows = (authUsers ?? []).map(u => {
-    const p   = profileMap.get(u.id);
-    const use = usageMap.get(u.id) ?? EMPTY_USAGE;
-    return {
-      id:        u.id,
-      email:     u.email ?? "—",
-      createdAt: u.created_at,
-      plan:      (p?.plan ?? "free") as string,
-      approved:  (p?.approved ?? false) as boolean,
-      isBlocked: (p?.is_blocked ?? false) as boolean,
-      isAdmin:   (p?.is_admin ?? false) as boolean,
-      limit:     (p?.token_limit as number | null) ?? DEFAULT_MONTHLY_TOKEN_LIMIT,
-      ...use,
-    };
-  });
+  const profiles = profilesRes.data ?? [];
+  const pending  = profiles.filter(
+    p => !p.approved && !p.is_blocked && !p.is_admin,
+  ).length;
 
-  // Summary stats
-  const totalTokens = rows.reduce((s, r) => s + r.tokensIn + r.tokensOut, 0);
-  const totalCost   = rows.reduce((s, r) => s + r.cost, 0);
-  const pending     = rows.filter(r => !r.approved && !r.isBlocked && !r.isAdmin).length;
-  const activeUsers = rows.filter(r => (usageMap.get(r.id)?.tokensIn ?? 0) > 0).length;
+  const failures     = report.rows.reduce((s, r) => s + r.failed, 0);
+  const failingRows  = report.rows.filter(r => r.failed > 0)
+    .sort((a, b) => b.failed - a.failed);
+  const blindCount   = report.blind.length;
+
+  // The spend ranking the old page could not produce.
+  const topSpend = [...report.rows]
+    .filter(r => r.spendUsd > 0)
+    .sort((a, b) => b.spendUsd - a.spendUsd)
+    .slice(0, 6);
+
+  const needsAttention =
+    pending > 0 || failures > 0 || blindCount > 0 ||
+    report.unattributedSpendUsd > 0 || failed.spend || failed.outcomes || failed.accounts;
 
   return (
     <div className="min-h-screen bg-[#0A0F1E] text-slate-100">
-
-      {/* Header */}
-      <header className="border-b border-slate-800 px-8 py-4 flex items-center justify-between">
+      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 px-8 py-4">
         <div className="flex items-center gap-4">
-          <Link href="/home" className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300 transition-colors">
+          <Link
+            href="/home"
+            className="flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-slate-300"
+          >
             <ArrowLeft size={14} />
             Dashboard
           </Link>
           <span className="text-slate-700">|</span>
           <span className="font-serif text-lg font-semibold">Hugh Admin</span>
-          <span className="text-slate-700">|</span>
-          <Link href="/admin/architecture" className="text-sm text-slate-500 hover:text-slate-300 transition-colors">
-            Architecture
-          </Link>
-          <span className="text-slate-700">|</span>
-          <Link href="/admin/observability" className="text-sm text-slate-500 hover:text-slate-300 transition-colors">
-            Observability
-          </Link>
         </div>
-        <span className="text-xs text-slate-600">{new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" })}</span>
+        <span className="text-xs text-slate-600">
+          {new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" })}
+        </span>
       </header>
 
-      <main className="px-8 py-8 space-y-8 max-w-7xl mx-auto">
+      <main className="mx-auto max-w-6xl space-y-6 px-8 py-8">
 
-        {/* ── Provider status ─────────────────────────────────────── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* ── Does anything need me? ────────────────────────────────────── */}
+        <section
+          className={`rounded-2xl border p-6 ${
+            needsAttention
+              ? "border-amber-500/30 bg-amber-500/5"
+              : "border-green-500/25 bg-green-500/5"
+          }`}
+        >
+          <div className="flex items-start gap-4">
+            {needsAttention
+              ? <AlertTriangle size={22} className="mt-0.5 shrink-0 text-amber-400" />
+              : <CheckCircle2  size={22} className="mt-0.5 shrink-0 text-green-400" />}
 
-          {/* ElevenLabs */}
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-slate-300">ElevenLabs</p>
-              <Link
-                href="https://elevenlabs.io/app/subscription"
-                target="_blank"
-                className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-400 transition-colors"
-              >
-                Dashboard <ExternalLink size={11} />
-              </Link>
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-semibold text-slate-100">
+                {needsAttention ? "Some things need you" : "Nothing needs you"}
+              </p>
+
+              {needsAttention ? (
+                <ul className="mt-3 space-y-2 text-sm text-slate-400">
+                  {pending > 0 && (
+                    <li>
+                      <Link href="/admin/users" className="text-amber-400 hover:underline">
+                        {pending} {pending === 1 ? "account is" : "accounts are"} waiting for approval
+                      </Link>
+                      {" — they cannot reach any surface until approved."}
+                    </li>
+                  )}
+                  {failures > 0 && (
+                    <li>
+                      <Link href="/admin/features" className="text-amber-400 hover:underline">
+                        {failures} {failures === 1 ? "failure" : "failures"} in the last {ATTENTION_WINDOW_DAYS} days
+                      </Link>
+                      {" — "}
+                      {failingRows.slice(0, 3).map(r => `${r.feature.label} (${r.failed})`).join(", ")}
+                      {failingRows.length > 3 && `, and ${failingRows.length - 3} more`}.
+                    </li>
+                  )}
+                  {blindCount > 0 && (
+                    <li>
+                      <Link href="/admin/features" className="text-amber-400 hover:underline">
+                        {blindCount} {blindCount === 1 ? "surface spends" : "surfaces spend"} money without reporting an outcome
+                      </Link>
+                      {" — until fixed, this page cannot tell you they are healthy."}
+                    </li>
+                  )}
+                  {report.unattributedSpendUsd > 0 && (
+                    <li>
+                      {formatUsd(report.unattributedSpendUsd)} of spend belongs to no feature
+                      {" — "}
+                      <span className="font-mono text-xs text-slate-500">
+                        {report.unattributedFeatures.join(", ")}
+                      </span>.
+                    </li>
+                  )}
+                  {(failed.spend || failed.outcomes || failed.accounts) && (
+                    <li className="text-red-400">
+                      {[failed.spend && "spend", failed.outcomes && "outcomes", failed.accounts && "accounts"]
+                        .filter(Boolean).join(", ")} could not be loaded. Figures below are
+                      incomplete — this is a broken read, not an empty result.
+                    </li>
+                  )}
+                </ul>
+              ) : (
+                <p className="mt-1 max-w-3xl text-sm leading-relaxed text-slate-400">
+                  No accounts waiting, no failures in the last {ATTENTION_WINDOW_DAYS} days, and every
+                  money-spending surface is reporting an outcome. This is a positive
+                  statement, not an absence of data.
+                </p>
+              )}
             </div>
-            {elevenLabs ? (
-              <>
-                <div>
-                  <div className="flex items-end justify-between mb-1.5">
-                    <span className="text-xs text-slate-500">Characters used</span>
-                    <span className="text-xs text-slate-400 tabular-nums">
+          </div>
+        </section>
+
+        {/* ── Spend ─────────────────────────────────────────────────────── */}
+        <section className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5 lg:col-span-3">
+            <div className="flex items-baseline justify-between">
+              <p className="text-sm font-semibold text-slate-300">Spend by feature</p>
+              <p className="text-xs text-slate-600">this month</p>
+            </div>
+
+            {failed.spend ? (
+              <p className="mt-4 text-sm text-slate-600">Could not be loaded.</p>
+            ) : topSpend.length === 0 ? (
+              <p className="mt-4 text-sm text-slate-600">Nothing spent yet this month.</p>
+            ) : (
+              <div className="mt-4 space-y-2.5">
+                {topSpend.map(r => (
+                  <div key={r.feature.id} className="flex items-center gap-3">
+                    <span className="w-32 shrink-0 truncate text-xs text-slate-400">
+                      {r.feature.label}
+                    </span>
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-800">
+                      <div
+                        className="h-full rounded-full bg-sky-400"
+                        style={{ width: `${(r.spendUsd / topSpend[0].spendUsd) * 100}%` }}
+                      />
+                    </div>
+                    <span className="w-16 shrink-0 text-right font-mono text-xs tabular-nums text-slate-400">
+                      {formatUsd(r.spendUsd)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 border-t border-slate-800 pt-3 text-xs">
+              <span className="text-slate-500">
+                Total{" "}
+                <span className="font-semibold tabular-nums text-slate-300">
+                  {failed.spend ? "—" : formatUsd(report.totalSpendUsd)}
+                </span>
+              </span>
+              <span className="text-slate-500">
+                Claude <span className="tabular-nums text-slate-400">{formatUsd(anthropicCost)}</span>
+              </span>
+              {openaiCost > 0 && (
+                <span className="text-slate-500">
+                  OpenAI <span className="tabular-nums text-slate-400">{formatUsd(openaiCost)}</span>
+                </span>
+              )}
+              {ttsCost > 0 && (
+                <span className="text-slate-500">
+                  Voice <span className="tabular-nums text-slate-400">{formatUsd(ttsCost)}</span>
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Providers */}
+          <div className="space-y-4 lg:col-span-2">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-300">ElevenLabs</p>
+                <Link
+                  href="https://elevenlabs.io/app/subscription"
+                  target="_blank"
+                  className="flex items-center gap-1 text-xs text-slate-600 transition-colors hover:text-slate-400"
+                >
+                  Dashboard <ExternalLink size={11} />
+                </Link>
+              </div>
+              {elevenLabs ? (
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-end justify-between text-xs">
+                    <span className="text-slate-500">Characters used</span>
+                    <span className="tabular-nums text-slate-400">
                       {fmt(elevenLabs.character_count)} / {fmt(elevenLabs.character_limit)}
                     </span>
                   </div>
-                  <div className="h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
                     <div
-                      className={`h-full rounded-full transition-all ${
-                        elevenLabs.character_count / elevenLabs.character_limit > 0.8
-                          ? "bg-red-400"
-                          : elevenLabs.character_count / elevenLabs.character_limit > 0.6
-                          ? "bg-amber-400"
-                          : "bg-sky-400"
+                      className={`h-full rounded-full ${
+                        elevenLabs.character_count / elevenLabs.character_limit > 0.8 ? "bg-red-400"
+                        : elevenLabs.character_count / elevenLabs.character_limit > 0.6 ? "bg-amber-400"
+                        : "bg-sky-400"
                       }`}
                       style={{ width: `${Math.min(100, (elevenLabs.character_count / elevenLabs.character_limit) * 100)}%` }}
                     />
                   </div>
+                  <p className="text-xs capitalize text-slate-600">
+                    {elevenLabs.tier} plan · resets{" "}
+                    {new Date(elevenLabs.next_character_count_reset_unix * 1000)
+                      .toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                  </p>
                 </div>
-                <div className="flex items-center justify-between text-xs text-slate-600">
-                  <span className="capitalize">{elevenLabs.tier} plan · {elevenLabs.status}</span>
-                  <span>
-                    Resets {new Date(elevenLabs.next_character_count_reset_unix * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                  </span>
-                </div>
-              </>
-            ) : (
-              <p className="text-xs text-slate-600">Unable to fetch — check API key</p>
-            )}
-          </div>
-
-          {/* Anthropic */}
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-slate-300">Anthropic</p>
-              <Link
-                href="https://console.anthropic.com/settings/billing"
-                target="_blank"
-                className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-400 transition-colors"
-              >
-                Console <ExternalLink size={11} />
-              </Link>
-            </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500">Tokens in (this month)</span>
-                <span className="text-slate-400 tabular-nums">{fmt(rows.reduce((s, r) => s + r.tokensIn, 0))}</span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500">Tokens out (this month)</span>
-                <span className="text-slate-400 tabular-nums">{fmt(rows.reduce((s, r) => s + r.tokensOut, 0))}</span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500">Est. Claude cost</span>
-                <span className="text-slate-300 font-semibold tabular-nums">
-                  ${anthropicCost.toFixed(3)}
-                </span>
-              </div>
-              {openaiCost > 0 && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-500">Est. OpenAI cost</span>
-                  <span className="text-slate-400 tabular-nums">${openaiCost.toFixed(3)}</span>
-                </div>
+              ) : (
+                <p className="mt-3 text-xs text-slate-600">Unable to fetch — check API key</p>
               )}
             </div>
 
-            {/* Per-model breakdown — this is what makes a model switch visible. */}
-            {modelCost.size > 0 && (
-              <div className="space-y-1 border-t border-slate-800 pt-2">
-                <p className="text-xs font-semibold text-slate-600">By model</p>
-                {[...modelCost.entries()]
-                  .sort((a, b) => b[1] - a[1])
-                  .map(([model, cost]) => (
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-300">Anthropic</p>
+                <Link
+                  href="https://console.anthropic.com/settings/billing"
+                  target="_blank"
+                  className="flex items-center gap-1 text-xs text-slate-600 transition-colors hover:text-slate-400"
+                >
+                  Console <ExternalLink size={11} />
+                </Link>
+              </div>
+              <div className="mt-3 space-y-1.5 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Tokens in</span>
+                  <span className="tabular-nums text-slate-400">{failed.spend ? "—" : fmt(tokensIn)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Tokens out</span>
+                  <span className="tabular-nums text-slate-400">{failed.spend ? "—" : fmt(tokensOut)}</span>
+                </div>
+              </div>
+              {modelCost.size > 0 && (
+                <div className="mt-3 space-y-1 border-t border-slate-800 pt-2">
+                  {[...modelCost.entries()].sort((a, b) => b[1] - a[1]).map(([model, cost]) => (
                     <div key={model} className="flex items-center justify-between text-xs">
                       <span className="truncate text-slate-600">
                         {model}
                         {model in MODEL_RATES && (
                           <span className="ml-1 text-slate-700">
-                            (${MODEL_RATES[model].input}/${MODEL_RATES[model].output} per MTok)
+                            (${MODEL_RATES[model].input}/${MODEL_RATES[model].output})
                           </span>
                         )}
                       </span>
-                      <span className="tabular-nums text-slate-500">${cost.toFixed(3)}</span>
+                      <span className="tabular-nums text-slate-500">{formatUsd(cost)}</span>
                     </div>
                   ))}
-              </div>
-            )}
-
-            <p className="text-xs text-slate-700">No live usage API — check Console for actual billing.</p>
-          </div>
-
-        </div>
-
-        {/* Summary cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[
-            { label: "Total users",      value: rows.length,         icon: Users,        color: "text-sky-400",    bg: "bg-sky-500/10"    },
-            { label: "Pending approval", value: pending,             icon: AlertTriangle, color: "text-amber-400", bg: "bg-amber-500/10"  },
-            { label: "Tokens this month",value: fmt(totalTokens),    icon: Zap,          color: "text-violet-400", bg: "bg-violet-500/10" },
-            { label: "Est. cost (USD)",  value: `$${totalCost.toFixed(2)}`, icon: DollarSign, color: "text-green-400", bg: "bg-green-500/10"  },
-          ].map(({ label, value, icon: Icon, color, bg }) => (
-            <div key={label} className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5 space-y-2">
-              <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${bg}`}>
-                <Icon size={18} className={color} />
-              </div>
-              <p className="text-2xl font-bold text-slate-100">{value}</p>
-              <p className="text-xs text-slate-500">{label}</p>
+                </div>
+              )}
+              <p className="mt-3 text-xs text-slate-700">
+                No live usage API — Console has the billed figure.
+              </p>
             </div>
-          ))}
-        </div>
-
-        {/* User table */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/30 overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
-            <p className="font-semibold text-slate-200">Users</p>
-            <p className="text-xs text-slate-600">{activeUsers} active this month</p>
           </div>
+        </section>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-800/60 text-xs text-slate-600 uppercase tracking-wider">
-                  <th className="text-left px-6 py-3 font-medium">Email</th>
-                  <th className="text-left px-4 py-3 font-medium">Status</th>
-                  <th className="text-left px-4 py-3 font-medium">Plan</th>
-                  <th className="text-right px-4 py-3 font-medium">Tokens In</th>
-                  <th className="text-right px-4 py-3 font-medium">Tokens Out</th>
-                  <th className="text-right px-4 py-3 font-medium">TTS Chars</th>
-                  <th className="text-right px-4 py-3 font-medium">Est. Cost</th>
-                  <th className="text-left px-6 py-3 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/40">
-                {rows.map(r => {
-                  const overLimit = !r.isAdmin && r.plan !== "pro" && (r.tokensIn + r.tokensOut) >= r.limit;
-                  return (
-                    <tr key={r.id} className={`transition-colors hover:bg-slate-800/20 ${r.isBlocked ? "opacity-50" : ""}`}>
-                      <td className="px-6 py-4">
-                        <div>
-                          <p className="text-slate-200 font-medium">{r.email}</p>
-                          <p className="text-xs text-slate-600">
-                            {new Date(r.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">{statusBadge(r.approved, r.isBlocked, r.isAdmin)}</td>
-                      <td className="px-4 py-4">
-                        <span className={`text-xs font-semibold ${r.plan === "pro" ? "text-amber-400" : "text-slate-500"}`}>
-                          {r.plan}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-right text-slate-400 tabular-nums">{fmt(r.tokensIn)}</td>
-                      <td className="px-4 py-4 text-right text-slate-400 tabular-nums">{fmt(r.tokensOut)}</td>
-                      <td className="px-4 py-4 text-right text-slate-400 tabular-nums">{fmt(r.ttsChars)}</td>
-                      <td className="px-4 py-4 text-right tabular-nums">
-                        <span className={overLimit ? "text-red-400 font-semibold" : "text-slate-400"}>
-                          ${r.cost.toFixed(3)}
-                        </span>
-                        {overLimit && (
-                          <span className="ml-1.5 text-xs text-red-500">limit</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <AdminActions
-                          userId={r.id}
-                          approved={r.approved}
-                          isBlocked={r.isBlocked}
-                          isAdmin={r.isAdmin}
-                          plan={r.plan}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-                {rows.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="px-6 py-12 text-center text-slate-600 text-sm">
-                      No users yet
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        {/* ── Where to go next ──────────────────────────────────────────── */}
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <NavCard
+            href="/admin/features"
+            icon={<Layers size={18} className="text-sky-400" />}
+            title="Features"
+            note={`${report.instrumentedCount}/${report.spendingCount} spending surfaces reporting`}
+          />
+          <NavCard
+            href="/admin/users"
+            icon={<Users size={18} className="text-violet-400" />}
+            title="Users"
+            note={`${profiles.length} accounts${pending > 0 ? ` · ${pending} pending` : ""}`}
+          />
+          <NavCard
+            href="/admin/observability"
+            icon={<Activity size={18} className="text-green-400" />}
+            title="Observability"
+            note="Operation outcomes and silent failures"
+          />
+          <NavCard
+            href="/admin/architecture"
+            icon={<Boxes size={18} className="text-amber-400" />}
+            title="Architecture"
+            note="Repo map and the admin assistant"
+          />
+        </section>
 
       </main>
     </div>
+  );
+}
+
+function NavCard({ href, icon, title, note }: {
+  href:  string;
+  icon:  React.ReactNode;
+  title: string;
+  note:  string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group flex flex-col gap-2 rounded-2xl border border-slate-800 bg-slate-900/50 p-5 transition-colors hover:border-slate-700 hover:bg-slate-900"
+    >
+      <div className="flex items-center justify-between">
+        {icon}
+        <ArrowRight size={14} className="text-slate-700 transition-colors group-hover:text-slate-500" />
+      </div>
+      <p className="font-semibold text-slate-200">{title}</p>
+      <p className="text-xs leading-relaxed text-slate-600">{note}</p>
+    </Link>
   );
 }

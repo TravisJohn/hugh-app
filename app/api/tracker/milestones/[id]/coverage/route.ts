@@ -5,6 +5,7 @@ import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { learningPointsPrompt, parseLearningPoints } from "@/lib/claude/prompts";
 import { logSafeError } from "@/lib/observability/log";
 import { checkUsageAllowed, logUsage } from "@/lib/usage";
+import { recordOperation } from "@/lib/observability/record";
 import { normalizeCoverage } from "@/utils/coverage";
 import { type LearningPoint, type PointStatus } from "@/types";
 
@@ -58,6 +59,7 @@ async function ensureLearningPoints(
   if (ms.learning_points && ms.learning_points.length > 0) return ms.learning_points;
 
   const topic = ms.tracks?.topic_description ?? ms.title;
+  const startedAt = Date.now();
   const res = await anthropic.messages.create({
     model:      MODEL,
     max_tokens: 500,
@@ -72,6 +74,14 @@ async function ensureLearningPoints(
     texts = parseLearningPoints(raw);
   } catch (err) {
     logSafeError("tracker/points parse", err, [topic, ms.title]);
+    // This row is the ONLY evidence. The learner sees an empty rail, which is
+    // indistinguishable from a milestone with no key ideas, so nobody reports
+    // it — see `failureIsSilent` on ask.coverage.
+    void recordOperation({
+      userId, operation: "ask.coverage", outcome: "failed",
+      durationMs: Date.now() - startedAt, error: err,
+      redact: [topic, ms.title], detail: { stage: "parse" },
+    });
     return null;
   }
 
@@ -90,8 +100,17 @@ async function ensureLearningPoints(
 
   if (error) {
     logSafeError("tracker/points write", error, [topic, ms.title]);
+    void recordOperation({
+      userId, operation: "ask.coverage", outcome: "failed",
+      durationMs: Date.now() - startedAt, error,
+      redact: [topic, ms.title], detail: { stage: "write" },
+    });
     return null;
   }
+  void recordOperation({
+    userId, operation: "ask.coverage", outcome: "ok",
+    durationMs: Date.now() - startedAt, detail: { points: points.length },
+  });
   return points;
 }
 

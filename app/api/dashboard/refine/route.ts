@@ -5,6 +5,7 @@ import { enforceUsageGate, logUsage } from "@/lib/usage";
 import { refinementQuestionPrompt, parseClaudeJson } from "@/lib/claude/prompts";
 import { checkTopic, TOPIC_REJECTION_MESSAGE } from "@/lib/learn/topicInput";
 import { logSafeError } from "@/lib/observability/log";
+import { recordOperation } from "@/lib/observability/record";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -30,6 +31,12 @@ export async function POST(request: NextRequest) {
   // Same boundary as every other topic entry point.
   const checked = checkTopic(body.topic ?? "");
   if (!checked.ok) {
+    // Turning away a bad topic is the boundary working, so 'refused'. The
+    // rejection class is safe to record; the topic text itself never is.
+    void recordOperation({
+      userId, operation: "track.refine", outcome: "refused",
+      detail: { rejection: checked.rejection },
+    });
     return NextResponse.json(
       { error: TOPIC_REJECTION_MESSAGE[checked.rejection] },
       { status: 400 },
@@ -37,6 +44,8 @@ export async function POST(request: NextRequest) {
   }
 
   const prompt = refinementQuestionPrompt(checked.topic, answers);
+
+  const startedAt = Date.now();
 
   // Retry once: the Claude call or JSON parse can fail transiently. A single
   // retry keeps the refinement flow moving without hanging the client.
@@ -58,6 +67,13 @@ export async function POST(request: NextRequest) {
       });
       const text   = msg.content[0]?.type === "text" ? msg.content[0].text : "";
       const result = parseClaudeJson<{ question: string; done: boolean }>(text);
+      // One row per REQUEST, not per attempt: a retry that succeeds is one
+      // successful refinement. `attempt` carries how many tries it took, which
+      // is where a degrading model would show up first.
+      void recordOperation({
+        userId, operation: "track.refine", outcome: "ok",
+        durationMs: Date.now() - startedAt, detail: { attempt: attempt + 1 },
+      });
       return NextResponse.json(result);
     } catch (err) {
       lastErr = err;
@@ -69,5 +85,12 @@ export async function POST(request: NextRequest) {
   // error can quote the request that carried them, so the topic and every
   // answer are named as secrets here.
   logSafeError("dashboard/refine", lastErr, [checked.topic, ...answers.map(a => a.answer)]);
+  // Both attempts billed, so one 'failed' row here can represent two charges.
+  void recordOperation({
+    userId, operation: "track.refine", outcome: "failed",
+    durationMs: Date.now() - startedAt, error: lastErr,
+    redact: [checked.topic, ...answers.map(a => a.answer)],
+    detail: { attempts: 2 },
+  });
   return NextResponse.json({ error: "Failed to generate question" }, { status: 502 });
 }

@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { enforceUsageGate, logUsage } from "@/lib/usage";
+import { recordOperation } from "@/lib/observability/record";
 import { loadService } from "@/lib/cloud/loader";
 import { GROUP_LABELS } from "@/types/cloud";
 
@@ -60,7 +61,15 @@ export async function POST(request: NextRequest) {
   if (!userId) return NextResponse.json({ error: "Please sign in to use the assistant." }, { status: 401 });
 
   const usageGate = await enforceUsageGate(userId, "cloud/chat");
-  if (usageGate) return usageGate;
+  if (usageGate) {
+    // A quota block is the system working, not breaking — recorded as
+    // 'refused' so it never inflates the failure count.
+    void recordOperation({
+      userId, operation: "cloud.chat", outcome: "refused",
+      detail: { reason: "usage-gate" },
+    });
+    return usageGate;
+  }
 
   const body = (await request.json()) as {
     provider?: string;
@@ -76,6 +85,8 @@ export async function POST(request: NextRequest) {
   const service = await loadService(body.provider, body.serviceId);
   if (!service) return NextResponse.json({ error: "Unknown service." }, { status: 404 });
 
+  const startedAt = Date.now();
+
   try {
     const res = await anthropic.messages.create({
       model: MODEL,
@@ -85,9 +96,19 @@ export async function POST(request: NextRequest) {
     });
     const reply = res.content[0]?.type === "text" ? res.content[0].text : "";
     void logUsage({ userId, model: MODEL, feature: "cloud/chat", tokensIn: res.usage.input_tokens, tokensOut: res.usage.output_tokens });
+    // Voided, not awaited: the learner is waiting on the reply, and a lost row
+    // costs one data point where an added round trip costs every request.
+    void recordOperation({
+      userId, operation: "cloud.chat", outcome: "ok",
+      durationMs: Date.now() - startedAt,
+    });
     return NextResponse.json({ reply: reply || "Sorry — please try again." });
   } catch (err) {
     console.error("[cloud/chat] Claude error:", err);
+    void recordOperation({
+      userId, operation: "cloud.chat", outcome: "failed",
+      durationMs: Date.now() - startedAt, error: err,
+    });
     return NextResponse.json({ error: "Failed to generate a response." }, { status: 502 });
   }
 }
