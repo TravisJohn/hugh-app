@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   outcomeOfStatus,
   outcomeOfThrown,
+  withServerMessage,
   type SaveFailureReason,
 } from "./saveOutcome";
 
@@ -129,5 +130,47 @@ describe("the copy a learner actually reads", () => {
       expect(message).not.toMatch(/\d{3}/);
       expect(message.toLowerCase()).not.toMatch(/error|null|undefined|fetch|http|unauthorized/);
     }
+  });
+});
+
+describe("withServerMessage - the routes that write for a learner, not a log", () => {
+  it("shows the server's sentence when it wrote one worth reading", () => {
+    // The summary route's real 422. Strictly more useful than our generic
+    // "Hugh wouldn't accept that change, so nothing was saved."
+    const out = withServerMessage(
+      outcomeOfStatus(422),
+      "Add a diary entry before generating a summary",
+    );
+    expect(out.ok).toBe(false);
+    if (!out.ok) expect(out.message).toBe("Add a diary entry before generating a summary");
+  });
+
+  it("keeps our copy when the route sent nothing", () => {
+    const ours = outcomeOfStatus(422);
+    expect(withServerMessage(ours, undefined)).toEqual(ours);
+    expect(withServerMessage(ours, null)).toEqual(ours);
+  });
+
+  it("keeps our copy rather than showing an empty banner", () => {
+    const ours = outcomeOfStatus(500);
+    expect(withServerMessage(ours, "   ")).toEqual(ours);
+  });
+
+  it("trims the server's sentence before showing it", () => {
+    const out = withServerMessage(outcomeOfStatus(409), "  Milestone is not mastered  ");
+    if (!out.ok) expect(out.message).toBe("Milestone is not mastered");
+  });
+
+  it("never lets the server decide whether a retry could work", () => {
+    // A 401 cannot be fixed by pressing the button again, whatever it says.
+    const out = withServerMessage(outcomeOfStatus(401), "Please sign in to continue");
+    if (!out.ok) {
+      expect(out.message).toBe("Please sign in to continue");
+      expect(out.canRetry).toBe(false);
+    }
+  });
+
+  it("leaves a success untouched", () => {
+    expect(withServerMessage(outcomeOfStatus(200), "ignored")).toEqual({ ok: true });
   });
 });

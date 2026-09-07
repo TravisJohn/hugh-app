@@ -12,7 +12,7 @@ import {
   type DragStartEvent,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { Trophy, Medal, Crown, AlertCircle } from "lucide-react";
+import { Trophy, Medal, Crown } from "lucide-react";
 import {
   outcomeOfStatus, outcomeOfThrown,
   type SaveOutcome, type SaveFailure,
@@ -21,6 +21,7 @@ import { type Milestone, type KanbanColumn, type BacklogPriorityMode, KANBAN_COL
 import KanbanColumnComponent from "./KanbanColumn";
 import MilestoneCard from "./MilestoneCard";
 import MilestoneDrawer from "./MilestoneDrawer";
+import SaveFailureNotice from "@/components/ui/SaveFailureNotice";
 
 interface Props {
   initialMilestones: Milestone[];
@@ -264,11 +265,21 @@ export default function KanbanBoard({
 
   function handleDrawerClose() {
     if (activeMilestone) {
-      fetch(`/api/tracker/milestones/${activeMilestone.id}/entries`)
-        .then(r => r.json())
-        .then(d => {
-          const count = (d.entries ?? []).length as number;
-          setEntryCounts(prev => ({ ...prev, [activeMilestone.id]: count }));
+      // Only a reply we actually read may change the badge. A refusal answers
+      // `{ error }`, and `(d.entries ?? []).length` turned that into a confident
+      // zero — so a card reading "3 entries" quietly lost its badge because a
+      // request failed. Keeping the previous count is the honest move here: the
+      // card has no room to explain itself, and a stale count is a smaller lie
+      // than an invented one. The panel that just closed is where a failed read
+      // gets said out loud.
+      const milestoneId = activeMilestone.id;
+      fetch(`/api/tracker/milestones/${milestoneId}/entries`)
+        .then(async res => {
+          if (!res.ok) return;
+          const body    = await res.json() as { entries?: unknown[] };
+          const entries = body.entries;
+          if (!entries) return;
+          setEntryCounts(prev => ({ ...prev, [milestoneId]: entries.length }));
         })
         .catch(() => {});
     }
@@ -399,21 +410,11 @@ export default function KanbanBoard({
           miss, so this one does not time itself out. */}
       {saveFailure && (
         <div className="fixed bottom-8 left-1/2 z-50 animate-toast-in">
-          <div className="flex max-w-md items-start gap-3 rounded-2xl border border-red-500/50 bg-[#1a0505] px-5 py-4 shadow-2xl shadow-black/60 backdrop-blur-sm">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-500/20">
-              <AlertCircle size={18} className="text-red-400" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-red-300">Card moved back</p>
-              <p className="mt-0.5 text-xs leading-relaxed text-red-200/80">{saveFailure.message}</p>
-            </div>
-            <button
-              onClick={() => setSaveFailure(null)}
-              className="shrink-0 self-start rounded-lg px-2 py-1 text-xs text-red-300/70 hover:bg-red-500/15 hover:text-red-200 transition-colors"
-            >
-              Dismiss
-            </button>
-          </div>
+          <SaveFailureNotice
+            failure={saveFailure}
+            title="Card moved back"
+            onDismiss={() => setSaveFailure(null)}
+          />
         </div>
       )}
 

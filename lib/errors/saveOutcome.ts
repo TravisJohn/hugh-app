@@ -123,3 +123,31 @@ export function outcomeOfThrown(error: unknown): SaveOutcome {
     ? failure("unreachable")
     : failure("server");
 }
+
+/**
+ * Swap in the server's own sentence, where the server wrote one to be read.
+ *
+ * The header above explains why this module supplies the copy: the milestone
+ * routes answer with log shorthand. But one of them does not, all the way
+ * through. `milestones/[id]/summary` refuses with "Add a diary entry before
+ * generating a summary" (422), "Milestone is not mastered" (409) and "Summary
+ * is too long" (413) — reasons written for a learner, and each one strictly
+ * more useful than "Hugh wouldn't accept that change".
+ *
+ * So this is the opt-in escape hatch, applied per call site rather than
+ * guessed at per status code: a screen that knows its route writes learner
+ * copy for a given refusal passes that copy in, and everything else keeps
+ * ours. `canRetry` is untouched — the server supplies the sentence, never the
+ * verdict on whether pressing the button again could work.
+ *
+ * A blank or missing message falls through to ours, so a route that answers
+ * `{}` cannot produce an empty red banner.
+ */
+export function withServerMessage(
+  outcome: SaveOutcome,
+  message: string | null | undefined,
+): SaveOutcome {
+  if (outcome.ok) return outcome;
+  const trimmed = message?.trim();
+  return trimmed ? { ...outcome, message: trimmed } : outcome;
+}
