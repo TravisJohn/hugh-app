@@ -171,6 +171,10 @@ export default async function AdminPage() {
           <span className="text-slate-700">|</span>
           <span className="font-serif text-lg font-semibold">Hugh Admin</span>
           <span className="text-slate-700">|</span>
+          <Link href="/admin/features" className="text-sm text-slate-500 hover:text-slate-300 transition-colors">
+            Features
+          </Link>
+          <span className="text-slate-700">|</span>
           <Link href="/admin/architecture" className="text-sm text-slate-500 hover:text-slate-300 transition-colors">
             Architecture
           </Link>
