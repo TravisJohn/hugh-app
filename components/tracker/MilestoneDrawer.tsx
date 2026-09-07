@@ -137,6 +137,12 @@ export default function MilestoneDrawer({ milestone, goalId, onClose, onCoverage
   // something the learner never pressed reads as an app-level alarm. It
   // belongs where the button is, like the checklist failure above it.
   const [summaryFailure, setSummaryFailure] = useState<SaveFailure | null>(null);
+  // The document exists and was paid for, but the database would not keep it.
+  // Distinct from `summaryFailure`, which means there is no document at all —
+  // "here it is, we couldn't store it" and "we couldn't write it" are different
+  // things to be told, and only the first one leaves something worth reading.
+  const [summaryUnsaved, setSummaryUnsaved] = useState(false);
+  const [savingSummary, setSavingSummary]   = useState(false);
   const [showSummary, setShowSummary] = useState(true);
 
   // Section visibility
@@ -266,6 +272,7 @@ export default function MilestoneDrawer({ milestone, goalId, onClose, onCoverage
 
     setSaveFailure(null);
     setSummaryFailure(null);
+    setSummaryUnsaved(false);
     void loadEntries(milestone.id);
 
     // Load the checklist + cached coverage (generates the checklist once if absent)
@@ -475,7 +482,9 @@ export default function MilestoneDrawer({ milestone, goalId, onClose, onCoverage
     setGenSummary(true);
     setSummaryFailure(null);
     try {
-      const { data, failure } = await requestSave<{ summaryDoc?: string; generatedAt?: string }>(
+      const { data, failure } = await requestSave<{
+        summaryDoc?: string; generatedAt?: string; saved?: boolean;
+      }>(
         () => fetch(`/api/tracker/milestones/${milestoneId}/summary`, { method: "POST" }),
         SUMMARY_HUMAN_REFUSALS,
       );
@@ -483,9 +492,41 @@ export default function MilestoneDrawer({ milestone, goalId, onClose, onCoverage
       if (data?.summaryDoc) {
         setSummaryDoc(data.summaryDoc);
         setSummaryAt(data.generatedAt ?? new Date().toISOString());
+        // The route answers 200 with `saved: false` when Claude wrote the
+        // document but the database would not take it. Showing it anyway is
+        // the point: it has already been billed for, and the learner can
+        // download it or ask us to store it again.
+        setSummaryUnsaved(data.saved === false);
       }
     } finally {
       setGenSummary(false);
+    }
+  }
+
+  /**
+   * Store a summary that was generated but never saved.
+   *
+   * Deliberately the PUT and not the POST: the document already exists, only
+   * the store failed, and going back through generation would bill the learner
+   * a second time for words they are currently looking at.
+   */
+  async function retrySaveSummary() {
+    if (!milestone || !summaryDoc || savingSummary) return;
+    const milestoneId = milestone.id;
+    setSavingSummary(true);
+    setSummaryFailure(null);
+    try {
+      const { failure } = await requestSave(() =>
+        fetch(`/api/tracker/milestones/${milestoneId}/summary`, {
+          method:  "PUT",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ summaryDoc }),
+        }),
+      );
+      if (failure) { setSummaryFailure(failure); return; }
+      setSummaryUnsaved(false);
+    } finally {
+      setSavingSummary(false);
     }
   }
 
@@ -877,6 +918,30 @@ export default function MilestoneDrawer({ milestone, goalId, onClose, onCoverage
                                   </div>
                                 ) : summaryDoc ? (
                                   <>
+                                    {summaryUnsaved && (
+                                      <div className="rounded-lg border border-amber-500/40 bg-amber-500/8 px-4 py-3">
+                                        <p className="text-sm leading-relaxed text-amber-100/90">
+                                          This summary couldn&apos;t be saved. It won&apos;t be here
+                                          when you reopen the card — use Download if you want to
+                                          keep it.
+                                        </p>
+                                        {summaryFailure && (
+                                          <p className="mt-1.5 text-xs leading-relaxed text-amber-200/70">
+                                            {summaryFailure.message}
+                                          </p>
+                                        )}
+                                        <button
+                                          onClick={retrySaveSummary}
+                                          disabled={savingSummary}
+                                          className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-amber-200 transition-colors hover:text-amber-50 disabled:opacity-50"
+                                        >
+                                          {savingSummary
+                                            ? <Loader2 size={11} className="animate-spin" />
+                                            : <RotateCw size={11} />}
+                                          Try saving again
+                                        </button>
+                                      </div>
+                                    )}
                                     <div className="rounded-lg border border-slate-700/50 bg-slate-900/40 px-4 py-3">
                                       <ReactMarkdown remarkPlugins={[remarkGfm]} components={summaryMarkdownComponents}>
                                         {summaryDoc}

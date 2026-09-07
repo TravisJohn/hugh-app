@@ -5,6 +5,8 @@ import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { masterySummaryPrompt } from "@/lib/claude/prompts";
 import { enforceUsageGate, logUsage } from "@/lib/usage";
 import { recordOperation } from "@/lib/observability/record";
+import { logSafeError } from "@/lib/observability/log";
+import { writeOutcome } from "@/lib/supabase/writeResult";
 import { normalizeCoverage } from "@/utils/coverage";
 import { type LearningPoint } from "@/types";
 
@@ -112,19 +114,43 @@ export async function POST(
       return NextResponse.json({ error: "Empty summary generated" }, { status: 502 });
     }
 
-    const generatedAt = new Date().toISOString();
-    await supabase
-      .from("milestones")
-      .update({ summary_doc: doc, summary_doc_at: generatedAt })
-      .eq("id", id);
-
+    // Log the spend before touching the database. Claude has already billed
+    // for this document, so the cost is real whatever happens to it next — and
+    // the store below can now end this request early, which would otherwise
+    // have skipped the log and hidden money that was genuinely spent.
     void logUsage({ userId, model: MODEL, feature: "tracker/summary", tokensIn: res.usage.input_tokens, tokensOut: res.usage.output_tokens });
+
+    const generatedAt = new Date().toISOString();
+    const stored = writeOutcome(
+      await supabase
+        .from("milestones")
+        .update({ summary_doc: doc, summary_doc_at: generatedAt })
+        .eq("id", id)
+        .select("id")
+        .single(),
+    );
+
+    if (!stored.ok) {
+      logSafeError("tracker/summary store", new Error(stored.message), [ms.title]);
+      // The health page hears the truth: this operation did not succeed. It
+      // used to be told "ok" regardless, which is how a dashboard ends up
+      // reporting a feature as working while nothing is being stored.
+      void recordOperation({
+        userId, operation: "track.summary", outcome: "failed",
+        durationMs: Date.now() - startedAt, detail: { stage: "store", reason: stored.reason },
+      });
+      // The learner still gets the document. It was paid for, it is finished,
+      // and discarding it would charge them a second time for the same words.
+      // `saved: false` is the honest half: the panel shows it, says it will not
+      // be here next time, and offers to store it again without regenerating.
+      return NextResponse.json({ summaryDoc: doc, generatedAt, saved: false });
+    }
 
     void recordOperation({
       userId, operation: "track.summary", outcome: "ok",
       durationMs: Date.now() - startedAt,
     });
-    return NextResponse.json({ summaryDoc: doc, generatedAt });
+    return NextResponse.json({ summaryDoc: doc, generatedAt, saved: true });
   } catch (err) {
     console.error("[tracker/summary] error:", err);
     void recordOperation({
@@ -173,13 +199,22 @@ export async function PUT(
   }
 
   const generatedAt = new Date().toISOString();
-  const { error } = await supabase
-    .from("milestones")
-    .update({ summary_doc: doc, summary_doc_at: generatedAt })
-    .eq("id", id);
+  // Checked the same way as the POST above. This path already read its error,
+  // but an error was never the whole answer: an update matching no rows reports
+  // nothing at all, and this is the route the panel retries against when a
+  // generated summary could not be stored. A silent no-op here would tell the
+  // learner their rescue worked.
+  const stored = writeOutcome(
+    await supabase
+      .from("milestones")
+      .update({ summary_doc: doc, summary_doc_at: generatedAt })
+      .eq("id", id)
+      .select("id")
+      .single(),
+  );
 
-  if (error) {
-    console.error("[tracker/summary PUT] DB error:", error.message);
+  if (!stored.ok) {
+    logSafeError("tracker/summary PUT", new Error(stored.message));
     return NextResponse.json({ error: "Failed to save summary" }, { status: 500 });
   }
 

@@ -11,6 +11,7 @@ import {
 import { judgeTopicDomain } from "@/lib/learn/topic-domain-server";
 import { logSafeError } from "@/lib/observability/log";
 import { recordOperation } from "@/lib/observability/record";
+import { writeOutcome } from "@/lib/supabase/writeResult";
 import {
   extractDocumentText,
   EmptyExtractionError,
@@ -178,9 +179,37 @@ export async function POST(request: NextRequest) {
 
   if (extractionError) {
     logSafeError("goals/document/extract store", extractionError, [candidate.candidateTopic]);
+
     // Roll back — an 'awaiting_approval' goal with no pending extraction row
     // is a dead end the `approve` route can never complete.
-    await supabase.from("learning_goals").delete().eq("id", goal.id as string);
+    //
+    // The rollback was itself unchecked, which made this comment a hope rather
+    // than a guarantee: a delete that fails, or that matches no row, says
+    // nothing, and the dead-end goal it was meant to remove survives on the
+    // learner's board with no way to finish it. Both outcomes are failures, but
+    // they leave the learner in different places, so they do not share a
+    // sentence.
+    const rolledBack = writeOutcome(
+      await supabase
+        .from("learning_goals")
+        .delete()
+        .eq("id", goal.id as string)
+        .select("id")
+        .single(),
+    );
+
+    if (!rolledBack.ok) {
+      logSafeError("goals/document/extract rollback", new Error(rolledBack.message), [candidate.candidateTopic]);
+      return NextResponse.json(
+        {
+          error:
+            "We couldn't save your document, and couldn't tidy up the half-made goal it left behind. " +
+            "It may show on your board as stuck — delete it there and try uploading again.",
+        },
+        { status: 500 },
+      );
+    }
+
     return NextResponse.json({ error: "Failed to save extracted document." }, { status: 500 });
   }
 
