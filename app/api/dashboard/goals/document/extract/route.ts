@@ -10,6 +10,7 @@ import {
 } from "@/lib/claude/prompts";
 import { judgeTopicDomain } from "@/lib/learn/topic-domain-server";
 import { logSafeError } from "@/lib/observability/log";
+import { recordOperation } from "@/lib/observability/record";
 import {
   extractDocumentText,
   EmptyExtractionError,
@@ -65,7 +66,13 @@ export async function POST(request: NextRequest) {
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const usageGate = await enforceUsageGate(userId, "dashboard/document-extract");
-  if (usageGate) return usageGate;
+  if (usageGate) {
+    void recordOperation({
+      userId, operation: "track.extract", outcome: "refused",
+      detail: { reason: "usage-gate" },
+    });
+    return usageGate;
+  }
 
   let form: FormData;
   try {
@@ -104,6 +111,7 @@ export async function POST(request: NextRequest) {
   }
 
   let candidate: DocumentTopicExtraction;
+  const startedAt = Date.now();
   try {
     const extraction = await extractCandidateTopic(extracted.text);
     candidate = extraction.candidate;
@@ -114,8 +122,20 @@ export async function POST(request: NextRequest) {
       tokensIn:  extraction.tokensIn,
       tokensOut: extraction.tokensOut,
     });
+    // Only the file's TYPE is recorded. This route carries learner-supplied
+    // documents, so neither the filename nor any extracted text may reach a
+    // telemetry row.
+    void recordOperation({
+      userId, operation: "track.extract", outcome: "ok",
+      durationMs: Date.now() - startedAt, detail: { mime: file?.type ?? "unknown" },
+    });
   } catch (err) {
     logSafeError("goals/document/extract topic", err, [extracted.text.slice(0, 200), file?.name ?? ""]);
+    void recordOperation({
+      userId, operation: "track.extract", outcome: "failed",
+      durationMs: Date.now() - startedAt, error: err,
+      redact: [extracted.text.slice(0, 200), file?.name ?? ""],
+    });
     return NextResponse.json({ error: "Couldn't extract a topic from that document." }, { status: 502 });
   }
 

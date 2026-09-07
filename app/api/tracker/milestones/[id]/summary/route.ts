@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { masterySummaryPrompt } from "@/lib/claude/prompts";
 import { enforceUsageGate, logUsage } from "@/lib/usage";
+import { recordOperation } from "@/lib/observability/record";
 import { normalizeCoverage } from "@/utils/coverage";
 import { type LearningPoint } from "@/types";
 
@@ -36,7 +37,13 @@ export async function POST(
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const usageGate = await enforceUsageGate(userId, "tracker/summary");
-  if (usageGate) return usageGate;
+  if (usageGate) {
+    void recordOperation({
+      userId, operation: "track.summary", outcome: "refused",
+      detail: { reason: "usage-gate" },
+    });
+    return usageGate;
+  }
 
   const { id } = await params;
   const supabase = await createClient();
@@ -87,6 +94,8 @@ export async function POST(
     masteryFeedback:  ms.mastery_feedback,
   });
 
+  const startedAt = Date.now();
+
   try {
     const res = await anthropic.messages.create({
       model:      MODEL,
@@ -96,6 +105,10 @@ export async function POST(
 
     const doc = (res.content[0]?.type === "text" ? res.content[0].text : "").trim();
     if (!doc) {
+      void recordOperation({
+        userId, operation: "track.summary", outcome: "failed",
+        durationMs: Date.now() - startedAt, detail: { stage: "empty-doc" },
+      });
       return NextResponse.json({ error: "Empty summary generated" }, { status: 502 });
     }
 
@@ -107,9 +120,17 @@ export async function POST(
 
     void logUsage({ userId, model: MODEL, feature: "tracker/summary", tokensIn: res.usage.input_tokens, tokensOut: res.usage.output_tokens });
 
+    void recordOperation({
+      userId, operation: "track.summary", outcome: "ok",
+      durationMs: Date.now() - startedAt,
+    });
     return NextResponse.json({ summaryDoc: doc, generatedAt });
   } catch (err) {
     console.error("[tracker/summary] error:", err);
+    void recordOperation({
+      userId, operation: "track.summary", outcome: "failed",
+      durationMs: Date.now() - startedAt, error: err, redact: [ms.title],
+    });
     return NextResponse.json({ error: "Failed to generate summary" }, { status: 502 });
   }
 }

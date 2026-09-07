@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { enforceUsageGate, logUsage } from "@/lib/usage";
+import { recordOperation } from "@/lib/observability/record";
 
 // Lightweight coding helper for the Code practice page. Haiku — the job is a
 // short, focused Q&A about Python/code, not heavy reasoning (see Model Selection
@@ -27,7 +28,13 @@ export async function POST(request: NextRequest) {
   if (!userId) return NextResponse.json({ error: "Please sign in to use the helper." }, { status: 401 });
 
   const usageGate = await enforceUsageGate(userId, "code/chat");
-  if (usageGate) return usageGate;
+  if (usageGate) {
+    void recordOperation({
+      userId, operation: "code.chat", outcome: "refused",
+      detail: { reason: "usage-gate" },
+    });
+    return usageGate;
+  }
 
   const body = (await request.json()) as { messages?: Msg[]; context?: string };
   const messages = Array.isArray(body.messages) ? body.messages.slice(-12) : [];
@@ -38,6 +45,8 @@ export async function POST(request: NextRequest) {
   const context = typeof body.context === "string" ? body.context.slice(0, 1200) : "";
   const system = context ? `${SYSTEM}\n\nWhat the learner is working on right now:\n${context}` : SYSTEM;
 
+  const startedAt = Date.now();
+
   try {
     const res = await anthropic.messages.create({
       model: MODEL,
@@ -47,9 +56,17 @@ export async function POST(request: NextRequest) {
     });
     const reply = res.content[0]?.type === "text" ? res.content[0].text : "";
     void logUsage({ userId, model: MODEL, feature: "code/chat", tokensIn: res.usage.input_tokens, tokensOut: res.usage.output_tokens });
+    void recordOperation({
+      userId, operation: "code.chat", outcome: "ok",
+      durationMs: Date.now() - startedAt,
+    });
     return NextResponse.json({ reply: reply || "Sorry — please try again." });
   } catch (err) {
     console.error("[code/chat] Claude error:", err);
+    void recordOperation({
+      userId, operation: "code.chat", outcome: "failed",
+      durationMs: Date.now() - startedAt, error: err,
+    });
     return NextResponse.json({ error: "Failed to generate a response." }, { status: 502 });
   }
 }

@@ -3,6 +3,7 @@ import { ElevenLabsClient } from "elevenlabs";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { getPersonaById } from "@/lib/personas";
 import { enforceUsageGate, logUsage } from "@/lib/usage";
+import { recordOperation } from "@/lib/observability/record";
 
 // Constructed per request, not at module scope. The ElevenLabs SDK throws
 // eagerly when the key is absent, so building this at import time made the
@@ -20,7 +21,13 @@ export async function POST(request: NextRequest) {
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const usageGate = await enforceUsageGate(userId, "tts");
-  if (usageGate) return usageGate;
+  if (usageGate) {
+    void recordOperation({
+      userId, operation: "voice.speak", outcome: "refused",
+      detail: { reason: "usage-gate" },
+    });
+    return usageGate;
+  }
 
   const body = (await request.json()) as {
     text: string;
@@ -60,6 +67,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const startedAt = Date.now();
+
   try {
     // convert() returns a Node.js Readable stream
     const nodeStream = await elevenlabs.textToSpeech.convert(persona.voiceId, {
@@ -76,6 +85,11 @@ export async function POST(request: NextRequest) {
     const audioBuffer = Buffer.concat(chunks);
 
     void logUsage({ userId, feature: "tts", ttsChars: text.length });
+    // Characters, not tokens — the only operation in Hugh billed that way.
+    void recordOperation({
+      userId, operation: "voice.speak", outcome: "ok",
+      durationMs: Date.now() - startedAt, detail: { chars: text.length },
+    });
     return new Response(audioBuffer, {
       headers: {
         "Content-Type":   "audio/mpeg",
@@ -85,6 +99,10 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     console.error("[tts] ElevenLabs error:", err);
+    void recordOperation({
+      userId, operation: "voice.speak", outcome: "failed",
+      durationMs: Date.now() - startedAt, error: err,
+    });
     return NextResponse.json(
       { error: "Failed to generate audio" },
       { status: 502 }

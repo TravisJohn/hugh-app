@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { createServiceClient } from "@/lib/supabase/service";
 import { checkUsageAllowed, logUsage } from "@/lib/usage";
+import { recordOperation } from "@/lib/observability/record";
 import { SAMPLE_DRILL, type DrillContent } from "@/lib/code/drillContent";
 import { buildDrillPrompt, parseDrill, drillCacheKey, DRILL_SYSTEM, type DrillRequest } from "@/lib/code/generateDrill";
 
@@ -67,13 +68,26 @@ export async function POST(request: NextRequest) {
   };
 
   // Cache hit → serve instantly (no LLM call, so no usage charged).
+  //
+  // Deliberately NOT recorded: `code.drill` counts attempts to GENERATE, and a
+  // cache hit generated nothing. Counting it as 'ok' would pad the success rate
+  // with work that never ran, and hide a generator that had stopped working
+  // behind a warm cache.
   const key = drillCacheKey(req);
   const cached = await readCache(key);
   if (cached) return NextResponse.json({ content: cached, generated: true, cached: true });
 
   // Miss → generation is the billable path, so gate on usage here.
   const { allowed } = await checkUsageAllowed(userId, "code/generate-drill");
-  if (!allowed) return sample("usage-limit");
+  if (!allowed) {
+    void recordOperation({
+      userId, operation: "code.drill", outcome: "refused",
+      detail: { reason: "usage-limit" },
+    });
+    return sample("usage-limit");
+  }
+
+  const startedAt = Date.now();
 
   try {
     const res = await anthropic.messages.create({
@@ -87,9 +101,20 @@ export async function POST(request: NextRequest) {
     const text = res.content[0]?.type === "text" ? res.content[0].text : "";
     const content = parseDrill(text); // throws on any shape problem
     await writeCache(key, req, content);
+    void recordOperation({
+      userId, operation: "code.drill", outcome: "ok",
+      durationMs: Date.now() - startedAt,
+    });
     return NextResponse.json({ content, generated: true, cached: false });
   } catch (err) {
     console.error("[code/generate-drill] falling back to sample:", err);
+    // This row is the ONLY evidence the generation failed. The learner is
+    // handed SAMPLE_DRILL and practises something real, so nobody will ever
+    // report it — see `failureIsSilent` on code.drill.
+    void recordOperation({
+      userId, operation: "code.drill", outcome: "failed",
+      durationMs: Date.now() - startedAt, error: err, redact: [req.topic],
+    });
     return sample("generation-failed");
   }
 }

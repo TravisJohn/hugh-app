@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { enforceUsageGate, logUsage } from "@/lib/usage";
+import { recordOperation } from "@/lib/observability/record";
 import { stripEmphasis } from "@/lib/claude/prompts";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -40,7 +41,13 @@ export async function POST(request: NextRequest) {
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const usageGate = await enforceUsageGate(userId, "mastery/session");
-  if (usageGate) return usageGate;
+  if (usageGate) {
+    void recordOperation({
+      userId, operation: "mastery.session", outcome: "refused",
+      detail: { reason: "usage-gate" },
+    });
+    return usageGate;
+  }
 
   const body = (await request.json()) as RequestBody;
   const { milestoneId, scenario, phase, messages } = body;
@@ -168,26 +175,51 @@ Return ONLY valid JSON with no markdown fences:
   // Bound once so the usage log records the model that actually ran.
   const model = phase === "evaluate" ? "claude-sonnet-4-6" : "claude-haiku-4-5";
 
-  const completion = await anthropic.messages.create({
-    model,
-    max_tokens: phase === "evaluate" ? 512 : 256,
-    messages:   [{ role: "user", content: prompt }],
-  });
+  const startedAt = Date.now();
 
-  const raw = (completion.content[0] as { type: string; text: string }).text.trim();
+  // Wrapped so an SDK throw is recorded rather than becoming an unhandled 500
+  // that leaves no trace — the shape every sibling route already uses.
+  try {
+    const completion = await anthropic.messages.create({
+      model,
+      max_tokens: phase === "evaluate" ? 512 : 256,
+      messages:   [{ role: "user", content: prompt }],
+    });
 
-  void logUsage({ userId, model, feature: "mastery/session", tokensIn: completion.usage.input_tokens, tokensOut: completion.usage.output_tokens });
+    const raw = (completion.content[0] as { type: string; text: string }).text.trim();
 
-  if (phase === "evaluate") {
-    const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
-    try {
-      const result = JSON.parse(cleaned) as { score: number; feedback: string; passed: boolean };
-      return NextResponse.json({ ...result, feedback: stripEmphasis(result.feedback) });
-    } catch {
-      console.error("[mastery/session] Failed to parse evaluate JSON:", cleaned);
-      return NextResponse.json({ error: "Failed to parse evaluation" }, { status: 500 });
+    void logUsage({ userId, model, feature: "mastery/session", tokensIn: completion.usage.input_tokens, tokensOut: completion.usage.output_tokens });
+
+    if (phase === "evaluate") {
+      const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+      try {
+        const result = JSON.parse(cleaned) as { score: number; feedback: string; passed: boolean };
+        void recordOperation({
+          userId, operation: "mastery.session", outcome: "ok",
+          durationMs: Date.now() - startedAt, detail: { phase },
+        });
+        return NextResponse.json({ ...result, feedback: stripEmphasis(result.feedback) });
+      } catch {
+        console.error("[mastery/session] Failed to parse evaluate JSON:", cleaned);
+        void recordOperation({
+          userId, operation: "mastery.session", outcome: "failed",
+          durationMs: Date.now() - startedAt, detail: { phase, stage: "parse" },
+        });
+        return NextResponse.json({ error: "Failed to parse evaluation" }, { status: 500 });
+      }
     }
-  }
 
-  return NextResponse.json({ text: stripEmphasis(raw) });
+    void recordOperation({
+      userId, operation: "mastery.session", outcome: "ok",
+      durationMs: Date.now() - startedAt, detail: { phase },
+    });
+    return NextResponse.json({ text: stripEmphasis(raw) });
+  } catch (err) {
+    console.error("[mastery/session] Anthropic error:", err);
+    void recordOperation({
+      userId, operation: "mastery.session", outcome: "failed",
+      durationMs: Date.now() - startedAt, error: err, detail: { phase },
+    });
+    return NextResponse.json({ error: "Failed to run the session." }, { status: 502 });
+  }
 }

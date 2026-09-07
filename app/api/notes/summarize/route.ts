@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { requireProvisionedApi } from "@/lib/auth/requireProvisioned";
 import { enforceUsageGate, logUsage } from "@/lib/usage";
+import { recordOperation } from "@/lib/observability/record";
 import { createServiceClient } from "@/lib/supabase/service";
 import { buildSummaryMessages, type SummaryThreadMessage } from "@/lib/notes/summaryPrompt";
 
@@ -32,10 +33,22 @@ export async function POST(request: NextRequest) {
   // and bucket directly; this stops our own service-role client, which
   // bypasses RLS entirely.
   const denied = await requireProvisionedApi(userId, "notes");
-  if (denied) return denied;
+  if (denied) {
+    void recordOperation({
+      userId, operation: "notes.summarize", outcome: "refused",
+      detail: { reason: "not-provisioned" },
+    });
+    return denied;
+  }
 
   const usageGate = await enforceUsageGate(userId, "notes/summarize");
-  if (usageGate) return usageGate;
+  if (usageGate) {
+    void recordOperation({
+      userId, operation: "notes.summarize", outcome: "refused",
+      detail: { reason: "usage-gate" },
+    });
+    return usageGate;
+  }
 
   const body = (await request.json().catch(() => ({}))) as { image_id?: string };
   const imageId = body.image_id?.trim();
@@ -50,6 +63,8 @@ export async function POST(request: NextRequest) {
       { status: 503 },
     );
   }
+
+  const startedAt = Date.now();
 
   try {
     const db = createServiceClient();
@@ -86,12 +101,25 @@ export async function POST(request: NextRequest) {
     });
     const summary = res.choices[0]?.message?.content?.trim();
     if (!summary) {
+      // Billed and empty — logUsage above already charged for this attempt.
+      void recordOperation({
+        userId, operation: "notes.summarize", outcome: "failed",
+        durationMs: Date.now() - startedAt, detail: { stage: "empty-reply" },
+      });
       return NextResponse.json({ error: "Couldn't summarise just now. Try again." }, { status: 502 });
     }
 
+    void recordOperation({
+      userId, operation: "notes.summarize", outcome: "ok",
+      durationMs: Date.now() - startedAt,
+    });
     return NextResponse.json({ summary });
   } catch (e) {
     console.error("[notes/summarize] failed:", e);
+    void recordOperation({
+      userId, operation: "notes.summarize", outcome: "failed",
+      durationMs: Date.now() - startedAt, error: e,
+    });
     return NextResponse.json({ error: "The summary ran into a problem. Try again." }, { status: 502 });
   }
 }
