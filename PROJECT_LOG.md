@@ -7143,3 +7143,100 @@ server's message where the server wrote one for a human*.
 ### State
 
 Item 1 done. Items 2-5 queued, unstarted. Nothing committed yet.
+
+## 2026-09-08 — Learn repair item 2: the milestone panel, coming in and going out
+
+Item 2 of five. The card described a failed diary load plus five silent
+buttons. The file had nine.
+
+### Coming in: a failed read rendered as an empty diary
+
+The load was `.then(r => r.json()).then(d => setEntries(d.entries ?? []))`. A
+401 or a 500 resolves that chain exactly as a 200 does, and the refusal body
+carries no `entries`, so the `?? []` turned every failure into a diary with
+nothing in it — the case rule 5 names in as many words.
+
+It was worse below the diary than in it. The Review Quiz and Mastery gates read
+the same `entries.length === 0` and, on a failed load, told the learner to "add
+at least one learning diary entry before starting the review quiz" — withholding
+the button until they rewrote something they had already written. Being
+instructed to redo finished work is a worse failure than a blank screen.
+
+**New: `lib/tracker/diaryState.ts`** — sibling of `buildState.ts`, same job one
+screen over. Resolves the load into `loading | failed | empty | ready`, with the
+precedence as the point: `failed` outranks `count`, so an empty list can never
+again stand in for an unread one. Three sections consume it. Pure, 9 tests
+(rule 7). `canStartFromDiary` is the gate's half of it, and only `ready` opens.
+
+The failure copy is modelled on the checklist failure eight lines below, which
+already did this correctly, and it carries a **Try again** that re-runs the same
+load — the load was lifted into a `useCallback` for exactly that. Rule 5 asks
+for a retry that reuses the machine, not advice to close the card.
+
+### Going out: seven saves that never read the reply
+
+Every one ended `if (d.entry) …`. A refusal has no `entry`, so the button did
+nothing and said nothing: accept a correction, save an edit, re-tag, archive,
+add an entry, tick the checklist, generate the summary.
+
+Two beyond the card's five, both in the same file and both the same defect:
+
+- **The checklist tick was the worst of the nine.** Optimistic *and* published —
+  it wrote to the panel and bubbled to the board card behind it via
+  `onCoverageChange`, then swallowed the result with `.catch(() => {})`. A
+  refused tick stayed ticked in both places until a reload. It now reverts both
+  and says so.
+- **Archive/restore** already reverted, but silently. An entry hopping out of the
+  archive unexplained reads as a bug in the button.
+
+`requestSave` returns the outcome instead of discarding it; `save` is the thin
+wrapper for callers wanting the panel banner. Both route through item 1's
+`saveOutcome.ts`, so no new decision was invented here. Two saves keep the
+learner's text on refusal: the new-entry draft stays in the box, and the editor
+stays open with the rewrite still in it.
+
+### The exception, and why it is not a contradiction
+
+**New: `withServerMessage` in `saveOutcome.ts`** (6 tests), closing a gap that
+module's own header already named. This panel's copy is ours because the
+milestone routes answer in log shorthand — but `milestones/[id]/summary` is the
+exception all the way through, refusing with "Add a diary entry before
+generating a summary" (422), "Milestone is not mastered" (409) and "Summary is
+too long" (413). Sentences written to be read, each more use than our generic
+line. So the run's rule applies: *show the server's message where the server
+wrote one for a human.*
+
+Opted into per call site via `SUMMARY_HUMAN_REFUSALS = [409, 413, 422]`, never
+inferred from the status class. A 4xx is not in general a promise that its body
+is fit to show anyone — the same route's 401 says "Unauthorized".
+
+The summary also keeps its failure **inline beside its own button**, not in the
+panel banner, because that generation fires automatically when a mastered card
+is opened. A toast for something nobody pressed reads as an app-level alarm.
+
+**New: `components/ui/SaveFailureNotice.tsx`** — the board and the panel were
+about to grow a copy each of the same red card, which is how two screens end up
+disagreeing about how serious the same refusal looks. Positioning stays with the
+caller: the board floats it over the viewport, the panel keeps it inside its own
+column so it cannot cover the board behind it.
+
+### Also: a badge that invented a zero
+
+Closing the drawer refetches the card's entry count, and
+`(d.entries ?? []).length` read a refusal as zero — a card showing "3 entries"
+silently lost its badge because a request failed. It now keeps the count it had.
+A stale count is a smaller lie than an invented one, and a card has no room to
+explain itself; the panel that just closed is where a failed read gets said out
+loud.
+
+### Verification
+
+62 files / 1325 tests green (was 61 / 1310). `tsc --noEmit` clean, eslint clean,
+`npm run build` compiles. The registry's stale-count guard caught the drift and
+`learn` was bumped 10 → 11. Not yet exercised in a browser.
+
+### State
+
+Items 1 and 2 done and committed on `fix/learn-failure-paths` (`2793ef2`,
+`b8fb0fa`). Items 3-5 queued. Board republished to the same URL with the
+widening recorded on the card rather than absorbed.

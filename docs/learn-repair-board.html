@@ -423,11 +423,11 @@
     </p>
     <dl class="runstate">
       <div><dt>Items</dt><dd>5</dd></div>
-      <div><dt>Done</dt><dd class="green">1</dd></div>
+      <div><dt>Done</dt><dd class="green">2</dd></div>
       <div><dt>In progress</dt><dd>None</dd></div>
       <div><dt>Blocked</dt><dd>0</dd></div>
-      <div><dt>Gates</dt><dd class="green">lint · types · build · 1,310 tests pass</dd></div>
-      <div><dt>Updated</dt><dd>7 Sep 2026 · item 1 landed</dd></div>
+      <div><dt>Gates</dt><dd class="green">lint · types · build · 1,325 tests pass</dd></div>
+      <div><dt>Updated</dt><dd>8 Sep 2026 · item 2 landed</dd></div>
     </dl>
   </header>
 
@@ -441,13 +441,8 @@
     <div class="board">
 
       <div class="col col-queued">
-        <div class="col-head"><span>Queued</span><b>4</b></div>
+        <div class="col-head"><span>Queued</span><b>3</b></div>
 
-        <a class="card" href="#item-2">
-          <div class="card-top"><span class="card-num">02</span><span class="card-title">The milestone panel never says anything went wrong</span></div>
-          <p class="card-sub">A blank diary that isn't blank — and buttons that can do nothing at all, without a word.</p>
-          <div class="card-meta"><span>2 files</span><span>scope widened</span></div>
-        </a>
 
         <a class="card" href="#item-3">
           <div class="card-top"><span class="card-num">03</span><span class="card-title">The server doesn't check its own saves</span></div>
@@ -479,7 +474,13 @@
       </div>
 
       <div class="col col-done">
-        <div class="col-head"><span>Done</span><b>1</b></div>
+        <div class="col-head"><span>Done</span><b>2</b></div>
+
+        <a class="card" href="#item-2">
+          <div class="card-top"><span class="card-num">02</span><span class="card-title">The milestone panel never says anything went wrong</span></div>
+          <p class="card-sub">The diary now says when it couldn't load, and every button on the panel says when it was refused.</p>
+          <div class="card-meta"><span>8 files</span><span>+15 tests</span></div>
+        </a>
 
         <a class="card" href="#item-1">
           <div class="card-top"><span class="card-num">01</span><span class="card-title">"Saved" when nothing was saved</span></div>
@@ -624,7 +625,7 @@
         <div class="entry-head">
           <span class="entry-num">02</span>
           <h3>The milestone panel never says anything went wrong</h3>
-          <span class="pill pill-queued">Queued</span>
+          <span class="pill pill-done">Done</span>
         </div>
         <div class="entry-body">
           <div class="prose">
@@ -681,12 +682,91 @@
               </p>
             </div>
             <div class="block">
-              <h4>How you'll know it worked</h4>
+              <h4>What landed</h4>
               <p>
-                Tests that make each call fail and confirm the panel says so. In
-                the app: with the server refusing, the diary reads "we couldn't
-                load this — try again" rather than looking empty, and pressing
-                Accept or Save tells you it didn't take.
+                The diary now has four states instead of two, and the difference
+                between them is the whole item: still loading, <em>failed to
+                load</em>, genuinely empty, and has entries. A failed load says
+                "we couldn't load your learning diary — your entries are safe,
+                this screen just didn't get them", with a Try again button that
+                re-runs the same load rather than asking you to close the card.
+              </p>
+              <p>
+                That four-way decision went into a small file of its own, tested
+                directly, because three separate sections of the panel were
+                asking the same question and getting it wrong the same way.
+              </p>
+              <p>
+                Every button that sends a change now reads the reply. When one is
+                refused you get a red notice naming what didn't happen, and the
+                screen puts itself back the way the database actually has it.
+                Your typing is never discarded: a refused new entry leaves your
+                draft in the box, and a refused edit leaves the editor open with
+                your rewrite still in it.
+              </p>
+            </div>
+            <div class="block">
+              <h4>Two things found on the way</h4>
+              <p>
+                <strong>The gates were worse than the diary.</strong> The Review
+                Quiz and Mastery buttons read the same empty list, so a failed
+                load didn't just show a blank diary — it told you to "add at
+                least one learning diary entry before starting the review quiz"
+                and withheld the button until you did. Being instructed to redo
+                work you have already done is a worse failure than a blank
+                screen. Both gates now say they couldn't check, and offer the
+                retry.
+              </p>
+              <p>
+                <strong>One save was lying twice.</strong> Ticking an item on the
+                milestone checklist updates the panel immediately and also tells
+                the board card behind it. Neither was ever checked against the
+                server, so a refused tick stayed ticked in both places until you
+                reloaded the page. It now reverts both and says why.
+              </p>
+              <p class="quiet">
+                A third, smaller one: closing the panel refreshes the "3 entries"
+                badge on the card, and a failed refresh was being read as a count
+                of zero — so the badge would vanish. It now keeps the number it
+                had. A stale count is a smaller lie than an invented one, and a
+                card has no room to explain itself.
+              </p>
+            </div>
+            <div class="block">
+              <h4>One deliberate exception</h4>
+              <p>
+                The rule for this run is that failure wording on these screens is
+                ours, because the milestone routes answer in developer shorthand.
+                The summary route turned out to be the exception all the way
+                through: it refuses with "Add a diary entry before generating a
+                summary", "Milestone is not mastered", "Summary is too long".
+                Those are sentences written for a person, and each is more use
+                than our generic line — so those three, and only those three, are
+                shown as the server wrote them.
+              </p>
+              <p class="quiet">
+                This is the same rule item 5 rests on, not a contradiction of it:
+                show the server's message where the server wrote one for a human.
+                It is opted into for named cases rather than guessed at, because
+                a refusal is not in general a promise that its wording is fit to
+                read.
+              </p>
+            </div>
+            <div class="block">
+              <h4>How to check me</h4>
+              <p>
+                15 new tests, including the one this item exists for:
+                <em>reads a refused load as failed, not empty</em>. The suite went
+                from 1,310 to 1,325, all passing, with lint, types and a
+                production build clean.
+              </p>
+              <p>
+                In the app: open a milestone with the server refusing reads. The
+                diary should say it couldn't load and offer Try again — not look
+                empty — and the Review Quiz button should say it couldn't check
+                rather than telling you to write an entry. Then let your session
+                lapse and press Accept, Save, or Generate summary: each should
+                tell you it didn't take.
               </p>
             </div>
           </div>
@@ -694,8 +774,13 @@
             <section>
               <h5>Files</h5>
               <ul class="files">
-                <li>MilestoneDrawer.tsx <em>— diary, and 5 buttons</em></li>
+                <li>diaryState.ts <em>— new, the four-way decision</em></li>
+                <li>diaryState.test.ts <em>— new, 9 tests</em></li>
+                <li>MilestoneDrawer.tsx <em>— the diary, 2 gates, 7 saves</em></li>
                 <li>KanbanBoard.tsx <em>— entry counts on cards</em></li>
+                <li>SaveFailureNotice.tsx <em>— new, one shared notice</em></li>
+                <li>saveOutcome.ts <em>— the server-message exception</em></li>
+                <li>saveOutcome.test.ts <em>— 6 more tests</em></li>
               </ul>
             </section>
             <section>
@@ -705,6 +790,14 @@
                 audit but fell off when it was condensed to five cards. They live
                 in this item's file, so folding them in here means one pass
                 rather than two — recorded rather than quietly absorbed.
+              </p>
+              <p class="risk-note">
+                Widened again while building it, 8 Sep. Two more saves in the
+                same file had the identical fault (archive/restore, and the
+                checklist tick), and the two quiz/mastery gates were the same
+                failed read as the diary. Nine places in total, not six. Fixing
+                five of seven siblings and leaving two would have been the odder
+                choice.
               </p>
             </section>
             <section>
@@ -926,7 +1019,7 @@
     <div class="rule-grid">
       <dl class="rule queued">
         <dt>Queued</dt>
-        <dd>Understood and scoped, not started. Everything above is here right now.</dd>
+        <dd>Understood and scoped, not started. Items 3, 4 and 5 are here right now.</dd>
       </dl>
       <dl class="rule active">
         <dt>In progress</dt>
