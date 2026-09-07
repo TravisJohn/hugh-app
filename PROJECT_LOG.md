@@ -7073,3 +7073,73 @@ PRD-feature-registry.md is complete: registry, guards, health page, fourteen
 routes instrumented, console restructured. `8 of 8` money-spending surfaces
 report an outcome. None of it has been viewed in a browser — the seeded test
 user is not an admin.
+
+---
+
+## 2026-09-07 — Learn robustness audit, and item 1 of five
+
+### Why
+
+Before starting on the Code pillar, Travis asked whether Learn is robust. The
+gates all read green — lint, types, 1,296 tests — so the audit went after the
+failure paths instead: what each surface does when a save is refused, a read
+drops, or Claude returns something unparseable.
+
+The finding, in one line: **everything that spends a token is hardened;
+everything that stores the result of that spend is not.** Usage gates, model
+naming and per-row cost accounting are disciplined throughout. The plain
+Supabase writes underneath them were left on optimistic assumptions.
+
+Five defects, tracked on a plain-language Kanban at `docs/learn-repair-board.html`
+(published as an Artifact so the state is followable without reading a diff):
+
+1. A failed write shown as a success — progress writes.
+2. A dropped read rendered as empty data — the diary.
+3. Unchecked Supabase writes in three routes.
+4. Token spend that is never logged, in three routes.
+5. The server's own error message discarded by Ask Hugh.
+
+### Item 1 — "Saved" when nothing was saved
+
+`fetch` resolves for 401, 403 and 500 exactly as it does for 200; it only
+rejects when the request never reached a server. Four call sites treated
+"the await returned" as "the save happened":
+
+- `QuizClient.doValidate` navigated to the board's celebration from a `finally`,
+  so a lapsed session produced confetti and an unreviewed card.
+- `MasteryClient.confirmMastery` / `finishPractice` did the same, and had no
+  `try` at all — a dropped connection threw out of the handler and stranded the
+  screen on "Saving your mastery…" with no control to press. Rule 5 twice over:
+  a success that did not happen, and a wait that never ends.
+- `KanbanBoard`'s optimistic card move and reorder hung their rollback off
+  `.catch()`, which never fires for the failures that actually occur.
+
+**New: `lib/errors/saveOutcome.ts`** — the sibling of `errors/recovery.ts`.
+That one decides what to offer when a screen throws while rendering; this one
+decides what to offer when a save comes back refused. Six reasons, each
+carrying learner-facing copy and a `canRetry` flag, so "signed out" never
+offers a retry that cannot succeed. Pure, 14 unit tests (rule 7).
+
+Each screen then got the failure it deserved rather than a shared banner. The
+quiz keeps "Quiz Passed!" and the score — the pass is real even when recording
+it fails — and swaps only the saving line. Mastery returns to the result screen
+and carries its own board link, because that screen's controls all assume the
+save will eventually work and a lapsed session would otherwise be a dead end.
+The board rolls the card back and says so, in a notice that does not time out.
+
+### The judgement worth recording
+
+These screens show **our** copy, not the server's. The milestone routes answer
+with developer shorthand ("Unauthorized", "Invalid column") written for logs.
+Item 5 will do the opposite, because `learn/chat` deliberately writes learner
+sentences. The two look contradictory and are not: the rule is *show the
+server's message where the server wrote one for a human*.
+
+### Verification
+
+61 files / 1310 tests green (was 1296). `tsc --noEmit` clean, eslint clean,
+`npm run build` compiles. Not yet exercised in a browser.
+
+### State
+
+Item 1 done. Items 2-5 queued, unstarted. Nothing committed yet.
