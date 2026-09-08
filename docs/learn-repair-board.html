@@ -419,15 +419,19 @@
       Learn works when everything works. This board covers the other case: what
       happens when a save is refused, a load drops, or Claude returns nonsense.
       Five separate defects, fixed one at a time, each with a plain account of
-      what you'd see, why it happens, and what changes.
+      what you'd see, why it happens, and what changed.
+      <br><br>
+      <strong>All five are done.</strong> Three of them turned out to be bigger
+      than the card said, and each of those is written up on its own card rather
+      than quietly absorbed. Nothing was dropped.
     </p>
     <dl class="runstate">
       <div><dt>Items</dt><dd>5</dd></div>
-      <div><dt>Done</dt><dd class="green">4</dd></div>
+      <div><dt>Done</dt><dd class="green">5 of 5</dd></div>
       <div><dt>In progress</dt><dd>None</dd></div>
       <div><dt>Blocked</dt><dd>0</dd></div>
-      <div><dt>Gates</dt><dd class="green">lint · types · build · 1,342 tests pass</dd></div>
-      <div><dt>Updated</dt><dd>8 Sep 2026 · item 4 landed</dd></div>
+      <div><dt>Gates</dt><dd class="green">lint · types · build · 1,361 tests pass</dd></div>
+      <div><dt>Updated</dt><dd>8 Sep 2026 · run complete</dd></div>
     </dl>
   </header>
 
@@ -441,16 +445,8 @@
     <div class="board">
 
       <div class="col col-queued">
-        <div class="col-head"><span>Queued</span><b>1</b></div>
-
-
-
-
-        <a class="card" href="#item-5">
-          <div class="card-top"><span class="card-num">05</span><span class="card-title">The real reason gets replaced by a shrug</span></div>
-          <p class="card-sub">Hit your daily limit and Ask Hugh says "something went wrong" instead of saying so.</p>
-          <div class="card-meta"><span>1 file</span><span>wording</span></div>
-        </a>
+        <div class="col-head"><span>Queued</span><b>0</b></div>
+        <div class="col-empty">Empty — every item in this run has landed.</div>
       </div>
 
       <div class="col col-active">
@@ -464,18 +460,12 @@
       </div>
 
       <div class="col col-done">
-        <div class="col-head"><span>Done</span><b>4</b></div>
+        <div class="col-head"><span>Done</span><b>5</b></div>
 
-        <a class="card" href="#item-4">
-          <div class="card-top"><span class="card-num">04</span><span class="card-title">Money spent that nothing records</span></div>
-          <p class="card-sub">The cost is now written down the moment Claude answers — including the retries that were being thrown away.</p>
-          <div class="card-meta"><span>5 files</span><span>+10 tests</span></div>
-        </a>
-
-        <a class="card" href="#item-3">
-          <div class="card-top"><span class="card-num">03</span><span class="card-title">The server doesn't check its own saves</span></div>
-          <p class="card-sub">Three writes now prove a row actually changed — and a paid-for summary is no longer thrown away when it can't be stored.</p>
-          <div class="card-meta"><span>6 files</span><span>+7 tests</span></div>
+        <a class="card" href="#item-1">
+          <div class="card-top"><span class="card-num">01</span><span class="card-title">"Saved" when nothing was saved</span></div>
+          <p class="card-sub">Four saves now read the server's reply. A refused save keeps your score on screen and offers the button again.</p>
+          <div class="card-meta"><span>5 files</span><span>+14 tests</span></div>
         </a>
 
         <a class="card" href="#item-2">
@@ -484,11 +474,24 @@
           <div class="card-meta"><span>8 files</span><span>+15 tests</span></div>
         </a>
 
-        <a class="card" href="#item-1">
-          <div class="card-top"><span class="card-num">01</span><span class="card-title">"Saved" when nothing was saved</span></div>
-          <p class="card-sub">Four saves now read the server's reply. A refused save keeps your score on screen and offers the button again.</p>
-          <div class="card-meta"><span>5 files</span><span>+14 tests</span></div>
+        <a class="card" href="#item-3">
+          <div class="card-top"><span class="card-num">03</span><span class="card-title">The server doesn't check its own saves</span></div>
+          <p class="card-sub">Three writes now prove a row actually changed — and a paid-for summary is no longer thrown away when it can't be stored.</p>
+          <div class="card-meta"><span>6 files</span><span>+7 tests</span></div>
         </a>
+
+        <a class="card" href="#item-4">
+          <div class="card-top"><span class="card-num">04</span><span class="card-title">Money spent that nothing records</span></div>
+          <p class="card-sub">The cost is now written down the moment Claude answers — including the retries that were being thrown away.</p>
+          <div class="card-meta"><span>5 files</span><span>+10 tests</span></div>
+        </a>
+
+        <a class="card" href="#item-5">
+          <div class="card-top"><span class="card-num">05</span><span class="card-title">The real reason gets replaced by a shrug</span></div>
+          <p class="card-sub">Ask Hugh now tells you what actually happened — and a failure is no longer filed in your diary as something Hugh said.</p>
+          <div class="card-meta"><span>5 files</span><span>+19 tests</span></div>
+        </a>
+
       </div>
 
     </div>
@@ -1105,7 +1108,7 @@
         <div class="entry-head">
           <span class="entry-num">05</span>
           <h3>The real reason gets replaced by a shrug</h3>
-          <span class="pill pill-queued">Queued</span>
+          <span class="pill pill-done">Done</span>
         </div>
         <div class="entry-body">
           <div class="prose">
@@ -1138,10 +1141,89 @@
               </p>
             </div>
             <div class="block">
-              <h4>How you'll know it worked</h4>
+              <h4>What landed</h4>
               <p>
-                A test asserting the server's own wording reaches the screen. In the
-                app: run yourself out of budget and read what Ask Hugh tells you.
+                Ask Hugh now reads what the server actually said before deciding
+                what to tell you. Hit your monthly limit and you get the sentence
+                written for that — the one naming what to do about it — instead
+                of an apology that leaves you pressing send again.
+              </p>
+              <p>
+                A refusal also appears as what it is: a notice beside the
+                conversation, with no avatar and no speech bubble, because the
+                one thing it must never look like is Hugh talking. It carries
+                <strong>Send it again</strong> only when sending again could
+                actually work — a lapsed session and a spent budget get no
+                button, since a retry that cannot succeed is the same lie in a
+                different costume.
+              </p>
+              <p class="quiet">
+                Small thing with a real payoff: when the server says how long to
+                wait, you're now told. It has always sent that number and nothing
+                has ever shown it to you.
+              </p>
+            </div>
+            <div class="block">
+              <h4>The second half was bigger than this card said</h4>
+              <p>
+                The card said the error text became part of the conversation
+                Claude reads back. True — and it went three places further. It
+                was written into the exported transcript, folded into the
+                checklist rail's reading of what you'd covered, and handed to the
+                summariser.
+              </p>
+              <p>
+                That last one is the one that matters. The summary is what you
+                save to your learning diary, and your diary is the only thing a
+                review quiz is allowed to quote. So a sentence Hugh never said
+                could travel all the way to being the thing a quiz asks you
+                about.
+              </p>
+              <p>
+                The fix isn't care, it's shape: a failure now carries no reply at
+                all, so there is nothing to accidentally add to the conversation.
+              </p>
+            </div>
+            <div class="block">
+              <h4>And the worst one, found on the way</h4>
+              <p>
+                When the summariser itself failed, the words "Unable to generate
+                summary. Please try again." were handed to the summary panel
+                <em>as the session's story</em> — looking exactly like a real
+                one, with a working <strong>Save</strong> button underneath it.
+                One click filed that sentence in your learning diary.
+              </p>
+              <p>
+                The panel is now told explicitly when there is nothing to show,
+                and there is no save button on a failure because there is no
+                summary to save.
+              </p>
+            </div>
+            <div class="block">
+              <h4>The judgement call, resolved</h4>
+              <p>
+                Item 1's card flagged that these two items look contradictory:
+                there I use <em>our</em> wording, here the <em>server's</em>.
+                They aren't in conflict. The rule is to show the server's message
+                where the server wrote one for a person — and here it did, for
+                exactly two refusals, which are named one by one in the code.
+                Everything else on this route still answers in shorthand written
+                for logs, and that is still kept away from you.
+              </p>
+            </div>
+            <div class="block">
+              <h4>How to check me</h4>
+              <p>
+                19 new tests, including the two this item exists for:
+                <em>shows the budget refusal instead of a generic apology</em>,
+                and <em>carries no reply on any failure, so a refusal cannot
+                become a message</em>. The suite went from 1,342 to 1,361, all
+                passing, with lint, types and a production build clean.
+              </p>
+              <p>
+                In the app: run yourself out of budget and read what Ask Hugh
+                tells you. Then export the transcript — the refusal should not be
+                in it.
               </p>
             </div>
           </div>
@@ -1149,13 +1231,24 @@
             <section>
               <h5>Files</h5>
               <ul class="files">
+                <li>chatOutcome.ts <em>— new, the decision</em></li>
+                <li>chatOutcome.test.ts <em>— new, 19 tests</em></li>
                 <li>ChatWindow.tsx <em>— Ask Hugh chat</em></li>
+                <li>SummaryPanel.tsx <em>— the unsavable failure</em></li>
               </ul>
+            </section>
+            <section>
+              <h5>Scope note</h5>
+              <p class="risk-note">
+                One beyond the card, and the highest-consequence find of the
+                run: a failed summarise could be saved into the learning diary
+                as if it were the session's story.
+              </p>
             </section>
             <section>
               <h5>Risk</h5>
               <div class="risk"><span class="risk-low">Low</span></div>
-              <p class="risk-note">One file. The only judgement call is wording, which is yours to overrule.</p>
+              <p class="risk-note">The wording is still yours to overrule — it lives in one file, with the sentences in one list.</p>
             </section>
           </aside>
         </div>
@@ -1169,7 +1262,7 @@
     <div class="rule-grid">
       <dl class="rule queued">
         <dt>Queued</dt>
-        <dd>Understood and scoped, not started. Only item 5 is here now.</dd>
+        <dd>Understood and scoped, not started. Empty now — the run is finished.</dd>
       </dl>
       <dl class="rule active">
         <dt>In progress</dt>
@@ -1190,6 +1283,11 @@
       entitled to test. If something turns out bigger than the card says, or I
       find I was wrong about a cause, the card changes and I'll say what changed
       and why. Nothing gets dropped silently.
+      <br><br>
+      That happened three times. Item 2 grew from six places to nine. Item 3's
+      stated fix turned out to be insufficient, and the card now says so above
+      the correction. Item 5's second half reached the learning diary, which is
+      further than anyone thought. All three are written on their own cards.
     </p>
   </section>
 

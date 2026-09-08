@@ -7386,3 +7386,98 @@ Items 1-4 done and committed on `fix/learn-failure-paths` (`2793ef2`, `b8fb0fa`,
 `c60f714`, `56a851b`). Item 5 is the last one. Expect reported spend to rise —
 it was under-reported, and failed document uploads are where the difference will
 show.
+
+## 2026-09-08 — Learn repair item 5: the shrug that replaced the reason, and the run closes
+
+Item 5 of five, and the last. `data.reply ?? "Sorry, something went wrong.
+Please try again."` never looked at the status, so every sentence the server
+wrote for a refusal was discarded — including the only one that tells a learner
+what to do: "Monthly usage limit reached. Please contact Travis to reset or
+upgrade."
+
+### The second half travelled three places further than the card said
+
+The substitute was appended to `messages` as `role: "assistant"`, and everything
+in `messages` goes four places:
+
+1. `apiMessages` on the next turn — Claude reads it back as its own words, and
+   is billed for it as input.
+2. `onTranscriptChange` — the checklist rail's reading of what was covered.
+3. `buildTranscriptMarkdown` — the learner's exported transcript.
+4. `handleSummarise` → `/api/learn/summarize` → the summary the learner **saves
+   as a diary entry**.
+
+Review quizzes may only quote diary entries (migration 035, item 2's grounding
+rule). So a sentence Hugh never said could travel all the way to being the thing
+a quiz asks about.
+
+**New: `lib/learn/chatOutcome.ts`** (19 tests). A failure carries no `reply` at
+all, so there is nothing for a caller to append even by accident — structural
+rather than careful. Shows the server's own message for **403 and 429 only**,
+where `enforceUsageGate` writes `messageForDenial` (learner copy, already
+unit-tested in `lib/tokenBudget`), and ours for the shorthand ("Unauthorized",
+"topic and messages are required", "Failed to generate response"). Listed
+explicitly, never inferred from the status class. Also reads `retryAfter`, which
+the server has always sent and nothing has ever displayed, guarded against
+non-finite and negative values that would render a countdown that never ends.
+
+**Deliberately does NOT reuse `errors/saveOutcome`.** A 403 on a save means "not
+your row"; a 403 here means "your account is restricted". Same number, different
+sentence to the person reading it. Sharing the mapping would have been a
+tidier-looking lie. Two domains, two mappings — recorded so nobody "DRYs" it
+later.
+
+### The worst find of the whole run, on the way out
+
+On a failed summarise the component did
+`setSummary({ story: "Unable to generate summary. Please try again.", takeaway: "" })`.
+The panel cannot tell that from a real summary: it rendered it as the session's
+story with a working **Save** button underneath. One click filed that sentence
+in the learning diary — the one store a review quiz is allowed to quote.
+
+`SummaryPanel` now takes an explicit `error` prop, and `data` stays null on
+failure, so the save footer does not render at all. There is no summary to save
+because there was no summary.
+
+The refusal notice in the thread is deliberately not a `ChatBubble`: no avatar,
+no tail, `role="alert"`. It carries "Send it again" only when `canRetry`, so a
+lapsed session and a spent budget get no button.
+
+### Verification
+
+65 files / 1361 tests green (was 64 / 1342). `tsc --noEmit` clean, eslint clean,
+`npm run build` compiles. The registry drift guard caught the count change and
+`learn` 11→12, `ask` 9→10 were bumped.
+
+### The run, closed
+
+Five items, five commits, one branch, `fix/learn-failure-paths`:
+
+| Item | Commit  | What it was |
+|---|---|---|
+| 1 | 2793ef2 | "Saved" when nothing was saved — `errors/saveOutcome.ts` |
+| 2 | b8fb0fa | The milestone panel said nothing — `tracker/diaryState.ts` |
+| 3 | c60f714 | Writes that never proved they wrote — `supabase/writeResult.ts` |
+| 4 | 56a851b | Spend nothing recorded — `claude/attemptWithUsage.ts` |
+| 5 | 6b52a0f | The shrug that replaced the reason — `learn/chatOutcome.ts` |
+
+Suite went 1,296 → 1,361 (+65 tests, +5 files). Every item added exactly one
+pure module with its own tests, which is architecture rule 7 doing its job
+rather than being cited at.
+
+Three items were bigger than their card, each recorded on the card rather than
+absorbed: item 2 grew from six places to nine; item 3's stated fix ("check the
+error") was insufficient and the card now carries the correction above it; item
+5's second half reached the diary.
+
+**Still open, offered and not taken up:** there is no harness here for running a
+route against a fake database. Route fixes in items 3 and 4 are verified by a
+tested pure module plus reading. Travis was told plainly, twice.
+
+**Not yet done:** the branch has not been pushed and no PR is open. The plan
+recorded at the start was one PR for all five once complete.
+
+### State
+
+All five items done on `fix/learn-failure-paths`, 10 commits ahead of main,
+working tree clean, all gates green. Awaiting Travis on the PR.
