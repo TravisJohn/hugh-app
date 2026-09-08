@@ -51,12 +51,47 @@ in front of real users, and it should be treated as release-blocking.
   removes end to end, and what the Anthropic / OpenAI / ElevenLabs data-handling
   position is for learner text sent to them.
 
-## Realtime mastery spends without logging — do not enable (found 2026-09-05)
+## Realtime mastery spends without logging — CLOSED 2026-09-08
 
 `app/api/tracker/mastery/realtime-session/route.ts` calls `enforceUsageGate`
 but never calls `logUsage`. That is the CLAUDE.md rule stated outright: "A
 route that calls `enforceUsageGate` but never logs is a bug: it checks the
 learner's budget and then spends against it invisibly."
+
+**What it actually was.** Not a dropped line. That route mints an ephemeral
+client secret and returns it; the session then runs browser-to-OpenAI over
+WebRTC. At the moment that route runs, nothing has been spent and there is no
+figure to log. The spend is never visible to the server at all.
+
+**The fix (2026-09-08).** The Realtime API reports usage over the data channel,
+in two places that are not the same source: `response.done` carries the coach
+model's tokens, and `conversation.item.input_audio_transcription.completed`
+carries the transcription model's, which is *not* included in the first. The
+transport now folds both into totals, the hook reports them when the session
+ends (and beacons them on unload), and
+`app/api/tracker/mastery/realtime-usage/route.ts` bounds and logs them.
+
+Three rows per session, not one: realtime audio, realtime text and
+transcription price differently — audio input is 10.00 against text's 0.60, a
+16x spread — so all three are registered separately in `lib/pricing.ts`. Before
+this, none of the three existed there at all, so even a logged session would
+have been priced at the Sonnet fallback.
+
+The browser supplies the figures, so they are **bounded, not trusted**:
+`boundTotals` clamps each bucket to what a session of `MAX_SESSION_SECONDS`
+could physically emit, using the server's own config rather than anything in
+the request.
+
+**Residual, accepted and documented:** a learner who closes the laptop
+mid-session reports nothing, the reservation expires, and that spend is lost.
+`sendBeacon` covers most of it, not all. The `mastery.realtime` operation is
+flagged `failureIsSilent` for exactly this reason, and an empty report is
+recorded as a failure so /admin/features can count how often it happens.
+
+**Also worth knowing:** what gets recorded is what the API reported, which is
+not guaranteed to match the provider's billing meter, and the token breakdown
+is sometimes omitted. When the split is missing, everything is attributed to
+audio — the expensive class — so an unknown mix can never hide spend.
 
 The August audit already flagged this. It is **worse since migration 049**:
 `enforceUsageGate` now *reserves* budget and `logUsage` is what converts the
@@ -65,15 +100,17 @@ unconfirmed, the budget springs back, and OpenAI Realtime voice minutes — whic
 are not cheap — were spent with no record anywhere.
 
 `MASTERY_REALTIME_ENABLED=true` in local `.env.local`; confirmed **off in
-Vercel**, so this is not live. It is therefore not urgent, but it is the last
-hole in the money path.
+Vercel**, so this was never live.
 
-**Do not turn that flag on in production until the route logs usage**, naming
-its model once for both the API call and the log, and accounting for both the
-Realtime model and the transcription model.
+**The money blocker is closed. A privacy blocker is not.** Enabling the flag
+sends learner **voice audio to OpenAI**, and `/privacy` does not say so — it
+currently discloses ElevenLabs (which receives text, not voice) and the
+browser's Google-backed speech recognition, and nothing else. That disclosure
+has to be written before the flag goes on in production.
 
-Disclosure note: enabling it also sends learner **voice audio to OpenAI**, which
-the privacy page would then have to say.
+**Still untested end to end.** The pure accumulator has tests and the transport
+has tests, but no realtime session has ever run against this code — the flag has
+never been on. First enable should be watched, with /admin/features open.
 
 ## Browser speech recognition sends audio to Google (found 2026-09-05)
 

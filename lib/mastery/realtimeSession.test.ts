@@ -82,3 +82,78 @@ describe("follow-up cap (app-owned hard limit)", () => {
     expect(followupCapReached(7, 6)).toBe(true);  // opener + 6 follow-ups
   });
 });
+
+describe("usage observation", () => {
+  it("records the coach model's tokens from response.done", () => {
+    // The server never sees this call. If the transport does not capture the
+    // figure here, the spend has no record anywhere.
+    const { session } = makeSession();
+    session.ingestEvent({
+      type: "response.done",
+      response: {
+        usage: {
+          input_tokens: 120,
+          output_tokens: 80,
+          input_token_details:  { audio_tokens: 110, text_tokens: 10 },
+          output_token_details: { audio_tokens: 75,  text_tokens: 5  },
+        },
+      },
+    });
+
+    const usage = session.getUsage();
+    expect(usage.audioIn).toBe(110);
+    expect(usage.textIn).toBe(10);
+    expect(usage.audioOut).toBe(75);
+    expect(usage.textOut).toBe(5);
+  });
+
+  it("records transcription tokens, which response.done never reports", () => {
+    // Two models, two events, two rates — conflating them mis-states the cost.
+    const { session } = makeSession();
+    session.ingestEvent({
+      type: "conversation.item.input_audio_transcription.completed",
+      item_id: "item-1",
+      transcript: "I partitioned the table by date.",
+      usage: { type: "tokens", input_tokens: 44, output_tokens: 9 },
+    });
+
+    const usage = session.getUsage();
+    expect(usage.transcriptionIn).toBe(44);
+    expect(usage.transcriptionOut).toBe(9);
+    expect(usage.audioIn).toBe(0);
+  });
+
+  it("accumulates across a whole session rather than keeping only the last turn", () => {
+    const { session } = makeSession();
+    session.ingestEvent({ type: "response.done", response: { usage: { input_tokens: 10 } } });
+    session.ingestEvent({ type: "response.done", response: { usage: { input_tokens: 15 } } });
+
+    expect(session.getUsage().audioIn).toBe(25);
+  });
+
+  it("counts a response that arrives after the coach concluded", () => {
+    // It still cost money. The status guard must not gate the accounting.
+    const { session } = makeSession();
+    session.ingestEvent(concludeItem('{"reason":"done"}'));
+    session.ingestEvent({ type: "response.done", response: { usage: { input_tokens: 30 } } });
+
+    expect(session.getUsage().audioIn).toBe(30);
+  });
+
+  it("survives dispose() so an ended session can still be billed", () => {
+    // Every end path tears down the connection before the usage is read.
+    const { session } = makeSession();
+    session.ingestEvent({ type: "response.done", response: { usage: { input_tokens: 60 } } });
+    session.dispose();
+
+    expect(session.getUsage().audioIn).toBe(60);
+  });
+
+  it("tolerates a response.done carrying no usage at all", () => {
+    const { session } = makeSession();
+    session.ingestEvent({ type: "response.done", response: {} });
+    session.ingestEvent({ type: "response.done" });
+
+    expect(session.getUsage().audioIn).toBe(0);
+  });
+});

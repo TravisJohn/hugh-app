@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MasteryRealtimeSession } from '@/lib/mastery/realtimeSession';
 import { followupCapReached } from '@/lib/mastery/caps';
+import { isEmpty } from '@/lib/mastery/realtimeUsage';
 import type {
   MasteryRealtimeStatus,
   MasteryRealtimeError,
@@ -35,6 +36,58 @@ export function useMasteryRealtime(): UseMasteryRealtimeReturn {
   const inactivityMsRef = useRef(90_000);
   const endedRef = useRef(false); // single-evaluation guard
 
+  // Reporting what the session spent. The server minted a credential and never
+  // saw the call, so these two refs carry the only record of it: which card the
+  // spend belongs to, and whether it has already been sent. Without the second,
+  // the end-of-session report and the unload beacon would both fire and one
+  // conversation would be billed twice.
+  const milestoneIdRef = useRef<string | null>(null);
+  const reportedRef    = useRef(false);
+
+  /**
+   * Send the session's token usage to the server. At most once per session.
+   *
+   * `useBeacon` is for teardown paths (unload, unmount) where a normal fetch
+   * can be cancelled as the page goes away.
+   *
+   * Failures are swallowed on purpose: this is accounting riding on the
+   * learner's session, and it must never break the thing it measures. A report
+   * that never arrives is a known, documented gap — spend lost because the
+   * laptop closed cannot be recovered from the client.
+   */
+  const reportUsage = useCallback((useBeacon: boolean) => {
+    if (reportedRef.current) return;
+
+    const session     = sessionRef.current;
+    const milestoneId = milestoneIdRef.current;
+    if (!session || !milestoneId) return;
+
+    const usage = session.getUsage();
+    reportedRef.current = true;
+
+    // Nothing observed: no row to write. Silence is correct here — this is the
+    // page that opened and never connected.
+    if (isEmpty(usage)) return;
+
+    const body = JSON.stringify({ milestoneId, usage });
+    const url  = '/api/tracker/mastery/realtime-usage';
+
+    try {
+      if (useBeacon && typeof navigator !== 'undefined' && navigator.sendBeacon) {
+        navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
+        return;
+      }
+      void fetch(url, {
+        method:    'POST',
+        headers:   { 'Content-Type': 'application/json' },
+        body,
+        keepalive: true,
+      }).catch(() => { /* see doc comment — accounting must not surface here */ });
+    } catch {
+      /* same */
+    }
+  }, []);
+
   const clearTimers = useCallback(() => {
     if (maxTimerRef.current)  { clearTimeout(maxTimerRef.current);  maxTimerRef.current  = null; }
     if (idleTimerRef.current) { clearTimeout(idleTimerRef.current); idleTimerRef.current = null; }
@@ -45,10 +98,13 @@ export function useMasteryRealtime(): UseMasteryRealtimeReturn {
     if (endedRef.current) return;
     endedRef.current = true;
     clearTimers();
+    // getUsage() deliberately survives dispose(), so the order of these two is
+    // not load-bearing — only that both happen on every end path.
+    reportUsage(false);
     sessionRef.current?.dispose();
     setEndReason(reason);
     setStatus('concluding');
-  }, [clearTimers]);
+  }, [clearTimers, reportUsage]);
 
   const bumpIdle = useCallback(() => {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
@@ -57,12 +113,19 @@ export function useMasteryRealtime(): UseMasteryRealtimeReturn {
 
   const disconnect = useCallback(() => {
     clearTimers();
+    // Covers the paths that never reach endSession: unmount mid-conversation,
+    // and starting a second session over a first. The guard inside makes the
+    // second of two calls a no-op.
+    reportUsage(true);
     sessionRef.current?.dispose();
     sessionRef.current = null;
-  }, [clearTimers]);
+  }, [clearTimers, reportUsage]);
 
   const connect = useCallback(async (milestoneId: string): Promise<boolean> => {
     disconnect();
+    // A fresh session: new card, and its spend has not been reported yet.
+    milestoneIdRef.current = milestoneId;
+    reportedRef.current    = false;
     endedRef.current = false;
     coachTurnsRef.current = 0;
     setError(null);

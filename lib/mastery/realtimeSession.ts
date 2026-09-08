@@ -10,6 +10,10 @@
 //     cannot inject a result).
 //   • Events after dispose() can never fire callbacks (disposed guard).
 //   • Transcript turns are deduped by id and finalised in arrival order.
+//   • Session usage is observed, never estimated: the two events that actually
+//     carry token counts are folded into totals the caller can read once the
+//     session ends. This is the ONLY record of realtime spend — the server
+//     mints a credential and never sees the call itself. See realtimeUsage.ts.
 //
 // The event handler `ingestEvent` is deliberately callable in isolation so the
 // idempotency / dedup logic can be unit-tested without a live connection.
@@ -20,6 +24,12 @@ import type {
   MasteryRealtimeCredentials,
   MasteryTranscriptTurn,
 } from "@/types";
+import {
+  emptyTotals,
+  accumulateResponse,
+  accumulateTranscription,
+  type RealtimeUsageTotals,
+} from "./realtimeUsage";
 
 const REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
 
@@ -62,10 +72,24 @@ export class MasteryRealtimeSession {
 
   private creds: MasteryRealtimeCredentials | null = null;
 
+  // Running token totals for this session, folded from the events below. Kept
+  // here rather than in the hook so a re-render cannot lose a figure that no
+  // other system holds.
+  private usage: RealtimeUsageTotals = emptyTotals();
+
   constructor(private readonly cb: MasteryRealtimeCallbacks) {}
 
   getStatus(): MasteryRealtimeStatus { return this.status; }
   getTranscript(): MasteryTranscriptTurn[] { return [...this.turns]; }
+
+  /**
+   * Token totals observed so far.
+   *
+   * Deliberately still readable AFTER dispose(): every path that ends a session
+   * tears the connection down first, and the spend has to survive that or it is
+   * never recorded at all.
+   */
+  getUsage(): RealtimeUsageTotals { return { ...this.usage }; }
 
   private setStatus(next: MasteryRealtimeStatus): void {
     if (this.disposed) return;
@@ -213,6 +237,12 @@ export class MasteryRealtimeSession {
       case "conversation.item.input_audio_transcription.completed": {
         const key  = typeof msg.item_id === "string" ? msg.item_id : `learner-${this.turns.length}`;
         const text = typeof msg.transcript === "string" ? msg.transcript : "";
+        // The transcription model bills separately and is NOT included in
+        // `response.usage` — this event is the only place it is reported.
+        this.usage = accumulateTranscription(
+          this.usage,
+          msg.usage as Parameters<typeof accumulateTranscription>[1],
+        );
         this.recordTurn("learner", key, text);
         break;
       }
@@ -247,9 +277,17 @@ export class MasteryRealtimeSession {
         break;
       }
 
-      case "response.done":
+      case "response.done": {
+        // Fold usage BEFORE the status guard below: a response arriving after a
+        // conclusion still cost money and still has to be recorded.
+        const response = msg.response as { usage?: unknown } | undefined;
+        this.usage = accumulateResponse(
+          this.usage,
+          response?.usage as Parameters<typeof accumulateResponse>[1],
+        );
         if (!this.concludedOnce && this.status !== "error") this.setStatus("listening");
         break;
+      }
 
       case "error":
         console.error("[mastery-realtime] server error:", JSON.stringify(msg.error ?? {}));

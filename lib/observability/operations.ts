@@ -46,6 +46,7 @@ export type OperationId =
   | "mastery.evaluate"
   | "mastery.recap"
   | "mastery.session"
+  | "mastery.realtime"
   | "ask.chat"
   | "ask.summarize"
   | "ask.verify"
@@ -234,6 +235,19 @@ export const OPERATIONS: readonly OperationDefinition[] = [
     failureIsSilent:  false,
     description:
       "Starting a scripted mastery session and generating its opening line.",
+  },
+  {
+    id:               "mastery.realtime",
+    domain:           "mastery",
+    label:            "Record realtime voice spend",
+    clientReportable: false,
+    failureIsSilent:  true,
+    description:
+      "Recording what a Realtime voice session cost. The spend happens " +
+      "browser-to-OpenAI, so the server never observes it and only a report " +
+      "from the client can close the loop. A report that never arrives is " +
+      "invisible: the session looked fine to the learner, the reservation " +
+      "expires, the budget springs back, and the provider still bills.",
   },
   {
     id:               "ask.summarize",
