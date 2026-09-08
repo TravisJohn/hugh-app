@@ -7073,3 +7073,116 @@ PRD-feature-registry.md is complete: registry, guards, health page, fourteen
 routes instrumented, console restructured. `8 of 8` money-spending surfaces
 report an outcome. None of it has been viewed in a browser — the seeded test
 user is not an admin.
+
+
+## 2026-09-08 — The last hole in the money path: realtime voice spend
+
+### Why
+
+The wishlist has carried this since 2026-09-05, described as a missing line:
+`realtime-session` calls `enforceUsageGate` and never calls `logUsage`, which
+is the CLAUDE.md rule broken outright. Picked up as the next piece of work after
+the Learn repair run closed.
+
+### It was not a missing line
+
+That route mints an ephemeral OpenAI client secret and returns it. The session
+then runs **browser-to-OpenAI over WebRTC**. The server hands out a credential
+and never hears from the call again, so at the only moment that route executes,
+nothing has been spent and there is no usage figure in existence to log.
+
+Adding `logUsage` there would have logged zero. The fix had to be somewhere
+else entirely: the browser is the only party that ever learns what the session
+cost.
+
+### What the API actually reports, and where
+
+Two events carry usage, and they are **not** the same source:
+
+- `response.done` → `response.usage`, the coach model's own tokens, with
+  `input_token_details` / `output_token_details` splitting audio from text.
+- `conversation.item.input_audio_transcription.completed` → `usage`, the
+  transcription model. This is **not** inside `response.usage`.
+
+`MasteryRealtimeSession.ingestEvent` already handled both events — it read the
+transcript out of the second one and set status from the first, and discarded
+the numbers in both. So this was wiring, not new plumbing.
+
+### Three rows, because the rates differ by 16x
+
+Realtime bills audio and text at different rates **on the same model**: audio
+input 10.00 against text's 0.60; audio output 20.00 against 2.40. `ModelRate`
+holds one input/output pair, so the two rate classes are registered as two keys
+in `lib/pricing.ts` and the accumulator splits a session's tokens between them.
+`gpt-realtime-mini-text` is a **rate class, not an OpenAI model id** — it will
+never appear in a request, only in a `usage_logs.model` column.
+
+Blending them into one row would have restated a voice session's cost by up to
+16x, which is the exact thing the per-row rule at the top of `pricing.ts`
+exists to prevent.
+
+None of the three models — `gpt-realtime-mini`, its text class, or
+`gpt-4o-mini-transcribe` — were in `MODEL_RATES` before today. So even a
+session that *had* been logged would have been priced at the Sonnet fallback.
+There is now a test that fails if a row names a model `pricing.ts` cannot
+price.
+
+### Bounded, not trusted
+
+The figures come from the browser. `boundTotals` clamps each bucket to what a
+session of `MAX_SESSION_SECONDS` could physically emit, at a deliberately loose
+ceiling — its job is to make a fabricated number impossible, not to second-guess
+a real one. The ceiling comes from the server's own `realtimeConfig`, never from
+the request, or it would be as forgeable as the thing it bounds.
+
+When the API omits the audio/text breakdown — which happens — the unsplit
+tokens are attributed to **audio**, the expensive class. Same doctrine as
+`FALLBACK_MODEL`: an unknown must never be able to hide spend.
+
+### What the drift guard caught that I had not
+
+The feature registry rejected the first green build on four counts: an
+unregistered route, an unattributed spend string, a stale test count, and — the
+one that was a real omission — **a route that spends money and records no
+outcome**. `mastery.realtime` is now in the operation vocabulary, flagged
+`failureIsSilent: true`, which is the honest classification: if the report never
+arrives, the learner saw a working session and the spend left no trace. An empty
+report is recorded as a `failed` operation so /admin/features can count it.
+
+### Residual, stated rather than buried
+
+A learner who closes the laptop mid-session reports nothing. `sendBeacon` on
+unload covers most of that, not all, and the reservation then expires with the
+spend unrecorded. This shrinks the hole; it does not close it. Offered a
+mint-time minimum charge that would have closed it fully and Travis chose the
+simpler build with the gap documented.
+
+Also: what gets recorded is what the API reported, which is not guaranteed to
+reconcile with the provider's billing meter. These rows are Hugh's best honest
+record of a spend it cannot observe directly, not an invoice.
+
+### The privacy blocker is NOT closed
+
+The money blocker is. Enabling `MASTERY_REALTIME_ENABLED` sends learner **voice
+audio to OpenAI**, and `/privacy` does not say so — it discloses ElevenLabs
+(text, not voice) and the browser's Google-backed speech recognition, and
+nothing else. That disclosure must be written before the flag goes on.
+
+And nothing here has run against a live session, because the flag has never been
+on. The accumulator and transport are tested; the round trip is not.
+
+### Verification
+
+61 files / 1322 tests green, up from 1296 (+26: 20 for the accumulator, 6 for
+the transport's usage observation). `tsc --noEmit` clean, eslint clean. No
+migration.
+
+### Files
+
+- `lib/mastery/realtimeUsage.ts` + tests — new pure module, all the logic
+- `lib/mastery/realtimeSession.ts` — folds usage from two events, `getUsage()`
+- `hooks/useMasteryRealtime.ts` — reports once per session, beacons on unload
+- `app/api/tracker/mastery/realtime-usage/route.ts` — new, bounds and logs
+- `lib/pricing.ts` — three rate entries that did not exist
+- `lib/observability/operations.ts` — `mastery.realtime`
+- `lib/registry/features.ts` — route, spend string, operation, test count

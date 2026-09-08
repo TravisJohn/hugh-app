@@ -3,8 +3,9 @@
  *
  * `usage_logs` records the model that served each call (migration 036), so cost
  * is computed per log row and summed — never by applying one blended rate to an
- * aggregate. Hugh mixes Sonnet, Haiku, and two OpenAI models whose rates differ
- * by up to 20x, so aggregate-then-price overstates the cheap routes badly.
+ * aggregate. Hugh mixes Sonnet, Haiku and several OpenAI models whose rates
+ * differ by up to 67x — gpt-4o-mini text input at 0.15 against realtime audio
+ * input at 10.00 — so aggregate-then-price overstates the cheap routes badly.
  *
  * Pure and dependency-free so it can be unit-tested without Supabase.
  */
@@ -22,6 +23,22 @@ export const MODEL_RATES: Record<string, ModelRate> = {
   // OpenAI — Notes Coach (vision), Notes summariser, architecture assistant
   "gpt-4o":                 { input: 2.5,  output: 10   },
   "gpt-4o-mini":            { input: 0.15, output: 0.6  },
+
+  // OpenAI Realtime — mastery voice coach (`MASTERY_REALTIME_ENABLED`).
+  //
+  // Realtime bills audio and text tokens at DIFFERENT rates on the same model:
+  // audio input is 10.00 against text's 0.60, a 16x spread. `ModelRate` holds one
+  // input/output pair, so the two rate classes are registered as two keys and the
+  // accumulator splits a session's tokens between them. `gpt-realtime-mini-text`
+  // is therefore a RATE CLASS, not an OpenAI model id — it will never appear in a
+  // request, only in a `usage_logs.model` column. Blending them into one key
+  // would restate a voice session's cost by up to 16x, which is exactly what the
+  // per-row rule at the top of this file exists to prevent.
+  "gpt-realtime-mini":      { input: 10,   output: 20   },  // audio tokens
+  "gpt-realtime-mini-text": { input: 0.6,  output: 2.4  },  // text tokens
+  // Transcription of the learner's speech. Audio and text input are both 1.25,
+  // so this one genuinely needs no split.
+  "gpt-4o-mini-transcribe": { input: 1.25, output: 5    },
 };
 
 /**

@@ -37,6 +37,7 @@ const EVERY_OPERATION: Record<OperationId, true> = {
   "mastery.evaluate": true,
   "mastery.recap":    true,
   "mastery.session":  true,
+  "mastery.realtime": true,
   "ask.chat":         true,
   "ask.summarize":    true,
   "ask.verify":       true,

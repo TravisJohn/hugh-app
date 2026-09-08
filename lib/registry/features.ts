@@ -208,15 +208,29 @@ export const FEATURES: readonly FeatureDefinition[] = [
       "tracker/mastery/recap",
       "tracker/mastery/session",
       "tracker/mastery/realtime-session",
+      "tracker/mastery/realtime-usage",
     ],
     libDirs:       ["mastery"],
     componentDirs: [],
     tables: ["milestones", "milestone_entries"],
-    usageFeatures: ["mastery/evaluate", "mastery/recap", "mastery/session"],
+    usageFeatures: [
+      "mastery/evaluate",
+      "mastery/recap",
+      "mastery/session",
+      // Realtime voice. Gated at mint time under this same string since the
+      // flag was written; it only became a SPEND string once the usage report
+      // landed, because before that nothing was ever logged against it.
+      "mastery/realtime",
+    ],
     activityFeatures: ["mastery"],
-    operations: ["mastery.evaluate", "mastery.recap", "mastery.session"],
+    operations: [
+      "mastery.evaluate",
+      "mastery.recap",
+      "mastery.session",
+      "mastery.realtime",
+    ],
     spendsTokens: true,
-    tests: 4,
+    tests: 5,
   },
   {
     id:    "code",
