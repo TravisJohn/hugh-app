@@ -5,6 +5,8 @@ import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { factCheckEntryPrompt, parseClaudeJson } from "@/lib/claude/prompts";
 import { checkUsageAllowed, logUsage } from "@/lib/usage";
 import { recordOperation } from "@/lib/observability/record";
+import { logSafeError } from "@/lib/observability/log";
+import { writeOutcome } from "@/lib/supabase/writeResult";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -69,6 +71,10 @@ export async function POST(
       messages:   [{ role: "user", content: factCheckEntryPrompt(topic, title, entry.body as string) }],
     });
 
+    // Logged before the parse below, which can throw on a malformed reply.
+    // The fact-check has already been billed for by the time we look at it.
+    void logUsage({ userId, model: MODEL, feature: "tracker/verify", tokensIn: res.usage.input_tokens, tokensOut: res.usage.output_tokens });
+
     const raw    = res.content[0]?.type === "text" ? res.content[0].text : "{}";
     const parsed = parseClaudeJson<FactCheckResult>(raw);
     const isWrong = parsed.status === "incorrect";
@@ -83,7 +89,12 @@ export async function POST(
       : { fact_status: "correct",   correction: null,                       corrected: true };
       // On "correct" we omit gap_note so the existing permanent record is preserved.
 
-    const { data: updated } = await supabase
+    // Item 3's rule, in a route item 3 did not name: this write's reply was
+    // discarded, so a verdict that never reached the database still came back
+    // as a 200 with an entry the drawer would then render as verified. Only a
+    // verified line may be quoted by a review quiz, so a phantom verdict here
+    // becomes a quiz question tomorrow.
+    const written = await supabase
       .from("milestone_entries")
       .update(update)
       .eq("id", entryId)
@@ -91,14 +102,23 @@ export async function POST(
       .select("*")
       .single();
 
-    void logUsage({ userId, model: MODEL, feature: "tracker/verify", tokensIn: res.usage.input_tokens, tokensOut: res.usage.output_tokens });
+    const stored = writeOutcome(written);
+    if (!stored.ok) {
+      logSafeError("tracker/verify store", new Error(stored.message), [topic, title]);
+      void recordOperation({
+        userId, operation: "ask.verify", outcome: "failed",
+        durationMs: Date.now() - startedAt, detail: { stage: "store", reason: stored.reason },
+      });
+      return NextResponse.json({ error: "Couldn't save the fact-check for this entry." }, { status: 500 });
+    }
+
     // The verdict is recorded, never the entry: only a verified line may be
     // quoted by a review quiz, so the ratio here is worth watching.
     void recordOperation({
       userId, operation: "ask.verify", outcome: "ok",
       durationMs: Date.now() - startedAt, detail: { verdict: parsed.status },
     });
-    return NextResponse.json({ entry: updated });
+    return NextResponse.json({ entry: written.data });
   } catch (err) {
     console.error("[tracker/verify] error:", err);
     void recordOperation({
