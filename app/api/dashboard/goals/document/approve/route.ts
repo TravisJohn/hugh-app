@@ -3,6 +3,7 @@ import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { judgeTopicDomain } from "@/lib/learn/topic-domain-server";
+import { mayProceed } from "@/lib/learn/topic-domain";
 import { logSafeError } from "@/lib/observability/log";
 import { generateTrack } from "@/lib/tracker/generate";
 import { recordOperation } from "@/lib/observability/record";
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
   // editing a field doesn't get to skip the same check a machine-derived
   // topic goes through — this closes the edit-bypass gap (PRD §6/§7.1).
   const verdict = await judgeTopicDomain(topic, userId);
-  if (!verdict.inDomain) {
+  if (!mayProceed(verdict)) {
     return NextResponse.json(verdict);
   }
 

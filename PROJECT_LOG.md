@@ -7593,3 +7593,91 @@ migration.
 - `lib/pricing.ts` — three rate entries that did not exist
 - `lib/observability/operations.ts` — `mastery.realtime`
 - `lib/registry/features.ts` — route, spend string, operation, test count
+
+---
+
+## 2026-09-08 — The topic gate learns a third answer
+
+### What was wrong
+
+Typing "Generative AI" on `/home/learn` got a warning triangle and "that topic
+sits outside this focus" — followed by chips offering "Machine learning
+engineering fundamentals" and "Neural networks and deep learning for data
+scientists". The gate rejected the topic and then suggested the same topic in
+different words.
+
+The scope was never the problem. The judge prompt already listed "machine
+learning / AI engineering" as in-domain. What fired was the ambiguity clause:
+*when you cannot tell that the CORE skill is data/analytics, lean OUT*. And
+"Generative AI" genuinely is ambiguous — building RAG pipelines and running
+evals is ML engineering; using a chat assistant to write faster is not. The
+judge could not tell which was meant, and its only two moves were *build it*
+and *go away*.
+
+### The decision
+
+**Keep the discipline as the guardrail. Do not switch to sector verticals.**
+
+The alternative considered was gating on domain instead — "Data for Commerce",
+"Data for Health and Science". Rejected on two grounds. First, every one of
+those names contains the discipline, so the discipline is doing the gating
+either way, and "Generative AI" is not a sector, so it would still have failed.
+Second, most good topics have no vertical at all — `dbt`, window functions,
+pandas — which forces a "Data for General" bucket that is the discipline wearing
+a hat. Verticals are a useful facet for track generation and library shape;
+they are not a gate.
+
+What was actually missing was a **third verdict**, and that is what shipped:
+
+- `in` — build the track.
+- `needs_angle` — a real data reading exists but the phrasing has not committed
+  to one. Do not reject: ask, and carry the suggestions as the answers.
+- `out` — a different profession or subject. Unchanged, kindly worded.
+
+### Notable choices
+
+- `inDomain: boolean` was **removed**, not kept alongside the new field. Two
+  representations of one verdict can drift; `mayProceed()` derives the boolean
+  where a boolean is wanted.
+- All fail-open rules moved into one pure `normalizeVerdict()` used by both the
+  browser wrapper and the server judge, so they cannot disagree about what a
+  malformed response means. A `needs_angle` carrying zero suggestions is
+  downgraded to `in` — a question with no answers is a dead end, and Hugh does
+  not build dead ends (rule 5).
+- `needs_angle` shares the existing `refused` operation outcome rather than
+  earning a fourth one. `operation_events.outcome` is a CHECK constraint, and
+  the distinction is not operational — nothing broke either way. The verdict
+  rides in `detail` instead, so the two are still separable when reading the
+  numbers. **No migration.**
+- Chips fill the topic field and re-run the gate rather than bypassing it. One
+  Haiku call is cheaper than a second way into track building.
+- `max_tokens` 250 → 400. A `needs_angle` response carries a message *and*
+  three suggestions; a truncated body fails JSON.parse, which fails **open** —
+  under-budgeting here would have quietly stopped the gate from gating.
+- On the document path, `needs_angle` does **not** block at extraction. The
+  picking screen's only input is a file picker, so asking "which angle?" there
+  would be a question with no answer box. It carries into the review step, which
+  already has an editable topic field, and `approve` re-gates before any
+  milestone is generated.
+- One shared `TopicGateNotice` replaced three near-duplicate banners. The
+  document flow had been dropping the suggestion chips entirely; that is fixed
+  as a side effect.
+
+### Verification
+
+67 files / 1404 tests green (+17 for the normalizer). `tsc --noEmit` clean,
+eslint clean. Probed live against Haiku over 13 topics: "Generative AI", "AI",
+"big data" and "Excel" now ask for an angle; RAG pipelines, LLM evaluation,
+window functions, dbt and marketing analytics pass; nursing boards, Spanish and
+CSS animations are declined; a prompt-injection attempt is still refused.
+
+### Files
+
+- `lib/learn/topic-domain.ts` — three-way type, `normalizeVerdict`, `mayProceed`
+- `lib/learn/topic-domain.test.ts` — new, 17 tests
+- `lib/claude/prompts.ts` — judge rewritten; LLM engineering named explicitly
+- `lib/learn/topic-domain-server.ts` — shared normalizer, outcome + detail
+- `components/dashboard/TopicGateNotice.tsx` — new, the two notices
+- `components/dashboard/DashboardPanel.tsx`, `DocumentUploadFlow.tsx`
+- `app/api/dashboard/goals/route.ts`, `goals/document/{extract,approve}/route.ts`
+- `lib/registry/features.ts` — test counts
