@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, BookMarked, CheckCircle2, Loader2, Sparkles } from "lucide-react";
+import { X, BookMarked, CheckCircle2, Loader2, Sparkles, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type LearningPoint, type CoveredPoint, type TranscriptMessage } from "@/types";
 import PointTagSelect from "./PointTagSelect";
@@ -17,6 +17,13 @@ export interface SummaryData {
 interface Props {
   topic:        string;
   data:         SummaryData | null;
+  /**
+   * Set when the write-up could not be produced. Deliberately its own prop
+   * rather than a `story` saying so: this panel's whole job is to offer a
+   * summary for SAVING, and a failure dressed as a story is a failure the
+   * learner can file in their diary — the one place a review quiz may quote.
+   */
+  error?:       string | null;
   loading:      boolean;
   goalId?:      string;
   milestoneId?: string;
@@ -25,7 +32,7 @@ interface Props {
   onClose:      () => void;
 }
 
-export default function SummaryPanel({ topic, data, loading, goalId, milestoneId, transcript, onClose }: Props) {
+export default function SummaryPanel({ topic, data, error, loading, goalId, milestoneId, transcript, onClose }: Props) {
   const router = useRouter();
   const [saving, setSaving]       = useState(false);
   const [saved, setSaved]         = useState(false);
@@ -124,6 +131,15 @@ export default function SummaryPanel({ topic, data, loading, goalId, milestoneId
           <div className="flex flex-col items-center justify-center gap-3 py-14">
             <Loader2 size={22} className="animate-spin text-violet-400" />
             <p className="text-xs text-slate-500">Summarising your session…</p>
+          </div>
+        )}
+
+        {/* No save footer renders beneath this, because `data` stays null on a
+            failure — so there is nothing here that can be filed in the diary. */}
+        {!loading && error && (
+          <div role="alert" className="flex items-start gap-2.5 rounded-xl border border-red-500/40 bg-red-500/8 px-4 py-3.5">
+            <AlertCircle size={15} className="mt-0.5 shrink-0 text-red-400" />
+            <p className="text-sm leading-relaxed text-red-100/90">{error}</p>
           </div>
         )}
 

@@ -7,6 +7,7 @@ import { logSafeError } from "@/lib/observability/log";
 import { checkUsageAllowed, logUsage } from "@/lib/usage";
 import { recordOperation } from "@/lib/observability/record";
 import { normalizeCoverage } from "@/utils/coverage";
+import { writeOutcome } from "@/lib/supabase/writeResult";
 import { type LearningPoint, type PointStatus } from "@/types";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -181,7 +182,29 @@ export async function POST(
   const coverage = { statuses: clean, updatedAt: new Date().toISOString() };
 
   // Persist the current snapshot (what the board/drawer/card read).
-  await supabase.from("milestones").update({ coverage }).eq("id", id);
+  //
+  // `.select("id").single()` is not decoration: an update whose filter matches
+  // nothing answers with no error at all, so the previous bare `await` reported
+  // success for a write that never happened — including every RLS denial. The
+  // returned row is the only proof there was one. See lib/supabase/writeResult.
+  const snapshot = await supabase
+    .from("milestones")
+    .update({ coverage })
+    .eq("id", id)
+    .select("id")
+    .single();
+
+  const stored = writeOutcome(snapshot);
+  if (!stored.ok) {
+    logSafeError("tracker/coverage snapshot", new Error(stored.message), [ms.title]);
+    // The drawer ticks optimistically and tells the board card as it goes, so a
+    // refusal reported here is what puts both of them back. Saying "saved" would
+    // leave the learner's screen disagreeing with the database until a reload.
+    return NextResponse.json(
+      { error: "Your checklist changes could not be saved." },
+      { status: 500 },
+    );
+  }
 
   // Append-only history: log every actual transition for future coaching. The
   // snapshot above is the source of truth for the UI; this is best-effort and
@@ -198,7 +221,17 @@ export async function POST(
       to_status:    clean[pid] ?? null,
     }));
   if (events.length > 0) {
-    await supabase.from("point_status_events").insert(events);
+    // Deliberately best-effort, and now actually best-effort: the comment above
+    // has always promised this never blocks the learner's save, but a bare
+    // `await` would still have thrown a connection failure straight out of the
+    // handler and turned a stored save into a 500. Observability must not break
+    // the thing it observes.
+    try {
+      const { error: eventsError } = await supabase.from("point_status_events").insert(events);
+      if (eventsError) logSafeError("tracker/coverage events", eventsError);
+    } catch (err) {
+      logSafeError("tracker/coverage events", err);
+    }
   }
 
   return NextResponse.json({ learningPoints: ms.learning_points ?? [], coverage });

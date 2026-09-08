@@ -1,0 +1,1294 @@
+<title>Learn Repair Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+
+<style>
+  /* ── Tokens ───────────────────────────────────────────────────────────────
+     Committed to a single dark world on purpose: this board documents Hugh,
+     and Hugh is a dark app (#0F172A / #1E293B / #38BDF8, Lora + Inter). Every
+     colour is painted explicitly so the page holds on any host ground. */
+  :root {
+    color-scheme: dark;
+
+    --ground:      #0F172A;
+    --surface:     #1A2537;
+    --raised:      #22304a;
+    --line:        #2c3b55;
+    --line-soft:   #223047;
+
+    --ink:         #E8EDF5;
+    --ink-2:       #A7B6CC;
+    --ink-3:       #74869F;
+
+    --sky:         #38BDF8;
+    --sky-dim:     #0EA5E9;
+
+    --queued:      #7C8DA6;
+    --active:      #FBBF24;
+    --blocked:     #FB7185;
+    --done:        #34D399;
+
+    --font-display: "Lora", Georgia, "Times New Roman", serif;
+    --font-body:    "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono:    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+    --measure: 68ch;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 40px 28px 88px;
+    display: flex;
+    flex-direction: column;
+    gap: 52px;
+  }
+
+  a { color: var(--sky); }
+  :focus-visible { outline: 2px solid var(--sky); outline-offset: 3px; border-radius: 3px; }
+
+  /* ── Masthead ─────────────────────────────────────────────────────────── */
+  .masthead { display: flex; flex-direction: column; gap: 18px; }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--sky);
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(30px, 4.2vw, 44px);
+    line-height: 1.12;
+    letter-spacing: -0.01em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    margin: 0;
+    max-width: var(--measure);
+    color: var(--ink-2);
+    font-size: 16px;
+  }
+
+  .runstate {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--surface);
+    width: fit-content;
+    max-width: 100%;
+  }
+  .runstate div {
+    padding: 11px 20px;
+    border-right: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .runstate div:last-child { border-right: 0; }
+  .runstate dt {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0;
+  }
+  .runstate dd {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+  .runstate dd.green { color: var(--done); }
+
+  /* ── Board ────────────────────────────────────────────────────────────── */
+  section > h2 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 22px;
+    margin: 0 0 6px;
+    letter-spacing: -0.005em;
+  }
+  .section-note {
+    margin: 0 0 22px;
+    color: var(--ink-2);
+    max-width: var(--measure);
+    font-size: 14px;
+  }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    align-items: start;
+  }
+
+  .col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+
+  .col-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 9px;
+    border-bottom: 2px solid var(--col-tint, var(--line));
+  }
+  .col-head span {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--col-tint, var(--ink-3));
+  }
+  .col-head b {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-3);
+    font-weight: 400;
+  }
+
+  .col-queued  { --col-tint: var(--queued); }
+  .col-active  { --col-tint: var(--active); }
+  .col-blocked { --col-tint: var(--blocked); }
+  .col-done    { --col-tint: var(--done); }
+
+  .card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    background: var(--surface);
+    border: 1px solid var(--line-soft);
+    border-left: 3px solid var(--col-tint, var(--line));
+    border-radius: 4px;
+    padding: 13px 14px;
+    transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+  }
+  .card:hover { background: var(--raised); border-color: var(--line); transform: translateY(-1px); }
+
+  .card-top {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    margin-bottom: 6px;
+  }
+  .card-num {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--col-tint, var(--ink-3));
+    font-weight: 500;
+  }
+  .card-title {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.35;
+    text-wrap: balance;
+  }
+  .card-sub {
+    margin: 0;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--ink-2);
+  }
+  .card-meta {
+    margin-top: 10px;
+    padding-top: 9px;
+    border-top: 1px solid var(--line-soft);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--ink-3);
+    display: flex;
+    gap: 12px;
+  }
+
+  .col-empty {
+    border: 1px dashed var(--line-soft);
+    border-radius: 4px;
+    padding: 16px 14px;
+    font-size: 12.5px;
+    color: var(--ink-3);
+    line-height: 1.5;
+  }
+
+  /* ── Detail entries ───────────────────────────────────────────────────── */
+  .entries { display: flex; flex-direction: column; gap: 34px; }
+
+  .entry {
+    scroll-margin-top: 20px;
+    border-top: 1px solid var(--line);
+    padding-top: 22px;
+  }
+
+  .entry-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+  }
+  .entry-num {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-3);
+  }
+  .entry-head h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 21px;
+    margin: 0;
+    letter-spacing: -0.005em;
+  }
+
+  .pill {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 100px;
+    border: 1px solid currentColor;
+  }
+  .pill-queued  { color: var(--queued); }
+  .pill-active  { color: var(--active); }
+  .pill-blocked { color: var(--blocked); }
+  .pill-done    { color: var(--done); }
+
+  .entry-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 268px;
+    gap: 30px;
+    margin-top: 18px;
+    align-items: start;
+  }
+
+  .prose { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+
+  .block h4 {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--sky);
+    margin: 0 0 5px;
+    font-weight: 500;
+  }
+  .block p {
+    margin: 0 0 9px;
+    max-width: var(--measure);
+    color: var(--ink);
+  }
+  .block p:last-child { margin-bottom: 0; }
+  .block p.quiet { color: var(--ink-2); }
+
+  .aside {
+    background: var(--surface);
+    border: 1px solid var(--line-soft);
+    border-radius: 5px;
+    padding: 15px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+  .aside section h5 {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0 0 7px;
+    font-weight: 500;
+  }
+  .files { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+  .files li {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--ink-2);
+    word-break: break-word;
+  }
+  .files li em { color: var(--ink-3); font-style: normal; }
+
+  .risk { display: flex; align-items: baseline; gap: 9px; }
+  .risk span {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .risk-low { color: var(--done); }
+  .risk-note { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; margin: 6px 0 0; }
+
+  .heads-up {
+    border-left: 2px solid var(--active);
+    padding: 2px 0 2px 13px;
+    margin: 0;
+    color: var(--ink-2);
+    font-size: 14px;
+    max-width: var(--measure);
+  }
+  .heads-up b { color: var(--ink); font-weight: 600; }
+
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.88em;
+    background: var(--raised);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--ink);
+  }
+
+  /* ── Rules ────────────────────────────────────────────────────────────── */
+  .rules {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--surface);
+    padding: 26px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .rules h2 { margin: 0; }
+  .rule-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+    gap: 20px 26px;
+  }
+  .rule dt {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+  .rule dd { margin: 0; font-size: 13.5px; color: var(--ink-2); line-height: 1.55; }
+  .rule.queued dt  { color: var(--queued); }
+  .rule.active dt  { color: var(--active); }
+  .rule.blocked dt { color: var(--blocked); }
+  .rule.done dt    { color: var(--done); }
+
+  .promise {
+    border-top: 1px solid var(--line-soft);
+    padding-top: 18px;
+    margin: 0;
+    color: var(--ink-2);
+    font-size: 14px;
+    max-width: var(--measure);
+  }
+  .promise b { color: var(--ink); font-weight: 600; }
+
+  @media (max-width: 900px) {
+    .board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .entry-body { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 560px) {
+    .board { grid-template-columns: minmax(0, 1fr); }
+    .wrap { padding: 28px 18px 60px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Hugh · Learn · repair run</p>
+    <h1>Five things Learn gets wrong when something fails</h1>
+    <p class="standfirst">
+      Learn works when everything works. This board covers the other case: what
+      happens when a save is refused, a load drops, or Claude returns nonsense.
+      Five separate defects, fixed one at a time, each with a plain account of
+      what you'd see, why it happens, and what changed.
+      <br><br>
+      <strong>All five are done.</strong> Three of them turned out to be bigger
+      than the card said, and each of those is written up on its own card rather
+      than quietly absorbed. Nothing was dropped.
+    </p>
+    <dl class="runstate">
+      <div><dt>Items</dt><dd>5</dd></div>
+      <div><dt>Done</dt><dd class="green">5 of 5</dd></div>
+      <div><dt>In progress</dt><dd>None</dd></div>
+      <div><dt>Blocked</dt><dd>0</dd></div>
+      <div><dt>Gates</dt><dd class="green">lint · types · build · 1,361 tests pass</dd></div>
+      <div><dt>Updated</dt><dd>8 Sep 2026 · run complete</dd></div>
+    </dl>
+  </header>
+
+  <section>
+    <h2>The board</h2>
+    <p class="section-note">
+      Ordered top to bottom by how much a learner would notice. Items 1, 2 and 3
+      are the same underlying mistake in three places, so they run together.
+    </p>
+
+    <div class="board">
+
+      <div class="col col-queued">
+        <div class="col-head"><span>Queued</span><b>0</b></div>
+        <div class="col-empty">Empty — every item in this run has landed.</div>
+      </div>
+
+      <div class="col col-active">
+        <div class="col-head"><span>In progress</span><b>0</b></div>
+        <div class="col-empty">Nothing started. One card sits here at a time — never two.</div>
+      </div>
+
+      <div class="col col-blocked">
+        <div class="col-head"><span>Blocked</span><b>0</b></div>
+        <div class="col-empty">Empty, and I'd rather it stayed that way. A card lands here only with a written reason.</div>
+      </div>
+
+      <div class="col col-done">
+        <div class="col-head"><span>Done</span><b>5</b></div>
+
+        <a class="card" href="#item-1">
+          <div class="card-top"><span class="card-num">01</span><span class="card-title">"Saved" when nothing was saved</span></div>
+          <p class="card-sub">Four saves now read the server's reply. A refused save keeps your score on screen and offers the button again.</p>
+          <div class="card-meta"><span>5 files</span><span>+14 tests</span></div>
+        </a>
+
+        <a class="card" href="#item-2">
+          <div class="card-top"><span class="card-num">02</span><span class="card-title">The milestone panel never says anything went wrong</span></div>
+          <p class="card-sub">The diary now says when it couldn't load, and every button on the panel says when it was refused.</p>
+          <div class="card-meta"><span>8 files</span><span>+15 tests</span></div>
+        </a>
+
+        <a class="card" href="#item-3">
+          <div class="card-top"><span class="card-num">03</span><span class="card-title">The server doesn't check its own saves</span></div>
+          <p class="card-sub">Three writes now prove a row actually changed — and a paid-for summary is no longer thrown away when it can't be stored.</p>
+          <div class="card-meta"><span>6 files</span><span>+7 tests</span></div>
+        </a>
+
+        <a class="card" href="#item-4">
+          <div class="card-top"><span class="card-num">04</span><span class="card-title">Money spent that nothing records</span></div>
+          <p class="card-sub">The cost is now written down the moment Claude answers — including the retries that were being thrown away.</p>
+          <div class="card-meta"><span>5 files</span><span>+10 tests</span></div>
+        </a>
+
+        <a class="card" href="#item-5">
+          <div class="card-top"><span class="card-num">05</span><span class="card-title">The real reason gets replaced by a shrug</span></div>
+          <p class="card-sub">Ask Hugh now tells you what actually happened — and a failure is no longer filed in your diary as something Hugh said.</p>
+          <div class="card-meta"><span>5 files</span><span>+19 tests</span></div>
+        </a>
+
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>What each one actually is</h2>
+    <p class="section-note">
+      One principle sits under the first three: when a computer asks another
+      computer to do something, it gets an answer back saying whether it worked.
+      All three items are places where nobody opens the answer.
+    </p>
+
+    <div class="entries">
+
+      <!-- ── 01 ────────────────────────────────────────────────────────── -->
+      <article class="entry" id="item-1">
+        <div class="entry-head">
+          <span class="entry-num">01</span>
+          <h3>"Saved" when nothing was saved</h3>
+          <span class="pill pill-done">Done</span>
+        </div>
+        <div class="entry-body">
+          <div class="prose">
+            <div class="block">
+              <h4>What you'd see</h4>
+              <p>
+                You finish a review quiz and get every question right. The screen
+                celebrates, and the milestone card moves on your board. Next
+                morning the card is back where it was, as if you never took the
+                quiz — and taking it again costs money, because the quiz is
+                written fresh by Claude each time.
+              </p>
+              <p>Proving mastery out loud has the same hole, plus a second one: if your connection drops at that exact moment, the screen sits on a spinner that never finishes and offers no way out.</p>
+            </div>
+            <div class="block">
+              <h4>Why it happens</h4>
+              <p>
+                The browser asks the server to record the pass. The server replies —
+                "recorded", or "your login expired", or "something broke". The code
+                never opens that reply. It moves straight to the celebration.
+              </p>
+              <p class="quiet">
+                So a refusal and a success are literally indistinguishable from
+                where you're sitting. The most common real cause is mundane: your
+                login quietly expires while you're working, and every save after
+                that is politely declined.
+              </p>
+            </div>
+            <div class="block">
+              <h4>What I'll change</h4>
+              <p>
+                Read the reply before celebrating. If it didn't work, stay on the
+                screen, say what happened in one sentence, and put the button back.
+                Nothing about the passing case changes — you'd never notice the fix
+                unless something failed.
+              </p>
+            </div>
+            <div class="block">
+              <h4>What landed</h4>
+              <p>
+                All four saves now read the reply. The decision about <em>what a
+                refused save means</em> was pulled out into one small file of its
+                own, so it is written once and tested directly rather than being
+                repeated in four screens — the project's own rule for anything
+                with real branching.
+              </p>
+              <p>
+                That file sorts a refusal into six kinds and decides two things
+                for each: the sentence a learner reads, and whether pressing the
+                button again could actually work. Being signed out gets no retry
+                button, because a retry that can't succeed is the same lie in a
+                different costume.
+              </p>
+              <p class="quiet">
+                Each screen then got the failure it deserved. The quiz keeps
+                "Quiz Passed!" and your score on screen — you <em>did</em> pass,
+                and that stays true — and only swaps the "saving…" line for what
+                went wrong plus a way out. Mastery returns you to your score with
+                the same. The board slides the card back where it was and says
+                so, instead of leaving it in a column the database never agreed to.
+              </p>
+            </div>
+            <div class="block">
+              <h4>The stranded spinner, found on the way</h4>
+              <p>
+                The mastery screen had a second fault I hadn't separated out:
+                if your connection dropped at the moment you confirmed, the code
+                fell out of the handler entirely and left the screen spinning on
+                "Saving your mastery…" with no button anywhere. Not a wrong
+                answer — no answer, forever. Same fix covers it.
+              </p>
+            </div>
+            <div class="block">
+              <h4>How to check me</h4>
+              <p>
+                14 new tests cover the decision itself, including the one this
+                item exists for: <em>reports an expired session as a failure
+                rather than a success</em>. Whole suite went from 1,296 to 1,310,
+                all passing, with lint, types and a production build clean.
+              </p>
+              <p>
+                In the app: sign in, leave a quiz open long enough for the session
+                to lapse, then pass it. You should get your score and an honest
+                sentence — not confetti.
+              </p>
+            </div>
+          </div>
+          <aside class="aside">
+            <section>
+              <h5>Files</h5>
+              <ul class="files">
+                <li>saveOutcome.ts <em>— new, the decision</em></li>
+                <li>saveOutcome.test.ts <em>— new, 14 tests</em></li>
+                <li>QuizClient.tsx <em>— review pass</em></li>
+                <li>MasteryClient.tsx <em>— mastery + practice</em></li>
+                <li>KanbanBoard.tsx <em>— moving and reordering cards</em></li>
+              </ul>
+            </section>
+            <section>
+              <h5>Judgement call</h5>
+              <p class="risk-note">
+                These screens show <em>our</em> wording, not the server's. The
+                milestone routes answer with developer shorthand
+                ("Unauthorized") written for logs. Item 5 does the opposite for
+                good reason: Ask Hugh's server writes real sentences meant to be
+                read. Worth knowing the two look contradictory and aren't.
+              </p>
+            </section>
+          </aside>
+        </div>
+      </article>
+
+      <!-- ── 02 ────────────────────────────────────────────────────────── -->
+      <article class="entry" id="item-2">
+        <div class="entry-head">
+          <span class="entry-num">02</span>
+          <h3>The milestone panel never says anything went wrong</h3>
+          <span class="pill pill-done">Done</span>
+        </div>
+        <div class="entry-body">
+          <div class="prose">
+            <div class="block">
+              <h4>What you'd see</h4>
+              <p>
+                You open a milestone and your learning diary is blank. You wrote in
+                it yesterday. The entries are safe in the database — the app simply
+                failed to fetch them, and showed you nothing rather than saying so.
+              </p>
+            </div>
+            <div class="block">
+              <h4>Why it happens</h4>
+              <p>
+                The code says, in effect, <em>use whatever came back, or an empty
+                list if nothing did</em>. A failed request produces nothing. An
+                empty diary also produces nothing. They render identically.
+              </p>
+              <p class="quiet">
+                This is a rule Hugh already wrote down for itself: "you have
+                nothing" and "we could not load it" are different sentences to the
+                person reading them.
+              </p>
+            </div>
+            <div class="block">
+              <h4>And the other half: buttons that do nothing</h4>
+              <p>
+                Five more places on that same panel have the mirror of the same
+                fault, on the way out rather than the way in. Accepting a
+                suggested correction, editing a diary entry, re-tagging one,
+                adding one, and asking Hugh to write the milestone summary — each
+                sends a change and never checks whether it was taken. When one is
+                refused, the button simply does nothing. No message, no spinner,
+                no change on screen. You would reasonably assume you misclicked.
+              </p>
+              <p class="quiet">
+                Two small mercies, confirmed: your typed text is not thrown away
+                when an entry fails to save, and nothing is lost — it just never
+                left. But nothing tells you that.
+              </p>
+            </div>
+            <div class="block">
+              <h4>What I'll change</h4>
+              <p>
+                For the diary load, use the pattern that already exists eight
+                lines below it — the checklist on that same panel handles this
+                correctly, with its own "this failed" state that keeps your ticks
+                visible. Copy that shape rather than invent one.
+              </p>
+              <p>
+                For the five silent buttons, reuse the decision file built for
+                item 1. It already knows what each kind of refusal means and how
+                to word it; these screens simply weren't asking.
+              </p>
+            </div>
+            <div class="block">
+              <h4>What landed</h4>
+              <p>
+                The diary now has four states instead of two, and the difference
+                between them is the whole item: still loading, <em>failed to
+                load</em>, genuinely empty, and has entries. A failed load says
+                "we couldn't load your learning diary — your entries are safe,
+                this screen just didn't get them", with a Try again button that
+                re-runs the same load rather than asking you to close the card.
+              </p>
+              <p>
+                That four-way decision went into a small file of its own, tested
+                directly, because three separate sections of the panel were
+                asking the same question and getting it wrong the same way.
+              </p>
+              <p>
+                Every button that sends a change now reads the reply. When one is
+                refused you get a red notice naming what didn't happen, and the
+                screen puts itself back the way the database actually has it.
+                Your typing is never discarded: a refused new entry leaves your
+                draft in the box, and a refused edit leaves the editor open with
+                your rewrite still in it.
+              </p>
+            </div>
+            <div class="block">
+              <h4>Two things found on the way</h4>
+              <p>
+                <strong>The gates were worse than the diary.</strong> The Review
+                Quiz and Mastery buttons read the same empty list, so a failed
+                load didn't just show a blank diary — it told you to "add at
+                least one learning diary entry before starting the review quiz"
+                and withheld the button until you did. Being instructed to redo
+                work you have already done is a worse failure than a blank
+                screen. Both gates now say they couldn't check, and offer the
+                retry.
+              </p>
+              <p>
+                <strong>One save was lying twice.</strong> Ticking an item on the
+                milestone checklist updates the panel immediately and also tells
+                the board card behind it. Neither was ever checked against the
+                server, so a refused tick stayed ticked in both places until you
+                reloaded the page. It now reverts both and says why.
+              </p>
+              <p class="quiet">
+                A third, smaller one: closing the panel refreshes the "3 entries"
+                badge on the card, and a failed refresh was being read as a count
+                of zero — so the badge would vanish. It now keeps the number it
+                had. A stale count is a smaller lie than an invented one, and a
+                card has no room to explain itself.
+              </p>
+            </div>
+            <div class="block">
+              <h4>One deliberate exception</h4>
+              <p>
+                The rule for this run is that failure wording on these screens is
+                ours, because the milestone routes answer in developer shorthand.
+                The summary route turned out to be the exception all the way
+                through: it refuses with "Add a diary entry before generating a
+                summary", "Milestone is not mastered", "Summary is too long".
+                Those are sentences written for a person, and each is more use
+                than our generic line — so those three, and only those three, are
+                shown as the server wrote them.
+              </p>
+              <p class="quiet">
+                This is the same rule item 5 rests on, not a contradiction of it:
+                show the server's message where the server wrote one for a human.
+                It is opted into for named cases rather than guessed at, because
+                a refusal is not in general a promise that its wording is fit to
+                read.
+              </p>
+            </div>
+            <div class="block">
+              <h4>How to check me</h4>
+              <p>
+                15 new tests, including the one this item exists for:
+                <em>reads a refused load as failed, not empty</em>. The suite went
+                from 1,310 to 1,325, all passing, with lint, types and a
+                production build clean.
+              </p>
+              <p>
+                In the app: open a milestone with the server refusing reads. The
+                diary should say it couldn't load and offer Try again — not look
+                empty — and the Review Quiz button should say it couldn't check
+                rather than telling you to write an entry. Then let your session
+                lapse and press Accept, Save, or Generate summary: each should
+                tell you it didn't take.
+              </p>
+            </div>
+          </div>
+          <aside class="aside">
+            <section>
+              <h5>Files</h5>
+              <ul class="files">
+                <li>diaryState.ts <em>— new, the four-way decision</em></li>
+                <li>diaryState.test.ts <em>— new, 9 tests</em></li>
+                <li>MilestoneDrawer.tsx <em>— the diary, 2 gates, 7 saves</em></li>
+                <li>KanbanBoard.tsx <em>— entry counts on cards</em></li>
+                <li>SaveFailureNotice.tsx <em>— new, one shared notice</em></li>
+                <li>saveOutcome.ts <em>— the server-message exception</em></li>
+                <li>saveOutcome.test.ts <em>— 6 more tests</em></li>
+              </ul>
+            </section>
+            <section>
+              <h5>Scope note</h5>
+              <p class="risk-note">
+                Widened on 7 Sep. The five silent buttons were in the original
+                audit but fell off when it was condensed to five cards. They live
+                in this item's file, so folding them in here means one pass
+                rather than two — recorded rather than quietly absorbed.
+              </p>
+              <p class="risk-note">
+                Widened again while building it, 8 Sep. Two more saves in the
+                same file had the identical fault (archive/restore, and the
+                checklist tick), and the two quiz/mastery gates were the same
+                failed read as the diary. Nine places in total, not six. Fixing
+                five of seven siblings and leaving two would have been the odder
+                choice.
+              </p>
+            </section>
+            <section>
+              <h5>Risk</h5>
+              <div class="risk"><span class="risk-low">Low</span></div>
+              <p class="risk-note">The working pattern is already in the same file, and the decision file already exists. This is applying, not designing.</p>
+            </section>
+          </aside>
+        </div>
+      </article>
+
+      <!-- ── 03 ────────────────────────────────────────────────────────── -->
+      <article class="entry" id="item-3">
+        <div class="entry-head">
+          <span class="entry-num">03</span>
+          <h3>The server doesn't check its own saves</h3>
+          <span class="pill pill-done">Done</span>
+        </div>
+        <div class="entry-body">
+          <div class="prose">
+            <div class="block">
+              <h4>What you'd see</h4>
+              <p>
+                Two things. You tick items off a milestone checklist, they show as
+                ticked, and later they're unticked again. And separately: Hugh
+                writes you a milestone summary — which costs real money each time —
+                and it may never be stored, so it gets written and paid for again
+                the next time you open that card.
+              </p>
+            </div>
+            <div class="block">
+              <h4>Why it happens</h4>
+              <p>
+                Same principle as items 1 and 2, one layer deeper. The server asks
+                the database to save, and the database answers "saved" or "failed".
+                Three places don't look at that answer. The server then tells your
+                browser everything is fine.
+              </p>
+              <p>
+                The summary case is the worst of the three, because it also writes a
+                success into your own admin dashboard. So the health page reports
+                the feature as working while nothing was stored.
+              </p>
+              <p class="quiet">
+                Hugh's own written rules already forbid this, in the "never do this"
+                list. These three slipped past.
+              </p>
+            </div>
+            <div class="block">
+              <h4>What I'll change</h4>
+              <p>
+                Look at the answer. If the save failed, tell the browser it failed
+                instead of claiming success — and don't record a win in the
+                dashboard that didn't happen.
+              </p>
+            </div>
+            <div class="block">
+              <h4>What landed — and the card was wrong about the fix</h4>
+              <p>
+                "Look at the answer" turned out to be necessary and not enough.
+                A database write that matches <em>no rows</em> doesn't report an
+                error — it reports nothing at all, and quietly changes nothing.
+                So a route that only checks for errors still concludes it
+                worked.
+              </p>
+              <p>
+                That is not a rare case. It is exactly what a permission refusal
+                looks like from the server's side: the row simply isn't visible,
+                so nothing matches, so nothing is written, so nothing is said.
+                The quietest failure in the stack.
+              </p>
+              <p>
+                The real fix is to make each write hand back the row it changed,
+                and treat "nothing came back" as a failure. That check lives in
+                one small file with its own tests, so no route has to remember
+                the trap.
+              </p>
+            </div>
+            <div class="block">
+              <h4>Your call on the paid-for summary</h4>
+              <p>
+                You chose: when Hugh has written your summary but the database
+                won't keep it, you get the summary anyway. It renders, with a
+                plain line saying it couldn't be saved and won't be there next
+                time, and the Download button beside it still works.
+              </p>
+              <p>
+                There's also a <strong>Try saving again</strong> that costs
+                nothing. The words already exist — only the storing failed — so
+                the retry stores what's on screen rather than asking Claude to
+                write it a second time.
+              </p>
+              <p class="quiet">
+                Worth recording why this came up: I asked whether the failure
+                could be prevented on the database side instead. It can't. The
+                column is unlimited text, and the summary is capped by the model
+                at roughly 4,000 characters — about five times under the only
+                limit in that file, which doesn't even apply to this path. Size
+                was never the problem. What's left is dropped connections,
+                timeouts and permission refusals, and none of those can be
+                designed away.
+              </p>
+            </div>
+            <div class="block">
+              <h4>Something item 4 had to fix early</h4>
+              <p>
+                The summary route recorded what it spent <em>after</em> storing
+                the document. Adding a failure exit above that line would have
+                skipped the spend record entirely — quietly creating item 4's
+                defect in the very route item 3 was fixing. The cost is now
+                recorded the moment Claude answers, before anything can go
+                wrong, because the money is gone either way.
+              </p>
+            </div>
+            <div class="block">
+              <h4>How to check me</h4>
+              <p>
+                7 new tests on the check itself, including the one this item
+                exists for: <em>a write that matched no rows is reported as a
+                failure, not a success</em>. The suite went from 1,325 to 1,332,
+                all passing, with lint, types and a production build clean.
+              </p>
+              <p class="quiet">
+                Being straight about the limit: those tests cover the decision,
+                not the three routes wired to it. This project has no harness
+                for testing a route against a fake database, and this run isn't
+                building one — same approach as items 1 and 2, where the
+                decision is tested and the wiring is verified by reading. If
+                you'd rather I built that harness, say so and it becomes its own
+                item.
+              </p>
+            </div>
+          </div>
+          <aside class="aside">
+            <section>
+              <h5>Files</h5>
+              <ul class="files">
+                <li>writeResult.ts <em>— new, the check</em></li>
+                <li>writeResult.test.ts <em>— new, 7 tests</em></li>
+                <li>coverage/route.ts <em>— checklist ticks</em></li>
+                <li>summary/route.ts <em>— milestone summary</em></li>
+                <li>extract/route.ts <em>— document cleanup</em></li>
+                <li>MilestoneDrawer.tsx <em>— the unsaved summary</em></li>
+              </ul>
+            </section>
+            <section>
+              <h5>Scope note</h5>
+              <p class="risk-note">
+                Two beyond the card, both forced by the work: the summary
+                route's spend record had to move before a failure exit could be
+                added above it, and the checklist's history log was claiming to
+                be harmless while still able to fail a save. Recorded rather
+                than absorbed.
+              </p>
+            </section>
+            <section>
+              <h5>Risk</h5>
+              <div class="risk"><span class="risk-low">Low</span></div>
+              <p class="risk-note">Still expect your admin health page to look <em>worse</em> after this. It has stopped reporting failed saves as successes, which is the point.</p>
+            </section>
+          </aside>
+        </div>
+      </article>
+
+      <!-- ── 04 ────────────────────────────────────────────────────────── -->
+      <article class="entry" id="item-4">
+        <div class="entry-head">
+          <span class="entry-num">04</span>
+          <h3>Money spent that nothing records</h3>
+          <span class="pill pill-done">Done</span>
+        </div>
+        <div class="entry-body">
+          <div class="prose">
+            <div class="block">
+              <h4>What you'd see</h4>
+              <p>
+                Nothing, directly — this one only shows up as a gap in your cost
+                page. Some real spend never appears there at all.
+              </p>
+            </div>
+            <div class="block">
+              <h4>Why it happens</h4>
+              <p>
+                Claude charges the moment it answers, whether or not the answer is
+                any good. Occasionally it returns something malformed that Hugh
+                can't read. In three places the code checks the answer first and
+                only records the cost afterwards — so a malformed answer means money
+                spent and no record of it.
+              </p>
+              <p class="quiet">
+                Most of Hugh already gets this right and records the cost first.
+                One route even has a comment explaining exactly why. These three are
+                the exceptions.
+              </p>
+            </div>
+            <div class="block">
+              <h4>What I'll change</h4>
+              <p>
+                Record the cost the moment the answer arrives, before inspecting it.
+                Two of the three are literally moving one block of code above
+                another. The third throws away a running total it has already
+                counted — I'll log it instead.
+              </p>
+            </div>
+            <div class="block">
+              <h4>What landed</h4>
+              <p>
+                Two of the three were exactly as described — one line moved above
+                another, so the cost is written down the moment Claude answers
+                rather than after we've decided whether we liked the answer.
+              </p>
+              <p>
+                I also checked the claim on this card rather than repeating it.
+                It holds: five other places that pay Claude — mastery scoring,
+                the mastery recap, topic refinement twice over, and the learning
+                summariser — all already record the cost first. One of them
+                explains why in a single line above the code. These three were
+                the exceptions, not the pattern.
+              </p>
+            </div>
+            <div class="block">
+              <h4>The third one was worse than the card said</h4>
+              <p>
+                The document reader doesn't ask Claude once. It asks, and if the
+                answer comes back unreadable it asks again — then gives up. It
+                was carefully adding up what both tries cost, and then throwing
+                that total away on its way out the door. The comment above it
+                even promised it wouldn't.
+              </p>
+              <p>
+                That's the most expensive call in this item by a distance: your
+                whole uploaded document goes into each attempt, and you're
+                charged for what goes in as well as what comes back. Two of
+                those, invisible.
+              </p>
+              <p>
+                The fix is a small piece of shared machinery with its own tests,
+                and it exists for one specific reason: the moment of billing and
+                the moment of failure are one line apart. Claude answers — you're
+                charged — and the very next step is the one that can blow up. So
+                the cost is now handed over <em>before</em> that step, and it
+                survives the failure rather than disappearing with it.
+              </p>
+            </div>
+            <div class="block">
+              <h4>One found on the way, from item 3</h4>
+              <p>
+                The fact-checker throws away the answer to its own save, the same
+                way the three routes in item 3 did. So an entry could be marked
+                as fact-checked on screen while the database never recorded it —
+                and since only fact-checked lines may be quoted in a review quiz,
+                a phantom verdict there turns into a quiz question later. Fixed
+                here rather than left for a sixth item.
+              </p>
+            </div>
+            <div class="block">
+              <h4>How to check me</h4>
+              <p>
+                10 new tests on the accounting itself, including the one this
+                item exists for: <em>reports usage from an attempt that billed
+                and then threw</em>, and <em>sums every attempt when all of them
+                fail</em>. The suite went from 1,332 to 1,342, all passing, with
+                lint, types and a production build clean.
+              </p>
+              <p>
+                Then your cost page. Expect the number to go <em>up</em> — not
+                because we started spending more, but because it was
+                under-reported before. Document uploads that failed are where the
+                difference will show.
+              </p>
+            </div>
+          </div>
+          <aside class="aside">
+            <section>
+              <h5>Files</h5>
+              <ul class="files">
+                <li>attemptWithUsage.ts <em>— new, the accounting</em></li>
+                <li>attemptWithUsage.test.ts <em>— new, 10 tests</em></li>
+                <li>quiz/route.ts <em>— quiz generation</em></li>
+                <li>verify/route.ts <em>— diary fact-check</em></li>
+                <li>extract/route.ts <em>— document topic</em></li>
+              </ul>
+            </section>
+            <section>
+              <h5>Scope note</h5>
+              <p class="risk-note">
+                One beyond the card: the fact-checker's unchecked save, which is
+                item 3's defect in a file item 3 didn't list. Same visit, same
+                rule, recorded rather than absorbed.
+              </p>
+            </section>
+            <section>
+              <h5>Risk</h5>
+              <div class="risk"><span class="risk-low">Very low</span></div>
+              <p class="risk-note">Two line moves and one loop rewritten behind a tested helper. Nothing a learner touches changes.</p>
+            </section>
+          </aside>
+        </div>
+      </article>
+
+      <!-- ── 05 ────────────────────────────────────────────────────────── -->
+      <article class="entry" id="item-5">
+        <div class="entry-head">
+          <span class="entry-num">05</span>
+          <h3>The real reason gets replaced by a shrug</h3>
+          <span class="pill pill-done">Done</span>
+        </div>
+        <div class="entry-body">
+          <div class="prose">
+            <div class="block">
+              <h4>What you'd see</h4>
+              <p>
+                You hit your daily usage limit in Ask Hugh. The chat replies "Sorry,
+                something went wrong. Please try again." So you try again, and get
+                the same thing. Nothing anywhere tells you you've hit a limit.
+              </p>
+            </div>
+            <div class="block">
+              <h4>Why it happens</h4>
+              <p>
+                The server writes a specific, useful message and sends it back. The
+                chat window throws it away and substitutes a generic one. A
+                deliberate refusal and a genuine crash come out reading the same.
+              </p>
+              <p>
+                There's a smaller second problem underneath: that error text gets
+                saved as though Hugh said it, so it becomes part of the conversation
+                Claude reads back on your next message.
+              </p>
+            </div>
+            <div class="block">
+              <h4>What I'll change</h4>
+              <p>
+                Show the message the server actually sent, and keep failure text out
+                of the saved conversation.
+              </p>
+            </div>
+            <div class="block">
+              <h4>What landed</h4>
+              <p>
+                Ask Hugh now reads what the server actually said before deciding
+                what to tell you. Hit your monthly limit and you get the sentence
+                written for that — the one naming what to do about it — instead
+                of an apology that leaves you pressing send again.
+              </p>
+              <p>
+                A refusal also appears as what it is: a notice beside the
+                conversation, with no avatar and no speech bubble, because the
+                one thing it must never look like is Hugh talking. It carries
+                <strong>Send it again</strong> only when sending again could
+                actually work — a lapsed session and a spent budget get no
+                button, since a retry that cannot succeed is the same lie in a
+                different costume.
+              </p>
+              <p class="quiet">
+                Small thing with a real payoff: when the server says how long to
+                wait, you're now told. It has always sent that number and nothing
+                has ever shown it to you.
+              </p>
+            </div>
+            <div class="block">
+              <h4>The second half was bigger than this card said</h4>
+              <p>
+                The card said the error text became part of the conversation
+                Claude reads back. True — and it went three places further. It
+                was written into the exported transcript, folded into the
+                checklist rail's reading of what you'd covered, and handed to the
+                summariser.
+              </p>
+              <p>
+                That last one is the one that matters. The summary is what you
+                save to your learning diary, and your diary is the only thing a
+                review quiz is allowed to quote. So a sentence Hugh never said
+                could travel all the way to being the thing a quiz asks you
+                about.
+              </p>
+              <p>
+                The fix isn't care, it's shape: a failure now carries no reply at
+                all, so there is nothing to accidentally add to the conversation.
+              </p>
+            </div>
+            <div class="block">
+              <h4>And the worst one, found on the way</h4>
+              <p>
+                When the summariser itself failed, the words "Unable to generate
+                summary. Please try again." were handed to the summary panel
+                <em>as the session's story</em> — looking exactly like a real
+                one, with a working <strong>Save</strong> button underneath it.
+                One click filed that sentence in your learning diary.
+              </p>
+              <p>
+                The panel is now told explicitly when there is nothing to show,
+                and there is no save button on a failure because there is no
+                summary to save.
+              </p>
+            </div>
+            <div class="block">
+              <h4>The judgement call, resolved</h4>
+              <p>
+                Item 1's card flagged that these two items look contradictory:
+                there I use <em>our</em> wording, here the <em>server's</em>.
+                They aren't in conflict. The rule is to show the server's message
+                where the server wrote one for a person — and here it did, for
+                exactly two refusals, which are named one by one in the code.
+                Everything else on this route still answers in shorthand written
+                for logs, and that is still kept away from you.
+              </p>
+            </div>
+            <div class="block">
+              <h4>How to check me</h4>
+              <p>
+                19 new tests, including the two this item exists for:
+                <em>shows the budget refusal instead of a generic apology</em>,
+                and <em>carries no reply on any failure, so a refusal cannot
+                become a message</em>. The suite went from 1,342 to 1,361, all
+                passing, with lint, types and a production build clean.
+              </p>
+              <p>
+                In the app: run yourself out of budget and read what Ask Hugh
+                tells you. Then export the transcript — the refusal should not be
+                in it.
+              </p>
+            </div>
+          </div>
+          <aside class="aside">
+            <section>
+              <h5>Files</h5>
+              <ul class="files">
+                <li>chatOutcome.ts <em>— new, the decision</em></li>
+                <li>chatOutcome.test.ts <em>— new, 19 tests</em></li>
+                <li>ChatWindow.tsx <em>— Ask Hugh chat</em></li>
+                <li>SummaryPanel.tsx <em>— the unsavable failure</em></li>
+              </ul>
+            </section>
+            <section>
+              <h5>Scope note</h5>
+              <p class="risk-note">
+                One beyond the card, and the highest-consequence find of the
+                run: a failed summarise could be saved into the learning diary
+                as if it were the session's story.
+              </p>
+            </section>
+            <section>
+              <h5>Risk</h5>
+              <div class="risk"><span class="risk-low">Low</span></div>
+              <p class="risk-note">The wording is still yours to overrule — it lives in one file, with the sentences in one list.</p>
+            </section>
+          </aside>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <section class="rules">
+    <h2>How this board works</h2>
+    <div class="rule-grid">
+      <dl class="rule queued">
+        <dt>Queued</dt>
+        <dd>Understood and scoped, not started. Empty now — the run is finished.</dd>
+      </dl>
+      <dl class="rule active">
+        <dt>In progress</dt>
+        <dd>Being worked on. Only ever one card — if two are here, I've lost the plot.</dd>
+      </dl>
+      <dl class="rule blocked">
+        <dt>Blocked</dt>
+        <dd>Stopped, with the reason written on the card in plain words. Not a quiet skip.</dd>
+      </dl>
+      <dl class="rule done">
+        <dt>Done</dt>
+        <dd>Changed, tested, and the whole suite still passes — plus a note saying what you can click to see it.</dd>
+      </dl>
+    </div>
+    <p class="promise">
+      <b>I move the cards; you check them.</b> The real state of the work lives in
+      the code, not on this page — so a card claiming Done is a claim you're
+      entitled to test. If something turns out bigger than the card says, or I
+      find I was wrong about a cause, the card changes and I'll say what changed
+      and why. Nothing gets dropped silently.
+      <br><br>
+      That happened three times. Item 2 grew from six places to nine. Item 3's
+      stated fix turned out to be insufficient, and the card now says so above
+      the correction. Item 5's second half reached the learning diary, which is
+      further than anyone thought. All three are written on their own cards.
+    </p>
+  </section>
+
+</div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   X, Plus, Loader2, MessageCircle, ArrowRight,
@@ -18,8 +18,13 @@ import {
   type MilestoneCoverage, type CoverageResponse, KANBAN_COLUMN_LABELS,
 } from "@/types";
 import { normalizeCoverage, countByStatus } from "@/utils/coverage";
+import {
+  outcomeOfStatus, outcomeOfThrown, withServerMessage, type SaveFailure,
+} from "@/lib/errors/saveOutcome";
+import { diaryState, canStartFromDiary } from "@/lib/tracker/diaryState";
 import PointStatusControl from "@/components/learn/PointStatusControl";
 import PointTagSelect from "@/components/learn/PointTagSelect";
+import SaveFailureNotice from "@/components/ui/SaveFailureNotice";
 
 interface Props {
   milestone:        Milestone | null;
@@ -33,6 +38,17 @@ interface Props {
   // sync as the learner changes self-assessment statuses, without a reload.
   onCoverageChange?: (milestoneId: string, coverage: MilestoneCoverage) => void;
 }
+
+/**
+ * The summary route is this panel's exception to the copy rule. Its neighbours
+ * refuse with log shorthand ("Unauthorized", "Not found"), but these three are
+ * reasons written to be read — "Add a diary entry before generating a summary"
+ * (422), "Milestone is not mastered" (409), "Summary is too long" (413) — and
+ * each is more use to a learner than our generic refusal line. Listed
+ * explicitly rather than inferred from the status, because a 4xx is not in
+ * general a promise that the body is worth showing anyone.
+ */
+const SUMMARY_HUMAN_REFUSALS = [409, 413, 422] as const;
 
 const COLUMN_COLOURS: Record<string, string> = {
   backlog: "text-slate-400 bg-slate-800",
@@ -84,6 +100,9 @@ export default function MilestoneDrawer({ milestone, goalId, onClose, onCoverage
 
   const [entries, setEntries]               = useState<MilestoneEntry[]>([]);
   const [loadingEntries, setLoadingEntries] = useState(false);
+  // Set when the diary could not be read. Kept apart from `entries` because
+  // an empty list is the one thing it must never be confused with.
+  const [entriesFailed, setEntriesFailed]   = useState(false);
   const [draft, setDraft]                   = useState("");
   const [draftTitle, setDraftTitle]         = useState("");
   const [draftPointId, setDraftPointId]     = useState<string | null>(null);
@@ -113,6 +132,17 @@ export default function MilestoneDrawer({ milestone, goalId, onClose, onCoverage
   const [summaryDoc, setSummaryDoc]   = useState<string | null>(null);
   const [summaryAt, setSummaryAt]     = useState<string | null>(null);
   const [genSummary, setGenSummary]   = useState(false);
+  // Kept out of the panel-wide banner on purpose: this generation also runs
+  // automatically when a mastered card is opened, and a red toast for
+  // something the learner never pressed reads as an app-level alarm. It
+  // belongs where the button is, like the checklist failure above it.
+  const [summaryFailure, setSummaryFailure] = useState<SaveFailure | null>(null);
+  // The document exists and was paid for, but the database would not keep it.
+  // Distinct from `summaryFailure`, which means there is no document at all —
+  // "here it is, we couldn't store it" and "we couldn't write it" are different
+  // things to be told, and only the first one leaves something worth reading.
+  const [summaryUnsaved, setSummaryUnsaved] = useState(false);
+  const [savingSummary, setSavingSummary]   = useState(false);
   const [showSummary, setShowSummary] = useState(true);
 
   // Section visibility
@@ -128,8 +158,83 @@ export default function MilestoneDrawer({ milestone, goalId, onClose, onCoverage
   // Which individual entries are expanded
   const [openEntries, setOpenEntries] = useState<Set<string>>(new Set());
 
+  // Set when a save came back refused. One banner for the panel: only one
+  // save is ever in flight from a click, and stacking these would bury the
+  // newest failure under an older one the learner has already read.
+  const [saveFailure, setSaveFailure] = useState<SaveFailure | null>(null);
+
   const textareaRef   = useRef<HTMLTextAreaElement>(null);
   const entriesEndRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Load the diary, and be honest about a load that did not happen.
+   *
+   * `fetch` resolves for a 401 or a 500 exactly as it does for a 200, so the
+   * previous `.then(r => r.json()).then(d => setEntries(d.entries ?? []))`
+   * rendered a refusal as a diary with nothing in it. Lifted out of the
+   * open-card effect so the failure has a way out: rule 5 asks for a retry that
+   * reuses the machine, not advice to close the card and open it again.
+   */
+  const loadEntries = useCallback(async (milestoneId: string) => {
+    setLoadingEntries(true);
+    setEntriesFailed(false);
+    try {
+      const res = await fetch(`/api/tracker/milestones/${milestoneId}/entries`);
+      if (!res.ok) { setEntriesFailed(true); return; }
+      const body = await res.json() as { entries?: MilestoneEntry[] };
+      setEntries(body.entries ?? []);
+    } catch {
+      setEntriesFailed(true);
+    } finally {
+      setLoadingEntries(false);
+    }
+  }, []);
+
+  /**
+   * Send a change and read the reply before believing it.
+   *
+   * Every save on this panel had the same shape — `await fetch(...)`, then
+   * `if (d.entry) …` — which does nothing whatsoever when the entry is absent
+   * because the save was refused. No message, no spinner, no change on screen:
+   * the learner reasonably concludes they misclicked. This returns the refusal
+   * instead of discarding it, and leaves each caller to decide where it is
+   * shown.
+   *
+   * `humanRefusals` names the statuses whose message this route wrote for a
+   * learner rather than for a log — see `withServerMessage`.
+   */
+  async function requestSave<T>(
+    request:       () => Promise<Response>,
+    humanRefusals: readonly number[] = [],
+  ): Promise<{ data: T | null; failure: SaveFailure | null }> {
+    try {
+      const res     = await request();
+      const outcome = outcomeOfStatus(res.status);
+      if (!outcome.ok) {
+        const message = humanRefusals.includes(res.status)
+          ? await res.json()
+              .then(b => (b as { error?: string }).error)
+              .catch(() => undefined)   // a refusal need not carry a JSON body
+          : undefined;
+        const shown = withServerMessage(outcome, message);
+        return { data: null, failure: shown.ok ? null : shown };
+      }
+      return { data: await res.json() as T, failure: null };
+    } catch (err) {
+      const outcome = outcomeOfThrown(err);
+      return { data: null, failure: outcome.ok ? null : outcome };
+    }
+  }
+
+  /** `requestSave` for the callers that want the panel-wide banner. */
+  async function save<T>(
+    request:       () => Promise<Response>,
+    humanRefusals: readonly number[] = [],
+  ): Promise<T | null> {
+    const { data, failure } = await requestSave<T>(request, humanRefusals);
+    setSaveFailure(failure);
+    return data;
+  }
 
   // Reset all per-milestone state when the open card changes — an intentional
   // sync-on-id pattern, so the setState-in-effect rule is suppressed here.
@@ -165,11 +270,10 @@ export default function MilestoneDrawer({ milestone, goalId, onClose, onCoverage
     setShowDiary(!isReview && !isMastery);
     setShowWriteEntry(!isReview && !isMastery);
 
-    setLoadingEntries(true);
-    fetch(`/api/tracker/milestones/${milestone.id}/entries`)
-      .then(r => r.json())
-      .then(d => setEntries(d.entries ?? []))
-      .finally(() => setLoadingEntries(false));
+    setSaveFailure(null);
+    setSummaryFailure(null);
+    setSummaryUnsaved(false);
+    void loadEntries(milestone.id);
 
     // Load the checklist + cached coverage (generates the checklist once if absent)
     setLoadingCoverage(true);
@@ -228,17 +332,23 @@ export default function MilestoneDrawer({ milestone, goalId, onClose, onCoverage
     const optimistic = archived ? new Date().toISOString() : null;
     setEntries(prev => prev.map(e => e.id === entryId ? { ...e, archived_at: optimistic } : e));
     if (archived) setOpenEntries(prev => { const n = new Set(prev); n.delete(entryId); return n; });
-    void fetch(`/api/tracker/entries/${entryId}`, {
-      method:  "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ action: archived ? "archive" : "restore" }),
-    })
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(d => { if (d.entry) replaceEntry(d.entry as MilestoneEntry); })
-      .catch(() => {
-        // Revert to the entry's prior archive state on failure.
+    void requestSave<{ entry?: MilestoneEntry }>(() =>
+      fetch(`/api/tracker/entries/${entryId}`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ action: archived ? "archive" : "restore" }),
+      }),
+    ).then(({ data, failure }) => {
+      if (failure) {
+        // Revert to the entry's prior archive state, and say why it moved back.
+        // The revert alone was visible but unexplained: an entry that hops out
+        // of the archive on its own looks like a bug in the button.
         setEntries(prev => prev.map(e => e.id === entryId ? { ...e, archived_at: prevArchivedAt } : e));
-      });
+        setSaveFailure(failure);
+        return;
+      }
+      if (data?.entry) replaceEntry(data.entry);
+    });
   }
 
   // Background fact-check for a saved/edited entry
@@ -263,14 +373,17 @@ export default function MilestoneDrawer({ milestone, goalId, onClose, onCoverage
     if (!draft.trim() || !milestone || saving) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/tracker/milestones/${milestone.id}/entries`, {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ body: draft.trim(), title: draftTitle.trim() || undefined, pointId: draftPointId }),
-      });
-      const d = await res.json();
-      if (d.entry) {
-        const newEntry = d.entry as MilestoneEntry;
+      const d = await save<{ entry?: MilestoneEntry }>(() =>
+        fetch(`/api/tracker/milestones/${milestone.id}/entries`, {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ body: draft.trim(), title: draftTitle.trim() || undefined, pointId: draftPointId }),
+        }),
+      );
+      // On a refusal the banner explains it and the draft below is left alone,
+      // so the learner's typing is still there to send again.
+      if (d?.entry) {
+        const newEntry = d.entry;
         setEntries(prev => [...prev, newEntry]);
         setOpenEntries(prev => new Set([...prev, newEntry.id]));
         setDraft("");
@@ -285,13 +398,14 @@ export default function MilestoneDrawer({ milestone, goalId, onClose, onCoverage
   }
 
   async function acceptFix(entryId: string) {
-    const res = await fetch(`/api/tracker/entries/${entryId}`, {
-      method:  "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ action: "accept" }),
-    });
-    const d = await res.json();
-    if (d.entry) replaceEntry(d.entry as MilestoneEntry);
+    const d = await save<{ entry?: MilestoneEntry }>(() =>
+      fetch(`/api/tracker/entries/${entryId}`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ action: "accept" }),
+      }),
+    );
+    if (d?.entry) replaceEntry(d.entry);
   }
 
   function startEdit(entry: MilestoneEntry) {
@@ -303,14 +417,17 @@ export default function MilestoneDrawer({ milestone, goalId, onClose, onCoverage
 
   async function saveEdit(entryId: string) {
     if (!editBody.trim()) return;
-    const res = await fetch(`/api/tracker/entries/${entryId}`, {
-      method:  "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ body: editBody.trim(), title: editTitle.trim() || undefined }),
-    });
-    const d = await res.json();
-    if (d.entry) {
-      replaceEntry(d.entry as MilestoneEntry);
+    const d = await save<{ entry?: MilestoneEntry }>(() =>
+      fetch(`/api/tracker/entries/${entryId}`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ body: editBody.trim(), title: editTitle.trim() || undefined }),
+      }),
+    );
+    // The editor stays open on a refusal — closing it would strand the rewrite
+    // the learner just typed behind an entry still showing the old text.
+    if (d?.entry) {
+      replaceEntry(d.entry);
       setEditingId(null);
       void verifyEntry(entryId); // re-check the rewritten entry
     }
@@ -319,43 +436,97 @@ export default function MilestoneDrawer({ milestone, goalId, onClose, onCoverage
   // Re-tag an existing entry to a learning point (or clear the tag). No content
   // change, so no re-verify — the server updates point_id only.
   async function retagEntry(entryId: string, pointId: string | null) {
-    const res = await fetch(`/api/tracker/entries/${entryId}`, {
-      method:  "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ pointId }),
-    });
-    const d = await res.json();
-    if (d.entry) replaceEntry(d.entry as MilestoneEntry);
+    const d = await save<{ entry?: MilestoneEntry }>(() =>
+      fetch(`/api/tracker/entries/${entryId}`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ pointId }),
+      }),
+    );
+    if (d?.entry) replaceEntry(d.entry);
   }
 
   // Self-assessment: the learner flags each idea as understood / bookmarked /
   // stuck. Clearing a status removes the id from the map.
   function setPointStatus(id: string, next: PointStatus | undefined) {
     if (!milestone) return;
-    const updated = { ...statuses };
+    const milestoneId = milestone.id;
+    const previous    = statuses;
+    const updated     = { ...statuses };
     if (next) updated[id] = next; else delete updated[id];
     setStatuses(updated); // optimistic
     // Bubble the change up so the board's card chips update without a reload.
-    onCoverageChange?.(milestone.id, { statuses: updated, updatedAt: new Date().toISOString() });
-    void fetch(`/api/tracker/milestones/${milestone.id}/coverage`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ statuses: updated }),
-    }).catch(() => {});
+    onCoverageChange?.(milestoneId, { statuses: updated, updatedAt: new Date().toISOString() });
+    void requestSave(() =>
+      fetch(`/api/tracker/milestones/${milestoneId}/coverage`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ statuses: updated }),
+      }),
+    ).then(({ failure }) => {
+      if (!failure) return;
+      // The worst of the silent saves, because it was optimistic *and*
+      // published: a refused tick stayed ticked here and on the card behind the
+      // panel, and stayed wrong until a reload. Put both back, and say so.
+      // The timestamp is a fresh one — it stamps when this map became true on
+      // screen, which it just did, rather than claiming the server's.
+      setStatuses(previous);
+      onCoverageChange?.(milestoneId, { statuses: previous, updatedAt: new Date().toISOString() });
+      setSaveFailure(failure);
+    });
   }
 
   async function generateSummary() {
     if (!milestone || genSummary) return;
+    const milestoneId = milestone.id;
     setGenSummary(true);
+    setSummaryFailure(null);
     try {
-      const res = await fetch(`/api/tracker/milestones/${milestone.id}/summary`, { method: "POST" });
-      const d   = await res.json();
-      if (d.summaryDoc) {
-        setSummaryDoc(d.summaryDoc as string);
-        setSummaryAt((d.generatedAt as string) ?? new Date().toISOString());
+      const { data, failure } = await requestSave<{
+        summaryDoc?: string; generatedAt?: string; saved?: boolean;
+      }>(
+        () => fetch(`/api/tracker/milestones/${milestoneId}/summary`, { method: "POST" }),
+        SUMMARY_HUMAN_REFUSALS,
+      );
+      if (failure) { setSummaryFailure(failure); return; }
+      if (data?.summaryDoc) {
+        setSummaryDoc(data.summaryDoc);
+        setSummaryAt(data.generatedAt ?? new Date().toISOString());
+        // The route answers 200 with `saved: false` when Claude wrote the
+        // document but the database would not take it. Showing it anyway is
+        // the point: it has already been billed for, and the learner can
+        // download it or ask us to store it again.
+        setSummaryUnsaved(data.saved === false);
       }
     } finally {
       setGenSummary(false);
+    }
+  }
+
+  /**
+   * Store a summary that was generated but never saved.
+   *
+   * Deliberately the PUT and not the POST: the document already exists, only
+   * the store failed, and going back through generation would bill the learner
+   * a second time for words they are currently looking at.
+   */
+  async function retrySaveSummary() {
+    if (!milestone || !summaryDoc || savingSummary) return;
+    const milestoneId = milestone.id;
+    setSavingSummary(true);
+    setSummaryFailure(null);
+    try {
+      const { failure } = await requestSave(() =>
+        fetch(`/api/tracker/milestones/${milestoneId}/summary`, {
+          method:  "PUT",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ summaryDoc }),
+        }),
+      );
+      if (failure) { setSummaryFailure(failure); return; }
+      setSummaryUnsaved(false);
+    } finally {
+      setSavingSummary(false);
     }
   }
 
@@ -391,6 +562,17 @@ export default function MilestoneDrawer({ milestone, goalId, onClose, onCoverage
   // surface under the "Show archived" toggle.
   const activeEntries   = entries.filter(e => !e.archived_at);
   const archivedEntries = entries.filter(e => e.archived_at);
+
+  // Two readings of the same load, because the diary and the gates count
+  // different things: the diary lists only unarchived entries, while a quiz is
+  // built from everything written here. Both go through `diaryState` so neither
+  // can go back to reading a failed load as an empty one.
+  const diaryView = diaryState({
+    loading: loadingEntries, failed: entriesFailed, count: activeEntries.length,
+  });
+  const gateView  = diaryState({
+    loading: loadingEntries, failed: entriesFailed, count: entries.length,
+  });
 
   // Learning-point tag lookups for the diary: id → text, per-point entry counts,
   // and the entries visible under the active filter.
@@ -615,12 +797,26 @@ export default function MilestoneDrawer({ milestone, goalId, onClose, onCoverage
 
                             {checklistNudge}
 
-                            {loadingEntries ? (
+                            {gateView === "loading" ? (
                               <div className="flex items-center gap-2 text-xs text-slate-500 px-1">
                                 <Loader2 size={12} className="animate-spin" />
                                 Checking learning activity…
                               </div>
-                            ) : entries.length === 0 ? (
+                            ) : gateView === "failed" ? (
+                              <div className="rounded-xl border border-red-500/30 bg-red-500/8 px-4 py-3">
+                                <p className="text-sm leading-relaxed text-red-200/90">
+                                  We couldn&apos;t check your learning diary, so this is on hold.
+                                  Nothing is lost — it just didn&apos;t load.
+                                </p>
+                                <button
+                                  onClick={() => { if (milestone) void loadEntries(milestone.id); }}
+                                  className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-red-300 transition-colors hover:text-red-100"
+                                >
+                                  <RotateCw size={11} />
+                                  Try again
+                                </button>
+                              </div>
+                            ) : !canStartFromDiary(gateView) ? (
                               <div className="rounded-xl border border-slate-700/60 bg-slate-800/50 px-4 py-3">
                                 <p className="text-sm text-slate-400 leading-relaxed">
                                   Add at least one learning diary entry before starting the review quiz.
@@ -722,6 +918,30 @@ export default function MilestoneDrawer({ milestone, goalId, onClose, onCoverage
                                   </div>
                                 ) : summaryDoc ? (
                                   <>
+                                    {summaryUnsaved && (
+                                      <div className="rounded-lg border border-amber-500/40 bg-amber-500/8 px-4 py-3">
+                                        <p className="text-sm leading-relaxed text-amber-100/90">
+                                          This summary couldn&apos;t be saved. It won&apos;t be here
+                                          when you reopen the card — use Download if you want to
+                                          keep it.
+                                        </p>
+                                        {summaryFailure && (
+                                          <p className="mt-1.5 text-xs leading-relaxed text-amber-200/70">
+                                            {summaryFailure.message}
+                                          </p>
+                                        )}
+                                        <button
+                                          onClick={retrySaveSummary}
+                                          disabled={savingSummary}
+                                          className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-amber-200 transition-colors hover:text-amber-50 disabled:opacity-50"
+                                        >
+                                          {savingSummary
+                                            ? <Loader2 size={11} className="animate-spin" />
+                                            : <RotateCw size={11} />}
+                                          Try saving again
+                                        </button>
+                                      </div>
+                                    )}
                                     <div className="rounded-lg border border-slate-700/50 bg-slate-900/40 px-4 py-3">
                                       <ReactMarkdown remarkPlugins={[remarkGfm]} components={summaryMarkdownComponents}>
                                         {summaryDoc}
@@ -733,6 +953,16 @@ export default function MilestoneDrawer({ milestone, goalId, onClose, onCoverage
                                   </>
                                 ) : (
                                   <>
+                                    {/* A failed generation used to drop straight back to
+                                        the button below with nothing said, so pressing it
+                                        again was the only way to learn anything. */}
+                                    {summaryFailure && (
+                                      <div className="rounded-lg border border-red-500/30 bg-red-500/8 px-4 py-3">
+                                        <p className="text-sm leading-relaxed text-red-200/90">
+                                          {summaryFailure.message}
+                                        </p>
+                                      </div>
+                                    )}
                                     <p className="text-sm text-slate-400 leading-relaxed">
                                       Generate a document summarising what you learned here — drawn from your diary, the checklist, and your mastery session.
                                     </p>
@@ -759,12 +989,26 @@ export default function MilestoneDrawer({ milestone, goalId, onClose, onCoverage
 
                             {checklistNudge}
 
-                            {loadingEntries ? (
+                            {gateView === "loading" ? (
                               <div className="flex items-center gap-2 text-xs text-slate-500 px-1">
                                 <Loader2 size={12} className="animate-spin" />
                                 Checking learning activity…
                               </div>
-                            ) : entries.length === 0 ? (
+                            ) : gateView === "failed" ? (
+                              <div className="rounded-xl border border-red-500/30 bg-red-500/8 px-4 py-3">
+                                <p className="text-sm leading-relaxed text-red-200/90">
+                                  We couldn&apos;t check your learning diary, so this is on hold.
+                                  Nothing is lost — it just didn&apos;t load.
+                                </p>
+                                <button
+                                  onClick={() => { if (milestone) void loadEntries(milestone.id); }}
+                                  className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-red-300 transition-colors hover:text-red-100"
+                                >
+                                  <RotateCw size={11} />
+                                  Try again
+                                </button>
+                              </div>
+                            ) : !canStartFromDiary(gateView) ? (
                               <div className="rounded-xl border border-slate-700/60 bg-slate-800/50 px-4 py-3">
                                 <p className="text-sm text-slate-400 leading-relaxed">
                                   Add at least one learning diary entry before starting a mastery session.
@@ -827,12 +1071,30 @@ export default function MilestoneDrawer({ milestone, goalId, onClose, onCoverage
 
                   {showDiary && (
                     <>
-                      {loadingEntries && (
+                      {diaryView === "loading" && (
                         <div className="flex justify-center py-6">
                           <Loader2 size={18} className="animate-spin text-slate-500" />
                         </div>
                       )}
-                      {!loadingEntries && activeEntries.length === 0 && (
+                      {/* Not the same sentence as "you have written nothing", which
+                          is what this used to show. Modelled on the checklist
+                          failure above: name it, and offer the way back. */}
+                      {diaryView === "failed" && (
+                        <div className="my-2 rounded-xl border border-red-500/30 bg-red-500/8 px-4 py-3">
+                          <p className="text-sm leading-relaxed text-red-200/90">
+                            We couldn&apos;t load your learning diary. Your entries are
+                            safe — this screen just didn&apos;t get them.
+                          </p>
+                          <button
+                            onClick={() => { if (milestone) void loadEntries(milestone.id); }}
+                            className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-red-300 transition-colors hover:text-red-100"
+                          >
+                            <RotateCw size={11} />
+                            Try again
+                          </button>
+                        </div>
+                      )}
+                      {diaryView === "empty" && (
                         <p className="py-6 text-center text-xs text-slate-600">
                           {archivedEntries.length > 0
                             ? "No active entries — all your notes here are archived."
@@ -856,7 +1118,7 @@ export default function MilestoneDrawer({ milestone, goalId, onClose, onCoverage
                           </button>
                         </div>
                       )}
-                      {!loadingEntries && activeEntries.length > 0 && visibleEntries.length === 0 && (
+                      {diaryView === "ready" && visibleEntries.length === 0 && (
                         <p className="py-6 text-center text-xs text-slate-600">
                           No entries tagged to this learning point yet.
                         </p>
@@ -1154,6 +1416,20 @@ export default function MilestoneDrawer({ milestone, goalId, onClose, onCoverage
                 )}
               </div>
             </div>
+
+            {/* Anchored inside the panel rather than the viewport, so it cannot
+                land on top of the board's own toast behind it. */}
+            {saveFailure && (
+              <div className="pointer-events-none absolute inset-x-4 bottom-4 z-20 flex justify-center">
+                <div className="pointer-events-auto animate-toast-in">
+                  <SaveFailureNotice
+                    failure={saveFailure}
+                    title="Not saved"
+                    onDismiss={() => setSaveFailure(null)}
+                  />
+                </div>
+              </div>
+            )}
 
           </div>
         )}
