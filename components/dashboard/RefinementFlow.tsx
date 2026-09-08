@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, SkipForward, ArrowRight, Brain, ChevronLeft, AlertTriangle } from "lucide-react";
+import { Loader2, SkipForward, ArrowRight, Brain, RotateCcw, AlertTriangle } from "lucide-react";
 import { useTrackStatusWatch } from "@/hooks/useTrackStatusWatch";
 import { type LearningGoal } from "@/types";
 
@@ -14,7 +14,8 @@ interface Props {
   topic:         string;
   endDate:       string;
   onGoalCreated: (goal: LearningGoal) => void;
-  onCancel:      () => void;
+  /** Abandon refinement and return the learner to an empty topic form. */
+  onReset:       () => void;
 }
 
 const FALLBACK_TIPS = [
@@ -27,12 +28,17 @@ const MAX_QUESTIONS = 5;
 
 type Phase = "asking" | "waiting" | "failed";
 
-export default function RefinementFlow({ topic, endDate, onGoalCreated, onCancel }: Props) {
+export default function RefinementFlow({ topic, endDate, onGoalCreated, onReset }: Props) {
   const [question, setQuestion]     = useState<string | null>(null);
   const [answers, setAnswers]       = useState<QA[]>([]);
   const [draft, setDraft]           = useState("");
   const [fetching, setFetching]     = useState(false);
   const [fetchError, setFetchError] = useState(false);
+
+  // Reset is destructive of work the learner can see (their answers) and of
+  // the topic behind it, so it asks once before doing it. Only when there is
+  // something to lose — an immediate reset on question 1 discards nothing.
+  const [confirmingReset, setConfirmingReset] = useState(false);
 
   const [phase, setPhase]         = useState<Phase>("asking");
   const [tips, setTips]           = useState<string[]>(FALLBACK_TIPS);
@@ -167,6 +173,11 @@ export default function RefinementFlow({ topic, endDate, onGoalCreated, onCancel
     enterWaiting(answers);
   }
 
+  function handleResetClick() {
+    if (answers.length === 0) onReset();
+    else setConfirmingReset(true);
+  }
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") submitAnswer();
   }
@@ -244,38 +255,63 @@ export default function RefinementFlow({ topic, endDate, onGoalCreated, onCancel
   // ── Asking phase ──────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-4">
-      {/* Header row */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={onCancel}
-          className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-400 transition-colors"
-        >
-          <ChevronLeft size={12} />
-          Back
-        </button>
-
-        <div className="flex flex-1 items-center justify-center gap-1.5">
-          <span className="text-xs text-slate-600">Refining</span>
-          <div className="flex gap-1">
-            {Array.from({ length: MAX_QUESTIONS }).map((_, i) => (
-              <div
-                key={i}
-                className={`h-1.5 w-1.5 rounded-full transition-all ${
-                  i < answers.length ? "bg-amber-500" : "bg-slate-700"
-                }`}
-              />
-            ))}
+      {/* Header row. The confirm replaces it rather than sitting beside it —
+          the panel is narrow, and a reset is not something to offer alongside
+          the progress dots it is about to clear. */}
+      {confirmingReset ? (
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs text-amber-400/80">
+            Discard {answers.length} answer{answers.length === 1 ? "" : "s"} and start over?
+          </span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setConfirmingReset(false)}
+              className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              Keep answering
+            </button>
+            <button
+              onClick={onReset}
+              className="flex items-center gap-1 rounded-lg border border-amber-500/40 px-2.5 py-1 text-xs font-semibold text-amber-400 hover:bg-amber-500/10 transition-colors"
+            >
+              <RotateCcw size={11} />
+              Reset
+            </button>
           </div>
         </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleResetClick}
+            className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-400 transition-colors"
+          >
+            <RotateCcw size={12} />
+            Reset
+          </button>
 
-        <button
-          onClick={handleSkip}
-          className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-400 transition-colors"
-        >
-          <SkipForward size={12} />
-          Skip
-        </button>
-      </div>
+          <div className="flex flex-1 items-center justify-center gap-1.5">
+            <span className="text-xs text-slate-600">Refining</span>
+            <div className="flex gap-1">
+              {Array.from({ length: MAX_QUESTIONS }).map((_, i) => (
+                <div
+                  key={i}
+                  className={`h-1.5 w-1.5 rounded-full transition-all ${
+                    i < answers.length ? "bg-amber-500" : "bg-slate-700"
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+
+          <button
+            onClick={handleSkip}
+            className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-400 transition-colors"
+          >
+            <SkipForward size={12} />
+            Skip
+          </button>
+        </div>
+      )}
 
       {/* Question card */}
       <div className="min-h-[68px] rounded-xl border border-slate-700/60 bg-slate-800/50 p-4">
