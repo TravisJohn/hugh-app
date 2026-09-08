@@ -117,6 +117,12 @@ Return ONLY a valid JSON array — no markdown, no commentary:
       messages:   [{ role: "user", content: prompt }],
     });
 
+    // Logged here, before anything reads the reply. Claude billed the moment
+    // it answered, and both lines below can throw — a non-text block, or JSON
+    // that will not parse. Logging after them meant a garbled answer was money
+    // spent with no record of it anywhere.
+    void logUsage({ userId, model: MODEL, feature: "review/quiz", tokensIn: response.usage.input_tokens, tokensOut: response.usage.output_tokens });
+
     const block = response.content[0];
     if (block.type !== "text") throw new Error("Non-text response from Claude");
 
@@ -124,8 +130,6 @@ Return ONLY a valid JSON array — no markdown, no commentary:
     const parsed = JSON.parse(raw) as unknown;
 
     const { kept, malformed, ungrounded } = keepGroundedQuestions(parsed, entriesText, target);
-
-    void logUsage({ userId, model: MODEL, feature: "review/quiz", tokensIn: response.usage.input_tokens, tokensOut: response.usage.output_tokens });
 
     if (malformed || ungrounded) {
       console.warn(

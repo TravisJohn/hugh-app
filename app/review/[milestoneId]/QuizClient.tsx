@@ -7,6 +7,10 @@ import {
   Trophy, RefreshCcw, AlertCircle, ChevronRight,
 } from "lucide-react";
 import ExitLink from "@/components/ui/ExitLink";
+import {
+  outcomeOfStatus, outcomeOfThrown,
+  type SaveOutcome, type SaveFailure,
+} from "@/lib/errors/saveOutcome";
 
 interface QuizQuestion {
   question:     string;
@@ -40,6 +44,8 @@ export default function QuizClient({ milestoneId, milestoneTitle, entryCount, re
   const [answers, setAnswers]       = useState<(number | null)[]>([]);
   const [timeLeft, setTimeLeft]     = useState(SECONDS_PER_Q);
   const [genError, setGenError]     = useState<string | null>(null);
+  // Set when the pass was real but recording it was refused — see doValidate.
+  const [saveFailure, setSaveFailure] = useState<SaveFailure | null>(null);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -102,18 +108,39 @@ export default function QuizClient({ milestoneId, milestoneTitle, entryCount, re
     setRevealed(true);
   }
 
+  /**
+   * Record the pass.
+   *
+   * The pass itself is real whatever happens here — it is *recording* it that
+   * can be refused, and `fetch` resolves for a 401 exactly as it does for a
+   * 200. Navigating from a `finally` sent the learner to the board's
+   * celebration either way, so an expired session read as a win and the card
+   * was still unreviewed the next morning. Only a save that actually landed
+   * may leave this screen.
+   */
   async function doValidate() {
+    setSaveFailure(null);
+
+    let outcome: SaveOutcome;
     try {
-      await fetch(`/api/tracker/milestones/${milestoneId}`, {
+      const res = await fetch(`/api/tracker/milestones/${milestoneId}`, {
         method:  "PATCH",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ reviewValidated: true }),
       });
-    } finally {
-      // Append validated flag so the board can show the celebration
-      const sep  = returnUrl.includes("?") ? "&" : "?";
-      router.push(`${returnUrl}${sep}validated=${milestoneId}`);
+      outcome = outcomeOfStatus(res.status);
+    } catch (err) {
+      outcome = outcomeOfThrown(err);
     }
+
+    if (!outcome.ok) {
+      setSaveFailure(outcome);
+      return;
+    }
+
+    // Append validated flag so the board can show the celebration
+    const sep  = returnUrl.includes("?") ? "&" : "?";
+    router.push(`${returnUrl}${sep}validated=${milestoneId}`);
   }
 
   function handleNext() {
@@ -365,22 +392,56 @@ export default function QuizClient({ milestoneId, milestoneTitle, entryCount, re
   }
 
   // ─── Validating (passed — saving to DB) ───────────────────────────────────
+  // The score stays on screen in both branches: the learner did pass, and that
+  // stays true even when Hugh cannot record it. Only the line underneath
+  // changes, from a wait into a failure with its own way out (rule 5).
   if (phase === "validating") {
     return (
-      <div className="min-h-screen bg-[#0F172A] flex items-center justify-center">
-        <div className="text-center">
-          <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full bg-green-500/20 text-green-400">
+      <div className="min-h-screen bg-[#0F172A] flex items-center justify-center px-6">
+        <div className="w-full max-w-md text-center">
+          <div className="mb-5 inline-flex h-16 w-16 items-center justify-center rounded-full bg-green-500/20 text-green-400">
             <Trophy size={30} />
           </div>
           <h2 className="mb-2 text-2xl font-bold text-slate-100">Quiz Passed!</h2>
           <p className="mb-1 text-4xl font-black text-green-400">
             {questions.length} / {questions.length}
           </p>
-          <p className="mb-6 text-sm text-slate-400">All correct — marking this card as reviewed…</p>
-          <div className="flex items-center justify-center gap-2 text-sm text-slate-500">
-            <Loader2 size={14} className="animate-spin" />
-            Saving and returning to your board…
-          </div>
+
+          {saveFailure ? (
+            <>
+              <p className="mb-4 text-sm text-slate-400">
+                Your score stands. It is marking the card as reviewed that didn&apos;t go through.
+              </p>
+              <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-left">
+                <AlertCircle size={15} className="mt-0.5 shrink-0 text-red-400" />
+                <p className="text-sm text-red-300">{saveFailure.message}</p>
+              </div>
+              <div className="flex flex-col gap-2">
+                {saveFailure.canRetry && (
+                  <button
+                    onClick={doValidate}
+                    className="flex items-center justify-center gap-2 rounded-xl bg-green-600 py-3 text-sm font-bold text-white hover:bg-green-500 transition-colors"
+                  >
+                    <RefreshCcw size={14} />
+                    Try saving again
+                  </button>
+                )}
+                <ExitLink
+                  href={returnUrl}
+                  label="Back to board without saving"
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 py-2.5 text-sm text-slate-400 hover:text-slate-200 hover:border-slate-600 transition-colors"
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="mb-6 text-sm text-slate-400">All correct — marking this card as reviewed…</p>
+              <div className="flex items-center justify-center gap-2 text-sm text-slate-500">
+                <Loader2 size={14} className="animate-spin" />
+                Saving and returning to your board…
+              </div>
+            </>
+          )}
         </div>
       </div>
     );

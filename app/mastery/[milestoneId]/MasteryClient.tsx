@@ -4,9 +4,13 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Briefcase, Users, MessageCircle, GraduationCap,
-  Mic, MicOff, Loader2, Trophy, RotateCcw,
+  Mic, MicOff, Loader2, Trophy, RotateCcw, AlertCircle,
 } from "lucide-react";
 import ExitLink from "@/components/ui/ExitLink";
+import {
+  outcomeOfStatus, outcomeOfThrown,
+  type SaveOutcome, type SaveFailure,
+} from "@/lib/errors/saveOutcome";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 
@@ -27,6 +31,13 @@ type Phase =
 interface ConversationMessage {
   role: "hugh" | "learner";
   text: string;
+}
+
+/** The two shapes of mastery write; `masteryValidated` only on a first pass. */
+interface MasteryPatch {
+  masteryValidated?: boolean;
+  masteryScore:      number;
+  masteryFeedback:   string;
 }
 
 interface Evaluation {
@@ -116,6 +127,8 @@ export default function MasteryClient({ milestoneId, milestoneTitle, personaId, 
   const [messages,   setMessages]   = useState<ConversationMessage[]>([]);
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [apiError,   setApiError]   = useState<string | null>(null);
+  // Set when the session was scored but recording the result was refused.
+  const [saveFailure, setSaveFailure] = useState<SaveFailure | null>(null);
 
   const speech      = useSpeechRecognition();
   const messagesRef = useRef<ConversationMessage[]>([]);
@@ -242,37 +255,61 @@ export default function MasteryClient({ milestoneId, milestoneTitle, personaId, 
     router.push(`${boardUrl}${sep}mastered=${milestoneId}`);
   }
 
+  /**
+   * Persist a mastery result, and leave this screen only if it persisted.
+   *
+   * Both callers used to `await fetch(...)` and navigate unconditionally. That
+   * fails twice over, and rule 5 names both: `fetch` resolves for a refused
+   * save, so a lapsed session took the learner to the board's gold-confetti
+   * celebration with nothing recorded; and a dropped connection threw straight
+   * out of the handler, stranding the screen on "Saving your mastery…" forever
+   * with no control to press. A failure now returns to the score with its own
+   * copy and its own way out.
+   */
+  async function saveResult(patch: MasteryPatch) {
+    setSaveFailure(null);
+    setPhase("validating");
+
+    let outcome: SaveOutcome;
+    try {
+      const res = await fetch(`/api/tracker/milestones/${milestoneId}`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(patch),
+      });
+      outcome = outcomeOfStatus(res.status);
+    } catch (err) {
+      outcome = outcomeOfThrown(err);
+    }
+
+    if (!outcome.ok) {
+      setSaveFailure(outcome);
+      setPhase("result");
+      return;
+    }
+
+    navigateBackMastered();
+  }
+
   // ── First-time mastery: validate + persist score/feedback, then navigate ──
   // The summary document is generated lazily by the milestone drawer (it shows
   // a "writing…" state) so confirming mastery stays fast and never blocks on it.
-  async function confirmMastery() {
-    setPhase("validating");
-    await fetch(`/api/tracker/milestones/${milestoneId}`, {
-      method:  "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({
-        masteryValidated: true,
-        masteryScore:     evaluation?.score ?? 0,
-        masteryFeedback:  evaluation?.feedback ?? "",
-      }),
+  function confirmMastery() {
+    return saveResult({
+      masteryValidated: true,
+      masteryScore:     evaluation?.score ?? 0,
+      masteryFeedback:  evaluation?.feedback ?? "",
     });
-    navigateBackMastered();
   }
 
   // ── Practice run on an already-mastered card ──────────────────────────────
   // Records the latest score + feedback (even if lower) and never revokes
   // mastery. Does NOT regenerate the summary doc — that stays on-demand.
-  async function finishPractice() {
-    setPhase("validating");
-    await fetch(`/api/tracker/milestones/${milestoneId}`, {
-      method:  "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({
-        masteryScore:    evaluation?.score ?? 0,
-        masteryFeedback: evaluation?.feedback ?? "",
-      }),
+  function finishPractice() {
+    return saveResult({
+      masteryScore:    evaluation?.score ?? 0,
+      masteryFeedback: evaluation?.feedback ?? "",
     });
-    navigateBackMastered();
   }
 
   // ── Derived values ────────────────────────────────────────────────────────
@@ -566,6 +603,27 @@ export default function MasteryClient({ milestoneId, milestoneTitle, personaId, 
                 {cfg.label}
               </div>
             </div>
+
+            {/* A scored session Hugh could not record. The score above is real
+                and stays put — it is only the saving of it that failed. The
+                board link is the way out: the result screen's own controls all
+                assume the save will eventually work, and where it cannot
+                (a lapsed session) that would be a dead end. */}
+            {saveFailure && (
+              <div className="space-y-2.5 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3.5">
+                <div className="flex items-start gap-2.5">
+                  <AlertCircle size={15} className="mt-0.5 shrink-0 text-red-400" />
+                  <p className="text-sm text-red-300">{saveFailure.message}</p>
+                </div>
+                <ExitLink
+                  href={boardUrl}
+                  label="Back to board without saving"
+                  onNavigate={stopPlayback}
+                  showIcon={false}
+                  className="block w-full rounded-xl border border-red-500/30 py-2 text-center text-xs text-red-300/80 hover:text-red-200 hover:border-red-500/50 transition-colors"
+                />
+              </div>
+            )}
 
             {/* CTA */}
             {alreadyMastered ? (

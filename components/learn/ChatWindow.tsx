@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Loader2, Sparkles, Code2, Download } from "lucide-react";
+import { Send, Loader2, Sparkles, Code2, Download, AlertCircle, RotateCw } from "lucide-react";
 import ChatBubble from "./ChatBubble";
 import OffTrackNotice from "./OffTrackNotice";
 import SummaryPanel, { type SummaryData } from "./SummaryPanel";
@@ -9,6 +9,9 @@ import PomodoroControl from "./PomodoroControl";
 import { usePomodoroContext } from "./PomodoroProvider";
 import CodeComposer from "@/components/askcode/CodeComposer";
 import { buildTranscriptMarkdown, transcriptFilename } from "@/lib/learn/transcript";
+import {
+  chatOutcome, chatOutcomeOfThrown, retryHint, type ChatFailure,
+} from "@/lib/learn/chatOutcome";
 import { isCodeModeRequest, isCodeModeCommand } from "@/lib/askcode/detect";
 import { fenceCode, mergeCodeExample } from "@/lib/askcode/format";
 import type { ChatResponse } from "@/types/askcode";
@@ -48,6 +51,16 @@ const WELCOME = (topic: string) =>
   `Hi! I'm Hugh, and I'm here to help you learn about **${topic}**. Ask me anything — concepts, examples, how things work, or where to start.`;
 
 export default function ChatWindow({ topic, goalId, milestoneId, milestoneTitle, onTranscriptChange, onSummariseStart, insertRef }: Props) {
+  // A refused question is not a turn in the conversation. It is kept out here,
+  // beside the thread rather than in it, because anything that lands in
+  // `messages` is replayed to Claude as its own words, folded into the
+  // checklist rail, written into the exported transcript, and handed to the
+  // summariser whose output becomes a diary entry a quiz may quote.
+  const [chatError, setChatError] = useState<ChatFailure | null>(null);
+  // The question that was refused, kept so it can be sent again without the
+  // learner retyping it.
+  const [lastAsked, setLastAsked] = useState<{ content: string; codeMode: boolean } | null>(null);
+
   const [messages, setMessages]     = useState<Message[]>([
     { role: "assistant", content: WELCOME(topic) },
   ]);
@@ -79,6 +92,7 @@ export default function ChatWindow({ topic, goalId, milestoneId, milestoneTitle,
   // Summary panel state
   const [panelOpen, setPanelOpen]     = useState(false);
   const [summary, setSummary]         = useState<SummaryData | null>(null);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
   const [summarizing, setSummarizing] = useState(false);
   // The exact turns the summary was built from, kept so they can be saved with
   // the entry — a summary describes a session, the transcript is the session.
@@ -143,6 +157,8 @@ export default function ChatWindow({ topic, goalId, milestoneId, milestoneTitle,
 
     const history = [...messages, { role: "user" as const, content: userContent }];
     setMessages(history);
+    setChatError(null);
+    setLastAsked({ content: userContent, codeMode: codeModeRequested });
     setLoading(true);
 
     try {
@@ -155,24 +171,31 @@ export default function ChatWindow({ topic, goalId, milestoneId, milestoneTitle,
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ topic, messages: apiMessages, focusMode: pomo.focusActive, codeModeRequested }),
       });
-      const data = await res.json() as Partial<ChatResponse> & { error?: string };
+      const data = await res.json().catch(() => null) as (Partial<ChatResponse> & { error?: string }) | null;
+
+      // Read the status before the body. The old code went straight for
+      // `data.reply ?? "Sorry, something went wrong."`, which threw away every
+      // sentence the server wrote — including "Monthly usage limit reached",
+      // the one message that actually tells the learner what to do next.
+      const outcome = chatOutcome(res.status, data);
+      if (!outcome.ok) {
+        setChatError(outcome);
+        return;   // nothing is appended: a refusal is not a turn Hugh took
+      }
 
       // Fold any code example into the stored message so it renders (via the
       // bubble's markdown) and stays in history for Hugh to compare against.
-      const replyText = mergeCodeExample(
-        data.reply ?? "Sorry, something went wrong. Please try again.",
-        data.codeExample ?? null,
-      );
+      const replyText = mergeCodeExample(outcome.reply, data?.codeExample ?? null);
       const updated = [...history, { role: "assistant" as const, content: replyText }];
       setMessages(updated);
 
-      const offTopic = data.isOffTopic ?? false;
+      const offTopic = data?.isOffTopic ?? false;
       setIsOffTrack(offTopic);
 
       // Snippet attached → offer the mirror step (offer-first, not auto-switch).
       // Otherwise, if an offer is still pending, age it out once the conversation
       // has moved on for a few turns — see MIRROR_OFFER_EXPIRY.
-      if (data.codeExample) {
+      if (data?.codeExample) {
         setOffer(data.codeExample.language || "python");
         setOfferAge(0);
       } else if (offer) {
@@ -194,20 +217,33 @@ export default function ChatWindow({ topic, goalId, milestoneId, milestoneTitle,
       const userCount = updated.filter(m => m.role === "user").length;
       if (!offerSaved && !offerReason && userCount >= offerCooldownUntil) {
         const reason: OfferReason | null =
-          data.covered            ? "covered"
+          data?.covered           ? "covered"
           : streak >= DRIFT_STREAK  ? "drift"
           : userCount >= LENGTH_CAP ? "length"
           : null;
         if (reason) setOfferReason(reason);
       }
-    } catch {
-      setMessages(prev => [...prev, {
-        role:    "assistant",
-        content: "Network error — please try again.",
-      }]);
+    } catch (err) {
+      // Also kept out of the thread. "Network error — please try again." used
+      // to be stored as something Hugh said, and travelled everywhere a real
+      // answer travels.
+      const outcome = chatOutcomeOfThrown(err);
+      if (!outcome.ok) setChatError(outcome);
     } finally {
       setLoading(false);
     }
+  }
+
+  /** Send the refused question again, without making the learner retype it. */
+  function retryLastAsk() {
+    if (!lastAsked || loading) return;
+    // Drop the user turn that went unanswered; `postMessage` appends it again,
+    // so retrying twice cannot leave the same question in the thread twice.
+    setMessages(prev => {
+      const last = prev[prev.length - 1];
+      return last?.role === "user" && last.content === lastAsked.content ? prev.slice(0, -1) : prev;
+    });
+    void postMessage(lastAsked.content, lastAsked.codeMode);
   }
 
   function sendText() {
@@ -263,6 +299,7 @@ export default function ChatWindow({ topic, goalId, milestoneId, milestoneTitle,
     setPanelOpen(true);
     setSummarizing(true);
     setSummary(null);
+    setSummaryError(null);
 
     try {
       const apiMessages: TranscriptMessage[] = messages
@@ -274,11 +311,22 @@ export default function ChatWindow({ topic, goalId, milestoneId, milestoneTitle,
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ topic, messages: apiMessages }),
       });
-      const data = await res.json() as SummaryData & { error?: string };
-      if (data.error) throw new Error(data.error);
+      const data = await res.json().catch(() => null) as (SummaryData & { error?: string }) | null;
+      if (!res.ok || !data || data.error || !data.story?.trim()) {
+        // Never as a summary. This used to be handed to the panel as the
+        // session's `story`, where it looked exactly like a real one and could
+        // be SAVED — putting "Unable to generate summary" into the learning
+        // diary, which is the one place a review quiz is allowed to quote.
+        setSummaryError(
+          typeof data?.error === "string" && data.error.trim()
+            ? data.error.trim()
+            : "Hugh couldn't write up this session. Nothing is lost — your conversation is still here.",
+        );
+        return;
+      }
       setSummary(data);
     } catch {
-      setSummary({ story: "Unable to generate summary. Please try again.", takeaway: "" });
+      setSummaryError("We couldn't reach Hugh to write this up. Your conversation is still here — try again.");
     } finally {
       setSummarizing(false);
     }
@@ -376,6 +424,30 @@ export default function ChatWindow({ topic, goalId, milestoneId, milestoneTitle,
           {messages.map((m, i) => (
             <ChatBubble key={i} role={m.role} content={m.content} />
           ))}
+
+          {/* Deliberately not a ChatBubble. It carries no avatar and no bubble
+              tail, because the one thing it must never look like is Hugh. */}
+          {chatError && (
+            <div role="alert" className="flex items-start gap-2.5 rounded-xl border border-red-500/40 bg-red-500/8 px-4 py-3">
+              <AlertCircle size={15} className="mt-0.5 shrink-0 text-red-400" />
+              <div className="min-w-0">
+                <p className="text-sm leading-relaxed text-red-100/90">{chatError.message}</p>
+                {retryHint(chatError.retryAfterSeconds) && (
+                  <p className="mt-1 text-xs text-red-200/70">{retryHint(chatError.retryAfterSeconds)}</p>
+                )}
+                {chatError.canRetry && (
+                  <button
+                    onClick={retryLastAsk}
+                    disabled={loading || !lastAsked}
+                    className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-red-200 transition-colors hover:text-red-50 disabled:opacity-50"
+                  >
+                    <RotateCw size={11} />
+                    Send it again
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {loading && (
             <div className="flex justify-start">
@@ -495,11 +567,12 @@ export default function ChatWindow({ topic, goalId, milestoneId, milestoneTitle,
         <SummaryPanel
           topic={topic}
           data={summary}
+          error={summaryError}
           loading={summarizing}
           goalId={goalId}
           milestoneId={milestoneId}
           transcript={summarized}
-          onClose={() => { setPanelOpen(false); setSummary(null); }}
+          onClose={() => { setPanelOpen(false); setSummary(null); setSummaryError(null); }}
         />
       )}
     </div>

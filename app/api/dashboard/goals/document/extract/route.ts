@@ -11,6 +11,8 @@ import {
 import { judgeTopicDomain } from "@/lib/learn/topic-domain-server";
 import { logSafeError } from "@/lib/observability/log";
 import { recordOperation } from "@/lib/observability/record";
+import { writeOutcome } from "@/lib/supabase/writeResult";
+import { attemptWithUsage, wasBilled } from "@/lib/claude/attemptWithUsage";
 import {
   extractDocumentText,
   EmptyExtractionError,
@@ -35,30 +37,24 @@ const MODEL = "claude-sonnet-4-6";
  * Extraction has no user context of its own, so it hands the token counts back
  * to the POST handler, which owns the userId and does the logging. Counts
  * accumulate across retries — a discarded attempt still costs money.
+ *
+ * It used to accumulate them and then `throw`, which lost every one of them on
+ * the only path where the total mattered: two Sonnet calls carrying a whole
+ * document, billed and unrecorded. Returning an outcome instead of throwing is
+ * what makes the counts survive the failure — see lib/claude/attemptWithUsage,
+ * where `report` is deliberately called before the parse that can throw.
  */
-async function extractCandidateTopic(
-  documentText: string,
-): Promise<{ candidate: DocumentTopicExtraction; tokensIn: number; tokensOut: number }> {
-  let lastErr: unknown = null;
-  let tokensIn  = 0;
-  let tokensOut = 0;
-
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const msg = await anthropic.messages.create({
-        model:      MODEL,
-        max_tokens: 600,
-        messages:   [{ role: "user", content: documentTopicExtractionPrompt(documentText) }],
-      });
-      tokensIn  += msg.usage.input_tokens;
-      tokensOut += msg.usage.output_tokens;
-      const text = msg.content[0]?.type === "text" ? msg.content[0].text : "";
-      return { candidate: parseDocumentTopicExtraction(text), tokensIn, tokensOut };
-    } catch (err) {
-      lastErr = err;
-    }
-  }
-  throw lastErr ?? new Error("topic extraction failed");
+function extractCandidateTopic(documentText: string) {
+  return attemptWithUsage(2, async report => {
+    const msg = await anthropic.messages.create({
+      model:      MODEL,
+      max_tokens: 600,
+      messages:   [{ role: "user", content: documentTopicExtractionPrompt(documentText) }],
+    });
+    report({ tokensIn: msg.usage.input_tokens, tokensOut: msg.usage.output_tokens });
+    const text = msg.content[0]?.type === "text" ? msg.content[0].text : "";
+    return parseDocumentTopicExtraction(text);
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -110,34 +106,41 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Couldn't read that file." }, { status: 502 });
   }
 
-  let candidate: DocumentTopicExtraction;
-  const startedAt = Date.now();
-  try {
-    const extraction = await extractCandidateTopic(extracted.text);
-    candidate = extraction.candidate;
+  const startedAt  = Date.now();
+  const extraction = await extractCandidateTopic(extracted.text);
+
+  // Logged before the outcome is even inspected, and on both branches. Whatever
+  // Claude was asked, it has already charged for; which branch we are on
+  // changes what the learner sees, not what this cost.
+  if (wasBilled(extraction.usage)) {
     void logUsage({
       userId,
       model:     MODEL,
       feature:   "dashboard/document-extract",
-      tokensIn:  extraction.tokensIn,
-      tokensOut: extraction.tokensOut,
+      tokensIn:  extraction.usage.tokensIn,
+      tokensOut: extraction.usage.tokensOut,
     });
-    // Only the file's TYPE is recorded. This route carries learner-supplied
-    // documents, so neither the filename nor any extracted text may reach a
-    // telemetry row.
-    void recordOperation({
-      userId, operation: "track.extract", outcome: "ok",
-      durationMs: Date.now() - startedAt, detail: { mime: file?.type ?? "unknown" },
-    });
-  } catch (err) {
-    logSafeError("goals/document/extract topic", err, [extracted.text.slice(0, 200), file?.name ?? ""]);
+  }
+
+  if (!extraction.ok) {
+    logSafeError("goals/document/extract topic", extraction.error, [extracted.text.slice(0, 200), file?.name ?? ""]);
     void recordOperation({
       userId, operation: "track.extract", outcome: "failed",
-      durationMs: Date.now() - startedAt, error: err,
+      durationMs: Date.now() - startedAt, error: extraction.error,
       redact: [extracted.text.slice(0, 200), file?.name ?? ""],
+      detail: { attempts: extraction.attempts },
     });
     return NextResponse.json({ error: "Couldn't extract a topic from that document." }, { status: 502 });
   }
+
+  const candidate: DocumentTopicExtraction = extraction.value;
+  // Only the file's TYPE is recorded. This route carries learner-supplied
+  // documents, so neither the filename nor any extracted text may reach a
+  // telemetry row.
+  void recordOperation({
+    userId, operation: "track.extract", outcome: "ok",
+    durationMs: Date.now() - startedAt, detail: { mime: file?.type ?? "unknown" },
+  });
 
   // Domain gate (PRD §6 layer 3), reused in-process — same judge the typed-
   // topic path calls, just with no HTTP round-trip since we're already
@@ -178,9 +181,37 @@ export async function POST(request: NextRequest) {
 
   if (extractionError) {
     logSafeError("goals/document/extract store", extractionError, [candidate.candidateTopic]);
+
     // Roll back — an 'awaiting_approval' goal with no pending extraction row
     // is a dead end the `approve` route can never complete.
-    await supabase.from("learning_goals").delete().eq("id", goal.id as string);
+    //
+    // The rollback was itself unchecked, which made this comment a hope rather
+    // than a guarantee: a delete that fails, or that matches no row, says
+    // nothing, and the dead-end goal it was meant to remove survives on the
+    // learner's board with no way to finish it. Both outcomes are failures, but
+    // they leave the learner in different places, so they do not share a
+    // sentence.
+    const rolledBack = writeOutcome(
+      await supabase
+        .from("learning_goals")
+        .delete()
+        .eq("id", goal.id as string)
+        .select("id")
+        .single(),
+    );
+
+    if (!rolledBack.ok) {
+      logSafeError("goals/document/extract rollback", new Error(rolledBack.message), [candidate.candidateTopic]);
+      return NextResponse.json(
+        {
+          error:
+            "We couldn't save your document, and couldn't tidy up the half-made goal it left behind. " +
+            "It may show on your board as stuck — delete it there and try uploading again.",
+        },
+        { status: 500 },
+      );
+    }
+
     return NextResponse.json({ error: "Failed to save extracted document." }, { status: 500 });
   }
 
