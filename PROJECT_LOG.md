@@ -7681,3 +7681,72 @@ CSS animations are declined; a prompt-injection attempt is still refused.
 - `components/dashboard/DashboardPanel.tsx`, `DocumentUploadFlow.tsx`
 - `app/api/dashboard/goals/route.ts`, `goals/document/{extract,approve}/route.ts`
 - `lib/registry/features.ts` — test counts
+
+---
+
+## 2026-09-09 — Refinement gets a way out that admits what it is
+
+### The observation
+
+Travis, mid-refinement on "deep learning": you can answer two or three of the
+five questions, realise you picked the wrong thing, and there is no control
+that says so. The header offered **Back** and **Skip**, and neither is the
+thing you want. Skip builds the track anyway. Back leaves — silently, taking
+the answers with it, with no warning that it is about to.
+
+### What was actually there
+
+A reset was *reachable* before this change, which is why it was easy to miss
+that it was broken. `handleCancelRefinement` only flipped `refining` to false;
+the topic and date were still sitting in the form behind the flow, so pressing
+the CTA again remounted `RefinementFlow` and it re-asked from question 1. Two
+clicks. But it was spelled as a grey 12px "Back", it discarded answers with no
+prompt, and re-entering re-ran the domain gate — a second Haiku call to
+re-approve a topic that had just been approved.
+
+Worth recording because it shaped the fix: **nothing is persisted during
+refinement.** The goal row is not created until `enterWaiting`. So a reset is
+local state and nothing else — no orphan row, no cleanup path, no migration.
+
+### The decision
+
+Reset returns the learner to an empty "What do you want to learn?" on the same
+page — topic, date and answers all cleared. Not a rewind to question 1 on the
+same topic, and not the old topic-preserving Back. Travis's call, and it holds
+up: the answers were drawn out *by* a topic being abandoned, so keeping either
+half hands back a half-refined goal nobody asked for.
+
+It replaces Back rather than joining it. Two adjacent controls that both leave
+the flow, differing only in what they quietly keep, is the ambiguity this
+change exists to remove.
+
+- **Reset confirms, but only when there is something to lose.** With zero
+  answers it acts immediately; with answers it asks once, naming the count.
+  This is Rule 5's shape applied to a destructive control rather than a failure
+  state: the learner should not discover what Reset meant afterwards.
+- **The confirm replaces the header row** instead of sitting beside it. The
+  panel is narrow, and offering a reset alongside the progress dots it is about
+  to clear reads badly.
+
+### Not done, and why
+
+No unit test. There is no jsdom/RTL setup in the project and the branching here
+is a single boolean (`answers.length === 0`); standing up component-test infra
+— and its dependency surface, which the CI gate audits — to cover that is out
+of proportion. Flagged rather than hidden.
+
+Layout was not confirmed in a running browser: the dev server redirects to
+`/login` and signing in is not something this session does. Left with Travis.
+
+### Verification
+
+`tsc --noEmit` clean. 2808 tests across 134 files green (unchanged — nothing
+here touches tested modules). `npm run lint` reports 20 errors, all of them
+inside a stale `.claude/worktrees/` copy that is gitignored and untracked;
+zero in `components/dashboard/`.
+
+### Files
+
+- `components/dashboard/RefinementFlow.tsx` — `onCancel` → `onReset`, Reset
+  control with inline confirm, `ChevronLeft` → `RotateCcw`
+- `components/dashboard/DashboardPanel.tsx` — `handleResetRefinement`

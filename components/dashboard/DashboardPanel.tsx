@@ -117,8 +117,23 @@ export default function DashboardPanel({ initialGoals }: Props) {
     setPendingFile(null);
   }
 
-  function handleCancelRefinement() {
+  // Reset — the refinement flow's only way out, and deliberately a full one.
+  // The answers a learner has given were drawn out by a topic they are now
+  // abandoning, so keeping either half would hand them back a half-refined
+  // goal they never asked for. Nothing is written until enterWaiting, so there
+  // is no goal row to clean up: this is local state and the domain gate's
+  // verdict, both cleared.
+  function handleResetRefinement() {
     setRefining(false);
+    setInputMode("qa");
+    setTopic("");
+    setChip(null);
+    setCustomDate("");
+    setPendingTopic("");
+    setPendingEndDate("");
+    setDocFile(null);
+    setPendingFile(null);
+    setGate(null);
   }
 
   function handleStartUpload() {
@@ -158,7 +173,7 @@ export default function DashboardPanel({ initialGoals }: Props) {
               topic={pendingTopic}
               endDate={pendingEndDate}
               onGoalCreated={handleGoalCreated}
-              onCancel={handleCancelRefinement}
+              onReset={handleResetRefinement}
             />
           ) : uploadingDoc ? (
             <DocumentUploadFlow
