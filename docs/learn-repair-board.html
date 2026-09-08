@@ -423,11 +423,11 @@
     </p>
     <dl class="runstate">
       <div><dt>Items</dt><dd>5</dd></div>
-      <div><dt>Done</dt><dd class="green">3</dd></div>
+      <div><dt>Done</dt><dd class="green">4</dd></div>
       <div><dt>In progress</dt><dd>None</dd></div>
       <div><dt>Blocked</dt><dd>0</dd></div>
-      <div><dt>Gates</dt><dd class="green">lint · types · build · 1,332 tests pass</dd></div>
-      <div><dt>Updated</dt><dd>8 Sep 2026 · item 3 landed</dd></div>
+      <div><dt>Gates</dt><dd class="green">lint · types · build · 1,342 tests pass</dd></div>
+      <div><dt>Updated</dt><dd>8 Sep 2026 · item 4 landed</dd></div>
     </dl>
   </header>
 
@@ -441,15 +441,10 @@
     <div class="board">
 
       <div class="col col-queued">
-        <div class="col-head"><span>Queued</span><b>2</b></div>
+        <div class="col-head"><span>Queued</span><b>1</b></div>
 
 
 
-        <a class="card" href="#item-4">
-          <div class="card-top"><span class="card-num">04</span><span class="card-title">Money spent that nothing records</span></div>
-          <p class="card-sub">Three places pay Claude for an answer, then only log the cost if the answer was usable.</p>
-          <div class="card-meta"><span>3 files</span><span>cost accuracy</span></div>
-        </a>
 
         <a class="card" href="#item-5">
           <div class="card-top"><span class="card-num">05</span><span class="card-title">The real reason gets replaced by a shrug</span></div>
@@ -469,7 +464,13 @@
       </div>
 
       <div class="col col-done">
-        <div class="col-head"><span>Done</span><b>3</b></div>
+        <div class="col-head"><span>Done</span><b>4</b></div>
+
+        <a class="card" href="#item-4">
+          <div class="card-top"><span class="card-num">04</span><span class="card-title">Money spent that nothing records</span></div>
+          <p class="card-sub">The cost is now written down the moment Claude answers — including the retries that were being thrown away.</p>
+          <div class="card-meta"><span>5 files</span><span>+10 tests</span></div>
+        </a>
 
         <a class="card" href="#item-3">
           <div class="card-top"><span class="card-num">03</span><span class="card-title">The server doesn't check its own saves</span></div>
@@ -968,7 +969,7 @@
         <div class="entry-head">
           <span class="entry-num">04</span>
           <h3>Money spent that nothing records</h3>
-          <span class="pill pill-queued">Queued</span>
+          <span class="pill pill-done">Done</span>
         </div>
         <div class="entry-body">
           <div class="prose">
@@ -1004,12 +1005,70 @@
               </p>
             </div>
             <div class="block">
-              <h4>How you'll know it worked</h4>
+              <h4>What landed</h4>
               <p>
-                Tests that simulate a garbled answer and confirm the cost is still
-                recorded. Then your cost page. Expect the number to go
-                <em>up</em> — not because we started spending more, but because it
-                was under-reported before.
+                Two of the three were exactly as described — one line moved above
+                another, so the cost is written down the moment Claude answers
+                rather than after we've decided whether we liked the answer.
+              </p>
+              <p>
+                I also checked the claim on this card rather than repeating it.
+                It holds: five other places that pay Claude — mastery scoring,
+                the mastery recap, topic refinement twice over, and the learning
+                summariser — all already record the cost first. One of them
+                explains why in a single line above the code. These three were
+                the exceptions, not the pattern.
+              </p>
+            </div>
+            <div class="block">
+              <h4>The third one was worse than the card said</h4>
+              <p>
+                The document reader doesn't ask Claude once. It asks, and if the
+                answer comes back unreadable it asks again — then gives up. It
+                was carefully adding up what both tries cost, and then throwing
+                that total away on its way out the door. The comment above it
+                even promised it wouldn't.
+              </p>
+              <p>
+                That's the most expensive call in this item by a distance: your
+                whole uploaded document goes into each attempt, and you're
+                charged for what goes in as well as what comes back. Two of
+                those, invisible.
+              </p>
+              <p>
+                The fix is a small piece of shared machinery with its own tests,
+                and it exists for one specific reason: the moment of billing and
+                the moment of failure are one line apart. Claude answers — you're
+                charged — and the very next step is the one that can blow up. So
+                the cost is now handed over <em>before</em> that step, and it
+                survives the failure rather than disappearing with it.
+              </p>
+            </div>
+            <div class="block">
+              <h4>One found on the way, from item 3</h4>
+              <p>
+                The fact-checker throws away the answer to its own save, the same
+                way the three routes in item 3 did. So an entry could be marked
+                as fact-checked on screen while the database never recorded it —
+                and since only fact-checked lines may be quoted in a review quiz,
+                a phantom verdict there turns into a quiz question later. Fixed
+                here rather than left for a sixth item.
+              </p>
+            </div>
+            <div class="block">
+              <h4>How to check me</h4>
+              <p>
+                10 new tests on the accounting itself, including the one this
+                item exists for: <em>reports usage from an attempt that billed
+                and then threw</em>, and <em>sums every attempt when all of them
+                fail</em>. The suite went from 1,332 to 1,342, all passing, with
+                lint, types and a production build clean.
+              </p>
+              <p>
+                Then your cost page. Expect the number to go <em>up</em> — not
+                because we started spending more, but because it was
+                under-reported before. Document uploads that failed are where the
+                difference will show.
               </p>
             </div>
           </div>
@@ -1017,15 +1076,25 @@
             <section>
               <h5>Files</h5>
               <ul class="files">
+                <li>attemptWithUsage.ts <em>— new, the accounting</em></li>
+                <li>attemptWithUsage.test.ts <em>— new, 10 tests</em></li>
                 <li>quiz/route.ts <em>— quiz generation</em></li>
                 <li>verify/route.ts <em>— diary fact-check</em></li>
                 <li>extract/route.ts <em>— document topic</em></li>
               </ul>
             </section>
             <section>
+              <h5>Scope note</h5>
+              <p class="risk-note">
+                One beyond the card: the fact-checker's unchecked save, which is
+                item 3's defect in a file item 3 didn't list. Same visit, same
+                rule, recorded rather than absorbed.
+              </p>
+            </section>
+            <section>
               <h5>Risk</h5>
               <div class="risk"><span class="risk-low">Very low</span></div>
-              <p class="risk-note">Mostly moving existing lines. Nothing a learner touches changes.</p>
+              <p class="risk-note">Two line moves and one loop rewritten behind a tested helper. Nothing a learner touches changes.</p>
             </section>
           </aside>
         </div>
@@ -1100,7 +1169,7 @@
     <div class="rule-grid">
       <dl class="rule queued">
         <dt>Queued</dt>
-        <dd>Understood and scoped, not started. Items 4 and 5 are here right now.</dd>
+        <dd>Understood and scoped, not started. Only item 5 is here now.</dd>
       </dl>
       <dl class="rule active">
         <dt>In progress</dt>

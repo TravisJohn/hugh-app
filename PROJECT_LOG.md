@@ -7320,3 +7320,69 @@ Offered to Travis as its own item if he wants it.
 Items 1-3 done and committed on `fix/learn-failure-paths` (`2793ef2`, `b8fb0fa`,
 `c60f714`). Items 4-5 queued. Expect `/admin/features` to look worse now: it has
 stopped reporting failed saves as successes.
+
+## 2026-09-08 — Learn repair item 4: spend that nothing recorded
+
+Item 4 of five. Three routes paid Claude and then logged the cost only if the
+answer parsed. Anthropic bills the moment it answers; whether the reply is
+usable is our problem, not theirs.
+
+### Two were ordering, and the card's premise checked out
+
+`review/quiz` had `logUsage` below a `JSON.parse` and a non-text-block throw;
+`tracker/verify` had it below `parseClaudeJson`. Both moved above.
+
+Verified the card's claim rather than repeating it: `mastery/evaluate`,
+`mastery/recap`, `dashboard/goals`, `learn/summarize` and `dashboard/refine`
+all already log immediately after `messages.create`. `dashboard/refine` is the
+reference — it logs **inside** its retry loop, per attempt, with the comment
+"Logged per attempt: a failed parse still burned tokens." These three were the
+exceptions, not the pattern.
+
+### The third was worse than the card said
+
+`extractCandidateTopic` retries twice, accumulates `tokensIn`/`tokensOut`
+across both attempts exactly as its own comment promises — and then
+`throw lastErr`, discarding the total on the only path where it mattered. The
+caller's `catch` had no access to the counts, so a document whose topic could
+not be extracted was two Sonnet calls, each carrying the whole document as
+input, billed and invisible. Input is the bulk of Claude spend, so this was the
+expensive one.
+
+**New: `lib/claude/attemptWithUsage.ts`** (10 tests). The trap it closes is the
+ordering *inside* one attempt: a loop body of `call → parse → return` bills on
+the first line and can throw on the second, so a helper that collects usage only
+from attempts that returned loses exactly the money it exists to protect. The
+caller is handed a `report` callback and must call it the instant the model
+replies; whatever was reported is summed and returned on the failure branch too.
+The call itself is injected, so the accounting is tested with fakes and no
+network (rule 7).
+
+Deliberately did **not** convert `dashboard/refine` to it. That route logs per
+attempt, which is strictly more robust than accumulate-then-log-once if the
+process dies mid-request, and it already works. Symmetry is not a reason to
+rewrite a correct route.
+
+### One found on the way, item 3's rule in a file item 3 did not name
+
+`tracker/verify` discarded the reply to its own `milestone_entries` update
+(`const { data: updated } = await …`), so a verdict that never reached the
+database still returned 200. Only a verified line may be quoted by a review
+quiz, so a phantom verdict becomes a quiz question later. Now runs through
+`writeOutcome` and answers 500 with an `ask.verify` / `failed` operation row.
+
+Client behaviour is unchanged by that: the drawer's background `verifyEntry`
+already did nothing when no entry came back, so the entry stays visibly pending
+— which is now true rather than lucky.
+
+### Verification
+
+64 files / 1342 tests green (was 63 / 1332). `tsc --noEmit` clean, eslint clean,
+`npm run build` compiles.
+
+### State
+
+Items 1-4 done and committed on `fix/learn-failure-paths` (`2793ef2`, `b8fb0fa`,
+`c60f714`, `56a851b`). Item 5 is the last one. Expect reported spend to rise —
+it was under-reported, and failed document uploads are where the difference will
+show.
