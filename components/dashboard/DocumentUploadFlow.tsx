@@ -6,7 +6,12 @@ import {
 } from "lucide-react";
 import { useTrackStatusWatch } from "@/hooks/useTrackStatusWatch";
 import { type LearningGoal, type TrackStatus } from "@/types";
-import { type TopicDomainVerdict } from "@/lib/learn/topic-domain";
+import {
+  type TopicDomainVerdict,
+  normalizeVerdict,
+  mayProceed,
+} from "@/lib/learn/topic-domain";
+import TopicGateNotice from "./TopicGateNotice";
 
 interface Props {
   endDate:       string;
@@ -35,10 +40,11 @@ interface ExtractResponse {
   tips?:           string[];
   truncated?:      boolean;
   error?:          string;
-  inDomain?:       boolean;
-  message?:        string;
-  suggestions?:    string[];
-  reason?:         string;
+  // A BLOCKED response is the verdict itself, at the top level — which is why
+  // the whole body is handed to normalizeVerdict rather than one field of it.
+  // `gate` is the other case: a successful extract whose topic still needs the
+  // learner to pick an angle in the review step.
+  gate?:           TopicDomainVerdict | null;
 }
 
 // Sibling to RefinementFlow: same phase-driven shape and the same waiting/
@@ -116,13 +122,11 @@ export default function DocumentUploadFlow({ endDate, initialFile, onGoalCreated
         setPhase("picking");
         return;
       }
-      if (data.inDomain === false) {
-        setBlocked({
-          inDomain:    false,
-          reason:      data.reason ?? "",
-          message:     data.message ?? "",
-          suggestions: data.suggestions ?? [],
-        });
+      // Only an "out" verdict comes back here — extract carries "needs_angle"
+      // through to the review step, where there is a field to answer it with.
+      const gate = normalizeVerdict(data);
+      if (!mayProceed(gate)) {
+        setBlocked(gate);
         setPhase("picking");
         return;
       }
@@ -136,6 +140,7 @@ export default function DocumentUploadFlow({ endDate, initialFile, onGoalCreated
       setCandidateTopic(data.candidateTopic);
       if (data.tips && data.tips.length > 0) setTips(data.tips);
       setTruncated(!!data.truncated);
+      setBlocked(data.gate ?? null);
       setPhase("reviewing");
     } catch {
       setPickError("Something went wrong reading that file.");
@@ -157,13 +162,9 @@ export default function DocumentUploadFlow({ endDate, initialFile, onGoalCreated
       });
       const data = (await res.json().catch(() => ({}))) as ExtractResponse;
 
-      if (data.inDomain === false) {
-        setBlocked({
-          inDomain:    false,
-          reason:      data.reason ?? "",
-          message:     data.message ?? "",
-          suggestions: data.suggestions ?? [],
-        });
+      const gate = normalizeVerdict(data);
+      if (!mayProceed(gate)) {
+        setBlocked(gate);
         setApproving(false);
         return;
       }
@@ -316,17 +317,7 @@ export default function DocumentUploadFlow({ endDate, initialFile, onGoalCreated
           </p>
         )}
 
-        {blocked && !blocked.inDomain && (
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-            <div className="flex items-start gap-2.5">
-              <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-400" />
-              <p className="text-sm leading-relaxed text-slate-200">
-                {blocked.message ||
-                  "Hugh is built specifically for data & analytics skill prep — that topic sits outside this focus."}
-              </p>
-            </div>
-          </div>
-        )}
+        {blocked && <TopicGateNotice verdict={blocked} onPickSuggestion={handleTopicEdit} />}
 
         {approveError && <p className="text-xs text-red-400">{approveError}</p>}
 
@@ -393,17 +384,7 @@ export default function DocumentUploadFlow({ endDate, initialFile, onGoalCreated
 
       {pickError && <p className="text-xs text-red-400">{pickError}</p>}
 
-      {blocked && !blocked.inDomain && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-          <div className="flex items-start gap-2.5">
-            <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-400" />
-            <p className="text-sm leading-relaxed text-slate-200">
-              {blocked.message ||
-                "Hugh is built specifically for data & analytics skill prep — that topic sits outside this focus."}
-            </p>
-          </div>
-        </div>
-      )}
+      {blocked && <TopicGateNotice verdict={blocked} />}
 
       <button
         onClick={() => handleAnalyze()}

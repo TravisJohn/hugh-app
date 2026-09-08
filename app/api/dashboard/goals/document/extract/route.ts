@@ -147,9 +147,18 @@ export async function POST(request: NextRequest) {
   // server-side. Rejected verdicts return the same shape classify-topic
   // does, so any future client code can share one verdict-handling path.
   const verdict = await judgeTopicDomain(candidate.candidateTopic, userId);
-  if (!verdict.inDomain) {
+  if (verdict.verdict === "out") {
     return NextResponse.json(verdict);
   }
+
+  // A 'needs_angle' verdict deliberately does NOT stop here. Stopping would
+  // ask the learner which angle they meant on a screen whose only input is a
+  // file picker — a question with no answer box (CLAUDE.md rule 5). It carries
+  // into the review step instead, which already has an editable topic field,
+  // and `approve` re-gates before a single milestone is generated. The goal
+  // sits at 'awaiting_approval' until then, so nothing is built from an
+  // unresolved topic.
+  const gate = verdict.verdict === "needs_angle" ? verdict : null;
 
   const supabase = await createClient();
 
@@ -220,5 +229,6 @@ export async function POST(request: NextRequest) {
     candidateTopic: candidate.candidateTopic,
     tips:           candidate.tips,
     truncated:      extracted.truncated,
+    gate,
   });
 }

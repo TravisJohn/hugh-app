@@ -1,7 +1,12 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { topicDomainJudgePrompt, parseClaudeJson } from "@/lib/claude/prompts";
-import { type TopicDomainVerdict } from "@/lib/learn/topic-domain";
+import {
+  type TopicDomainVerdict,
+  normalizeVerdict,
+  openVerdict,
+  mayProceed,
+} from "@/lib/learn/topic-domain";
 import { logUsage } from "@/lib/usage";
 import { recordOperation } from "@/lib/observability/record";
 import { messageOf } from "@/lib/observability/sanitize";
@@ -12,10 +17,6 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // Model for the domain gate — see CLAUDE.md "Model Selection". Declared once
 // so the API call and the usage log cannot disagree about what was billed.
 const MODEL = "claude-haiku-4-5";
-
-function openVerdict(): TopicDomainVerdict {
-  return { inDomain: true, reason: "classifier-unavailable", message: "", suggestions: [] };
-}
 
 /**
  * Server-side core of the topic domain gate (see `lib/learn/topic-domain.ts`
@@ -54,35 +55,36 @@ export async function judgeTopicDomain(
     try {
       const msg = await anthropic.messages.create({
         model:      MODEL,
-        max_tokens: 250,
+        // Headroom for the widest response: a 'needs_angle' verdict carries a
+        // message AND three suggestions. A truncated body fails JSON.parse,
+        // which fails OPEN — so under-budgeting here would quietly stop the
+        // gate from gating.
+        max_tokens: 400,
         messages:   [{ role: "user", content: prompt }],
       });
       tokensIn  += msg.usage.input_tokens;
       tokensOut += msg.usage.output_tokens;
-      const text   = msg.content[0]?.type === "text" ? msg.content[0].text : "";
-      const result = parseClaudeJson<Partial<TopicDomainVerdict>>(text);
-      const verdict: TopicDomainVerdict = {
-        inDomain: result.inDomain !== false,
-        reason: typeof result.reason === "string" ? result.reason : "",
-        message: typeof result.message === "string" ? result.message : "",
-        suggestions: Array.isArray(result.suggestions)
-          ? result.suggestions.filter((s): s is string => typeof s === "string").slice(0, 3)
-          : [],
-      };
-      if (verdict.inDomain) {
-        verdict.message = "";
-        verdict.suggestions = [];
-      }
+      const text = msg.content[0]?.type === "text" ? msg.content[0].text : "";
+      // All fail-open and shape rules live in normalizeVerdict (pure, unit
+      // tested in topic-domain.test.ts) so the browser wrapper and this judge
+      // cannot disagree about what a malformed response means.
+      const verdict = normalizeVerdict(parseClaudeJson<unknown>(text));
       bill();
-      // 'refused' for an off-domain topic: the gate turning someone away is
-      // the gate working, and counting it as a failure would make a week of
-      // off-topic requests read as an outage.
+      // 'refused' for anything that did not proceed: the gate turning someone
+      // away is the gate working, and counting it as a failure would make a
+      // week of off-topic requests read as an outage.
+      //
+      // 'needs_angle' shares the 'refused' outcome rather than earning a fourth
+      // one, because outcome is a CHECK constraint ('ok','failed','refused')
+      // and a new value would mean a migration for a distinction that is not
+      // operational — nothing broke either way. The verdict rides in `detail`,
+      // where the two can still be told apart when reading the numbers.
       await recordOperation({
         userId,
         operation:  "topic.gate",
-        outcome:    verdict.inDomain ? "ok" : "refused",
+        outcome:    mayProceed(verdict) ? "ok" : "refused",
         durationMs: Date.now() - startedAt,
-        detail:     { attempts: attempt + 1 },
+        detail:     { attempts: attempt + 1, verdict: verdict.verdict },
       });
       return verdict;
     } catch (err) {

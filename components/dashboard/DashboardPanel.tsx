@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { BookMarked, Sparkles, Loader2, AlertTriangle, Upload, FileText, ArrowRight } from "lucide-react";
+import { BookMarked, Sparkles, Loader2, Upload, FileText, ArrowRight } from "lucide-react";
 import { type LearningGoal } from "@/types";
-import { classifyTopic, type TopicDomainVerdict } from "@/lib/learn/topic-domain";
+import { classifyTopic, mayProceed, type TopicDomainVerdict } from "@/lib/learn/topic-domain";
+import TopicGateNotice from "./TopicGateNotice";
 import { MAX_TOPIC_CHARS } from "@/lib/learn/topicInput";
 import GoalCard from "./GoalCard";
 import RefinementFlow from "./RefinementFlow";
@@ -57,8 +58,9 @@ export default function DashboardPanel({ initialGoals }: Props) {
   const [docFile, setDocFile]     = useState<File | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
 
-  // Domain gate: judge the topic before building anything. `gate` holds the
-  // kind reminder when the topic is out of Hugh's data & analytics domain.
+  // Domain gate: judge the topic before building anything. `gate` holds any
+  // verdict that stopped the build — either a request to pick a data angle
+  // or the kind reminder that the topic is outside Hugh's domain.
   const [checking, setChecking] = useState(false);
   const [gate, setGate]         = useState<TopicDomainVerdict | null>(null);
 
@@ -82,7 +84,7 @@ export default function DashboardPanel({ initialGoals }: Props) {
     // Strict domain gate — block out-of-domain topics before any track is built.
     const verdict = await classifyTopic(topic.trim());
     setChecking(false);
-    if (!verdict.inDomain) {
+    if (!mayProceed(verdict)) {
       setGate(verdict);
       return;
     }
@@ -206,38 +208,8 @@ export default function DashboardPanel({ initialGoals }: Props) {
                     className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500 transition-colors"
                   />
 
-                  {/* Out-of-domain reminder (strict data & analytics gate) */}
-                  {gate && !gate.inDomain && (
-                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-                      <div className="flex items-start gap-2.5">
-                        <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-400" />
-                        <div className="space-y-2.5">
-                          <p className="text-sm leading-relaxed text-slate-200">
-                            {gate.message ||
-                              "Hugh is built specifically for data & analytics skill prep — that topic sits outside this focus. Try a data-related angle."}
-                          </p>
-                          {gate.suggestions.length > 0 && (
-                            <div>
-                              <p className="mb-1.5 text-xs font-medium text-slate-500">
-                                Try a data angle
-                              </p>
-                              <div className="flex flex-wrap gap-2">
-                                {gate.suggestions.map(s => (
-                                  <button
-                                    key={s}
-                                    onClick={() => handleTopicChange(s)}
-                                    className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs text-amber-200 hover:bg-amber-500/20 transition-colors"
-                                  >
-                                    {s}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  {/* Topic gate: asks for an angle, or kindly declines. */}
+                  {gate && <TopicGateNotice verdict={gate} onPickSuggestion={handleTopicChange} />}
                 </>
               ) : (
                 <label

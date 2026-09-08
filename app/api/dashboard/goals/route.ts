@@ -8,6 +8,7 @@ import { refineTopicPrompt, parseTopicRefinement } from "@/lib/claude/prompts";
 import { checkTopic, TOPIC_REJECTION_MESSAGE } from "@/lib/learn/topicInput";
 import { logSafeError } from "@/lib/observability/log";
 import { judgeTopicDomain } from "@/lib/learn/topic-domain-server";
+import { mayProceed } from "@/lib/learn/topic-domain";
 import { generateTrack } from "@/lib/tracker/generate";
 import { recordOperation } from "@/lib/observability/record";
 
@@ -109,7 +110,7 @@ export async function POST(request: NextRequest) {
   // rather than the typed one, because refinement is what actually becomes the
   // curriculum. Same rule the document path already enforces in approve.
   const verdict = await judgeTopicDomain(finalTopic, userId);
-  if (!verdict.inDomain) {
+  if (!mayProceed(verdict)) {
     return NextResponse.json(verdict, { status: 422 });
   }
 
