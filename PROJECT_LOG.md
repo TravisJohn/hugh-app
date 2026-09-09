@@ -7750,3 +7750,140 @@ zero in `components/dashboard/`.
 - `components/dashboard/RefinementFlow.tsx` — `onCancel` → `onReset`, Reset
   control with inline confirm, `ChevronLeft` → `RotateCcw`
 - `components/dashboard/DashboardPanel.tsx` — `handleResetRefinement`
+
+---
+
+## 2026-09-09 — What Hugh Learn is for, decided at the gate
+
+### Where this started
+
+A wishlist note: the topic gate's three angle chips read as a closed set, and a
+learner should be able to phrase their own. That is what got built first. The
+session then found something worse behind it, and finished somewhere else
+entirely — with a clearer statement of what Hugh Learn actually teaches than the
+gate has ever had.
+
+### The bug that made the gate feel rigid
+
+The chips for "Generative AI" were not being generated. They were being copied
+out of the prompt's own worked example, which named those exact three
+suggestions. Every learner typing that topic got identical chips, and no
+instruction about varying them could have changed it while the example sat
+there. Found by comparing a screenshot against the prompt text, not by testing.
+
+Fixed by changing the example's topic. This is the second time in this codebase
+an example in a prompt was mistaken by the model for the answer, and the prompt
+now says in both places that an example shows the SHAPE and is never a list to
+reuse.
+
+### The path not taken, recorded because it was nearly shipped
+
+Between those two ends the gate briefly grew a fourth verdict, `reframe`:
+accept every topic, and answer an off-domain one by offering data angles on it
+("learn Spanish" → "measuring vocabulary retention with spaced-repetition
+data"). It was built, probed live, and removed the same afternoon.
+
+Two findings survive it and are worth keeping:
+
+- **A live probe is the only thing that tests a prompt.** The reframe work
+  passed tsc, lint and the whole suite while containing a defect that made it
+  worse than what it replaced: every reframed angle, handed back to the gate,
+  was reframed AGAIN. A learner who picked one would have looped forever. No
+  unit test could have caught it, and none did.
+- **It read as a sales pitch.** Travis's call, and correct: someone who asked to
+  learn Spanish did not ask for a track on measuring their Spanish retention.
+  The judge kept doing it in prose even after the suggestion chips were removed
+  — "…but if you're interested in analysing healthcare data, those are
+  definitely in scope" — so the prompt now forbids naming any alternative topic
+  in a decline at all, in those words.
+
+### What the gate decides now
+
+| Verdict | For | Behaviour |
+|---|---|---|
+| `in` | Named a data field, however broad, or any data ACTIVITY on any subject | Builds |
+| `needs_angle` | Named no field at all — "AI", "automation", "the cloud", "Excel" | Asks, with chips + "describe it myself" |
+| `out` | A different subject | Warm heads-up, and nothing else |
+
+`needs_angle` narrowed sharply. "Generative AI", "machine learning", "big data"
+and "data science" now go straight in, because **the five refinement questions
+already narrow the topic**, twice — `refineTopicPrompt` rewrites it from the
+answers and milestone generation reads them. An angle chip was a third
+narrowing step, asked earliest and with the least context. It was built as an
+improvement on *rejection* (PR #7, yesterday) and never weighed against simply
+letting the topic through.
+
+Also new: `in` may now carry a note, and the fail-open path deliberately cannot
+— a verdict Hugh never really made must not put words in Hugh's mouth.
+
+### What Hugh Learn teaches
+
+The session's real conclusion, and a constraint the product did not have
+written down anywhere: **Hugh Learn teaches concepts, not product surface.** It
+builds understanding through conversation, so it cannot give hands-on practice,
+and a learner who types "Apache Airflow" wanting to *use* Airflow would have
+been disappointed by anything it built.
+
+Tools are still accepted — they are data topics, and declining them would turn
+away the right learner for the wrong reason. What changed is that Hugh says
+what it will do, before the refinement questions rather than after a track
+exists:
+
+> I'll teach you the orchestration thinking behind Airflow — scheduling,
+> idempotency, backfills, and DAG design — rather than the UI itself, so run it
+> alongside as we go.
+
+Three places had been promising the opposite, and all three moved together:
+
+1. The topic input suggested "e.g. Apache Airflow, dbt, …". Now concept-led.
+2. The gate prompt listed tools as in-domain examples.
+3. **Milestone generation was steering at the tutorial.** Its own title
+   examples were "Writing Your First DAG" and "Task Dependencies & XComs" —
+   precisely the track Hugh cannot deliver in a conversation. Replaced, and the
+   prompt now says to build around the durable ideas a tool embodies and use
+   the tool as the running example.
+
+That last edit changed two fingerprints, so `milestones.qa` and
+`milestones.qa.context` are registered as `@2`. Tracks built before today stay
+labelled `@1` and the two eras remain comparable.
+
+### Deliberately not done
+
+- **The document-upload path is unchanged.** Its contract is "teach what this
+  document contains". Someone who uploads an Airflow manual wants that manual,
+  which is a different promise from someone typing "Airflow", and folding one
+  into the other should be its own decision.
+- **`marketing` asks for an angle while `general project management` is
+  declined.** The same band of topic, judged two ways. Left as the model calls
+  it; the line for professional fields with real data work in them has not been
+  drawn.
+- **No test covers the reset confirm or the notice components.** There is no
+  jsdom/RTL setup and the branching is one boolean; the pure modules underneath
+  are tested instead.
+
+### Verification
+
+`tsc --noEmit` clean, eslint clean, 68 files / 1,430 tests green, production
+build clean. Probed live against Haiku across 21 topics in four rounds — the
+first two rounds each found a blocking defect that the test suite did not.
+Walked in the running app by Travis: tools, declines, straight-through and
+angle-asking all confirmed.
+
+### Files
+
+- `lib/learn/gateHistory.ts` + test — new; prior attempts carried to the judge
+- `lib/learn/topic-domain.ts` + test — `awaitsChoice`, notes on `in`, `reframe`
+  mapped to a decline rather than left as a hole
+- `lib/claude/prompts.ts` — judge rewritten, `previousAttemptsBlock` added,
+  generation taught concepts over surface, two copied examples fixed
+- `lib/claude/promptIdentity.ts` + test — `@2` for both generation arms; the
+  version assertion no longer pins a number it must be edited for
+- `lib/learn/topic-domain-server.ts` — history threaded, headroom raised
+- `app/api/dashboard/classify-topic/route.ts` — history bounded at the boundary
+- `app/api/dashboard/goals/document/extract/route.ts` — `awaitsChoice`, so an
+  unknown verdict cannot fall through as approval
+- `components/dashboard/TopicGateNotice.tsx` — "describe it myself"; a decline
+  can no longer render chips
+- `components/dashboard/DashboardPanel.tsx`, `RefinementFlow.tsx` — the note,
+  the held-open question, the concept-led placeholder
+- `CLAUDE.md` — what Learn teaches, as a design decision
