@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { BookMarked, Sparkles, Loader2, Upload, FileText, ArrowRight } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { BookMarked, Sparkles, Loader2, Upload, FileText, ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { type LearningGoal } from "@/types";
 import { classifyTopic, mayProceed, type TopicDomainVerdict } from "@/lib/learn/topic-domain";
 import TopicGateNotice from "./TopicGateNotice";
@@ -9,15 +9,46 @@ import { MAX_TOPIC_CHARS } from "@/lib/learn/topicInput";
 import { recordAttempt } from "@/lib/learn/gateHistory";
 import GoalCard from "./GoalCard";
 import RefinementFlow from "./RefinementFlow";
+import IdeaConstellation from "./IdeaConstellation";
+import ThoughtTrail, { type Thought } from "./ThoughtTrail";
+import { type GroupProgress } from "@/lib/learn/constellation";
+import { type RefinementPhase } from "@/lib/learn/network";
+import { MAX_ORBITS, type InFlightGoal } from "@/lib/learn/progress";
+import { isRegionId } from "@/lib/learn/regions";
 import DocumentUploadFlow, { ACCEPT as DOCUMENT_ACCEPT } from "./DocumentUploadFlow";
 
 type InputMode = "qa" | "document";
 
 interface Props {
   initialGoals: LearningGoal[];
+  /**
+   * How lit each region of the constellation is. `null` means the read failed
+   * — distinct from `{}`, which means a learner who genuinely has nothing yet.
+   */
+  regionProgress: GroupProgress | null;
+  /** Goals the learner is working through, shown orbiting their clusters. */
+  inFlight: InFlightGoal[];
+  /**
+   * Whether the course-from-document path is open. Locked by default — see
+   * lib/learn/documentPath.ts. The routes refuse regardless; this only decides
+   * whether the learner is offered a door that would not open.
+   */
+  documentUpload: boolean;
 }
 
 type DurationChip = "2w" | "1m" | "3m" | "custom";
+
+/**
+ * How many goals the library shows before folding the rest away.
+ *
+ * Four fits the screen alongside the form, which is the whole constraint: this
+ * is a teaching surface, and rule 4 says it loses padding or gains pagination
+ * before it gains a scrollbar.
+ */
+const VISIBLE_GOALS = 4;
+
+/** How long the library takes to fade out before a page swap, and back in after. */
+const PAGE_FADE_MS = 160;
 
 const CHIPS: { id: DurationChip; label: string; days: number | null }[] = [
   { id: "2w",     label: "2 weeks",  days: 14 },
@@ -36,7 +67,9 @@ function todayStr(): string {
   return new Date().toISOString().split("T")[0]!;
 }
 
-export default function DashboardPanel({ initialGoals }: Props) {
+export default function DashboardPanel({
+  initialGoals, regionProgress, inFlight, documentUpload,
+}: Props) {
   const [goals, setGoals]       = useState<LearningGoal[]>(initialGoals);
   const [topic, setTopic]       = useState("");
   const [chip, setChip]         = useState<DurationChip | null>(null);
@@ -45,6 +78,8 @@ export default function DashboardPanel({ initialGoals }: Props) {
   // Which input the idle "Add goal" form shows — a typed topic (Q&A
   // refinement) or a document upload. Only relevant when neither flow below
   // has been entered yet.
+  // Always starts at "qa". The document mode is only reachable through the
+  // toggle above, which is not rendered while the path is locked.
   const [inputMode, setInputMode] = useState<InputMode>("qa");
 
   // Refinement flow state
@@ -84,7 +119,78 @@ export default function DashboardPanel({ initialGoals }: Props) {
   // into the refinement flow so it is read before any time is invested.
   const [lensNote, setLensNote] = useState("");
 
+  // What the learner has told Hugh so far, mirrored here for the panel beside
+  // the form. RefinementFlow remains the owner — this is a projection for
+  // rendering, and nothing writes back through it.
+  const [trail, setTrail] = useState<{
+    answers: Thought[]; question: string | null; phase: RefinementPhase;
+  }>({ answers: [], question: null, phase: "asking" });
+
+  // The orbits, kept in state rather than read straight from the prop.
+  //
+  // The prop is computed on the server when the page loads, so a goal created
+  // in this session would not appear until a reload — the learner finishes the
+  // questions, watches their track build, and the sphere carries on showing the
+  // work they had before. A goal created just now is in flight by definition:
+  // it exists, it has not failed, and nothing in it can be mastered yet.
+  const [flight, setFlight] = useState<InFlightGoal[]>(inFlight);
+
+  // The library pages rather than grows. Rule 4: this screen has to fit the
+  // viewport, and a list that gets longer for ever is how a teaching surface
+  // quietly acquires a scrollbar. Paging keeps its height fixed no matter how
+  // many goals a learner accumulates — which expanding never would.
+  const [goalPage, setGoalPage] = useState(0);
+
+  // Paging fades out, swaps, fades back in. The cards are the same size and in
+  // the same place, so without it a page change is an instant relabel that the
+  // eye reads as a glitch rather than as movement.
+  const [pageFading, setPageFading] = useState(false);
+  const fadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (fadeTimer.current) clearTimeout(fadeTimer.current);
+  }, []);
+
+  // Stable, or RefinementFlow's reporting effect fires on every render here.
+  const handleProgress = useCallback(
+    (p: { answers: Thought[]; question: string | null; phase: RefinementPhase }) =>
+      setTrail(p),
+    [],
+  );
+
+  // Paging, derived rather than stored. Deleting the last goal on the final
+  // page would otherwise leave `goalPage` pointing past the end and the library
+  // rendering empty — clamping here means the state can never be wrong, instead
+  // of being corrected after the fact.
+  const goalPages    = Math.max(1, Math.ceil(goals.length / VISIBLE_GOALS));
+  const safeGoalPage = Math.min(goalPage, goalPages - 1);
+  const pageGoals    = goals.slice(safeGoalPage * VISIBLE_GOALS, (safeGoalPage + 1) * VISIBLE_GOALS);
+  const firstShown   = goals.length === 0 ? 0 : safeGoalPage * VISIBLE_GOALS + 1;
+  const lastShown    = safeGoalPage * VISIBLE_GOALS + pageGoals.length;
+
+  function goToGoalPage(next: number) {
+    if (next === safeGoalPage || pageFading) return;
+    setPageFading(true);
+    if (fadeTimer.current) clearTimeout(fadeTimer.current);
+    fadeTimer.current = setTimeout(() => {
+      setGoalPage(next);
+      setPageFading(false);
+    }, PAGE_FADE_MS);
+  }
+
   const today = todayStr();
+
+  // What the aside shows.
+  //
+  // The ideas hold until the learner COMMITS — pressing "Let's Discuss", which
+  // is when `checking` goes true — rather than going on the first keystroke.
+  // Fading them while someone is still typing pulls half the page away
+  // mid-thought, and typing is not a decision: they may still be reading the
+  // sphere for what to write. If the gate then declines the topic, `checking`
+  // drops back and the ideas return, which is right — that learner is choosing
+  // again.
+  const showTrail = refining;
+  const showIdeas = !refining && !uploadingDoc && !checking;
 
   function resolvedEndDate(): string {
     if (!chip) return "";
@@ -164,9 +270,19 @@ export default function DashboardPanel({ initialGoals }: Props) {
 
   function handleGoalCreated(goal: LearningGoal) {
     setGoals(prev => [goal, ...prev]);
+    // The new goal is prepended, so page 0 is where the learner will look for
+    // the thing they just made.
+    setGoalPage(0);
+    if (isRegionId(goal.region)) {
+      setFlight(prev => [
+        { id: goal.id, topic: goal.topic, region: goal.region as string },
+        ...prev.filter(f => f.id !== goal.id),
+      ].slice(0, MAX_ORBITS));
+    }
     setAttemptHistory([]);
     setWritingOwn(false);
     setLensNote("");
+    setTrail({ answers: [], question: null, phase: "asking" });
     setRefining(false);
     setUploadingDoc(false);
     setInputMode("qa");
@@ -190,6 +306,7 @@ export default function DashboardPanel({ initialGoals }: Props) {
     setAttemptHistory([]);
     setWritingOwn(false);
     setLensNote("");
+    setTrail({ answers: [], question: null, phase: "asking" });
     setInputMode("qa");
     setTopic("");
     setChip(null);
@@ -214,10 +331,16 @@ export default function DashboardPanel({ initialGoals }: Props) {
 
   function handleGoalDeleted(id: string) {
     setGoals(prev => prev.filter(g => g.id !== id));
+    // A deleted goal is not in flight either — leaving its mote circling would
+    // be the same staleness in the other direction.
+    setFlight(prev => prev.filter(f => f.id !== id));
   }
 
   return (
-    <div className="flex flex-col gap-10 px-10 py-8 max-w-2xl w-full">
+    <div className="flex w-full gap-10 px-10 py-8">
+
+      {/* ── The form and the library ─────────────────────────────────── */}
+      <div className="flex w-full max-w-2xl shrink-0 flex-col gap-10">
 
       {/* ── Add goal ───────────────────────────────────────────────── */}
       <section>
@@ -238,6 +361,7 @@ export default function DashboardPanel({ initialGoals }: Props) {
               topic={pendingTopic}
               endDate={pendingEndDate}
               lensNote={lensNote}
+              onProgress={handleProgress}
               onGoalCreated={handleGoalCreated}
               onReset={handleResetRefinement}
             />
@@ -250,33 +374,38 @@ export default function DashboardPanel({ initialGoals }: Props) {
             />
           ) : (
             <div className="flex flex-col gap-4">
-              {/* Input mode toggle */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setInputMode("qa")}
-                  className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors
-                    ${inputMode === "qa"
-                      ? "border-amber-500 bg-amber-500/20 text-amber-300"
-                      : "border-slate-700 bg-slate-800 text-slate-500 hover:border-slate-500 hover:text-slate-300"
-                    }`}
-                >
-                  <Sparkles size={12} />
-                  Answer a few questions
-                </button>
-                <button
-                  onClick={() => setInputMode("document")}
-                  className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors
-                    ${inputMode === "document"
-                      ? "border-amber-500 bg-amber-500/20 text-amber-300"
-                      : "border-slate-700 bg-slate-800 text-slate-500 hover:border-slate-500 hover:text-slate-300"
-                    }`}
-                >
-                  <Upload size={12} />
-                  Upload a document
-                </button>
-              </div>
+              {/* Input mode toggle. Only shown when the document path is
+                  open: a locked door with a handle on it is worse than no door,
+                  because the learner spends a file picker finding out. */}
+              {documentUpload && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setInputMode("qa")}
+                    className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors
+                      ${inputMode === "qa"
+                        ? "border-amber-500 bg-amber-500/20 text-amber-300"
+                        : "border-slate-700 bg-slate-800 text-slate-500 hover:border-slate-500 hover:text-slate-300"
+                      }`}
+                  >
+                    <Sparkles size={12} />
+                    Answer a few questions
+                  </button>
+                  <button
+                    onClick={() => setInputMode("document")}
+                    className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors
+                      ${inputMode === "document"
+                        ? "border-amber-500 bg-amber-500/20 text-amber-300"
+                        : "border-slate-700 bg-slate-800 text-slate-500 hover:border-slate-500 hover:text-slate-300"
+                      }`}
+                  >
+                    <Upload size={12} />
+                    Upload a document
+                  </button>
+                </div>
 
-              {inputMode === "qa" ? (
+              )}
+
+              {inputMode === "qa" || !documentUpload ? (
                 <>
                   {/* Topic input */}
                   <input
@@ -416,9 +545,40 @@ export default function DashboardPanel({ initialGoals }: Props) {
             <span className="ml-1 rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-600 font-mono">
               {goals.length}
             </span>
+
+            {goalPages > 1 && (
+              <div className="ml-auto flex items-center gap-1.5">
+                <span className="mr-1 text-xs tabular-nums text-slate-600">
+                  {firstShown}–{lastShown} of {goals.length}
+                </span>
+                <button
+                  onClick={() => goToGoalPage(safeGoalPage - 1)}
+                  disabled={safeGoalPage === 0}
+                  aria-label="Previous goals"
+                  className="rounded-lg border border-slate-700 p-1 text-slate-500 transition-colors hover:border-slate-500 hover:text-slate-300 disabled:opacity-30 disabled:hover:border-slate-700 disabled:hover:text-slate-500"
+                >
+                  <ChevronLeft size={13} />
+                </button>
+                <button
+                  onClick={() => goToGoalPage(safeGoalPage + 1)}
+                  disabled={safeGoalPage >= goalPages - 1}
+                  aria-label="More goals"
+                  className="rounded-lg border border-slate-700 p-1 text-slate-500 transition-colors hover:border-slate-500 hover:text-slate-300 disabled:opacity-30 disabled:hover:border-slate-700 disabled:hover:text-slate-500"
+                >
+                  <ChevronRight size={13} />
+                </button>
+              </div>
+            )}
           </div>
-          <div className="flex flex-col gap-3">
-            {goals.map(g => <GoalCard key={g.id} goal={g} onDelete={handleGoalDeleted} />)}
+          <div
+            className={`flex flex-col gap-3 transition-opacity ${
+              pageFading ? "opacity-0" : "opacity-100"
+            }`}
+            style={{ transitionDuration: `${PAGE_FADE_MS}ms` }}
+          >
+            {pageGoals.map(g => (
+              <GoalCard key={g.id} goal={g} onDelete={handleGoalDeleted} />
+            ))}
           </div>
         </section>
       )}
@@ -428,6 +588,39 @@ export default function DashboardPanel({ initialGoals }: Props) {
           Your library is empty — add your first topic above.
         </p>
       )}
+      </div>
+
+      {/* ── The aside ────────────────────────────────────────────────────
+          Two layers crossfading in the same space rather than one swapping
+          for the other: the ideas recede as the learner commits to something,
+          and what they have said takes their place. Hidden below xl, where
+          there is no room for it and the form is the whole job. */}
+      {/* A FIXED height, not a minimum. As a minimum it stretched to whatever
+          the column beside it happened to be, so the sphere grew and shrank
+          with the number of goal cards — paging the library visibly resized
+          the constellation, which is not something the library should be able
+          to do. */}
+      <aside className="relative hidden h-[38rem] flex-1 xl:block" aria-live="polite">
+        <div
+          className={`absolute inset-0 transition-opacity duration-700 ${
+            showIdeas ? "opacity-100" : "pointer-events-none opacity-0"
+          }`}
+        >
+          <IdeaConstellation active={showIdeas} progress={regionProgress} inFlight={flight} />
+        </div>
+
+        <div
+          className={`absolute inset-0 overflow-hidden transition-opacity duration-500 ${
+            showTrail ? "opacity-100" : "pointer-events-none opacity-0"
+          }`}
+        >
+          <ThoughtTrail
+            topic={pendingTopic}
+            thoughts={trail.answers}
+            phase={trail.phase}
+          />
+        </div>
+      </aside>
     </div>
   );
 }

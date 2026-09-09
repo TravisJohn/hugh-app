@@ -24,6 +24,20 @@ interface Props {
   onGoalCreated: (goal: LearningGoal) => void;
   /** Abandon refinement and return the learner to an empty topic form. */
   onReset:       () => void;
+  /**
+   * Reports what the learner has said so far, for display beside the form.
+   *
+   * This component stays the owner: the callback carries a projection for
+   * rendering, never a second place the flow can be driven from. Must be
+   * referentially stable (wrap it in useCallback) or the effect below will
+   * fire on every parent render.
+   */
+  onProgress?:   (p: {
+    answers:  QA[];
+    question: string | null;
+    /** Which half of refinement this is — the diagram beside it lights differently. */
+    phase:    "asking" | "building";
+  }) => void;
 }
 
 const FALLBACK_TIPS = [
@@ -36,7 +50,7 @@ const MAX_QUESTIONS = 5;
 
 type Phase = "asking" | "waiting" | "failed";
 
-export default function RefinementFlow({ topic, endDate, lensNote, onGoalCreated, onReset }: Props) {
+export default function RefinementFlow({ topic, endDate, lensNote, onGoalCreated, onReset, onProgress }: Props) {
   const [question, setQuestion]     = useState<string | null>(null);
   const [answers, setAnswers]       = useState<QA[]>([]);
   const [draft, setDraft]           = useState("");
@@ -52,13 +66,27 @@ export default function RefinementFlow({ topic, endDate, lensNote, onGoalCreated
   const [tips, setTips]           = useState<string[]>(FALLBACK_TIPS);
   const [tipIdx, setTipIdx]       = useState(0);
   const [pendingGoal, setPendingGoal] = useState<LearningGoal | null>(null);
-  const [apiError, setApiError]   = useState(false);
+  // The server's own words when saving the goal fails, not a boolean. A
+  // refusal ("that topic sits outside Hugh's focus") and a breakage ("failed to
+  // save goal") are different things to the person reading them, and a shared
+  // "something went wrong" hides which one happened.
+  const [apiError, setApiError]   = useState<string | null>(null);
 
   // Load first question on mount
   useEffect(() => {
     fetchNextQuestion([]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Publish progress for the trail beside the form. Effect rather than a call
+  // inside submitAnswer so a question arriving from the server is reported too,
+  // not only an answer the learner typed.
+  useEffect(() => {
+    // 'waiting' and 'failed' both mean the questions are over. Reported as one
+    // phase because the diagram is about refinement, and refinement has ended
+    // either way — the failure has its own screen to explain itself on.
+    onProgress?.({ answers, question, phase: phase === "asking" ? "asking" : "building" });
+  }, [answers, question, phase, onProgress]);
 
   // Tip rotator during waiting
   useEffect(() => {
@@ -134,7 +162,7 @@ export default function RefinementFlow({ topic, endDate, lensNote, onGoalCreated
 
   const enterWaiting = useCallback(async (finalAnswers: QA[]) => {
     setPhase("waiting");
-    setApiError(false);
+    setApiError(null);
     setPendingGoal(null);
 
     try {
@@ -143,10 +171,21 @@ export default function RefinementFlow({ topic, endDate, lensNote, onGoalCreated
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ topic, end_date: endDate, answers: finalAnswers }),
       });
-      const data = await res.json() as { goal?: LearningGoal; tips?: string[]; error?: string };
+      const data = await res.json() as {
+        goal?: LearningGoal; tips?: string[]; error?: string; message?: string;
+      };
 
       if (!res.ok || !data.goal) {
-        setApiError(true);
+        // Two different failures share this branch, and the learner should be
+        // able to tell them apart. A 422 is the server re-gating the refined
+        // topic and declining it — a decision, written for a human, and the
+        // only useful thing to show. Anything else is a breakage, and the
+        // route's own message says more than "something went wrong" does.
+        setApiError(
+          (res.status === 422 ? data.message : null)
+          || data.error
+          || "Hugh could not save this goal. Nothing has been lost — try again.",
+        );
         setPhase("asking");
         return;
       }
@@ -156,7 +195,7 @@ export default function RefinementFlow({ topic, endDate, lensNote, onGoalCreated
       // for the background track build to flip it to 'ready' or 'failed'.
       setPendingGoal(data.goal);
     } catch {
-      setApiError(true);
+      setApiError("Hugh could not be reached. Your answers are still here — try again.");
       setPhase("asking");
     }
   }, [topic, endDate]);
@@ -353,9 +392,21 @@ export default function RefinementFlow({ topic, endDate, lensNote, onGoalCreated
         delete them any time from your goal.
       </p>
 
-      {/* Error notice */}
+      {/* Saving the goal failed. The learner is left with a question card that
+          will never fill in — nothing is being fetched and nothing is coming —
+          so this carries its own way out rather than leaving them to guess
+          that the Answer button is now inert. */}
       {apiError && (
-        <p className="text-xs text-red-400">Something went wrong — please try again.</p>
+        <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-3">
+          <p className="text-xs leading-relaxed text-red-300">{apiError}</p>
+          <button
+            onClick={() => enterWaiting(answers)}
+            className="mt-2 flex items-center gap-1.5 rounded-lg border border-red-400/40 px-2.5 py-1 text-xs font-semibold text-red-200 transition-colors hover:bg-red-500/10"
+          >
+            <RotateCcw size={11} />
+            Try again
+          </button>
+        </div>
       )}
       {fetchError && (
         <p className="text-xs text-amber-400/80">
