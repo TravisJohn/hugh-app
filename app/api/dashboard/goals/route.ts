@@ -118,7 +118,17 @@ export async function POST(request: NextRequest) {
   // The response returns here — the track is built afterwards in `after()`.
   const { data: goal, error: goalError } = await supabase
     .from("learning_goals")
-    .insert({ user_id: userId, topic: finalTopic, end_date, track_status: "pending" })
+    // `region` files this goal on the learner's map (migration 051). It comes
+    // from the verdict just above rather than from the request body: the client
+    // never gets to say which region its goal belongs to, and a gate that
+    // failed open carries none, so the goal stays unfiled instead of guessed.
+    .insert({
+      user_id:      userId,
+      topic:        finalTopic,
+      end_date,
+      track_status: "pending",
+      region:       verdict.region ?? null,
+    })
     .select("*")
     .single();
 

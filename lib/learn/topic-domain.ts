@@ -1,3 +1,5 @@
+import { isRegionId } from "@/lib/learn/regions";
+
 // ── Topic domain gate ────────────────────────────────────────────────────────
 // Hugh is strictly a data & analytics skill-prep app. Before ANY topic entry
 // point builds a track or starts a session, an LLM judge (server-side, Haiku)
@@ -47,6 +49,16 @@ export interface TopicDomainVerdict {
   message: string;
   /** 0–3 data-angle options. Required when "needs_angle"; optional when "out". */
   suggestions: string[];
+  /**
+   * Which learning region this topic belongs to, when the judge could say.
+   *
+   * Only meaningful for "in" — a topic that is not being built needs no filing.
+   * Undefined whenever the judge omitted it, named something that is not a
+   * region, or the gate failed open: a goal with no region simply lights
+   * nothing, and that is much cheaper than a column filling with invented
+   * names no cluster will ever match.
+   */
+  region?: string;
 }
 
 /** True only when a track may actually be built from this topic. */
@@ -127,7 +139,8 @@ export function normalizeVerdict(raw: unknown): TopicDomainVerdict {
   // fail-open path below deliberately cannot: a verdict Hugh never really made
   // must not put words in Hugh's mouth.
   if (raw3 === "in") {
-    return { verdict: "in", reason, message: asString(r.message), suggestions: [] };
+    const region = isRegionId(r.region) ? r.region : undefined;
+    return { verdict: "in", reason, message: asString(r.message), suggestions: [], region };
   }
 
   return openVerdict(reason || "unrecognised-verdict");

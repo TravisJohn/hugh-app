@@ -1,5 +1,6 @@
 import { isPresetRoom, type PresetRoom, type Room } from "@/types";
 import { checkTopic } from "@/lib/learn/topicInput";
+import { regionIds } from "@/lib/learn/regions";
 
 export const ROOM_CONTEXT: Record<PresetRoom, string> = {
   data_engineering:
@@ -941,8 +942,21 @@ If "in" AND the topic names a tool or platform:
 
 If "in" and the topic is already a concept, a language, or a technique (statistics, SQL window functions, A/B testing, dimensional modelling, RAG evaluation): "message" is "" and "suggestions" is [].
 
+FILING. When and only when the verdict is "in", also return "region": the ONE area of the learner's map this topic belongs under. Choose from exactly these ids:
+
+${regionIds().join(", ")}
+
+- ml            — models and how they are built, judged and kept honest, including LLM and retrieval work
+- stats         — probability, inference, experiments, causality
+- engineering   — moving, shaping and modelling data; pipelines and warehouses
+- cloud         — platforms, distributed processing, storage and what it costs
+- automation    — orchestration, scheduling, reliability, testing and shipping data work
+- analytics     — asking the question, measuring, visualising and communicating
+
+Pick the region whose SKILL the learner would mostly be building, not whichever word appears in their topic. Return exactly one id, lowercase, spelled as above. If it genuinely does not fit any, omit the field rather than guessing — a wrong filing is worse than none. For any verdict other than "in", omit it.
+
 Respond with ONLY valid JSON, no markdown fences:
-{"verdict": "in" | "needs_angle" | "out", "reason": "<one short clause>", "message": "...", "suggestions": ["..."]}`;
+{"verdict": "in" | "needs_angle" | "out", "reason": "<one short clause>", "message": "...", "suggestions": ["..."], "region": "<one id, only when in>"}`;
 }
 
 // ── Shared JSON parse helper ──────────────────────────────────────────────
