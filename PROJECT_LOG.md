@@ -7887,3 +7887,130 @@ angle-asking all confirmed.
 - `components/dashboard/DashboardPanel.tsx`, `RefinementFlow.tsx` — the note,
   the held-open question, the concept-led placeholder
 - `CLAUDE.md` — what Learn teaches, as a design decision
+
+---
+
+## 2026-09-09 — The learning map: a brain that lights up
+
+### What this is
+
+`/home/learn` had a wide empty right-hand side — not a rail, just the panel's
+unused width. It now carries two things that swap as the learner commits:
+
+**Idle:** a sphere of 760 concept nodes with **Data** at the core, clustered
+into six learning regions. Concepts surface a few at a time and fade, rather
+than sitting there as captions. Each region starts at half brightness and
+brightens as its milestones are mastered, so the picture doubles as a record of
+what the learner has actually built. Goals in flight orbit the core on great
+circles whose planes pass through their own cluster.
+
+**Working:** a network diagram, one hidden layer per refinement question,
+lighting a layer at a time as answers land, with the output glowing while the
+track builds.
+
+It is SVG and arithmetic throughout. No three.js, no model file, nothing added
+to the bundle.
+
+### Decisions that took more than one attempt, recorded so they are not redone
+
+**The orbits are shells around the core, not rings around a cluster.** Twice
+built as a small circle beside its cluster, and twice it read as a stray point
+in the field: nothing about a small circle says *this is going round something*.
+A great circle sweeping the whole sphere is the shape everyone already reads as
+an electron round a nucleus. The region association survives because each
+orbit's plane is chosen to CONTAIN its cluster's direction, so the mote passes
+over its own cluster once a lap.
+
+**An unlit layer must stay within reach of a lit one.** The band between the
+last answered layer and the next read as a hole through three attempts. Grey at
+10% disappeared. Slate at 40% appeared, but as a different *material* — a white
+bar cutting the network in half, worse than the gap. What settled it was
+measuring: there are 118 edges across that boundary, so nothing was missing.
+0.16 sitting beside neighbours at 0.4 and 0.5 is what the eye reads as nothing.
+One hue, brightness alone carrying state, and the unlit band close enough to its
+neighbours to read as dimmer rather than absent.
+
+**The ideas hold until the learner commits.** They were fading on the first
+keystroke, on the reasoning that typing meant browsing was over. In use that
+pulls half the page away mid-thought — someone may still be reading the sphere
+for what to write. They now go when "Let's Discuss" is pressed, and come back if
+the gate declines.
+
+**A minimum height is not a height.** The aside was `min-h`, so it stretched to
+whatever the column beside it happened to be, and paging the library visibly
+resized the constellation. The library should not be able to change the size of
+the sphere.
+
+### Filing, and what it cost
+
+A goal is filed into one of six regions by the topic gate, which already runs
+server-side on every goal and already has the topic in front of it — no extra
+model call, and nothing asked of the learner. The region comes from the
+**server's own verdict**, never the request body.
+
+Probed live: SQL window functions and dimensional modelling to `engineering`,
+statistics and A/B testing to `stats`, Airflow to `automation`, RAG pipelines
+and Generative AI to `ml`, Snowflake cost to `cloud`, executive dashboards to
+`analytics`. Declined and ambiguous topics carry none.
+
+Migration 051 is nullable with no CHECK constraint and no backfill, each
+deliberate and argued in the file: NULL is a real state, the region list changes
+more often than a schema should, and filing old goals honestly would mean
+re-running the judge over every one.
+
+### Two rule-5 defects found while wiring it
+
+Neither was the feature being built, which is how they had survived:
+
+1. **A failed read claimed the learner had nothing in flight.** If the tracks or
+   milestones query dropped, the sphere showed no orbits — indistinguishable
+   from having no work. Unknown mastery now means "nothing is *known* to be
+   finished", so goals stay in flight.
+2. **A goal whose track was still building never orbited.** No `tracks` row
+   exists yet at that point and the code bailed out, so the moment a goal is
+   most in flight was the moment it was invisible.
+
+A third, in the same family: a goal created in the session did not appear on the
+sphere at all, because `inFlight` was computed on the server at page load. The
+learner finished the questions, watched the track build, and the picture carried
+on showing the work they had before.
+
+### The document path is locked
+
+Course-from-document is switched OFF by product decision, pending an answer to
+what happens when a learner uploads material they did not mean to send. The
+five-layer injection defence is untouched and still in the code; nothing was
+deleted, and re-opening it is one environment variable.
+
+Enforced on the SERVER — both document routes refuse — not by hiding a button,
+because those endpoints are reachable directly. `DOCUMENT_UPLOAD_ENABLED`
+defaults to off on purpose: a flag that defaults to on turns itself on wherever
+nobody configured it.
+
+### Also
+
+- **The library pages rather than grows** — four at a time behind `‹ ›`, with a
+  crossfade. Rule 4: a teaching surface loses padding or gains pagination before
+  it gains a scrollbar, and expanding would have kept the height growing.
+- **The refinement diagram takes a phase, not an answer count.** Refinement does
+  not always run to five questions — Hugh can stop early, and Skip ends it
+  anywhere — so an output lit only on a full set left those learners watching a
+  dead diagram while their track was genuinely being built.
+- **Saving a goal can fail, and now says so.** A 422 (the server re-gating the
+  refined topic) is told apart from a breakage, and the failure carries a Try
+  again instead of a question card that will never fill in.
+
+### Verification
+
+`tsc --noEmit` clean, eslint clean, 71 files / 1,503 tests, production build
+clean. Six new pure modules with tests: constellation geometry and lighting,
+regions, progress and in-flight selection, network layout and layer state.
+Probed live against Haiku for region filing. Every visual walked in the running
+app by Travis.
+
+### Open
+
+- **One goal save failed and was never explained.** No log was captured. The
+  handling is fixed; the fault is unknown. Recorded in `WISHLIST.md`.
+- **Two goals from August have no region** and stay dark. Filing them means
+  re-running the judge over history.

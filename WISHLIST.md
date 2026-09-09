@@ -123,3 +123,19 @@ transcription.
 Not a bug — it is how the API works — but it makes Google a data processor that
 no document listed. Now covered on `/privacy`. Worth correcting the wording in
 CLAUDE.md so nobody re-derives the wrong conclusion from it.
+
+## A goal save failed once, cause unknown (seen 2026-09-09)
+
+Creating a fifth learning track returned an error from `POST /api/dashboard/goals`
+and was never reproduced. No log was captured — the dev server was not in a
+terminal that could be read at the time — so the cause is genuinely unknown.
+
+What was fixed is the handling, not the fault. The learner was left on a
+question card that would never fill in, with an Answer button that had silently
+become inert, under the words "Something went wrong". The refinement flow now
+shows the server's own message and carries a Try again that re-runs the save
+with the answers intact, and a 422 (the server re-gating the refined topic and
+declining it) is told apart from a breakage.
+
+So if it happens again it will name itself. Worth watching for; not worth
+hunting blind.
