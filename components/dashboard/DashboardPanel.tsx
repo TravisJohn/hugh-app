@@ -96,6 +96,16 @@ export default function DashboardPanel({ initialGoals }: Props) {
   const endDate    = resolvedEndDate();
   const canSubmit  = topic.trim().length > 0 && endDate.length > 0;
 
+  // The learner has done their part and only the date is outstanding. The
+  // submit button is disabled in this state and says nothing about why, and
+  // Enter silently does nothing — so the row that is actually missing has to
+  // speak up itself, rather than leaving someone to guess which of the two
+  // controls above it is the problem. Derived, not stored: it is a fact about
+  // the form, and a second copy of it could go stale.
+  const awaitingDate =
+    endDate.length === 0 &&
+    (inputMode === "qa" ? topic.trim().length > 0 : docFile !== null);
+
   async function handleFinalize() {
     if (!canSubmit || checking) return;
     const candidate = topic.trim();
@@ -321,8 +331,17 @@ export default function DashboardPanel({ initialGoals }: Props) {
 
               {/* Commitment chips — shared by both input modes */}
               <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-600">
+                <p
+                  className={`mb-2 text-xs font-semibold uppercase tracking-widest transition-colors ${
+                    awaitingDate ? "text-amber-400" : "text-slate-500"
+                  }`}
+                >
                   I&apos;ll commit for
+                  {awaitingDate && (
+                    <span className="ml-2 normal-case tracking-normal font-medium text-amber-400/80">
+                      — pick one to continue
+                    </span>
+                  )}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {CHIPS.map(c => (
@@ -332,6 +351,8 @@ export default function DashboardPanel({ initialGoals }: Props) {
                       className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors
                         ${chip === c.id
                           ? "border-amber-500 bg-amber-500/20 text-amber-300"
+                          : awaitingDate
+                          ? "border-amber-500/40 bg-slate-800 text-slate-300 hover:border-amber-500 hover:text-amber-200"
                           : "border-slate-700 bg-slate-800 text-slate-400 hover:border-slate-500 hover:text-slate-200"
                         }`}
                     >
