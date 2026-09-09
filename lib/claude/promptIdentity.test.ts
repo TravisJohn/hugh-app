@@ -33,7 +33,11 @@ describe("the registry is the enforcement", () => {
   });
 
   it("resolves a version to the readable label, not the hash", () => {
-    expect(promptVersion("milestones.qa")).toBe("milestones.qa@1");
+    // Matched by shape, not pinned to a number. Which version is current
+    // changes every time a prompt is legitimately edited, and the test above
+    // already fails when a fingerprint is unregistered — pinning it here only
+    // added a second thing to edit for the same reason.
+    expect(promptVersion("milestones.qa")).toMatch(/^milestones\.qa@\d+$/);
   });
 
   it("falls back to the raw fingerprint rather than throwing on an unknown hash", () => {

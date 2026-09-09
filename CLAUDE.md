@@ -264,6 +264,7 @@ picked at random per mastery session.
 | Decision | Choice | Reason |
 |---|---|---|
 | Topic scope | Data/analytics only, LLM-judged gate at every entry point | Keeps tracks coherent; broader scope is a separate product |
+| What Learn teaches | Concepts, not product surface. A topic naming a tool is accepted, and Hugh says up front it will teach the thinking behind it | Hugh teaches by conversation and cannot give hands-on practice. A track on which button to press dates on the next release and disappoints someone who came to learn the tool |
 | Similarity check | LLM-judged (Claude), not string match | Handles paraphrasing correctly |
 | Similarity threshold | >90% alignment = "used best answer" | Generous but meaningful |
 | Review quizzes | Must quote verified diary lines | A quiz on untaught material is noise |

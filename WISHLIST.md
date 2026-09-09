@@ -124,32 +124,18 @@ Not a bug — it is how the API works — but it makes Google a data processor t
 no document listed. Now covered on `/privacy`. Worth correcting the wording in
 CLAUDE.md so nobody re-derives the wrong conclusion from it.
 
-## The angle chips read as the only three options (noticed 2026-09-09)
+## A goal save failed once, cause unknown (seen 2026-09-09)
 
-When the topic gate returns `needs_angle` — "Generative AI covers a lot of
-ground…" — `TopicGateNotice` shows **Pick an angle** and three suggestion
-chips. Travis: it feels rigid. There should be a way to say "none of these"
-and phrase your own angle, with the guard rail still applied to what you type.
+Creating a fifth learning track returned an error from `POST /api/dashboard/goals`
+and was never reproduced. No log was captured — the dev server was not in a
+terminal that could be read at the time — so the cause is genuinely unknown.
 
-**The machinery for this already exists.** A chip calls `onPickSuggestion`,
-which in `DashboardPanel` is `handleTopicChange` — it writes the suggestion
-into the topic input and clears the notice. It does not submit. The learner
-still presses "Let's Discuss", and the gate re-runs on whatever text is in the
-box. So typing your own angle is already possible today; the notice just never
-says so, and three chips under an imperative heading read as a closed set.
+What was fixed is the handling, not the fault. The learner was left on a
+question card that would never fill in, with an Answer button that had silently
+become inert, under the words "Something went wrong". The refinement flow now
+shows the server's own message and carries a Try again that re-runs the save
+with the answers intact, and a 422 (the server re-gating the refined topic and
+declining it) is told apart from a breakage.
 
-That makes the first half mostly copy and affordance — an explicit "or describe
-it yourself" that points at the field above, or a fourth chip that focuses the
-input rather than filling it.
-
-**The second half is a real open question.** Today a typed angle that still
-fails gets the same notice again — the same three chips, or a decline if the
-verdict flipped to `out`. That is a loop, not guidance. "Guide the learner into
-a topic that fits the domain" needs a decision about what the second and third
-attempt look like, and that has to hold the line the gate exists to hold: the
-domain stays data/analytics ([[domain-gate-scope-decision]]), so this is about
-helping someone find their way in, never about letting them argue their way in.
-
-Files: `components/dashboard/TopicGateNotice.tsx`,
-`components/dashboard/DashboardPanel.tsx`, `DocumentUploadFlow.tsx` (the review
-step renders the same notice).
+So if it happens again it will name itself. Worth watching for; not worth
+hunting blind.

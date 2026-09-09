@@ -1,3 +1,5 @@
+import { isRegionId } from "@/lib/learn/regions";
+
 // ── Topic domain gate ────────────────────────────────────────────────────────
 // Hugh is strictly a data & analytics skill-prep app. Before ANY topic entry
 // point builds a track or starts a session, an LLM judge (server-side, Haiku)
@@ -21,6 +23,11 @@
  *                   committed to one. Don't proceed, and don't reject: ask,
  *                   carrying `suggestions` as the answers.
  * - `out`         — the core skill is a different profession or subject.
+ *                   Declined with a warm heads-up and nothing else: no angles,
+ *                   no reframes. Offering data readings of an off-domain
+ *                   subject was tried and removed — Hugh proposing a track on
+ *                   "measuring your Spanish retention" to someone who asked to
+ *                   learn Spanish is not a kindness, it is a sales pitch.
  */
 export type TopicVerdict = "in" | "needs_angle" | "out";
 
@@ -29,15 +36,47 @@ export interface TopicDomainVerdict {
   verdict: TopicVerdict;
   /** One short clause explaining the call (for logs / debugging). */
   reason: string;
-  /** Learner-facing copy. Empty when `verdict` is "in". */
+  /**
+   * Learner-facing copy.
+   *
+   * Usually empty for "in" — a topic that passes cleanly needs no comment. The
+   * exception is a topic naming a TOOL or PLATFORM (Airflow, dbt, Power BI):
+   * it passes, and carries one sentence saying Hugh Learn will teach the
+   * durable concepts behind it rather than the tool itself. Said before the
+   * refinement questions, not after a track is built, because a learner who
+   * wanted hands-on practice should find that out in the first ten seconds.
+   */
   message: string;
   /** 0–3 data-angle options. Required when "needs_angle"; optional when "out". */
   suggestions: string[];
+  /**
+   * Which learning region this topic belongs to, when the judge could say.
+   *
+   * Only meaningful for "in" — a topic that is not being built needs no filing.
+   * Undefined whenever the judge omitted it, named something that is not a
+   * region, or the gate failed open: a goal with no region simply lights
+   * nothing, and that is much cheaper than a column filling with invented
+   * names no cluster will ever match.
+   */
+  region?: string;
 }
 
 /** True only when a track may actually be built from this topic. */
 export function mayProceed(v: TopicDomainVerdict): boolean {
   return v.verdict === "in";
+}
+
+/**
+ * True when the gate is holding a question out to the learner rather than
+ * deciding for them, and is waiting on an answer before anything is built.
+ *
+ * One verdict qualifies today. It is a function rather than a comparison so a
+ * caller cannot branch on `"out"` alone and let a verdict it has never heard of
+ * fall through as though it were approval — which is exactly how the document
+ * path behaved before this existed.
+ */
+export function awaitsChoice(v: TopicDomainVerdict): boolean {
+  return v.verdict === "needs_angle";
 }
 
 /** The permissive default used whenever the judge can't be reached. */
@@ -79,6 +118,14 @@ export function normalizeVerdict(raw: unknown): TopicDomainVerdict {
     return { verdict: "out", reason, message: asString(r.message), suggestions };
   }
 
+  // A retired verdict, kept as a mapping rather than a hole. An older prompt
+  // (or a model reverting to it) can still emit "reframe" for an off-domain
+  // subject; that is a decline now, and must not fall through to the fail-open
+  // return below and build a track for it.
+  if (raw3 === "reframe") {
+    return { verdict: "out", reason: reason || "reframe-retired", message: "", suggestions: [] };
+  }
+
   if (raw3 === "needs_angle") {
     // A question with no answers is a dead end, and Hugh does not build dead
     // ends (CLAUDE.md rule 5 — a block needs its own way out). If the judge
@@ -86,6 +133,14 @@ export function normalizeVerdict(raw: unknown): TopicDomainVerdict {
     // so let the topic through rather than stranding the learner.
     if (suggestions.length === 0) return openVerdict("needs-angle-without-suggestions");
     return { verdict: "needs_angle", reason, message: asString(r.message), suggestions };
+  }
+
+  // An explicit, well-formed "in" may carry a note (see `message` above). The
+  // fail-open path below deliberately cannot: a verdict Hugh never really made
+  // must not put words in Hugh's mouth.
+  if (raw3 === "in") {
+    const region = isRegionId(r.region) ? r.region : undefined;
+    return { verdict: "in", reason, message: asString(r.message), suggestions: [], region };
   }
 
   return openVerdict(reason || "unrecognised-verdict");
@@ -96,16 +151,24 @@ export function normalizeVerdict(raw: unknown): TopicDomainVerdict {
  * every topic ENTRY point to enforce the "data & analytics skill prep only"
  * protocol.
  *
+ * `previousAttempts` are earlier phrasings this learner was already asked to
+ * narrow. They exist so a second or third try does not come back with the same
+ * three suggestions the learner has already turned down; they do not influence
+ * the verdict. Build the list with `recordAttempt` in `lib/learn/gateHistory`.
+ *
  * Fails OPEN on any network/parse error so a transient classifier failure never
  * blocks a legitimate learner — the app's downstream flows keep their own
  * per-message guards.
  */
-export async function classifyTopic(topic: string): Promise<TopicDomainVerdict> {
+export async function classifyTopic(
+  topic:            string,
+  previousAttempts: readonly string[] = [],
+): Promise<TopicDomainVerdict> {
   try {
     const res = await fetch("/api/dashboard/classify-topic", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topic }),
+      body: JSON.stringify({ topic, previousAttempts }),
     });
     if (!res.ok) return openVerdict();
     return normalizeVerdict(await res.json());

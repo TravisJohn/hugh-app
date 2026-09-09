@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse, after } from "next/server";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
+import { documentUploadEnabled, DOCUMENT_UPLOAD_LOCKED_MESSAGE } from "@/lib/learn/documentPath";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { judgeTopicDomain } from "@/lib/learn/topic-domain-server";
@@ -17,6 +18,13 @@ import { recordOperation } from "@/lib/observability/record";
 export const maxDuration = 120;
 
 export async function POST(request: NextRequest) {
+  // The document path is locked (see lib/learn/documentPath.ts). Refused here
+  // rather than only hidden in the UI: this endpoint is reachable directly, and
+  // a check that only runs in the browser is not a check.
+  if (!documentUploadEnabled()) {
+    return NextResponse.json({ error: DOCUMENT_UPLOAD_LOCKED_MESSAGE }, { status: 403 });
+  }
+
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -58,7 +66,16 @@ export async function POST(request: NextRequest) {
 
   const { error: updateError } = await supabase
     .from("learning_goals")
-    .update({ topic, track_status: "pending", track_started_at: startedAt })
+    // Filed here rather than at extraction (migration 051), for the same reason
+    // track_started_at is: this is the point where the FINAL topic is known and
+    // has just been judged. A learner who edited the extracted topic gets the
+    // region their edit earned, not the one the document suggested.
+    .update({
+      topic,
+      track_status:     "pending",
+      track_started_at: startedAt,
+      region:           verdict.region ?? null,
+    })
     .eq("id", goalId);
 
   if (updateError) {

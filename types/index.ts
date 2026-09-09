@@ -108,6 +108,10 @@ export interface LearningGoal {
   // When the current track build started. Null on rows written before
   // migration 046 — read it as `track_started_at ?? created_at`.
   track_started_at: string | null;
+  // Which region of the learner's map this goal is filed under (migration 051),
+  // assigned by the topic gate. Null on every goal created before it, and on
+  // any the gate could not honestly place — an unfiled goal lights nothing.
+  region: string | null;
 }
 
 // One 5-whys question and the learner's answer to it, as stored by migration

@@ -7750,3 +7750,267 @@ zero in `components/dashboard/`.
 - `components/dashboard/RefinementFlow.tsx` — `onCancel` → `onReset`, Reset
   control with inline confirm, `ChevronLeft` → `RotateCcw`
 - `components/dashboard/DashboardPanel.tsx` — `handleResetRefinement`
+
+---
+
+## 2026-09-09 — What Hugh Learn is for, decided at the gate
+
+### Where this started
+
+A wishlist note: the topic gate's three angle chips read as a closed set, and a
+learner should be able to phrase their own. That is what got built first. The
+session then found something worse behind it, and finished somewhere else
+entirely — with a clearer statement of what Hugh Learn actually teaches than the
+gate has ever had.
+
+### The bug that made the gate feel rigid
+
+The chips for "Generative AI" were not being generated. They were being copied
+out of the prompt's own worked example, which named those exact three
+suggestions. Every learner typing that topic got identical chips, and no
+instruction about varying them could have changed it while the example sat
+there. Found by comparing a screenshot against the prompt text, not by testing.
+
+Fixed by changing the example's topic. This is the second time in this codebase
+an example in a prompt was mistaken by the model for the answer, and the prompt
+now says in both places that an example shows the SHAPE and is never a list to
+reuse.
+
+### The path not taken, recorded because it was nearly shipped
+
+Between those two ends the gate briefly grew a fourth verdict, `reframe`:
+accept every topic, and answer an off-domain one by offering data angles on it
+("learn Spanish" → "measuring vocabulary retention with spaced-repetition
+data"). It was built, probed live, and removed the same afternoon.
+
+Two findings survive it and are worth keeping:
+
+- **A live probe is the only thing that tests a prompt.** The reframe work
+  passed tsc, lint and the whole suite while containing a defect that made it
+  worse than what it replaced: every reframed angle, handed back to the gate,
+  was reframed AGAIN. A learner who picked one would have looped forever. No
+  unit test could have caught it, and none did.
+- **It read as a sales pitch.** Travis's call, and correct: someone who asked to
+  learn Spanish did not ask for a track on measuring their Spanish retention.
+  The judge kept doing it in prose even after the suggestion chips were removed
+  — "…but if you're interested in analysing healthcare data, those are
+  definitely in scope" — so the prompt now forbids naming any alternative topic
+  in a decline at all, in those words.
+
+### What the gate decides now
+
+| Verdict | For | Behaviour |
+|---|---|---|
+| `in` | Named a data field, however broad, or any data ACTIVITY on any subject | Builds |
+| `needs_angle` | Named no field at all — "AI", "automation", "the cloud", "Excel" | Asks, with chips + "describe it myself" |
+| `out` | A different subject | Warm heads-up, and nothing else |
+
+`needs_angle` narrowed sharply. "Generative AI", "machine learning", "big data"
+and "data science" now go straight in, because **the five refinement questions
+already narrow the topic**, twice — `refineTopicPrompt` rewrites it from the
+answers and milestone generation reads them. An angle chip was a third
+narrowing step, asked earliest and with the least context. It was built as an
+improvement on *rejection* (PR #7, yesterday) and never weighed against simply
+letting the topic through.
+
+Also new: `in` may now carry a note, and the fail-open path deliberately cannot
+— a verdict Hugh never really made must not put words in Hugh's mouth.
+
+### What Hugh Learn teaches
+
+The session's real conclusion, and a constraint the product did not have
+written down anywhere: **Hugh Learn teaches concepts, not product surface.** It
+builds understanding through conversation, so it cannot give hands-on practice,
+and a learner who types "Apache Airflow" wanting to *use* Airflow would have
+been disappointed by anything it built.
+
+Tools are still accepted — they are data topics, and declining them would turn
+away the right learner for the wrong reason. What changed is that Hugh says
+what it will do, before the refinement questions rather than after a track
+exists:
+
+> I'll teach you the orchestration thinking behind Airflow — scheduling,
+> idempotency, backfills, and DAG design — rather than the UI itself, so run it
+> alongside as we go.
+
+Three places had been promising the opposite, and all three moved together:
+
+1. The topic input suggested "e.g. Apache Airflow, dbt, …". Now concept-led.
+2. The gate prompt listed tools as in-domain examples.
+3. **Milestone generation was steering at the tutorial.** Its own title
+   examples were "Writing Your First DAG" and "Task Dependencies & XComs" —
+   precisely the track Hugh cannot deliver in a conversation. Replaced, and the
+   prompt now says to build around the durable ideas a tool embodies and use
+   the tool as the running example.
+
+That last edit changed two fingerprints, so `milestones.qa` and
+`milestones.qa.context` are registered as `@2`. Tracks built before today stay
+labelled `@1` and the two eras remain comparable.
+
+### Deliberately not done
+
+- **The document-upload path is unchanged.** Its contract is "teach what this
+  document contains". Someone who uploads an Airflow manual wants that manual,
+  which is a different promise from someone typing "Airflow", and folding one
+  into the other should be its own decision.
+- **`marketing` asks for an angle while `general project management` is
+  declined.** The same band of topic, judged two ways. Left as the model calls
+  it; the line for professional fields with real data work in them has not been
+  drawn.
+- **No test covers the reset confirm or the notice components.** There is no
+  jsdom/RTL setup and the branching is one boolean; the pure modules underneath
+  are tested instead.
+
+### Verification
+
+`tsc --noEmit` clean, eslint clean, 68 files / 1,430 tests green, production
+build clean. Probed live against Haiku across 21 topics in four rounds — the
+first two rounds each found a blocking defect that the test suite did not.
+Walked in the running app by Travis: tools, declines, straight-through and
+angle-asking all confirmed.
+
+### Files
+
+- `lib/learn/gateHistory.ts` + test — new; prior attempts carried to the judge
+- `lib/learn/topic-domain.ts` + test — `awaitsChoice`, notes on `in`, `reframe`
+  mapped to a decline rather than left as a hole
+- `lib/claude/prompts.ts` — judge rewritten, `previousAttemptsBlock` added,
+  generation taught concepts over surface, two copied examples fixed
+- `lib/claude/promptIdentity.ts` + test — `@2` for both generation arms; the
+  version assertion no longer pins a number it must be edited for
+- `lib/learn/topic-domain-server.ts` — history threaded, headroom raised
+- `app/api/dashboard/classify-topic/route.ts` — history bounded at the boundary
+- `app/api/dashboard/goals/document/extract/route.ts` — `awaitsChoice`, so an
+  unknown verdict cannot fall through as approval
+- `components/dashboard/TopicGateNotice.tsx` — "describe it myself"; a decline
+  can no longer render chips
+- `components/dashboard/DashboardPanel.tsx`, `RefinementFlow.tsx` — the note,
+  the held-open question, the concept-led placeholder
+- `CLAUDE.md` — what Learn teaches, as a design decision
+
+---
+
+## 2026-09-09 — The learning map: a brain that lights up
+
+### What this is
+
+`/home/learn` had a wide empty right-hand side — not a rail, just the panel's
+unused width. It now carries two things that swap as the learner commits:
+
+**Idle:** a sphere of 760 concept nodes with **Data** at the core, clustered
+into six learning regions. Concepts surface a few at a time and fade, rather
+than sitting there as captions. Each region starts at half brightness and
+brightens as its milestones are mastered, so the picture doubles as a record of
+what the learner has actually built. Goals in flight orbit the core on great
+circles whose planes pass through their own cluster.
+
+**Working:** a network diagram, one hidden layer per refinement question,
+lighting a layer at a time as answers land, with the output glowing while the
+track builds.
+
+It is SVG and arithmetic throughout. No three.js, no model file, nothing added
+to the bundle.
+
+### Decisions that took more than one attempt, recorded so they are not redone
+
+**The orbits are shells around the core, not rings around a cluster.** Twice
+built as a small circle beside its cluster, and twice it read as a stray point
+in the field: nothing about a small circle says *this is going round something*.
+A great circle sweeping the whole sphere is the shape everyone already reads as
+an electron round a nucleus. The region association survives because each
+orbit's plane is chosen to CONTAIN its cluster's direction, so the mote passes
+over its own cluster once a lap.
+
+**An unlit layer must stay within reach of a lit one.** The band between the
+last answered layer and the next read as a hole through three attempts. Grey at
+10% disappeared. Slate at 40% appeared, but as a different *material* — a white
+bar cutting the network in half, worse than the gap. What settled it was
+measuring: there are 118 edges across that boundary, so nothing was missing.
+0.16 sitting beside neighbours at 0.4 and 0.5 is what the eye reads as nothing.
+One hue, brightness alone carrying state, and the unlit band close enough to its
+neighbours to read as dimmer rather than absent.
+
+**The ideas hold until the learner commits.** They were fading on the first
+keystroke, on the reasoning that typing meant browsing was over. In use that
+pulls half the page away mid-thought — someone may still be reading the sphere
+for what to write. They now go when "Let's Discuss" is pressed, and come back if
+the gate declines.
+
+**A minimum height is not a height.** The aside was `min-h`, so it stretched to
+whatever the column beside it happened to be, and paging the library visibly
+resized the constellation. The library should not be able to change the size of
+the sphere.
+
+### Filing, and what it cost
+
+A goal is filed into one of six regions by the topic gate, which already runs
+server-side on every goal and already has the topic in front of it — no extra
+model call, and nothing asked of the learner. The region comes from the
+**server's own verdict**, never the request body.
+
+Probed live: SQL window functions and dimensional modelling to `engineering`,
+statistics and A/B testing to `stats`, Airflow to `automation`, RAG pipelines
+and Generative AI to `ml`, Snowflake cost to `cloud`, executive dashboards to
+`analytics`. Declined and ambiguous topics carry none.
+
+Migration 051 is nullable with no CHECK constraint and no backfill, each
+deliberate and argued in the file: NULL is a real state, the region list changes
+more often than a schema should, and filing old goals honestly would mean
+re-running the judge over every one.
+
+### Two rule-5 defects found while wiring it
+
+Neither was the feature being built, which is how they had survived:
+
+1. **A failed read claimed the learner had nothing in flight.** If the tracks or
+   milestones query dropped, the sphere showed no orbits — indistinguishable
+   from having no work. Unknown mastery now means "nothing is *known* to be
+   finished", so goals stay in flight.
+2. **A goal whose track was still building never orbited.** No `tracks` row
+   exists yet at that point and the code bailed out, so the moment a goal is
+   most in flight was the moment it was invisible.
+
+A third, in the same family: a goal created in the session did not appear on the
+sphere at all, because `inFlight` was computed on the server at page load. The
+learner finished the questions, watched the track build, and the picture carried
+on showing the work they had before.
+
+### The document path is locked
+
+Course-from-document is switched OFF by product decision, pending an answer to
+what happens when a learner uploads material they did not mean to send. The
+five-layer injection defence is untouched and still in the code; nothing was
+deleted, and re-opening it is one environment variable.
+
+Enforced on the SERVER — both document routes refuse — not by hiding a button,
+because those endpoints are reachable directly. `DOCUMENT_UPLOAD_ENABLED`
+defaults to off on purpose: a flag that defaults to on turns itself on wherever
+nobody configured it.
+
+### Also
+
+- **The library pages rather than grows** — four at a time behind `‹ ›`, with a
+  crossfade. Rule 4: a teaching surface loses padding or gains pagination before
+  it gains a scrollbar, and expanding would have kept the height growing.
+- **The refinement diagram takes a phase, not an answer count.** Refinement does
+  not always run to five questions — Hugh can stop early, and Skip ends it
+  anywhere — so an output lit only on a full set left those learners watching a
+  dead diagram while their track was genuinely being built.
+- **Saving a goal can fail, and now says so.** A 422 (the server re-gating the
+  refined topic) is told apart from a breakage, and the failure carries a Try
+  again instead of a question card that will never fill in.
+
+### Verification
+
+`tsc --noEmit` clean, eslint clean, 71 files / 1,503 tests, production build
+clean. Six new pure modules with tests: constellation geometry and lighting,
+regions, progress and in-flight selection, network layout and layer state.
+Probed live against Haiku for region filing. Every visual walked in the running
+app by Travis.
+
+### Open
+
+- **One goal save failed and was never explained.** No log was captured. The
+  handling is fixed; the fault is unknown. Recorded in `WISHLIST.md`.
+- **Two goals from August have no region** and stay dark. Filing them means
+  re-running the judge over history.
