@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getAuthenticatedUserId } from "@/lib/supabase/auth-helper";
+import { documentUploadEnabled, DOCUMENT_UPLOAD_LOCKED_MESSAGE } from "@/lib/learn/documentPath";
 import { createClient } from "@/lib/supabase/server";
 import { enforceUsageGate, logUsage } from "@/lib/usage";
 import {
@@ -59,6 +60,13 @@ function extractCandidateTopic(documentText: string) {
 }
 
 export async function POST(request: NextRequest) {
+  // The document path is locked (see lib/learn/documentPath.ts). Refused here
+  // rather than only hidden in the UI: this endpoint is reachable directly, and
+  // a check that only runs in the browser is not a check.
+  if (!documentUploadEnabled()) {
+    return NextResponse.json({ error: DOCUMENT_UPLOAD_LOCKED_MESSAGE }, { status: 403 });
+  }
+
   const userId = await getAuthenticatedUserId(request);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
