@@ -32,12 +32,19 @@ const MODEL = "claude-haiku-4-5";
  *
  * `userId` is required, not optional: this call spends tokens at every call
  * site, and an optional parameter is how a future caller forgets to bill them.
+ *
+ * `previousAttempts` are earlier phrasings this learner has already been asked
+ * to narrow, so the judge can stop re-offering suggestions they have turned
+ * down. Context for the reply only — the prompt states plainly that they carry
+ * no weight in the verdict. Callers must pass topics that have been through
+ * `checkTopic`, exactly as with `topic`.
  */
 export async function judgeTopicDomain(
-  topic:  string,
-  userId: string,
+  topic:            string,
+  userId:           string,
+  previousAttempts: readonly string[] = [],
 ): Promise<TopicDomainVerdict> {
-  const prompt = topicDomainJudgePrompt(topic);
+  const prompt = topicDomainJudgePrompt(topic, previousAttempts);
 
   const startedAt = Date.now();
 
@@ -55,11 +62,13 @@ export async function judgeTopicDomain(
     try {
       const msg = await anthropic.messages.create({
         model:      MODEL,
-        // Headroom for the widest response: a 'needs_angle' verdict carries a
-        // message AND three suggestions. A truncated body fails JSON.parse,
-        // which fails OPEN — so under-budgeting here would quietly stop the
-        // gate from gating.
-        max_tokens: 400,
+        // Headroom for the widest response, which is now a 'reframe': a
+        // first-person message plus up to three reframed topics, each a full
+        // phrase rather than a two-word label. A truncated body fails
+        // JSON.parse, which fails OPEN — and failing open on a reframe is
+        // worse than it ever was on a needs_angle, because the topic is known
+        // to be off-domain and the app would build a track for it anyway.
+        max_tokens: 600,
         messages:   [{ role: "user", content: prompt }],
       });
       tokensIn  += msg.usage.input_tokens;
@@ -84,7 +93,14 @@ export async function judgeTopicDomain(
         operation:  "topic.gate",
         outcome:    mayProceed(verdict) ? "ok" : "refused",
         durationMs: Date.now() - startedAt,
-        detail:     { attempts: attempt + 1, verdict: verdict.verdict },
+        detail:     {
+          attempts:  attempt + 1,
+          verdict:   verdict.verdict,
+          // Distinct from `attempts` above, which counts model retries. This
+          // is how many earlier phrasings the learner had already been asked
+          // to narrow — the number that says whether the gate is looping.
+          priorTries: previousAttempts.length,
+        },
       });
       return verdict;
     } catch (err) {
