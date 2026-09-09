@@ -156,7 +156,7 @@ export const FEATURES: readonly FeatureDefinition[] = [
       "track.summary", "topic.gate", "answers.forget",
     ],
     spendsTokens: true,
-    tests: 13,
+    tests: 14,
   },
   {
     id:    "ask",
@@ -179,7 +179,7 @@ export const FEATURES: readonly FeatureDefinition[] = [
     activityFeatures: ["ask"],
     operations: ["ask.chat", "ask.summarize", "ask.verify", "ask.coverage"],
     spendsTokens: true,
-    tests: 11,
+    tests: 12,
   },
   {
     id:    "review",

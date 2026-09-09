@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { BookMarked, Sparkles, Loader2, Upload, FileText, ArrowRight } from "lucide-react";
 import { type LearningGoal } from "@/types";
 import { classifyTopic, mayProceed, type TopicDomainVerdict } from "@/lib/learn/topic-domain";
 import TopicGateNotice from "./TopicGateNotice";
 import { MAX_TOPIC_CHARS } from "@/lib/learn/topicInput";
+import { recordAttempt } from "@/lib/learn/gateHistory";
 import GoalCard from "./GoalCard";
 import RefinementFlow from "./RefinementFlow";
 import DocumentUploadFlow, { ACCEPT as DOCUMENT_ACCEPT } from "./DocumentUploadFlow";
@@ -64,6 +65,25 @@ export default function DashboardPanel({ initialGoals }: Props) {
   const [checking, setChecking] = useState(false);
   const [gate, setGate]         = useState<TopicDomainVerdict | null>(null);
 
+  // Phrasings the gate has already asked this learner to narrow. Sent back on
+  // the next call so a second try does not return the same three suggestions
+  // they just turned down — the judge is stateless, and that is what makes a
+  // gate feel like a loop. Never influences the verdict; see the prompt.
+  const [attemptHistory, setAttemptHistory] = useState<string[]>([]);
+
+  // True once the learner has taken up "I'll describe it". Holds the question
+  // on screen while they type it out, which is otherwise dismissed by the first
+  // keystroke.
+  const [writingOwn, setWritingOwn] = useState(false);
+
+  const topicRef = useRef<HTMLInputElement>(null);
+
+  // What Hugh said on the way through. Empty for almost every topic; set when
+  // the learner named a TOOL, where the gate passes them but wants them to know
+  // Hugh teaches the thinking behind it rather than the product itself. Carried
+  // into the refinement flow so it is read before any time is invested.
+  const [lensNote, setLensNote] = useState("");
+
   const today = todayStr();
 
   function resolvedEndDate(): string {
@@ -78,25 +98,54 @@ export default function DashboardPanel({ initialGoals }: Props) {
 
   async function handleFinalize() {
     if (!canSubmit || checking) return;
+    const candidate = topic.trim();
+
     setChecking(true);
     setGate(null);
+    setWritingOwn(false);
 
     // Strict domain gate — block out-of-domain topics before any track is built.
-    const verdict = await classifyTopic(topic.trim());
+    // The history rides along so the judge can answer what they have already
+    // tried; it is context for the reply, not for the verdict.
+    const verdict = await classifyTopic(candidate, attemptHistory);
     setChecking(false);
+
+    // recordAttempt decides what is worth carrying: only a 'needs_angle' is
+    // remembered, so a declined topic never becomes context arguing for the
+    // next one.
+    setAttemptHistory(h => recordAttempt(h, candidate, verdict.verdict));
+
     if (!mayProceed(verdict)) {
       setGate(verdict);
       return;
     }
 
-    setPendingTopic(topic.trim());
+    setLensNote(verdict.message);
+    setPendingTopic(candidate);
     setPendingEndDate(endDate);
     setRefining(true);
   }
 
   function handleTopicChange(value: string) {
     setTopic(value);
-    if (gate) setGate(null); // editing the topic clears the reminder
+    // Editing normally dismisses the question. Not while the learner is writing
+    // their own angle: the question is the thing they are answering, and taking
+    // it off screen at the first keystroke is how you get a blank stare.
+    if (gate && !writingOwn) setGate(null);
+  }
+
+  function handlePickSuggestion(suggestion: string) {
+    setWritingOwn(false);
+    setTopic(suggestion);
+    setGate(null);
+  }
+
+  // "Something else — I'll describe it": hand them the field with the broad
+  // topic selected, so typing replaces it and arrowing away still keeps it.
+  function handleWriteOwn() {
+    setWritingOwn(true);
+    topicRef.current?.focus();
+    topicRef.current?.select();
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -105,6 +154,9 @@ export default function DashboardPanel({ initialGoals }: Props) {
 
   function handleGoalCreated(goal: LearningGoal) {
     setGoals(prev => [goal, ...prev]);
+    setAttemptHistory([]);
+    setWritingOwn(false);
+    setLensNote("");
     setRefining(false);
     setUploadingDoc(false);
     setInputMode("qa");
@@ -125,6 +177,9 @@ export default function DashboardPanel({ initialGoals }: Props) {
   // verdict, both cleared.
   function handleResetRefinement() {
     setRefining(false);
+    setAttemptHistory([]);
+    setWritingOwn(false);
+    setLensNote("");
     setInputMode("qa");
     setTopic("");
     setChip(null);
@@ -172,6 +227,7 @@ export default function DashboardPanel({ initialGoals }: Props) {
             <RefinementFlow
               topic={pendingTopic}
               endDate={pendingEndDate}
+              lensNote={lensNote}
               onGoalCreated={handleGoalCreated}
               onReset={handleResetRefinement}
             />
@@ -214,17 +270,24 @@ export default function DashboardPanel({ initialGoals }: Props) {
                 <>
                   {/* Topic input */}
                   <input
+                    ref={topicRef}
                     type="text"
                     value={topic}
                     onChange={e => handleTopicChange(e.target.value)}
                     onKeyDown={handleKeyDown}
                     maxLength={MAX_TOPIC_CHARS}
-                    placeholder="e.g. Apache Airflow, dbt, SQL window functions, ML pipelines…"
+                    placeholder="e.g. Statistics for data science, experiment design, dimensional modelling…"
                     className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500 transition-colors"
                   />
 
                   {/* Topic gate: asks for an angle, or kindly declines. */}
-                  {gate && <TopicGateNotice verdict={gate} onPickSuggestion={handleTopicChange} />}
+                  {gate && (
+                    <TopicGateNotice
+                      verdict={gate}
+                      onPickSuggestion={handlePickSuggestion}
+                      onWriteOwn={handleWriteOwn}
+                    />
+                  )}
                 </>
               ) : (
                 <label

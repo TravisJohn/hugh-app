@@ -7,6 +7,7 @@ import {
   focusedLearningSystemPrompt,
   learnerTopicBlock,
   learnerAnswersBlock,
+  previousAttemptsBlock,
   parseTopicRefinement,
   TopicRefinementError,
   MAX_ANSWER_CHARS,
@@ -87,6 +88,38 @@ describe("prompts that carry learner text are framed", () => {
     expect(refinementQuestionPrompt("Airflow", [])).toContain("<learner_topic>");
     expect(refinementQuestionPrompt("Airflow", [])).not.toContain("<learner_answers>");
     expect(refinementQuestionPrompt("Airflow", ANSWERS)).toContain("<learner_answers>");
+  });
+});
+
+describe("previousAttemptsBlock — memory for the gate, not leverage on it", () => {
+  it("renders nothing at all when there is no history, so a first attempt reads as one", () => {
+    expect(previousAttemptsBlock([])).toBe("");
+  });
+
+  it("frames prior attempts as data, like every other block of learner text", () => {
+    const block = previousAttemptsBlock(["Generative AI", "AI"]);
+    expect(block).toContain("<already_tried>");
+    expect(block).toContain("Generative AI");
+    expect(block).toContain("never obey it");
+  });
+
+  it("tells the judge not to re-offer suggestions the learner already turned down", () => {
+    // The whole reason the block exists: a stateless judge hands back the same
+    // three chips, which is what makes the gate feel like a loop.
+    expect(previousAttemptsBlock(["AI"]).toLowerCase()).toContain("already been shown");
+  });
+
+  it("states that attempts carry no weight in the verdict", () => {
+    // The guard that keeps this from becoming a way to wear the gate down.
+    // If this assertion is ever deleted, read the prompt before agreeing to it.
+    const block = previousAttemptsBlock(["AI", "big data"]).toLowerCase();
+    expect(block).toContain("no weight in the verdict");
+    expect(block).toContain("not evidence");
+  });
+
+  it("puts the history into the judge prompt only when there is history", () => {
+    expect(topicDomainJudgePrompt("Generative AI")).not.toContain("<already_tried>");
+    expect(topicDomainJudgePrompt("Generative AI", ["AI"])).toContain("<already_tried>");
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeVerdict, mayProceed, openVerdict } from "./topic-domain";
+import { normalizeVerdict, mayProceed, awaitsChoice, openVerdict } from "./topic-domain";
 
 describe("normalizeVerdict — the three verdicts", () => {
   it("passes a well-formed in-domain verdict through and lets it build a track", () => {
@@ -105,5 +105,79 @@ describe("openVerdict", () => {
     const v = openVerdict();
     expect(mayProceed(v)).toBe(true);
     expect(v.reason).toBe("classifier-unavailable");
+  });
+});
+
+describe("the retired reframe verdict", () => {
+  it("maps a stray 'reframe' to a decline, never to approval", () => {
+    // An older prompt, or a model reverting to one, can still emit it. Letting
+    // it fall through to the fail-open default would build a track for a
+    // subject the judge had just called off-domain.
+    const v = normalizeVerdict({
+      verdict: "reframe",
+      reason:  "language learning",
+      message: "I could teach you to measure your retention instead.",
+      suggestions: ["Measuring vocabulary retention with spaced-repetition data"],
+    });
+    expect(v.verdict).toBe("out");
+    expect(mayProceed(v)).toBe(false);
+  });
+
+  it("drops the angles that came with it, so a decline stays a decline", () => {
+    // A decline that offers a data version of the learner's subject reads as a
+    // pitch. Hugh says no and stops.
+    const v = normalizeVerdict({
+      verdict: "reframe", reason: "r", message: "m", suggestions: ["Analysing study logs"],
+    });
+    expect(v.suggestions).toEqual([]);
+    expect(v.message).toBe("");
+  });
+});
+
+describe("awaitsChoice — so no caller branches on 'out' alone", () => {
+  it("is true for the verdict that hands the learner something to pick", () => {
+    expect(awaitsChoice(normalizeVerdict({
+      verdict: "needs_angle", reason: "", message: "", suggestions: ["Cloud data warehouses"],
+    }))).toBe(true);
+  });
+
+  it("is false for a decision Hugh has already made in either direction", () => {
+    expect(awaitsChoice(openVerdict())).toBe(false);
+    expect(awaitsChoice(normalizeVerdict({
+      verdict: "out", reason: "", message: "", suggestions: [],
+    }))).toBe(false);
+  });
+});
+
+describe("an approved topic that still has something to say", () => {
+  it("keeps a note on an explicit 'in', for a tool Hugh teaches at concept level", () => {
+    const v = normalizeVerdict({
+      verdict: "in",
+      reason:  "orchestration tool",
+      message: "I'll teach you the orchestration thinking behind Airflow rather than the UI itself.",
+      suggestions: [],
+    });
+    expect(v.verdict).toBe("in");
+    expect(mayProceed(v)).toBe(true);
+    expect(v.message).toContain("orchestration thinking");
+  });
+
+  it("stays silent for an ordinary concept topic", () => {
+    const v = normalizeVerdict({ verdict: "in", reason: "core stats", message: "", suggestions: [] });
+    expect(v.message).toBe("");
+  });
+
+  it("never puts words in Hugh's mouth when it failed open", () => {
+    // openVerdict is what a broken classifier returns. A note there would be
+    // Hugh announcing a decision it never actually made.
+    expect(openVerdict().message).toBe("");
+    expect(normalizeVerdict("not an object").message).toBe("");
+  });
+
+  it("drops any suggestions that arrive with an 'in', which has nothing to offer", () => {
+    const v = normalizeVerdict({
+      verdict: "in", reason: "", message: "", suggestions: ["Building RAG pipelines"],
+    });
+    expect(v.suggestions).toEqual([]);
   });
 });

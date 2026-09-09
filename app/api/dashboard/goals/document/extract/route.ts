@@ -9,6 +9,7 @@ import {
   type DocumentTopicExtraction,
 } from "@/lib/claude/prompts";
 import { judgeTopicDomain } from "@/lib/learn/topic-domain-server";
+import { awaitsChoice } from "@/lib/learn/topic-domain";
 import { logSafeError } from "@/lib/observability/log";
 import { recordOperation } from "@/lib/observability/record";
 import { writeOutcome } from "@/lib/supabase/writeResult";
@@ -151,14 +152,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(verdict);
   }
 
-  // A 'needs_angle' verdict deliberately does NOT stop here. Stopping would
-  // ask the learner which angle they meant on a screen whose only input is a
-  // file picker — a question with no answer box (CLAUDE.md rule 5). It carries
-  // into the review step instead, which already has an editable topic field,
-  // and `approve` re-gates before a single milestone is generated. The goal
-  // sits at 'awaiting_approval' until then, so nothing is built from an
-  // unresolved topic.
-  const gate = verdict.verdict === "needs_angle" ? verdict : null;
+  // A verdict that holds a choice out to the learner — 'needs_angle' or
+  // 'reframe' — deliberately does NOT stop here. Stopping would ask the
+  // learner which angle they meant on a screen whose only input is a file
+  // picker: a question with no answer box (CLAUDE.md rule 5). It carries into
+  // the review step instead, which already has an editable topic field, and
+  // `approve` re-gates before a single milestone is generated. The goal sits
+  // at 'awaiting_approval' until then, so nothing is built from an unresolved
+  // topic.
+  //
+  // Asked via `awaitsChoice` rather than by naming the verdicts here, so a
+  // fifth verdict added later cannot silently fall through this line as
+  // though it were approval.
+  const gate = awaitsChoice(verdict) ? verdict : null;
 
   const supabase = await createClient();
 

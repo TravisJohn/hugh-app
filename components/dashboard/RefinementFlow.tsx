@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, SkipForward, ArrowRight, Brain, RotateCcw, AlertTriangle } from "lucide-react";
+import { Loader2, SkipForward, ArrowRight, Brain, Compass, RotateCcw, AlertTriangle } from "lucide-react";
 import { useTrackStatusWatch } from "@/hooks/useTrackStatusWatch";
 import { type LearningGoal } from "@/types";
 
@@ -13,6 +13,14 @@ interface QA {
 interface Props {
   topic:         string;
   endDate:       string;
+  /**
+   * What the gate said on the way through — set only when the learner named a
+   * tool, to say Hugh teaches the thinking behind it rather than the product.
+   * Shown here rather than after the track is built: someone who wanted
+   * hands-on practice should learn that in the first ten seconds, not the
+   * first ten minutes. Empty for almost every topic.
+   */
+  lensNote?:     string;
   onGoalCreated: (goal: LearningGoal) => void;
   /** Abandon refinement and return the learner to an empty topic form. */
   onReset:       () => void;
@@ -28,7 +36,7 @@ const MAX_QUESTIONS = 5;
 
 type Phase = "asking" | "waiting" | "failed";
 
-export default function RefinementFlow({ topic, endDate, onGoalCreated, onReset }: Props) {
+export default function RefinementFlow({ topic, endDate, lensNote, onGoalCreated, onReset }: Props) {
   const [question, setQuestion]     = useState<string | null>(null);
   const [answers, setAnswers]       = useState<QA[]>([]);
   const [draft, setDraft]           = useState("");
@@ -310,6 +318,13 @@ export default function RefinementFlow({ topic, endDate, onGoalCreated, onReset 
             <SkipForward size={12} />
             Skip
           </button>
+        </div>
+      )}
+
+      {lensNote && (
+        <div className="flex items-start gap-2 rounded-xl border border-slate-700/60 bg-slate-800/30 px-3.5 py-2.5">
+          <Compass size={13} className="mt-0.5 shrink-0 text-slate-500" />
+          <p className="text-xs leading-relaxed text-slate-400">{lensNote}</p>
         </div>
       )}
 

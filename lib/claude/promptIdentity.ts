@@ -168,6 +168,15 @@ const FINGERPRINTS: Record<PromptId, string> = {
 export const KNOWN_PROMPT_VERSIONS: Record<string, string> = {
   "3309ed3a3d9d3926": "milestones.qa@1",
   "8d9d9467486640fc": "milestones.qa.context@1",
+  // @2 (both arms): Hugh Learn teaches concepts, not product surface. The
+  // prompt now says so — where a topic names a tool, build the track around
+  // the durable ideas it embodies and use the tool as the running example —
+  // and the title examples no longer demonstrate the opposite ("Writing Your
+  // First DAG", "Task Dependencies & XComs" were steering generation straight
+  // at the tutorial Hugh cannot deliver in conversation). Tracks built under
+  // @1 stay labelled @1, so the two eras remain comparable and separate.
+  "5585a8333151b685": "milestones.qa@2",
+  "80d7c255e1643511": "milestones.qa.context@2",
   // @1 framed the topic as a bare interpolation on this branch alone, while
   // every sibling used learnerTopicBlock. @2 closed that gap. Rows written
   // under @1 keep pointing here, so the two eras stay comparable and separate.
