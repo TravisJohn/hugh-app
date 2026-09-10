@@ -480,6 +480,7 @@ export const INFRA_LIB_DIRS: readonly string[] = [
   "supabase",      // database clients
   "auth",          // session and admin gating
   "claude",        // prompts and parsers
+  "llm",           // provider seam - every route that spends tokens calls through it
   "errors",        // error shapes
   "observability", // the outcomes store (the console is a feature; the store is not)
   "pomodoro",      // focus timer, shared by Ask Hugh, Notes and the code drills

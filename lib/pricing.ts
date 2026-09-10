@@ -10,6 +10,8 @@
  * Pure and dependency-free so it can be unit-tested without Supabase.
  */
 
+import { LOCAL_MODEL_PREFIX } from "@/lib/llm/registry";
+
 /** USD per 1,000,000 tokens. */
 export interface ModelRate {
   input:  number;
@@ -51,11 +53,35 @@ export const FALLBACK_MODEL = "claude-sonnet-4-6";
 /** ElevenLabs, USD per character (~Creator plan). */
 export const COST_PER_TTS_CHAR = 0.30 / 1_000;
 
+/**
+ * Locally-served models cost nothing per token.
+ *
+ * Hugh prefixes them `ollama/` (see `lib/llm/registry.ts`), which is the only
+ * thing distinguishing them here — no hosted vendor's model id begins that way,
+ * so the prefix cannot collide with something that does bill.
+ *
+ * Zero is the honest figure for what this file measures, which is money owed to
+ * a provider. It is NOT a claim that local inference is free in every sense:
+ * it consumes electricity, a GPU, and wall-clock time that a hosted call does
+ * not. Those are real costs and they simply are not token costs, so recording
+ * them as spend would misstate the bill in the opposite direction.
+ *
+ * This is a deliberate exception to the fallback rule below, and it is safe for
+ * the same reason the rule exists: the fallback protects against UNKNOWN spend,
+ * and a local call is not unknown — it is known to be unbilled.
+ */
+const LOCAL_RATE: ModelRate = { input: 0, output: 0 };
+
+function isLocallyServed(model: string | null | undefined): boolean {
+  return Boolean(model && model.startsWith(LOCAL_MODEL_PREFIX) && model.length > LOCAL_MODEL_PREFIX.length);
+}
+
 export function isKnownModel(model: string | null | undefined): boolean {
-  return Boolean(model && model in MODEL_RATES);
+  return isLocallyServed(model) || Boolean(model && model in MODEL_RATES);
 }
 
 export function rateFor(model: string | null | undefined): ModelRate {
+  if (isLocallyServed(model)) return LOCAL_RATE;
   if (model && model in MODEL_RATES) return MODEL_RATES[model];
   return MODEL_RATES[FALLBACK_MODEL];
 }
