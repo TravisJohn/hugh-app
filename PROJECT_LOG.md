@@ -8064,3 +8064,130 @@ decision — shared project with additive-only migrations, versus a separate
 Supabase project for the variant — is due the moment migration `052` is
 proposed, and not before. Nothing may be applied to the shared database on
 behalf of `hugh-v1` until it is made.
+
+
+## 2026-09-10 — One seam for every model call
+
+Hugh made 22 model calls across 19 files, each one constructing its own client
+and restating the same request by hand. Nothing was wrong with any of them
+individually; together they meant that trying a different provider was a
+nineteen-file edit nobody would undertake casually, which is the same as not
+being able to try one at all.
+
+This is the seam that makes it a one-string change. It is deliberately the
+small version: `lib/llm/` exists and is fully tested, and **no route has been
+switched to use it yet**. Nothing a learner touches changed today.
+
+### Why the surface turned out to be tiny
+
+Before designing anything, every call site was read. All 22 pass exactly four
+things: `model`, `max_tokens`, `messages`, and — at four sites — `system`.
+Nothing in the codebase uses temperature, top_p, stop sequences, streaming,
+tool definitions or structured-output schemas. Two sites deviate at all:
+`learn/chat` adds `cache_control`, and Notes Coach passes image blocks.
+
+So `LlmRequest` is those four fields and nothing more. A neutral interface that
+mirrored one vendor's full API would just be that vendor's SDK wearing a
+different name, and would drag every other provider into emulating parameters
+Hugh never sends.
+
+### The model id names the provider, and an unknown id throws
+
+CLAUDE.md requires a route to name its model once so the API call and the usage
+log cannot drift. A route naming both a model and a provider would reintroduce
+that hazard with two strings instead of one — so the provider is a pure function
+of the model id.
+
+Unknown ids throw rather than falling back. `lib/pricing.ts` answers an unknown
+model by over-charging, which is safe because the worst case is a pessimistic
+number. Routing has no equivalent safe default: a guess sends a learner's prompt
+to the wrong company. That is loud on the first call by design.
+
+Local models are the exception, and they carry an explicit `ollama/` prefix.
+Ollama has thousands of tags that change constantly, so enumerating them would
+put a code edit in front of every experiment — friction on exactly the activity
+this module exists to enable. No hosted vendor's model id begins with
+`ollama/`, so the prefix cannot collide with something that does bill, and an
+unprefixed id can never be silently routed to localhost.
+
+### Two tables and a guard, not one merged table
+
+The plan had been to add a `provider` field to `MODEL_RATES`. That was dropped
+after looking at the cost: `ModelRate` is asserted with `toEqual` in the
+existing pricing tests, so widening it churns a settled, pure, well-tested
+module for no behavioural gain. The registry stays separate and a test asserts
+the one-way rule that matters — every model the registry is willing to CALL has
+a rate in pricing. The failure it prevents is invisible at runtime: an unpriced
+model still works, still spends money, and reports a fabricated cost.
+
+### Local models are priced at zero, and that is a real exception
+
+`rateFor` returns zero for an `ollama/` model instead of the most-expensive
+fallback. This is a deliberate exception to the unknown-model rule, and it is
+safe for the same reason the rule exists: the fallback protects against UNKNOWN
+spend, and a local call is not unknown, it is known to be unbilled.
+
+Zero is honest about what `lib/pricing.ts` measures, which is money owed to a
+provider. It is not a claim that local inference is free in every sense — it
+consumes electricity, a GPU and wall-clock time. Those are real costs that are
+simply not token costs.
+
+### `complete.ts` must never import `server-only`
+
+It was written with `server-only` and then corrected. `generateMilestones.ts`
+already documents why: `server-only` throws the moment a plain Node process
+touches it, so a `tsx` script could not import the file at all — and offline
+tooling has to run the SAME code a learner's request runs. A probe carrying its
+own copy of the routing and token mapping would drift into measuring the copy
+rather than the product, invisibly, because both halves would keep passing their
+own tests.
+
+Nothing is given up that matters: no secret is read in `complete.ts`. Keys are
+read lazily inside each adapter's client factory, and usage logging and error
+scrubbing stay at the call sites where they already live.
+
+### A dropped cache hint is reported, never swallowed
+
+`learn/chat` is the bulk of Hugh's Claude spend precisely because of its 1h
+cache breakpoint. A wrapper that silently dropped that hint when pointed
+elsewhere would turn a large cost regression into something discovered from a
+bill. So `LlmResponse.cacheApplied` reports whether caching ACTUALLY happened,
+measured from the returned token counts rather than copied from the request —
+Anthropic skips the cache below a model's minimum prefix, so a flag set from
+intent would claim a saving that never occurred. Architecture rule 5, applied
+to money.
+
+### How to actually try a provider
+
+`npm run llm:probe -- --model ollama/llama3.2:3b --prompt "..."` sends one
+prompt through the real entry point and reports reply, tokens, cost, latency,
+output tokens/sec, and whether the cache engaged. It writes nothing and touches
+no learner.
+
+`--learn "<topic>"` is the mode that decides anything: it sends the real
+`focusedLearningSystemPrompt` and runs the real `parseChatResponse` over the
+reply. `learn/chat` does not ask for prose — it demands strict JSON with every
+quote and newline escaped, including inside a code field. That contract, not
+teaching quality, is the first hurdle, and a model that fails it cannot serve
+the route however well it explains regression.
+
+### What is not done, deliberately
+
+- **No route is switched.** The seam is unused. That is the whole rollback
+  story: nothing to revert because nothing changed.
+- **No vision.** `LlmMessage.content` is a string, so Notes Coach still calls
+  its SDK directly. Widening the content type across every adapter is worth
+  doing once a second provider is genuinely in play.
+- **Realtime mastery never enters the seam.** It is browser-side WebRTC against
+  a credential the server mints but never uses, it accounts for its own spend,
+  and no other provider offers an equivalent. ElevenLabs TTS is out for the same
+  reason: it returns audio, not tokens.
+- **Hardware sets the ceiling on the local experiment.** The dev machine has a
+  4GB Quadro P2000, which fits a 3B model comfortably and spills a 7-8B one onto
+  a mobile Xeon. "Most capable local model" is not available here, and the probe
+  prints output tokens/sec so that shows up as a number rather than an
+  impression.
+
+Full gate green locally: lint, typecheck, cloud content check, 1547 tests across
+75 files, production build. `lib/llm` registered in `INFRA_LIB_DIRS` — the
+feature-registry guard caught it as unowned, which is what it is for.
