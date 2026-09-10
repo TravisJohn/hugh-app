@@ -18,7 +18,8 @@
     "health": "tsx scripts/health-check.ts",
     "cloud": "tsx scripts/cloud-meta.ts",
     "cloud:check": "tsx scripts/cloud-meta.ts --check",
-    "replay": "tsx scripts/replay-generations.ts"
+    "replay": "tsx scripts/replay-generations.ts",
+    "llm:probe": "tsx scripts/llm-probe.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
