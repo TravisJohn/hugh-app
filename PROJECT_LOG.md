@@ -8014,3 +8014,53 @@ app by Travis.
   handling is fixed; the fault is unknown. Recorded in `WISHLIST.md`.
 - **Two goals from August have no region** and stay dark. Filing them means
   re-running the judge over history.
+
+## 2026-09-10 — A second Hugh, and a way back ✅
+
+A narrow-market variant of Hugh is being explored. It may not work out, so the
+requirement was stated up front: get back to today's Hugh without destroying the
+variant, and be able to hold both at once rather than choosing between them.
+
+### Two worktrees, not one folder that switches
+
+`D:\WEB PROJECTS\hugh` stays on `main` and does not switch branch. A second
+working copy of the same repository lives at `D:\WEB PROJECTS\hugh-v1` on branch
+`hugh-v1`, created with `git worktree`. Both exist on disk simultaneously; both
+run a dev server; moving between the full Hugh and the variant is changing
+window, not running a git command.
+
+Branch-switching inside one folder would have been cheaper on disk and worse in
+every other way — one version visible at a time, `.next` rebuilt on every
+switch, and uncommitted work in the way of the switch.
+
+Killing the variant is `git worktree remove` plus `git branch -D hugh-v1`, and
+`main` never knew it existed. Keeping it is a merge, or a permanent second
+product.
+
+### The rollback point is a tag, and it does not cover everything
+
+`pre-narrow-market` is an annotated tag on `2744499` — the merge of PR #9,
+verified working. It marks "today's Hugh" independently of what any branch does
+later, which `main` alone would not, since `main` moves.
+
+Tags capture tracked files only. `.env.local`, `.vercel` and the untracked
+`PRD-code-typer.md` are outside it. `.env.local` was copied into the v1 worktree
+by hand, because the app cannot boot without it. `.vercel` deliberately was not:
+the variant folder is unlinked from the production Vercel project, so nothing
+run there can deploy over `hugh-app`.
+
+### The database is the half that git cannot roll back
+
+Migrations here are forward-only with no rollback tooling, applied by hand, and
+both worktrees currently point at one Supabase project. `git switch` rewinds
+code in a second and does nothing to schema. An additive migration applied for
+the variant is survivable — `main` ignores a column it never reads. A migration
+that drops, renames or retypes something `main` uses is permanent damage to the
+working product, and no git operation undoes it.
+
+**Deferred, deliberately.** The variant is not specified enough yet to know
+whether it needs schema at all, and exploring costs nothing until it does. The
+decision — shared project with additive-only migrations, versus a separate
+Supabase project for the variant — is due the moment migration `052` is
+proposed, and not before. Nothing may be applied to the shared database on
+behalf of `hugh-v1` until it is made.
