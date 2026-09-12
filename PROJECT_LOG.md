@@ -8191,3 +8191,60 @@ the route however well it explains regression.
 Full gate green locally: lint, typecheck, cloud content check, 1547 tests across
 75 files, production build. `lib/llm` registered in `INFRA_LIB_DIRS` — the
 feature-registry guard caught it as unowned, which is what it is for.
+
+## 2026-09-12 — Cutting the dangling work back to one stable state
+
+Nothing was built today. This entry records what was removed, why, and how to
+get any of it back.
+
+### The verdict on the provider seam
+
+**Scrapped as a direction.** Multi-provider is a lock-in argument, not a cost
+one, and Hugh does not have a lock-in problem worth 1,412 lines of indirection
+on the path every learner request takes.
+
+Two things killed it in practice rather than in principle:
+
+- **The hardware ceiling.** The dev machine's 4GB Quadro P2000 fits a 3B model
+  and spills anything larger onto a mobile Xeon. "Try the most capable local
+  model" was never available here, so the experiment could only ever have
+  measured a small model badly.
+- **`learn/chat`'s contract.** That route does not ask for prose. It demands
+  strict JSON with every quote and newline escaped, including inside a code
+  field. That contract — not teaching quality — is the first hurdle, and it is
+  the route carrying the bulk of Hugh's Claude spend, so it is also the only
+  route where switching would have paid for itself.
+
+The seam was correct work and is not being deleted because it was wrong. It is
+being deleted because an unused abstraction on a live path is a liability that
+earns nothing until a second provider is genuinely in play. If one ever is,
+the argument above is what has to change first, not the code.
+
+**Recoverable at tag `parked/llm-provider-seam`** (pushed to origin):
+
+    git checkout -b feat/llm-provider-seam parked/llm-provider-seam
+
+Note that it touches three shipped files — `lib/pricing.ts`,
+`lib/registry/features.ts` and `package.json` — so a restore is a merge, not a
+drop-in.
+
+### The narrow-market variant
+
+The `hugh-v1` worktree, its branch and the `pre-narrow-market` tag are removed.
+The branch held zero unique commits — it sat on the same commit as origin/main —
+so no history was lost, only 963 MB of disk and a second ready-to-run copy.
+
+`PRD-accountants.md` was written inside that worktree and would have gone with
+it. It is now committed here, alongside `PRD-code-typer.md`. Both are drafts
+that nothing links to. A PRD you cannot find is a decision you make twice.
+
+### The stable point
+
+`main` is tagged `stable-2026-09-12`. That is the 6 September
+production-ready standing: all six release blockers closed, migrations 031-051
+applied, `/privacy` live. The three open items are unchanged and none of them
+block a deploy — the realtime-mastery logging gap (flag off in Vercel), the
+`goal_answers` retention TTL decision, and dev-only audit findings.
+
+Four merged PR branches were deleted from origin: `feat/learn-teaches-concepts`,
+`fix/learn-failure-paths`, `fix/realtime-usage-logging`, `fix/refinement-reset`.
