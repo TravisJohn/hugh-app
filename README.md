@@ -1,14 +1,23 @@
 # Hugh
 
-Hugh is an AI-powered learning platform: mock interview practice, a
-personal-tutor chat, a spaced-review tracker, and a code-drill pillar, built
-on Next.js 16 (App Router) with Supabase for auth/data and Anthropic,
-OpenAI, and ElevenLabs for the AI/voice features.
+Hugh is an AI-powered learning platform for data and analytics. A learner picks
+a topic, Hugh generates a track of milestone cards, and the learner works
+through them: asking questions, keeping a learning diary, proving mastery out
+loud, drilling code, and working business cases. Built on Next.js 16 (App
+Router) with Supabase for auth/data and Anthropic, OpenAI, and ElevenLabs for
+the AI/voice features.
+
+The mock-interview loop it began as was deleted on 2026-08-24; the learning loop
+is the product.
 
 For product context, architecture rules, folder layout, and the AI model
 selection policy, see [`CLAUDE.md`](./CLAUDE.md) — that file is the source of
 truth for how this codebase is organized and why. `PROJECT_LOG.md` has the
 running history of decisions and milestones.
+
+If you are restoring this project from scratch, or rolling back to the
+known-good state, read [`RESTORE.md`](./RESTORE.md) first — it covers what the
+stable tag does and does not bring back.
 
 ## Prerequisites
 
@@ -73,10 +82,10 @@ npm run test:watch
 npm run health   # verify env vars are set AND that each provider key actually authenticates
 ```
 
-There is no CI workflow configured yet — `lint`, `tsc --noEmit`, `test`,
-`npm audit`, and `build` should all be run (and pass) before merging or
-deploying; see `DEPLOYMENT_READINESS_AUDIT.md`'s "Proposed CI release gate"
-for the exact command set this repo should eventually run on every push.
+CI runs on every push to `main` and on every pull request:
+`.github/workflows/ci.yml` gates on `lint`, `tsc --noEmit`, `test`,
+`npm audit --omit=dev` and `build`, secretless, on Node 20.x. Run the same set
+locally before opening a pull request.
 
 ## Deployment status
 
@@ -84,8 +93,10 @@ for the exact command set this repo should eventually run on every push.
 [`DEPLOYMENT_READINESS_AUDIT.md`](./DEPLOYMENT_READINESS_AUDIT.md) — that
 gates public deployment.** Read it before deploying to production. It
 documents what's already fixed, what's still open, and the recommended
-remediation order. Start with its **"Re-check: 22 August 2026"** section at
-the top — that is the current standing; the sections below it are the
-original 4 August record. The intended host is [Vercel](https://vercel.com); there
+remediation order. Start with its **"Re-check: 6 September 2026"** section — that is the current
+standing, and it reads **ready for production deployment** with all six
+original release blockers closed. The 4 August and 22 August sections above it
+are the original record, left unedited on purpose; where they disagree, the
+newest section wins. The intended host is [Vercel](https://vercel.com); there
 is no `vercel.json` — project settings (env vars, build command) are
 configured directly in the Vercel dashboard.
